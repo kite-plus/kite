@@ -6,6 +6,7 @@ import { PostsPage } from '@/pages/PostsPage'
 import { CategoriesPage } from '@/pages/CategoriesPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { TagsPage } from '@/pages/TagsPage'
+import { CommentsPage } from '@/pages/CommentsPage'
 
 /** TanStack Query 客户端 */
 const queryClient = new QueryClient({
@@ -31,6 +32,7 @@ function App() {
             <Route path="posts" element={<PostsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="tags" element={<TagsPage />} />
+            <Route path="comments" element={<CommentsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>

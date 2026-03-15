@@ -4,6 +4,7 @@ import {
   FileText,
   FolderTree,
   Tag,
+  MessageSquare,
   Settings,
   Wind,
   type LucideIcon,
@@ -26,6 +27,7 @@ const navItems: NavItem[] = [
   { label: '文章', icon: FileText, path: '/posts' },
   { label: '分类', icon: FolderTree, path: '/categories' },
   { label: '标签', icon: Tag, path: '/tags' },
+  { label: '评论', icon: MessageSquare, path: '/comments' },
   { label: '设置', icon: Settings, path: '/settings' },
 ]
 
