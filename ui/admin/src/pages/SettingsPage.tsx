@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Card, Button, Input, Select, Switch, Tabs, TabPane, Typography, TextArea, Divider } from '@douyinfe/semi-ui'
+import { Card, Button, Input, Select, Switch, Tabs, TabPane, Typography, TextArea } from '@douyinfe/semi-ui'
 import { IconSave, IconGlobe, IconArticle, IconServer, IconStar, IconTick } from '@douyinfe/semi-icons'
 import { useSettings, useSaveSettings } from '@/hooks/use-settings'
 import type { AllSettings } from '@/types/settings'
@@ -38,31 +38,31 @@ export function SettingsPage() {
         </Button>
       </div>
 
-      <Card>
-        <Tabs type="line" tabPosition="left">
+      <Card style={{ width: '100%' }}>
+        <Tabs type="line" tabPosition="left" style={{ minHeight: 420 }}>
           {/* 站点信息 */}
           <TabPane tab={<><IconGlobe size="small" /> 站点信息</>} itemKey="site">
             <div style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
               <FormRow label="站点名称">
-                <Input value={form.site.siteName} onChange={(v) => updateField(setForm, 'site', 'siteName', v)} placeholder="Kite Blog" style={{ maxWidth: 360 }} />
+                <Input value={form.site.siteName} onChange={(v) => updateField(setForm, 'site', 'siteName', v)} placeholder="Kite Blog" style={{ maxWidth: 480 }} />
               </FormRow>
               <FormRow label="站点 URL">
-                <Input value={form.site.siteUrl} onChange={(v) => updateField(setForm, 'site', 'siteUrl', v)} placeholder="https://blog.example.com" style={{ maxWidth: 360 }} />
+                <Input value={form.site.siteUrl} onChange={(v) => updateField(setForm, 'site', 'siteUrl', v)} placeholder="https://blog.example.com" style={{ maxWidth: 480 }} />
               </FormRow>
               <FormRow label="站点描述">
-                <TextArea value={form.site.description} onChange={(v) => updateField(setForm, 'site', 'description', v)} placeholder="简要描述你的博客…" rows={2} style={{ maxWidth: 360 }} />
+                <TextArea value={form.site.description} onChange={(v) => updateField(setForm, 'site', 'description', v)} placeholder="简要描述你的博客…" rows={2} style={{ maxWidth: 480 }} />
               </FormRow>
               <FormRow label="SEO 关键词">
-                <Input value={form.site.keywords} onChange={(v) => updateField(setForm, 'site', 'keywords', v)} placeholder="博客,技术,Go,React" style={{ maxWidth: 360 }} />
+                <Input value={form.site.keywords} onChange={(v) => updateField(setForm, 'site', 'keywords', v)} placeholder="博客,技术,Go,React" style={{ maxWidth: 480 }} />
               </FormRow>
               <FormRow label="ICP 备案号">
-                <Input value={form.site.icp} onChange={(v) => updateField(setForm, 'site', 'icp', v)} placeholder="京ICP备XXXXXXXX号" style={{ maxWidth: 360 }} />
+                <Input value={form.site.icp} onChange={(v) => updateField(setForm, 'site', 'icp', v)} placeholder="京ICP备XXXXXXXX号" style={{ maxWidth: 480 }} />
               </FormRow>
               <FormRow label="Favicon 路径">
-                <Input value={form.site.favicon} onChange={(v) => updateField(setForm, 'site', 'favicon', v)} placeholder="/favicon.svg" style={{ maxWidth: 360 }} />
+                <Input value={form.site.favicon} onChange={(v) => updateField(setForm, 'site', 'favicon', v)} placeholder="/favicon.svg" style={{ maxWidth: 480 }} />
               </FormRow>
               <FormRow label="页脚文本">
-                <Input value={form.site.footer} onChange={(v) => updateField(setForm, 'site', 'footer', v)} placeholder="© 2026 Blog" style={{ maxWidth: 360 }} />
+                <Input value={form.site.footer} onChange={(v) => updateField(setForm, 'site', 'footer', v)} placeholder="© 2026 Blog" style={{ maxWidth: 480 }} />
               </FormRow>
             </div>
           </TabPane>
@@ -89,13 +89,13 @@ export function SettingsPage() {
           <TabPane tab={<><IconServer size="small" /> 渲染模式</>} itemKey="render">
             <div style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
               <FormRow label="渲染模式">
-                <Select value={form.render.renderMode} onChange={(v) => updateField(setForm, 'render', 'renderMode', v as string)} style={{ maxWidth: 360 }}>
+                <Select value={form.render.renderMode} onChange={(v) => updateField(setForm, 'render', 'renderMode', v as string)} style={{ maxWidth: 480 }}>
                   <Select.Option value="classic">Classic — Go Template 服务端渲染</Select.Option>
                   <Select.Option value="headless">Headless — 纯 JSON API 输出</Select.Option>
                 </Select>
               </FormRow>
               <FormRow label="API 前缀">
-                <Input value={form.render.apiPrefix} onChange={(v) => updateField(setForm, 'render', 'apiPrefix', v)} placeholder="/api/v1" style={{ maxWidth: 360 }} />
+                <Input value={form.render.apiPrefix} onChange={(v) => updateField(setForm, 'render', 'apiPrefix', v)} placeholder="/api/v1" style={{ maxWidth: 480 }} />
               </FormRow>
               <FormRow label="启用 CORS" description="允许跨域请求">
                 <Switch checked={form.render.enableCors as boolean} onChange={(v) => updateField(setForm, 'render', 'enableCors', v)} />
@@ -112,16 +112,16 @@ export function SettingsPage() {
               {form.ai.enabled && (
                 <>
                   <FormRow label="AI 服务商">
-                    <Select value={form.ai.provider} onChange={(v) => updateField(setForm, 'ai', 'provider', v as string)} style={{ maxWidth: 360 }}>
+                    <Select value={form.ai.provider} onChange={(v) => updateField(setForm, 'ai', 'provider', v as string)} style={{ maxWidth: 480 }}>
                       <Select.Option value="deepseek">DeepSeek</Select.Option>
                       <Select.Option value="openai">OpenAI</Select.Option>
                     </Select>
                   </FormRow>
                   <FormRow label="模型名称">
-                    <Input value={form.ai.model} onChange={(v) => updateField(setForm, 'ai', 'model', v)} placeholder="deepseek-chat" style={{ maxWidth: 360 }} />
+                    <Input value={form.ai.model} onChange={(v) => updateField(setForm, 'ai', 'model', v)} placeholder="deepseek-chat" style={{ maxWidth: 480 }} />
                   </FormRow>
                   <FormRow label="API Key">
-                    <Input mode="password" value={form.ai.apiKey} onChange={(v) => updateField(setForm, 'ai', 'apiKey', v)} placeholder="sk-xxxxxxxxxxxx" style={{ maxWidth: 360 }} />
+                    <Input mode="password" value={form.ai.apiKey} onChange={(v) => updateField(setForm, 'ai', 'apiKey', v)} placeholder="sk-xxxxxxxxxxxx" style={{ maxWidth: 480 }} />
                   </FormRow>
                   <FormRow label="自动生成摘要" description="发布时自动调用 AI 生成摘要">
                     <Switch checked={form.ai.autoSummary as boolean} onChange={(v) => updateField(setForm, 'ai', 'autoSummary', v)} />

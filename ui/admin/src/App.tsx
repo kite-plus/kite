@@ -9,6 +9,8 @@ import { TagsPage } from '@/pages/TagsPage'
 import { CommentsPage } from '@/pages/CommentsPage'
 import { FriendLinksPage } from '@/pages/FriendLinksPage'
 import { PostEditorPage } from '@/pages/PostEditorPage'
+import { PagesPage } from '@/pages/PagesPage'
+import { PageEditorPage } from '@/pages/PageEditorPage'
 
 /** TanStack Query 客户端 */
 const queryClient = new QueryClient({
@@ -34,6 +36,9 @@ function App() {
             <Route path="posts" element={<PostsPage />} />
             <Route path="posts/new" element={<PostEditorPage />} />
             <Route path="posts/:id/edit" element={<PostEditorPage />} />
+            <Route path="pages" element={<PagesPage />} />
+            <Route path="pages/new" element={<PageEditorPage />} />
+            <Route path="pages/:id/edit" element={<PageEditorPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="tags" element={<TagsPage />} />
             <Route path="comments" element={<CommentsPage />} />

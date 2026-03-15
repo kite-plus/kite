@@ -6,7 +6,7 @@ import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
-import { Button, Tooltip, Divider } from '@douyinfe/semi-ui'
+import { Divider } from '@douyinfe/semi-ui'
 import {
   Bold, Italic, Strikethrough, Code, List, ListOrdered,
   Quote, Minus, Heading1, Heading2, Heading3,
@@ -25,7 +25,7 @@ interface TiptapEditorProps {
 
 /**
  * Tiptap 富文本编辑器
- * 工具栏使用 Semi Button + Tooltip
+ * 工具栏按钮使用原生 button + CSS tooltip，彻底消除 Semi Tooltip 定位闪烁问题
  */
 export function TiptapEditor({ content = '', onChange, placeholder = '开始写作…' }: TiptapEditorProps) {
   const editor = useEditor({
@@ -97,7 +97,7 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
   )
 }
 
-/* ========== 工具栏按钮 ========== */
+/* ========== 工具栏按钮 — 纯 CSS tooltip，无 Semi Tooltip ========== */
 interface ToolBtnProps {
   icon: React.ComponentType<{ className?: string }>
   tooltip: string
@@ -108,16 +108,14 @@ interface ToolBtnProps {
 
 function ToolBtn({ icon: Icon, tooltip, onClick, active, disabled }: ToolBtnProps) {
   return (
-    <Tooltip content={tooltip} position="bottom">
-      <Button
-        type="tertiary"
-        theme={active ? 'solid' : 'borderless'}
-        size="small"
-        onClick={onClick}
-        disabled={disabled}
-        icon={<Icon className="h-4 w-4" />}
-        style={{ width: 32, height: 32, padding: 0 }}
-      />
-    </Tooltip>
+    <button
+      className={`tiptap-tool-btn${active ? ' active' : ''}${disabled ? ' disabled' : ''}`}
+      onClick={onClick}
+      disabled={disabled}
+      data-tooltip={tooltip}
+      type="button"
+    >
+      <Icon className="h-4 w-4" />
+    </button>
   )
 }

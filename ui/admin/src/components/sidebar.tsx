@@ -3,6 +3,7 @@ import { Layout, Nav, Input, Avatar } from '@douyinfe/semi-ui'
 import {
   IconHome,
   IconArticle,
+  IconCopy,
   IconGridView,
   IconPriceTag,
   IconComment,
@@ -19,6 +20,7 @@ const { Sider } = Layout
 const navItems = [
   { itemKey: '/', text: '仪表盘', icon: <IconHome /> },
   { itemKey: '/posts', text: '文章', icon: <IconArticle /> },
+  { itemKey: '/pages', text: '页面', icon: <IconCopy /> },
   { itemKey: '/categories', text: '分类', icon: <IconGridView /> },
   { itemKey: '/tags', text: '标签', icon: <IconPriceTag /> },
   { itemKey: '/comments', text: '评论', icon: <IconComment /> },

@@ -1,29 +1,94 @@
 /* ========== Tiptap 编辑器样式 ========== */
+/* 所有 CSS 变量统一使用 Semi Design 的 token */
 
 /* 编辑器容器 */
 .tiptap-wrapper {
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
-  overflow: hidden;
+  border: 1px solid var(--semi-color-border);
+  background: var(--semi-color-bg-0);
 }
 
 /* 工具栏 */
 .tiptap-toolbar {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
   padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in oklch, var(--muted) 30%, transparent);
+  border-bottom: 1px solid var(--semi-color-border);
+  background: var(--semi-color-fill-0);
+  align-items: center;
+  overflow: visible;
 }
 
-.tiptap-toolbar-divider {
-  width: 1px;
-  margin: 2px 4px;
-  background: var(--border);
+/* ========== 工具栏按钮 ========== */
+.tiptap-tool-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--semi-color-text-1);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
-/* 编辑区域 */
+.tiptap-tool-btn:hover:not(.disabled) {
+  background: var(--semi-color-fill-1);
+  color: var(--semi-color-text-0);
+}
+
+.tiptap-tool-btn.active {
+  background: var(--semi-color-primary);
+  color: #fff;
+}
+
+.tiptap-tool-btn.active:hover {
+  background: var(--semi-color-primary-hover);
+  color: #fff;
+}
+
+.tiptap-tool-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* 按钮内图标尺寸 */
+.tiptap-tool-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ========== CSS Tooltip（纯 CSS，向下弹出，避免被容器裁剪） ========== */
+.tiptap-tool-btn[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-2px);
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.78);
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 100;
+}
+
+.tiptap-tool-btn[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ========== 编辑区域 ========== */
 .tiptap-wrapper .tiptap {
   padding: 1rem 1.25rem;
   min-height: 400px;
@@ -32,14 +97,14 @@
   outline: none;
   font-size: 0.9375rem;
   line-height: 1.75;
-  color: var(--foreground);
+  color: var(--semi-color-text-0);
 }
 
 /* 占位文本 */
 .tiptap-wrapper .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--muted-foreground);
+  color: var(--semi-color-text-2);
   pointer-events: none;
   height: 0;
 }
@@ -47,128 +112,133 @@
 /* ========== 排版样式 ========== */
 
 .tiptap-wrapper .tiptap h1 {
-  font-size: 1.875rem !important;
-  font-weight: 700 !important;
-  margin-top: 1.5rem !important;
-  margin-bottom: 0.75rem !important;
-  line-height: 1.25 !important;
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.25;
+  color: var(--semi-color-text-0);
 }
 
 .tiptap-wrapper .tiptap h2 {
-  font-size: 1.5rem !important;
-  font-weight: 600 !important;
-  margin-top: 1.25rem !important;
-  margin-bottom: 0.5rem !important;
-  line-height: 1.3 !important;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+  color: var(--semi-color-text-0);
 }
 
 .tiptap-wrapper .tiptap h3 {
-  font-size: 1.25rem !important;
-  font-weight: 600 !important;
-  margin-top: 1rem !important;
-  margin-bottom: 0.5rem !important;
-  line-height: 1.35 !important;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.35;
+  color: var(--semi-color-text-0);
 }
 
 .tiptap-wrapper .tiptap p {
-  margin-top: 0.5rem !important;
-  margin-bottom: 0.5rem !important;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .tiptap-wrapper .tiptap ul {
-  list-style-type: disc !important;
-  padding-left: 1.5rem !important;
-  margin-top: 0.5rem !important;
-  margin-bottom: 0.5rem !important;
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .tiptap-wrapper .tiptap ol {
-  list-style-type: decimal !important;
-  padding-left: 1.5rem !important;
-  margin-top: 0.5rem !important;
-  margin-bottom: 0.5rem !important;
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .tiptap-wrapper .tiptap li {
-  margin-top: 0.25rem !important;
-  margin-bottom: 0.25rem !important;
-  display: list-item !important;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+  display: list-item;
 }
 
 .tiptap-wrapper .tiptap li p {
-  margin: 0 !important;
+  margin: 0;
 }
 
 .tiptap-wrapper .tiptap blockquote {
-  border-left: 3px solid var(--border) !important;
-  padding-left: 1rem !important;
-  margin-top: 0.75rem !important;
-  margin-bottom: 0.75rem !important;
-  color: var(--muted-foreground) !important;
-  font-style: italic !important;
+  border-left: 3px solid var(--semi-color-primary);
+  padding-left: 1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  color: var(--semi-color-text-2);
+  font-style: italic;
 }
 
 .tiptap-wrapper .tiptap hr {
-  border: none !important;
-  border-top: 1px solid var(--border) !important;
-  margin-top: 1.5rem !important;
-  margin-bottom: 1.5rem !important;
+  border: none;
+  border-top: 1px solid var(--semi-color-border);
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
 /* 行内代码 */
 .tiptap-wrapper .tiptap code {
-  background: var(--muted) !important;
-  padding: 0.15rem 0.4rem !important;
-  border-radius: calc(var(--radius) - 2px) !important;
-  font-size: 0.85em !important;
-  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace !important;
+  background: var(--semi-color-fill-0);
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  color: var(--semi-color-danger);
 }
 
 /* 代码块 */
 .tiptap-wrapper .tiptap pre {
-  background: var(--muted) !important;
-  border-radius: calc(var(--radius) - 2px) !important;
-  padding: 0.875rem 1rem !important;
-  margin-top: 0.75rem !important;
-  margin-bottom: 0.75rem !important;
-  overflow-x: auto !important;
+  background: var(--semi-color-fill-0);
+  border-radius: 4px;
+  padding: 0.875rem 1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+  border: 1px solid var(--semi-color-border);
 }
 
 .tiptap-wrapper .tiptap pre code {
-  background: none !important;
-  padding: 0 !important;
-  border-radius: 0 !important;
-  font-size: 0.8125rem !important;
-  line-height: 1.6 !important;
-  color: inherit !important;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: inherit;
 }
 
 /* 链接 */
 .tiptap-wrapper .tiptap a {
-  color: var(--primary) !important;
-  text-decoration: underline !important;
-  text-underline-offset: 3px !important;
-  cursor: pointer !important;
+  color: var(--semi-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .tiptap-wrapper .tiptap a:hover {
-  opacity: 0.8 !important;
+  opacity: 0.8;
 }
 
 /* 图片 */
 .tiptap-wrapper .tiptap img {
-  max-width: 100% !important;
-  border-radius: calc(var(--radius) - 2px) !important;
-  margin-top: 0.75rem !important;
-  margin-bottom: 0.75rem !important;
+  max-width: 100%;
+  border-radius: 4px;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
 }
 
 .tiptap-wrapper .tiptap img.ProseMirror-selectednode {
-  outline: 2px solid var(--primary) !important;
-  outline-offset: 2px !important;
+  outline: 2px solid var(--semi-color-primary);
+  outline-offset: 2px;
 }
 
-/* 代码高亮 */
+/* ========== 代码高亮 ========== */
 .tiptap-wrapper .tiptap pre .hljs-comment,
 .tiptap-wrapper .tiptap pre .hljs-quote { color: #6a737d; }
 .tiptap-wrapper .tiptap pre .hljs-keyword,

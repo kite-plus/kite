@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Card, Button, Tag, Divider, Empty, Typography } from '@douyinfe/semi-ui'
 import { IconEdit, IconEyeOpened, IconSetting, IconGridView, IconArticle, IconComment, IconTick } from '@douyinfe/semi-icons'
@@ -45,6 +46,7 @@ const activityLog = [
 export function DashboardPage() {
   const navigate = useNavigate()
   const maxViews = Math.max(...weeklyTraffic.map((d) => d.views))
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
   return (
     <div>
@@ -81,92 +83,74 @@ export function DashboardPage() {
         ))}
       </div>
 
-      {/* 主内容：左 3 / 右 2 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16 }}>
-        {/* 左列 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* 七日访问趋势 */}
-          <Card title="七日访问趋势" headerExtraContent={<Text type="tertiary" size="small">最近 7 天</Text>}>
-            {(() => {
-              const chartW = 560, chartH = 140, padX = 40, padY = 10, padBottom = 18
-              const innerW = chartW - padX * 2, innerH = chartH - padY - padBottom
-              const maxV = maxViews * 1.05
-              const points = weeklyTraffic.map((d, i) => ({
-                x: padX + (i / (weeklyTraffic.length - 1)) * innerW,
-                y: padY + innerH - (d.views / maxV) * innerH,
-                views: d.views, day: d.day,
-              }))
-              const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
-              const areaPath = `${linePath} L${points[points.length - 1].x},${padY + innerH} L${points[0].x},${padY + innerH} Z`
-              const yTicks = [0, Math.round(maxV * 0.33), Math.round(maxV * 0.66), Math.round(maxV)]
-              return (
-                <svg viewBox={`0 0 ${chartW} ${chartH}`} style={{ width: '100%' }} preserveAspectRatio="xMidYEnd meet">
-                  {yTicks.map((tick) => {
-                    const y = padY + innerH - (tick / maxV) * innerH
-                    return (
-                      <g key={tick}>
-                        <line x1={padX} y1={y} x2={chartW - padX} y2={y} stroke="var(--semi-color-border)" strokeWidth={0.5} />
-                        <text x={padX - 6} y={y + 3} textAnchor="end" fill="var(--semi-color-text-2)" fontSize={9}>
-                          {tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : tick}
-                        </text>
-                      </g>
-                    )
-                  })}
-                  <path d={areaPath} fill="rgba(0,100,250,0.06)" />
-                  <path d={linePath} fill="none" stroke="var(--semi-color-primary)" strokeWidth={2} />
-                  {points.map((p, i) => (
-                    <g key={i}>
-                      <text x={p.x} y={padY + innerH + 14} textAnchor="middle" fill="var(--semi-color-text-2)" fontSize={10}>{p.day}</text>
-                      <circle cx={p.x} cy={p.y} r={3} fill="#fff" stroke="var(--semi-color-primary)" strokeWidth={1.5} />
+      {/* 第二行：左列趋势 + 右列快捷操作/通知 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16, marginBottom: 16 }}>
+        {/* 七日访问趋势 */}
+        <Card title="七日访问趋势" headerExtraContent={<Text type="tertiary" size="small">最近 7 天</Text>}>
+          {(() => {
+            const chartW = 560, chartH = 240, padX = 40, padY = 10, padBottom = 18
+            const innerW = chartW - padX * 2, innerH = chartH - padY - padBottom
+            const maxV = maxViews * 1.05
+            const points = weeklyTraffic.map((d, i) => ({
+              x: padX + (i / (weeklyTraffic.length - 1)) * innerW,
+              y: padY + innerH - (d.views / maxV) * innerH,
+              views: d.views, day: d.day,
+            }))
+            const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+            const areaPath = `${linePath} L${points[points.length - 1].x},${padY + innerH} L${points[0].x},${padY + innerH} Z`
+            const yTicks = [0, Math.round(maxV * 0.33), Math.round(maxV * 0.66), Math.round(maxV)]
+            const hp = hoverIdx !== null ? points[hoverIdx] : null
+            return (
+              <svg
+                viewBox={`0 0 ${chartW} ${chartH}`}
+                style={{ width: '100%', cursor: 'crosshair' }}
+                preserveAspectRatio="xMidYMid meet"
+                onMouseLeave={() => setHoverIdx(null)}
+              >
+                {/* 网格线 + Y 轴标签 */}
+                {yTicks.map((tick) => {
+                  const y = padY + innerH - (tick / maxV) * innerH
+                  return (
+                    <g key={tick}>
+                      <line x1={padX} y1={y} x2={chartW - padX} y2={y} stroke="var(--semi-color-border)" strokeWidth={0.5} />
+                      <text x={padX - 6} y={y + 3} textAnchor="end" fill="var(--semi-color-text-2)" fontSize={9}>
+                        {tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : tick}
+                      </text>
                     </g>
-                  ))}
-                </svg>
-              )
-            })()}
-          </Card>
+                  )
+                })}
+                {/* 面积 + 折线 */}
+                <path d={areaPath} fill="rgba(0,100,250,0.06)" />
+                <path d={linePath} fill="none" stroke="var(--semi-color-primary)" strokeWidth={2} />
+                {/* 数据点 + 隐形 hover 区域 */}
+                {points.map((p, i) => (
+                  <g key={i}>
+                    <text x={p.x} y={padY + innerH + 14} textAnchor="middle" fill={hoverIdx === i ? 'var(--semi-color-primary)' : 'var(--semi-color-text-2)'} fontSize={10} fontWeight={hoverIdx === i ? 600 : 400}>{p.day}</text>
+                    <circle cx={p.x} cy={p.y} r={hoverIdx === i ? 5 : 3} fill="var(--semi-color-bg-0)" stroke="var(--semi-color-primary)" strokeWidth={hoverIdx === i ? 2.5 : 1.5} />
+                    {/* 隐形大圆作为 hover 热区 */}
+                    <circle cx={p.x} cy={p.y} r={20} fill="transparent" onMouseEnter={() => setHoverIdx(i)} />
+                  </g>
+                ))}
+                {/* Hover 竖线 + Tooltip */}
+                {hp && (
+                  <g>
+                    {/* 竖线参考线 */}
+                    <line x1={hp.x} y1={padY} x2={hp.x} y2={padY + innerH} stroke="var(--semi-color-primary)" strokeWidth={1} strokeDasharray="4 2" opacity={0.5} />
+                    {/* Tooltip 背景 */}
+                    <rect x={hp.x - 42} y={hp.y - 38} width={84} height={30} rx={4} fill="var(--semi-color-bg-3)" stroke="var(--semi-color-border)" strokeWidth={0.5} />
+                    {/* Tooltip 文字 */}
+                    <text x={hp.x} y={hp.y - 24} textAnchor="middle" fill="var(--semi-color-text-0)" fontSize={10} fontWeight={600}>
+                      {hp.day}  {hp.views.toLocaleString()} 次
+                    </text>
+                  </g>
+                )}
+              </svg>
+            )
+          })()}
+        </Card>
 
-          {/* 最近文章 */}
-          <Card title="最近文章" headerExtraContent={<Button theme="borderless" size="small" onClick={() => navigate('/posts')}>查看全部 →</Button>}>
-            {recentPosts.map((post, i) => (
-              <div key={i}>
-                {i > 0 && <Divider margin={0} />}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
-                  <div style={{ minWidth: 0, flex: 1, paddingRight: 12 }}>
-                    <Paragraph ellipsis style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>{post.title}</Paragraph>
-                    <Text type="tertiary" size="small">{post.date}</Text>
-                  </div>
-                  <Tag color={post.status === 'published' ? 'blue' : 'grey'}>
-                    {post.status === 'published' ? '已发布' : '草稿'}
-                  </Tag>
-                </div>
-              </div>
-            ))}
-          </Card>
-
-          {/* 近期动态 */}
-          <Card title="近期动态">
-            {activityLog.map((item, i) => (
-              <div key={i}>
-                {i > 0 && <Divider margin={0} />}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0' }}>
-                  <span style={{ fontSize: 14 }}>{item.icon}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ fontSize: 14 }}>
-                      <Text strong>{item.action}</Text>
-                      {' '}
-                      <Text type="tertiary">「{item.target}」</Text>
-                    </Text>
-                  </div>
-                  <Text type="tertiary" size="small">{item.time}</Text>
-                </div>
-              </div>
-            ))}
-          </Card>
-        </div>
-
-        {/* 右列 */}
+        {/* 右列：快捷操作 + 通知 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* 快捷操作 */}
           <Card title="快捷操作">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <Button icon={<IconEdit />} theme="light" block onClick={() => navigate('/posts/new')}>写文章</Button>
@@ -175,8 +159,6 @@ export function DashboardPage() {
               <Button icon={<IconSetting />} theme="light" block onClick={() => navigate('/settings')}>系统设置</Button>
             </div>
           </Card>
-
-          {/* 通知 — 空态 */}
           <Card title="通知">
             <Empty
               image={<IconTick style={{ fontSize: 48, color: 'var(--semi-color-text-2)' }} />}
@@ -184,6 +166,47 @@ export function DashboardPage() {
             />
           </Card>
         </div>
+      </div>
+
+      {/* 第三行：最近文章 + 近期动态 并排 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {/* 最近文章 */}
+        <Card title="最近文章" headerExtraContent={<Button theme="borderless" size="small" onClick={() => navigate('/posts')}>查看全部 →</Button>}>
+          {recentPosts.map((post, i) => (
+            <div key={i}>
+              {i > 0 && <Divider margin={0} />}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
+                <div style={{ minWidth: 0, flex: 1, paddingRight: 12 }}>
+                  <Paragraph ellipsis style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>{post.title}</Paragraph>
+                  <Text type="tertiary" size="small">{post.date}</Text>
+                </div>
+                <Tag color={post.status === 'published' ? 'blue' : 'grey'}>
+                  {post.status === 'published' ? '已发布' : '草稿'}
+                </Tag>
+              </div>
+            </div>
+          ))}
+        </Card>
+
+        {/* 近期动态 */}
+        <Card title="近期动态">
+          {activityLog.map((item, i) => (
+            <div key={i}>
+              {i > 0 && <Divider margin={0} />}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0' }}>
+                <span style={{ fontSize: 14 }}>{item.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 14 }}>
+                    <Text strong>{item.action}</Text>
+                    {' '}
+                    <Text type="tertiary">「{item.target}」</Text>
+                  </Text>
+                </div>
+                <Text type="tertiary" size="small">{item.time}</Text>
+              </div>
+            </div>
+          ))}
+        </Card>
       </div>
     </div>
   )
