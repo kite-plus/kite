@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router'
-import { Layout, Nav, Input, Avatar } from '@douyinfe/semi-ui'
+import { Layout, Nav, Avatar } from '@douyinfe/semi-ui'
 import {
   IconHome,
   IconArticle,
@@ -48,15 +48,31 @@ export function Sidebar() {
           </span>
         </div>
 
-        {/* 搜索栏 */}
+        {/* 搜索栏 — 点击打开命令面板 */}
         {!isCollapsed && (
           <div style={{ padding: '0 12px 8px', flexShrink: 0 }}>
-            <Input
-              prefix={<IconSearch />}
-              placeholder="搜索"
-              suffix={<kbd style={{ fontSize: 10, color: 'var(--semi-color-text-2)', background: 'var(--semi-color-fill-0)', padding: '2px 6px', borderRadius: 4 }}>⌘K</kbd>}
-              showClear={false}
-            />
+            <div
+              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: '1px solid var(--semi-color-border)',
+                cursor: 'pointer',
+                color: 'var(--semi-color-text-2)',
+                fontSize: 13,
+                background: 'var(--semi-color-bg-0)',
+                transition: 'border-color 0.2s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--semi-color-primary)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--semi-color-border)')}
+            >
+              <IconSearch style={{ fontSize: 14 }} />
+              <span style={{ flex: 1 }}>搜索</span>
+              <kbd style={{ fontSize: 10, color: 'var(--semi-color-text-2)', background: 'var(--semi-color-fill-0)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--semi-color-border)' }}>⌘K</kbd>
+            </div>
           </div>
         )}
 

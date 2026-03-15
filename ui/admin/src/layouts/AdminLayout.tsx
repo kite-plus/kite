@@ -2,6 +2,7 @@ import { Outlet } from 'react-router'
 import { Layout } from '@douyinfe/semi-ui'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
+import { CommandPalette } from '@/components/CommandPalette'
 
 const { Content } = Layout
 
@@ -21,6 +22,8 @@ export function AdminLayout() {
           </div>
         </Content>
       </Layout>
+      {/* 全局命令面板 */}
+      <CommandPalette />
     </Layout>
   )
 }
