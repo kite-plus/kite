@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   FileText,
   FolderTree,
+  Tag,
   Settings,
   Wind,
   type LucideIcon,
@@ -24,6 +25,7 @@ const navItems: NavItem[] = [
   { label: '仪表盘', icon: LayoutDashboard, path: '/' },
   { label: '文章', icon: FileText, path: '/posts' },
   { label: '分类', icon: FolderTree, path: '/categories' },
+  { label: '标签', icon: Tag, path: '/tags' },
   { label: '设置', icon: Settings, path: '/settings' },
 ]
 

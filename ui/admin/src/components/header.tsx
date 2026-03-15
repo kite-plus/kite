@@ -9,6 +9,7 @@ const breadcrumbMap: Record<string, string> = {
   '/': '仪表盘',
   '/posts': '文章管理',
   '/categories': '分类管理',
+  '/tags': '标签管理',
   '/settings': '系统设置',
 }
 
