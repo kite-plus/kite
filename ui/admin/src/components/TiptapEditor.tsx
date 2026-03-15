@@ -31,6 +31,8 @@ import {
   ListTodo, TableIcon, Upload, Lightbulb,
 } from 'lucide-react'
 import { Callout, CALLOUT_TYPES, type CalloutType } from '@/extensions/callout/callout-extension'
+import { SlashCommand } from '@/extensions/slash-command/slash-command-extension'
+import { slashCommandSuggestion } from '@/extensions/slash-command/suggestion'
 import '@/styles/tiptap.css'
 import '@/styles/callout.css'
 
@@ -145,6 +147,7 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
       TextStyle,
       Color,
       Callout,
+      SlashCommand.configure({ suggestion: slashCommandSuggestion() }),
     ],
     content,
     onUpdate: ({ editor }) => { onChange?.(editor.getHTML()) },
