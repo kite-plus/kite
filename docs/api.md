@@ -138,6 +138,35 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 - 标签：`keyword`
 - 分类：`keyword`
 
+### 4.4 管理员配置
+
+Kite 当前采用单管理员设计，管理员身份与个人资料通过配置文件提供。
+
+推荐配置示例：
+
+```yaml
+admin:
+  enabled: true
+  username: admin
+  password_hash: "$2a$10$replace.with.bcrypt.hash"
+  session_secret: "replace-with-a-long-random-secret"
+  session_ttl_hours: 168
+  profile:
+    display_name: "Amigoer"
+    email: "hello@example.com"
+    bio: "独立开发者，喜欢写作、设计和 Go。"
+    avatar: "https://example.com/avatar.png"
+    website: "https://example.com"
+    location: "Shanghai"
+```
+
+字段说明：
+- `enabled=true` 时，`/api/v1/admin/...` 路由启用登录态校验
+- `username` 与 `password_hash` 用于单管理员登录
+- `password_hash` 推荐使用 `bcrypt`
+- `session_secret` 用于管理员会话签名，需使用高强度随机字符串
+- `profile` 用于当前管理员资料展示，`/api/v1/admin/auth/me` 会返回这些字段
+
 ## 5. 数据模型草案
 
 以下是当前已经落地或即将扩展的核心资源。
@@ -250,6 +279,61 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
   "msg": "ok"
 }
 ```
+
+### 6.1.1 Admin Auth
+
+#### `POST /api/v1/admin/auth/login`
+
+用途：
+- 管理员登录
+- 登录成功后由服务端写入 `HttpOnly Cookie`
+
+请求体示例：
+
+```json
+{
+  "username": "admin",
+  "password": "your-password"
+}
+```
+
+响应示例：
+
+```json
+{
+  "code": 200,
+  "data": {
+    "auth_enabled": true,
+    "authenticated": true,
+    "user": {
+      "username": "admin",
+      "display_name": "Amigoer",
+      "email": "hello@example.com",
+      "bio": "独立开发者，喜欢写作、设计和 Go。",
+      "avatar": "https://example.com/avatar.png",
+      "website": "https://example.com",
+      "location": "Shanghai"
+    },
+    "session_expires": "2026-03-22T10:00:00Z"
+  },
+  "msg": "ok"
+}
+```
+
+#### `GET /api/v1/admin/auth/me`
+
+用途：
+- 获取当前管理员登录态与个人资料
+
+说明：
+- 当 `admin.enabled=true` 且未登录时，返回 `401`
+- 当 `admin.enabled=false` 时，返回当前配置中的管理员资料，`authenticated=false`
+
+#### `POST /api/v1/admin/auth/logout`
+
+用途：
+- 退出当前管理员会话
+- 需要已登录
 
 ### 6.2 Posts
 
@@ -691,7 +775,8 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 - 公共接口：`/api/v1/...`
 - 管理接口：`/api/v1/admin/...`
 
-当前文章接口示例：
+当前接口示例：
+- `POST /api/v1/admin/auth/login` 供后台登录使用
 - `GET /api/v1/posts/slug/:slug` 供前台使用
 - `GET /api/v1/admin/posts` 供后台管理使用
 - `GET /api/v1/friend-links` 供前台读取已启用友情链接

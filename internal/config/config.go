@@ -17,6 +17,7 @@ const (
 type Config struct {
 	RenderMode string         `yaml:"render_mode"`
 	Database   DatabaseConfig `yaml:"database"`
+	Admin      AdminConfig    `yaml:"admin"`
 }
 
 type DatabaseConfig struct {
@@ -28,6 +29,24 @@ type DatabaseConfig struct {
 	Name     string `yaml:"name"`
 	SSLMode  string `yaml:"ssl_mode"`
 	Path     string `yaml:"path"`
+}
+
+type AdminConfig struct {
+	Enabled         bool               `yaml:"enabled"`
+	Username        string             `yaml:"username"`
+	PasswordHash    string             `yaml:"password_hash"`
+	SessionSecret   string             `yaml:"session_secret"`
+	SessionTTLHours int                `yaml:"session_ttl_hours"`
+	Profile         AdminProfileConfig `yaml:"profile"`
+}
+
+type AdminProfileConfig struct {
+	DisplayName string `yaml:"display_name"`
+	Email       string `yaml:"email"`
+	Bio         string `yaml:"bio"`
+	Avatar      string `yaml:"avatar"`
+	Website     string `yaml:"website"`
+	Location    string `yaml:"location"`
 }
 
 func Load(path string) (*Config, error) {
@@ -59,6 +78,9 @@ func Default() *Config {
 			Port:    5432,
 			SSLMode: "disable",
 		},
+		Admin: AdminConfig{
+			SessionTTLHours: 168,
+		},
 	}
 	cfg.ApplyDefaults()
 	return cfg
@@ -83,6 +105,12 @@ func (c *Config) ApplyDefaults() {
 	if c.Database.SSLMode == "" {
 		c.Database.SSLMode = "disable"
 	}
+	if c.Admin.SessionTTLHours <= 0 {
+		c.Admin.SessionTTLHours = 168
+	}
+	if c.Admin.Profile.DisplayName == "" && c.Admin.Username != "" {
+		c.Admin.Profile.DisplayName = c.Admin.Username
+	}
 }
 
 func (c *Config) Validate() error {
@@ -103,6 +131,21 @@ func (c *Config) Validate() error {
 		}
 	default:
 		return fmt.Errorf("unsupported database driver: %s", c.Database.Driver)
+	}
+
+	if c.Admin.Enabled {
+		if c.Admin.Username == "" {
+			return fmt.Errorf("admin.username is required when admin auth is enabled")
+		}
+		if c.Admin.PasswordHash == "" {
+			return fmt.Errorf("admin.password_hash is required when admin auth is enabled")
+		}
+		if c.Admin.SessionSecret == "" {
+			return fmt.Errorf("admin.session_secret is required when admin auth is enabled")
+		}
+		if c.Admin.SessionTTLHours <= 0 {
+			return fmt.Errorf("admin.session_ttl_hours must be greater than 0 when admin auth is enabled")
+		}
 	}
 
 	return nil
