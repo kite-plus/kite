@@ -11,6 +11,7 @@ const breadcrumbMap: Record<string, string> = {
   '/categories': '分类管理',
   '/tags': '标签管理',
   '/comments': '评论管理',
+  '/links': '友链管理',
   '/settings': '系统设置',
 }
 
