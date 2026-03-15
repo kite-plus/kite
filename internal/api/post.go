@@ -23,10 +23,12 @@ func (h *PostHandler) List(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	result, err := h.postService.List(service.PostListParams{
-		Page:     page,
-		PageSize: pageSize,
-		Status:   c.Query("status"),
-		Keyword:  c.Query("keyword"),
+		Page:       page,
+		PageSize:   pageSize,
+		Status:     c.Query("status"),
+		Keyword:    c.Query("keyword"),
+		TagID:      c.Query("tag_id"),
+		CategoryID: c.Query("category_id"),
 	})
 	if err != nil {
 		handlePostError(c, err)

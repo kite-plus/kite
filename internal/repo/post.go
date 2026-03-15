@@ -13,10 +13,12 @@ import (
 var ErrPostNotFound = errors.New("post not found")
 
 type PostListParams struct {
-	Page     int
-	PageSize int
-	Status   string
-	Keyword  string
+	Page       int
+	PageSize   int
+	Status     string
+	Keyword    string
+	TagID      *uuid.UUID
+	CategoryID *uuid.UUID
 }
 
 type PostRepository struct {
@@ -40,6 +42,13 @@ func (r *PostRepository) List(params PostListParams) ([]model.Post, int64, error
 		keyword := "%" + strings.TrimSpace(params.Keyword) + "%"
 		query = query.Where("title LIKE ? OR summary LIKE ? OR content LIKE ?", keyword, keyword, keyword)
 	}
+	if params.CategoryID != nil {
+		query = query.Where("category_id = ?", *params.CategoryID)
+	}
+	if params.TagID != nil {
+		query = query.Joins("JOIN post_tags ON post_tags.post_id = posts.id").Where("post_tags.tag_id = ?", *params.TagID)
+	}
+	query = query.Distinct()
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -57,7 +66,7 @@ func (r *PostRepository) List(params PostListParams) ([]model.Post, int64, error
 	}
 
 	var posts []model.Post
-	if err := query.Order("created_at DESC").Offset((params.Page - 1) * params.PageSize).Limit(params.PageSize).Find(&posts).Error; err != nil {
+	if err := query.Preload("Category").Preload("Tags").Order("created_at DESC").Offset((params.Page - 1) * params.PageSize).Limit(params.PageSize).Find(&posts).Error; err != nil {
 		return nil, 0, fmt.Errorf("list posts: %w", err)
 	}
 
@@ -70,7 +79,7 @@ func (r *PostRepository) GetByID(id uuid.UUID) (*model.Post, error) {
 	}
 
 	var post model.Post
-	if err := r.db.First(&post, "id = ?", id).Error; err != nil {
+	if err := r.db.Preload("Category").Preload("Tags").First(&post, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPostNotFound
 		}
@@ -86,7 +95,7 @@ func (r *PostRepository) GetBySlug(slug string) (*model.Post, error) {
 	}
 
 	var post model.Post
-	if err := r.db.First(&post, "slug = ?", slug).Error; err != nil {
+	if err := r.db.Preload("Category").Preload("Tags").First(&post, "slug = ?", slug).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPostNotFound
 		}
@@ -103,21 +112,30 @@ func (r *PostRepository) Create(post *model.Post) error {
 	if err := r.db.Create(post).Error; err != nil {
 		return fmt.Errorf("create post: %w", err)
 	}
-	return nil
+	if len(post.Tags) > 0 {
+		if err := r.db.Model(post).Association("Tags").Replace(post.Tags); err != nil {
+			return fmt.Errorf("replace post tags: %w", err)
+		}
+	}
+	return r.reloadAssociations(post)
 }
 
 func (r *PostRepository) Update(post *model.Post) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("post repository is unavailable")
 	}
-	result := r.db.Model(post).Select("title", "slug", "summary", "content", "status", "cover_image", "published_at").Updates(post)
+
+	result := r.db.Model(post).Select("title", "slug", "summary", "content", "status", "cover_image", "published_at", "category_id").Updates(post)
 	if result.Error != nil {
 		return fmt.Errorf("update post: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
 		return ErrPostNotFound
 	}
-	return nil
+	if err := r.db.Model(post).Association("Tags").Replace(post.Tags); err != nil {
+		return fmt.Errorf("replace post tags: %w", err)
+	}
+	return r.reloadAssociations(post)
 }
 
 func (r *PostRepository) Delete(id uuid.UUID) error {
@@ -132,4 +150,11 @@ func (r *PostRepository) Delete(id uuid.UUID) error {
 		return ErrPostNotFound
 	}
 	return nil
+}
+
+func (r *PostRepository) reloadAssociations(post *model.Post) error {
+	if post == nil {
+		return nil
+	}
+	return r.db.Preload("Category").Preload("Tags").First(post, "id = ?", post.ID).Error
 }

@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 const (
 	PostStatusDraft     = "draft"
@@ -17,4 +21,7 @@ type Post struct {
 	Status      string     `gorm:"size:32;not null;index" json:"status"`
 	CoverImage  string     `gorm:"size:1024" json:"cover_image"`
 	PublishedAt *time.Time `json:"published_at"`
+	CategoryID  *uuid.UUID `gorm:"type:char(36);index" json:"category_id"`
+	Category    *Category  `json:"category,omitempty"`
+	Tags        []Tag      `gorm:"many2many:post_tags;" json:"tags,omitempty"`
 }

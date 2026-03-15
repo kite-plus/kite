@@ -130,7 +130,7 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 ### 4.3 过滤
 
 当前已实现的过滤能力：
-- 文章：`status`、`keyword`
+- 文章：`status`、`keyword`、`tag_id`、`category_id`
 - 友情链接：`keyword`、`is_active`
 
 ## 5. 数据模型草案
@@ -149,6 +149,19 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
   "status": "draft",
   "cover_image": "",
   "published_at": null,
+  "category_id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
+  "category": {
+    "id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
+    "name": "Backend",
+    "slug": "backend"
+  },
+  "tags": [
+    {
+      "id": "0195f400-13ad-7cbb-9b9f-04d15b759cb8",
+      "name": "golang",
+      "slug": "golang"
+    }
+  ],
   "created_at": "2026-03-15T10:00:00Z",
   "updated_at": "2026-03-15T10:00:00Z"
 }
@@ -158,6 +171,8 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 - `status`: `draft` / `published` / `archived`
 - `slug`: 全局唯一，用于前台路由
 - `summary`: 可人工填写，也可由 AI 自动生成
+- `category_id`: 可为空，表示文章所属分类
+- `tags`: 多对多标签集合
 
 ### 5.2 FriendLink
 
@@ -241,6 +256,8 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 - `page_size`
 - `status`
 - `keyword`
+- `tag_id`
+- `category_id`
 
 响应示例：
 
@@ -258,6 +275,19 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
         "status": "published",
         "cover_image": "",
         "published_at": "2026-03-15T10:00:00Z",
+        "category_id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
+        "category": {
+          "id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
+          "name": "Backend",
+          "slug": "backend"
+        },
+        "tags": [
+          {
+            "id": "0195f400-13ad-7cbb-9b9f-04d15b759cb8",
+            "name": "golang",
+            "slug": "golang"
+          }
+        ],
         "created_at": "2026-03-15T10:00:00Z",
         "updated_at": "2026-03-15T10:00:00Z"
       }
@@ -298,7 +328,11 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
   "content": "# Hello Kite",
   "status": "draft",
   "cover_image": "",
-  "published_at": null
+  "published_at": null,
+  "category_id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
+  "tag_ids": [
+    "0195f400-13ad-7cbb-9b9f-04d15b759cb8"
+  ]
 }
 ```
 
