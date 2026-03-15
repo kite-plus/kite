@@ -11,15 +11,27 @@
 /* --- CSS 自定义属性 --- */
 :root {
   --kite-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --kite-border: #e5e7eb;
-  --kite-border-hover: #9ca3af;
+
+  /* 边框 */
+  --kite-border: #e2e8f0;
+  --kite-border-hover: #94a3b8;
+
+  /* 主色 */
   --kite-accent: #18181b;
+
+  /* 背景 */
   --kite-bg: #ffffff;
+  --kite-bg-main: #f1f5f9;
   --kite-bg-sidebar: #ffffff;
-  --kite-bg-hover: #f9fafb;
-  --kite-text: #475569;
+  --kite-bg-hover: #f8fafc;
+
+  /* 文字 */
+  --kite-text: #1e293b;
   --kite-text-muted: #64748b;
-  --kite-text-heading: #1e293b;
+  --kite-text-heading: #0f172a;
+
+  /* 间距 */
+  --kite-content-padding: 24px;
 }
 
 /* --- 全局 Reset：封杀圆角与阴影 --- */
@@ -64,4 +76,17 @@ body {
 ::selection {
   background-color: var(--kite-accent);
   color: #ffffff;
+}
+
+/* --- 全局过渡优化 --- */
+a, button, input, select, textarea {
+  transition-property: color, background-color, border-color, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+/* --- 输入框聚焦动画 --- */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--kite-accent) !important;
 }

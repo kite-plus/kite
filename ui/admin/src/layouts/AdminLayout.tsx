@@ -4,8 +4,8 @@ import { Header } from '@/components/header'
 
 /**
  * Admin 全局布局组件
- * 三段式结构：左侧边栏 + 右侧（顶部 Header + 主内容区）
- * 特性：无圆角、硬线条分隔、高留白内容区
+ * 三段式结构：左侧边栏 + 右侧（顶部 Header + 灰底主内容区）
+ * 内容区使用灰色底衬，让白色卡片有层次感
  */
 export function AdminLayout() {
   return (
@@ -18,9 +18,11 @@ export function AdminLayout() {
         {/* 顶部 Header */}
         <Header />
 
-        {/* 主内容区 - 高留白 */}
-        <main className="flex-1 overflow-y-auto p-8">
-          <Outlet />
+        {/* 主内容区 - 灰底白卡片 */}
+        <main className="flex-1 overflow-y-auto bg-[var(--kite-bg)] p-6">
+          <div className="mx-auto max-w-[1200px]">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

@@ -112,17 +112,21 @@ export function DashboardPage() {
               key={card.label}
               className="border border-[var(--kite-border)] bg-[var(--kite-bg)] p-5 transition-colors duration-100 hover:border-[var(--kite-border-hover)]"
             >
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wider text-[var(--kite-text-muted)]">
-                  {card.label}
-                </p>
-                <Icon className="h-4 w-4 text-[var(--kite-text-muted)]" strokeWidth={1.5} />
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center border border-[var(--kite-border)] bg-[var(--kite-bg-hover)]">
+                  <Icon className="h-5 w-5 text-[var(--kite-text-muted)]" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--kite-text-muted)]">
+                    {card.label}
+                  </p>
+                  <p className="mt-0.5 text-2xl font-bold text-[var(--kite-text-heading)]">
+                    {card.value}
+                  </p>
+                </div>
               </div>
-              <p className="mt-3 text-3xl font-semibold text-[var(--kite-text-heading)]">
-                {card.value}
-              </p>
               {card.change !== '0' && (
-                <div className="mt-1.5 flex items-center gap-1">
+                <div className="mt-3 flex items-center gap-1 border-t border-[var(--kite-border)] pt-3">
                   <TrendingUp className="h-3 w-3 text-emerald-600" strokeWidth={1.5} />
                   <span className="text-xs text-emerald-600">{card.change}</span>
                   <span className="text-xs text-[var(--kite-text-muted)]">较上月</span>
@@ -135,34 +139,86 @@ export function DashboardPage() {
 
       {/* 中间区域：七日趋势 + 最近文章 */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-5">
-        {/* 七日访问趋势 - 条形图 */}
-        <div className="border border-[var(--kite-border)] bg-[var(--kite-bg)] p-5 lg:col-span-3">
+        {/* 七日访问趋势 - 折线图 */}
+        <div className="flex flex-col border border-[var(--kite-border)] bg-[var(--kite-bg)] p-5 lg:col-span-3">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[var(--kite-text-heading)]">七日访问趋势</h2>
             <span className="text-xs text-[var(--kite-text-muted)]">最近 7 天</span>
           </div>
-          <div className="flex items-end gap-3" style={{ height: 160 }}>
-            {weeklyTraffic.map((d) => {
-              const pct = (d.views / maxViews) * 100
-              return (
-                <div key={d.day} className="group flex flex-1 flex-col items-center gap-1.5">
-                  {/* 数值 - hover 显示 */}
-                  <span className="text-xs font-medium text-[var(--kite-text-heading)] opacity-0 transition-opacity duration-100 group-hover:opacity-100">
-                    {d.views.toLocaleString()}
-                  </span>
-                  {/* 柱体 */}
-                  <div className="relative w-full flex justify-center" style={{ height: 120 }}>
-                    <div
-                      className="w-full max-w-[40px] bg-[var(--kite-accent)] transition-all duration-200 group-hover:bg-[#444]"
-                      style={{ height: `${pct}%`, marginTop: 'auto' }}
-                    />
-                  </div>
-                  {/* 标签 */}
-                  <span className="text-xs text-[var(--kite-text-muted)]">{d.day}</span>
-                </div>
-              )
-            })}
-          </div>
+          {(() => {
+            const chartW = 560
+            const chartH = 140
+            const padX = 40
+            const padY = 10
+            const padBottom = 18
+            const innerW = chartW - padX * 2
+            const innerH = chartH - padY - padBottom
+            const minV = 0
+            const maxV = maxViews * 1.05
+
+            const points = weeklyTraffic.map((d, i) => ({
+              x: padX + (i / (weeklyTraffic.length - 1)) * innerW,
+              y: padY + innerH - ((d.views - minV) / (maxV - minV)) * innerH,
+              views: d.views,
+              day: d.day,
+            }))
+
+            const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+            const areaPath = `${linePath} L${points[points.length - 1].x},${padY + innerH} L${points[0].x},${padY + innerH} Z`
+
+            // Y 轴刻度
+            const yTicks = [0, Math.round(maxV * 0.33), Math.round(maxV * 0.66), Math.round(maxV)]
+
+            return (
+              <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full flex-1" preserveAspectRatio="xMidYEnd meet">
+                {/* 水平网格线 */}
+                {yTicks.map((tick) => {
+                  const y = padY + innerH - ((tick - minV) / (maxV - minV)) * innerH
+                  return (
+                    <g key={tick}>
+                      <line x1={padX} y1={y} x2={chartW - padX} y2={y} stroke="var(--kite-border)" strokeWidth={0.5} />
+                      <text x={padX - 6} y={y + 3} textAnchor="end" className="fill-[var(--kite-text-muted)]" fontSize={9}>
+                        {tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : tick}
+                      </text>
+                    </g>
+                  )
+                })}
+
+                {/* 面积填充 */}
+                <path d={areaPath} fill="var(--kite-accent)" opacity={0.06} />
+
+                {/* 折线 */}
+                <path d={linePath} fill="none" stroke="var(--kite-accent)" strokeWidth={2} />
+
+                {/* 数据点 + X 轴标签 */}
+                {points.map((p, i) => (
+                  <g key={i} className="group">
+                    {/* X 轴标签 */}
+                    <text x={p.x} y={padY + innerH + 14} textAnchor="middle" className="fill-[var(--kite-text-muted)]" fontSize={10}>
+                      {p.day}
+                    </text>
+                    {/* 圆点 */}
+                    <circle cx={p.x} cy={p.y} r={3} fill="var(--kite-bg)" stroke="var(--kite-accent)" strokeWidth={1.5} />
+                    {/* hover 大圆点 */}
+                    <circle cx={p.x} cy={p.y} r={5} fill="var(--kite-accent)" opacity={0} className="transition-opacity duration-100 hover:opacity-100" />
+                    {/* hover 数值标签 */}
+                    <rect x={p.x - 22} y={p.y - 24} width={44} height={18} fill="var(--kite-accent)" opacity={0} className="transition-opacity duration-100 hover:opacity-100 pointer-events-none" />
+                    {/* 透明大 hitbox */}
+                    <rect x={p.x - 25} y={padY} width={50} height={innerH} fill="transparent" className="peer" />
+                    {/* 提示框 */}
+                    <g className="opacity-0 transition-opacity duration-100 peer-hover:opacity-100" style={{ pointerEvents: 'none' }}>
+                      <rect x={p.x - 24} y={p.y - 26} width={48} height={18} fill="var(--kite-accent)" />
+                      <text x={p.x} y={p.y - 14} textAnchor="middle" fill="white" fontSize={10} fontWeight={600}>
+                        {p.views.toLocaleString()}
+                      </text>
+                      {/* 竖虚线 */}
+                      <line x1={p.x} y1={p.y + 4} x2={p.x} y2={padY + innerH} stroke="var(--kite-accent)" strokeWidth={0.5} strokeDasharray="3,3" />
+                    </g>
+                  </g>
+                ))}
+              </svg>
+            )
+          })()}
         </div>
 
         {/* 最近文章 */}
