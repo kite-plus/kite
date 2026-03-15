@@ -1,0 +1,64 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment and local config
+.env
+.env.*
+!.env.example
+config.yaml
+config.local.yaml
+config.*.local.yaml
+
+# Logs
+*.log
+logs/
+
+# Go build artifacts
+kite
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+coverage.html
+cover.out
+
+# Go workspace / tooling
+bin/
+dist/
+
+# SQLite and local data
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+
+# Frontend dependencies and build artifacts
+node_modules/
+ui/admin/node_modules/
+ui/admin/dist/
+!ui/admin/dist/.keep
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.cache
+
+# Generated archives
+*.zip
+*.tar
+*.tar.gz
