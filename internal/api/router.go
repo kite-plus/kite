@@ -39,9 +39,9 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 
 	apiV1 := router.Group("/api/v1")
 	apiV1.GET("/health", healthHandler.Get)
-	apiV1.GET("/posts", postHandler.List)
-	apiV1.GET("/posts/:id", postHandler.GetByID)
-	apiV1.GET("/posts/slug/:slug", postHandler.GetBySlug)
+	apiV1.GET("/posts", postHandler.ListPublic)
+	apiV1.GET("/posts/:id", postHandler.GetPublicByID)
+	apiV1.GET("/posts/slug/:slug", postHandler.GetPublicBySlug)
 	apiV1.POST("/posts", postHandler.Create)
 	apiV1.PUT("/posts/:id", postHandler.Update)
 	apiV1.PATCH("/posts/:id", postHandler.Patch)
@@ -64,6 +64,15 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	apiV1.PUT("/categories/:id", categoryHandler.Update)
 	apiV1.PATCH("/categories/:id", categoryHandler.Patch)
 	apiV1.DELETE("/categories/:id", categoryHandler.Delete)
+
+	adminV1 := apiV1.Group("/admin")
+	adminV1.GET("/posts", postHandler.List)
+	adminV1.GET("/posts/:id", postHandler.GetByID)
+	adminV1.GET("/posts/slug/:slug", postHandler.GetBySlug)
+	adminV1.POST("/posts", postHandler.Create)
+	adminV1.PUT("/posts/:id", postHandler.Update)
+	adminV1.PATCH("/posts/:id", postHandler.Patch)
+	adminV1.DELETE("/posts/:id", postHandler.Delete)
 }
 
 func registerPageRoutes(router *gin.Engine, cfg *config.Config, templateFS fs.FS) {

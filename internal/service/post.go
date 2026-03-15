@@ -26,39 +26,42 @@ type PostListParams struct {
 }
 
 type CreatePostInput struct {
-	Title       string     `json:"title"`
-	Slug        string     `json:"slug"`
-	Summary     string     `json:"summary"`
-	Content     string     `json:"content"`
-	Status      string     `json:"status"`
-	CoverImage  string     `json:"cover_image"`
-	PublishedAt *time.Time `json:"published_at"`
-	CategoryID  *string    `json:"category_id"`
-	TagIDs      []string   `json:"tag_ids"`
+	Title        string     `json:"title"`
+	Slug         string     `json:"slug"`
+	Summary      string     `json:"summary"`
+	Content      string     `json:"content"`
+	Status       string     `json:"status"`
+	CoverImage   string     `json:"cover_image"`
+	PublishedAt  *time.Time `json:"published_at"`
+	ShowComments *bool      `json:"show_comments"`
+	CategoryID   *string    `json:"category_id"`
+	TagIDs       []string   `json:"tag_ids"`
 }
 
 type UpdatePostInput struct {
-	Title       string     `json:"title"`
-	Slug        string     `json:"slug"`
-	Summary     string     `json:"summary"`
-	Content     string     `json:"content"`
-	Status      string     `json:"status"`
-	CoverImage  string     `json:"cover_image"`
-	PublishedAt *time.Time `json:"published_at"`
-	CategoryID  *string    `json:"category_id"`
-	TagIDs      []string   `json:"tag_ids"`
+	Title        string     `json:"title"`
+	Slug         string     `json:"slug"`
+	Summary      string     `json:"summary"`
+	Content      string     `json:"content"`
+	Status       string     `json:"status"`
+	CoverImage   string     `json:"cover_image"`
+	PublishedAt  *time.Time `json:"published_at"`
+	ShowComments *bool      `json:"show_comments"`
+	CategoryID   *string    `json:"category_id"`
+	TagIDs       []string   `json:"tag_ids"`
 }
 
 type PatchPostInput struct {
-	Title       *string    `json:"title"`
-	Slug        *string    `json:"slug"`
-	Summary     *string    `json:"summary"`
-	Content     *string    `json:"content"`
-	Status      *string    `json:"status"`
-	CoverImage  *string    `json:"cover_image"`
-	PublishedAt *time.Time `json:"published_at"`
-	CategoryID  *string    `json:"category_id"`
-	TagIDs      *[]string  `json:"tag_ids"`
+	Title        *string    `json:"title"`
+	Slug         *string    `json:"slug"`
+	Summary      *string    `json:"summary"`
+	Content      *string    `json:"content"`
+	Status       *string    `json:"status"`
+	CoverImage   *string    `json:"cover_image"`
+	PublishedAt  *time.Time `json:"published_at"`
+	ShowComments *bool      `json:"show_comments"`
+	CategoryID   *string    `json:"category_id"`
+	TagIDs       *[]string  `json:"tag_ids"`
 }
 
 type PostListResult struct {
@@ -83,6 +86,14 @@ func NewPostService(postRepo *repo.PostRepository, tagRepo *repo.TagRepository, 
 }
 
 func (s *PostService) List(params PostListParams) (*PostListResult, error) {
+	return s.list(params, false)
+}
+
+func (s *PostService) ListPublic(params PostListParams) (*PostListResult, error) {
+	return s.list(params, true)
+}
+
+func (s *PostService) list(params PostListParams, publicOnly bool) (*PostListResult, error) {
 	if s == nil || s.postRepo == nil {
 		return nil, fmt.Errorf("post service is unavailable")
 	}
@@ -109,10 +120,11 @@ func (s *PostService) List(params PostListParams) (*PostListResult, error) {
 	posts, total, err := s.postRepo.List(repo.PostListParams{
 		Page:       params.Page,
 		PageSize:   params.PageSize,
-		Status:     strings.TrimSpace(params.Status),
+		Status:     normalizeListStatus(params.Status, publicOnly),
 		Keyword:    strings.TrimSpace(params.Keyword),
 		TagID:      tagID,
 		CategoryID: categoryID,
+		PublicOnly: publicOnly,
 	})
 	if err != nil {
 		return nil, err
@@ -136,12 +148,28 @@ func (s *PostService) GetByID(id string) (*model.Post, error) {
 	return s.postRepo.GetByID(parsedID)
 }
 
+func (s *PostService) GetPublicByID(id string) (*model.Post, error) {
+	parsedID, err := parseUUID(id)
+	if err != nil {
+		return nil, err
+	}
+	return s.postRepo.GetPublicByID(parsedID)
+}
+
 func (s *PostService) GetBySlug(slug string) (*model.Post, error) {
 	slug = strings.TrimSpace(slug)
 	if slug == "" {
 		return nil, fmt.Errorf("%w: slug is required", ErrInvalidPostPayload)
 	}
 	return s.postRepo.GetBySlug(slug)
+}
+
+func (s *PostService) GetPublicBySlug(slug string) (*model.Post, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return nil, fmt.Errorf("%w: slug is required", ErrInvalidPostPayload)
+	}
+	return s.postRepo.GetPublicBySlug(slug)
 }
 
 func (s *PostService) Create(input CreatePostInput) (*model.Post, error) {
@@ -151,17 +179,19 @@ func (s *PostService) Create(input CreatePostInput) (*model.Post, error) {
 	}
 
 	post := &model.Post{
-		Title:       strings.TrimSpace(input.Title),
-		Slug:        strings.TrimSpace(input.Slug),
-		Summary:     strings.TrimSpace(input.Summary),
-		Content:     input.Content,
-		Status:      normalizeStatus(input.Status),
-		CoverImage:  strings.TrimSpace(input.CoverImage),
-		PublishedAt: input.PublishedAt,
-		CategoryID:  categoryID,
-		Tags:        tags,
+		Title:        strings.TrimSpace(input.Title),
+		Slug:         strings.TrimSpace(input.Slug),
+		Summary:      strings.TrimSpace(input.Summary),
+		Content:      input.Content,
+		Status:       normalizeStatus(input.Status),
+		CoverImage:   strings.TrimSpace(input.CoverImage),
+		PublishedAt:  normalizeTimePointer(input.PublishedAt),
+		ShowComments: normalizeShowComments(input.ShowComments, true),
+		CategoryID:   categoryID,
+		Tags:         tags,
 	}
 
+	preparePostForSave(post)
 	if err := validatePost(post); err != nil {
 		return nil, err
 	}
@@ -196,10 +226,14 @@ func (s *PostService) Update(id string, input UpdatePostInput) (*model.Post, err
 	existing.Content = input.Content
 	existing.Status = normalizeStatus(input.Status)
 	existing.CoverImage = strings.TrimSpace(input.CoverImage)
-	existing.PublishedAt = input.PublishedAt
+	if input.PublishedAt != nil {
+		existing.PublishedAt = normalizeTimePointer(input.PublishedAt)
+	}
+	existing.ShowComments = normalizeShowComments(input.ShowComments, existing.ShowComments)
 	existing.CategoryID = categoryID
 	existing.Tags = tags
 
+	preparePostForSave(existing)
 	if err := validatePost(existing); err != nil {
 		return nil, err
 	}
@@ -242,7 +276,10 @@ func (s *PostService) Patch(id string, input PatchPostInput) (*model.Post, error
 		existing.CoverImage = strings.TrimSpace(*input.CoverImage)
 	}
 	if input.PublishedAt != nil {
-		existing.PublishedAt = input.PublishedAt
+		existing.PublishedAt = normalizeTimePointer(input.PublishedAt)
+	}
+	if input.ShowComments != nil {
+		existing.ShowComments = *input.ShowComments
 	}
 	if input.CategoryID != nil {
 		categoryID, err := s.resolveCategoryID(input.CategoryID)
@@ -259,6 +296,7 @@ func (s *PostService) Patch(id string, input PatchPostInput) (*model.Post, error
 		existing.Tags = tags
 	}
 
+	preparePostForSave(existing)
 	if err := validatePost(existing); err != nil {
 		return nil, err
 	}
@@ -393,6 +431,38 @@ func ensureSlugAvailable(postRepo *repo.PostRepository, slug string, currentID u
 		return err
 	}
 	return nil
+}
+
+func preparePostForSave(post *model.Post) {
+	if post == nil {
+		return
+	}
+	if post.Status == model.PostStatusPublished && post.PublishedAt == nil {
+		now := time.Now().UTC()
+		post.PublishedAt = &now
+	}
+}
+
+func normalizeTimePointer(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	normalized := value.UTC()
+	return &normalized
+}
+
+func normalizeShowComments(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
+}
+
+func normalizeListStatus(status string, publicOnly bool) string {
+	if publicOnly {
+		return ""
+	}
+	return strings.TrimSpace(status)
 }
 
 func normalizeStatus(status string) string {

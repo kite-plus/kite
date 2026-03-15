@@ -38,6 +38,25 @@ func (h *PostHandler) List(c *gin.Context) {
 	Success(c, result)
 }
 
+func (h *PostHandler) ListPublic(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+
+	result, err := h.postService.ListPublic(service.PostListParams{
+		Page:       page,
+		PageSize:   pageSize,
+		Keyword:    c.Query("keyword"),
+		TagID:      c.Query("tag_id"),
+		CategoryID: c.Query("category_id"),
+	})
+	if err != nil {
+		handlePostError(c, err)
+		return
+	}
+
+	Success(c, result)
+}
+
 func (h *PostHandler) GetByID(c *gin.Context) {
 	post, err := h.postService.GetByID(c.Param("id"))
 	if err != nil {
@@ -48,8 +67,28 @@ func (h *PostHandler) GetByID(c *gin.Context) {
 	Success(c, post)
 }
 
+func (h *PostHandler) GetPublicByID(c *gin.Context) {
+	post, err := h.postService.GetPublicByID(c.Param("id"))
+	if err != nil {
+		handlePostError(c, err)
+		return
+	}
+
+	Success(c, post)
+}
+
 func (h *PostHandler) GetBySlug(c *gin.Context) {
 	post, err := h.postService.GetBySlug(c.Param("slug"))
+	if err != nil {
+		handlePostError(c, err)
+		return
+	}
+
+	Success(c, post)
+}
+
+func (h *PostHandler) GetPublicBySlug(c *gin.Context) {
+	post, err := h.postService.GetPublicBySlug(c.Param("slug"))
 	if err != nil {
 		handlePostError(c, err)
 		return

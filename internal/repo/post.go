@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/amigoer/kite-blog/internal/model"
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ type PostListParams struct {
 	Keyword    string
 	TagID      *uuid.UUID
 	CategoryID *uuid.UUID
+	PublicOnly bool
 }
 
 type PostRepository struct {
@@ -35,6 +37,9 @@ func (r *PostRepository) List(params PostListParams) ([]model.Post, int64, error
 	}
 
 	query := r.db.Model(&model.Post{})
+	if params.PublicOnly {
+		query = applyPublicPostScope(query, time.Now().UTC())
+	}
 	if params.Status != "" {
 		query = query.Where("status = ?", params.Status)
 	}
@@ -66,7 +71,11 @@ func (r *PostRepository) List(params PostListParams) ([]model.Post, int64, error
 	}
 
 	var posts []model.Post
-	if err := query.Preload("Category").Preload("Tags").Order("created_at DESC").Offset((params.Page - 1) * params.PageSize).Limit(params.PageSize).Find(&posts).Error; err != nil {
+	orderExpr := "created_at DESC"
+	if params.PublicOnly {
+		orderExpr = "COALESCE(published_at, created_at) DESC, created_at DESC"
+	}
+	if err := query.Preload("Category").Preload("Tags").Order(orderExpr).Offset((params.Page - 1) * params.PageSize).Limit(params.PageSize).Find(&posts).Error; err != nil {
 		return nil, 0, fmt.Errorf("list posts: %w", err)
 	}
 
@@ -89,6 +98,22 @@ func (r *PostRepository) GetByID(id uuid.UUID) (*model.Post, error) {
 	return &post, nil
 }
 
+func (r *PostRepository) GetPublicByID(id uuid.UUID) (*model.Post, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("post repository is unavailable")
+	}
+
+	var post model.Post
+	if err := applyPublicPostScope(r.db.Preload("Category").Preload("Tags"), time.Now().UTC()).First(&post, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPostNotFound
+		}
+		return nil, fmt.Errorf("get public post by id: %w", err)
+	}
+
+	return &post, nil
+}
+
 func (r *PostRepository) GetBySlug(slug string) (*model.Post, error) {
 	if r == nil || r.db == nil {
 		return nil, fmt.Errorf("post repository is unavailable")
@@ -100,6 +125,22 @@ func (r *PostRepository) GetBySlug(slug string) (*model.Post, error) {
 			return nil, ErrPostNotFound
 		}
 		return nil, fmt.Errorf("get post by slug: %w", err)
+	}
+
+	return &post, nil
+}
+
+func (r *PostRepository) GetPublicBySlug(slug string) (*model.Post, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("post repository is unavailable")
+	}
+
+	var post model.Post
+	if err := applyPublicPostScope(r.db.Preload("Category").Preload("Tags"), time.Now().UTC()).First(&post, "slug = ?", slug).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPostNotFound
+		}
+		return nil, fmt.Errorf("get public post by slug: %w", err)
 	}
 
 	return &post, nil
@@ -125,7 +166,7 @@ func (r *PostRepository) Update(post *model.Post) error {
 		return fmt.Errorf("post repository is unavailable")
 	}
 
-	result := r.db.Model(post).Select("title", "slug", "summary", "content", "status", "cover_image", "published_at", "category_id").Updates(post)
+	result := r.db.Model(post).Select("title", "slug", "summary", "content", "status", "cover_image", "published_at", "show_comments", "category_id").Updates(post)
 	if result.Error != nil {
 		return fmt.Errorf("update post: %w", result.Error)
 	}
@@ -157,4 +198,12 @@ func (r *PostRepository) reloadAssociations(post *model.Post) error {
 		return nil
 	}
 	return r.db.Preload("Category").Preload("Tags").First(post, "id = ?", post.ID).Error
+}
+
+func applyPublicPostScope(query *gorm.DB, now time.Time) *gorm.DB {
+	return query.Where(
+		"status = ? AND (published_at IS NULL OR published_at <= ?)",
+		model.PostStatusPublished,
+		now,
+	)
 }

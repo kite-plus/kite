@@ -124,13 +124,15 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 ### 4.2 排序
 
 当前已实现的列表接口采用服务端固定排序：
-- 文章：`created_at DESC`
+- 前台文章：`COALESCE(published_at, created_at) DESC, created_at DESC`
+- 后台文章：`created_at DESC`
 - 友情链接：`sort ASC, created_at DESC`
 
 ### 4.3 过滤
 
 当前已实现的过滤能力：
-- 文章：`status`、`keyword`、`tag_id`、`category_id`
+- 前台文章：`keyword`、`tag_id`、`category_id`，并强制追加公开约束
+- 后台文章：`status`、`keyword`、`tag_id`、`category_id`
 - 友情链接：`keyword`、`is_active`
 
 ## 5. 数据模型草案
@@ -149,6 +151,7 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
   "status": "draft",
   "cover_image": "",
   "published_at": null,
+  "show_comments": true,
   "category_id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
   "category": {
     "id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
@@ -171,6 +174,8 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 - `status`: `draft` / `published` / `archived`
 - `slug`: 全局唯一，用于前台路由
 - `summary`: 可人工填写，也可由 AI 自动生成
+- `published_at`: 文章发布时间；当前台接口查询时，只有 `status=published` 且 `published_at<=当前时间` 的文章会被公开
+- `show_comments`: 是否展示文章底部评论区
 - `category_id`: 可为空，表示文章所属分类
 - `tags`: 多对多标签集合
 
@@ -248,13 +253,13 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 #### `GET /api/v1/posts`
 
 用途：
-- 获取文章列表
-- 支持分页、状态过滤、关键字搜索
+- 获取前台公开文章列表
+- 支持分页、关键字搜索、标签和分类过滤
+- 仅返回 `status=published` 且 `published_at<=当前时间` 的文章
 
 查询参数：
 - `page`
 - `page_size`
-- `status`
 - `keyword`
 - `tag_id`
 - `category_id`
@@ -275,6 +280,7 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
         "status": "published",
         "cover_image": "",
         "published_at": "2026-03-15T10:00:00Z",
+        "show_comments": true,
         "category_id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
         "category": {
           "id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
@@ -305,18 +311,20 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 #### `GET /api/v1/posts/:id`
 
 用途：
-- 根据 UUID 获取文章详情
+- 根据 UUID 获取前台公开文章详情
+- 草稿、归档和未来发布时间的文章统一返回 `404`
 
 #### `GET /api/v1/posts/slug/:slug`
 
 用途：
-- 根据 slug 获取文章详情
+- 根据 slug 获取前台公开文章详情
 - 供 classic 前台和 headless 前端共用
+- 草稿、归档和未来发布时间的文章统一返回 `404`
 
 #### `POST /api/v1/posts`
 
 用途：
-- 创建文章
+- 创建文章（兼容现有写入路径，推荐后台管理端优先使用 `/api/v1/admin/posts`）
 
 请求体示例：
 
@@ -329,12 +337,17 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
   "status": "draft",
   "cover_image": "",
   "published_at": null,
+  "show_comments": true,
   "category_id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
   "tag_ids": [
     "0195f400-13ad-7cbb-9b9f-04d15b759cb8"
   ]
 }
 ```
+
+请求体字段补充说明：
+- `status=published` 且未显式传入 `published_at` 时，服务端会自动将发布时间补为当前时间
+- `show_comments=false` 时，前台可据此隐藏文章底部评论区
 
 #### `PUT /api/v1/posts/:id`
 
@@ -348,6 +361,53 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 - 推荐给后台表单自动保存场景
 
 #### `DELETE /api/v1/posts/:id`
+
+用途：
+- 软删除文章
+
+### 6.2.1 Admin Posts
+
+#### `GET /api/v1/admin/posts`
+
+用途：
+- 获取后台文章列表
+- 支持分页、状态过滤、关键字搜索
+- 不附加前台公开约束，可查询草稿、归档和定时发布文章
+
+查询参数：
+- `page`
+- `page_size`
+- `status`
+- `keyword`
+- `tag_id`
+- `category_id`
+
+#### `GET /api/v1/admin/posts/:id`
+
+用途：
+- 根据 UUID 获取后台文章详情
+
+#### `GET /api/v1/admin/posts/slug/:slug`
+
+用途：
+- 根据 slug 获取后台文章详情
+
+#### `POST /api/v1/admin/posts`
+
+用途：
+- 创建文章
+
+#### `PUT /api/v1/admin/posts/:id`
+
+用途：
+- 全量更新文章
+
+#### `PATCH /api/v1/admin/posts/:id`
+
+用途：
+- 局部更新文章
+
+#### `DELETE /api/v1/admin/posts/:id`
 
 用途：
 - 软删除文章
@@ -579,7 +639,7 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 
 ## 7. 管理端与前台接口边界
 
-建议将接口按使用场景分为两类：
+当前已将文章接口按使用场景分为两类：
 - 公共接口：面向前台展示与外部 headless 消费
 - 管理接口：面向后台管理端，后续可接入鉴权
 
@@ -587,7 +647,7 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 - 公共接口：`/api/v1/...`
 - 管理接口：`/api/v1/admin/...`
 
-例如：
+当前文章接口示例：
 - `GET /api/v1/posts/slug/:slug` 供前台使用
 - `GET /api/v1/admin/posts` 供后台管理使用
 - `GET /api/v1/friend-links` 可作为公开友情链接读取接口
