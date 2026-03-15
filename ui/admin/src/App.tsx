@@ -4,6 +4,7 @@ import { AdminLayout } from '@/layouts/AdminLayout'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PostsPage } from '@/pages/PostsPage'
 import { CategoriesPage } from '@/pages/CategoriesPage'
+import { SettingsPage } from '@/pages/SettingsPage'
 
 /** TanStack Query 客户端 */
 const queryClient = new QueryClient({
@@ -26,10 +27,9 @@ function App() {
         <Routes>
           <Route element={<AdminLayout />}>
             <Route index element={<DashboardPage />} />
-            {/* 后续页面路由在此扩展 */}
             <Route path="posts" element={<PostsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
-            <Route path="settings" element={<PlaceholderPage title="系统设置" />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
@@ -37,18 +37,5 @@ function App() {
   )
 }
 
-/** 通用占位页面 */
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-[var(--kite-text-heading)]">
-        {title}
-      </h1>
-      <p className="mt-1 text-sm text-[var(--kite-text-muted)]">
-        此页面尚未实现
-      </p>
-    </div>
-  )
-}
-
 export default App
+
