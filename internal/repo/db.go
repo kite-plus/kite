@@ -45,6 +45,8 @@ func autoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&model.Post{},
 		&model.FriendLink{},
+		&model.Tag{},
+		&model.Category{},
 	)
 }
 

@@ -30,6 +30,12 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	friendLinkRepository := repo.NewFriendLinkRepository(db)
 	friendLinkService := service.NewFriendLinkService(friendLinkRepository)
 	friendLinkHandler := NewFriendLinkHandler(friendLinkService)
+	tagRepository := repo.NewTagRepository(db)
+	tagService := service.NewTagService(tagRepository)
+	tagHandler := NewTagHandler(tagService)
+	categoryRepository := repo.NewCategoryRepository(db)
+	categoryService := service.NewCategoryService(categoryRepository)
+	categoryHandler := NewCategoryHandler(categoryService)
 
 	apiV1 := router.Group("/api/v1")
 	apiV1.GET("/health", healthHandler.Get)
@@ -46,6 +52,18 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	apiV1.PUT("/friend-links/:id", friendLinkHandler.Update)
 	apiV1.PATCH("/friend-links/:id", friendLinkHandler.Patch)
 	apiV1.DELETE("/friend-links/:id", friendLinkHandler.Delete)
+	apiV1.GET("/tags", tagHandler.List)
+	apiV1.GET("/tags/:id", tagHandler.GetByID)
+	apiV1.POST("/tags", tagHandler.Create)
+	apiV1.PUT("/tags/:id", tagHandler.Update)
+	apiV1.PATCH("/tags/:id", tagHandler.Patch)
+	apiV1.DELETE("/tags/:id", tagHandler.Delete)
+	apiV1.GET("/categories", categoryHandler.List)
+	apiV1.GET("/categories/:id", categoryHandler.GetByID)
+	apiV1.POST("/categories", categoryHandler.Create)
+	apiV1.PUT("/categories/:id", categoryHandler.Update)
+	apiV1.PATCH("/categories/:id", categoryHandler.Patch)
+	apiV1.DELETE("/categories/:id", categoryHandler.Delete)
 }
 
 func registerPageRoutes(router *gin.Engine, cfg *config.Config, templateFS fs.FS) {

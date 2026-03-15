@@ -402,18 +402,146 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 ### 6.4 Tags
 
 #### `GET /api/v1/tags`
+
+用途：
+- 获取标签列表
+- 支持分页与关键字搜索
+
+查询参数：
+- `page`
+- `page_size`
+- `keyword`
+
+响应示例：
+
+```json
+{
+  "code": 200,
+  "data": {
+    "items": [
+      {
+        "id": "0195f400-13ad-7cbb-9b9f-04d15b759cb8",
+        "name": "golang",
+        "slug": "golang",
+        "created_at": "2026-03-15T10:00:00Z",
+        "updated_at": "2026-03-15T10:00:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "page_size": 10,
+      "total": 1
+    }
+  },
+  "msg": "ok"
+}
+```
+
 #### `GET /api/v1/tags/:id`
+
+用途：
+- 根据 UUID 获取标签详情
+
 #### `POST /api/v1/tags`
+
+用途：
+- 创建标签
+
+请求体示例：
+
+```json
+{
+  "name": "golang",
+  "slug": "golang"
+}
+```
+
 #### `PUT /api/v1/tags/:id`
+
+用途：
+- 全量更新标签
+
+#### `PATCH /api/v1/tags/:id`
+
+用途：
+- 局部更新标签
+
 #### `DELETE /api/v1/tags/:id`
+
+用途：
+- 软删除标签
 
 ### 6.5 Categories
 
 #### `GET /api/v1/categories`
+
+用途：
+- 获取分类列表
+- 支持分页与关键字搜索
+
+查询参数：
+- `page`
+- `page_size`
+- `keyword`
+
+响应示例：
+
+```json
+{
+  "code": 200,
+  "data": {
+    "items": [
+      {
+        "id": "0195f400-0d80-730a-bf8a-4d9776db8f4d",
+        "name": "backend",
+        "slug": "backend",
+        "created_at": "2026-03-15T10:00:00Z",
+        "updated_at": "2026-03-15T10:00:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "page_size": 10,
+      "total": 1
+    }
+  },
+  "msg": "ok"
+}
+```
+
 #### `GET /api/v1/categories/:id`
+
+用途：
+- 根据 UUID 获取分类详情
+
 #### `POST /api/v1/categories`
+
+用途：
+- 创建分类
+
+请求体示例：
+
+```json
+{
+  "name": "Backend",
+  "slug": "backend"
+}
+```
+
 #### `PUT /api/v1/categories/:id`
+
+用途：
+- 全量更新分类
+
+#### `PATCH /api/v1/categories/:id`
+
+用途：
+- 局部更新分类
+
 #### `DELETE /api/v1/categories/:id`
+
+用途：
+- 软删除分类
 
 ## 7. 管理端与前台接口边界
 
@@ -444,16 +572,17 @@ Kite 后端采用严格分层结构：`api -> service -> repo -> model`。
 - `resource not found`
 - `duplicate slug`
 - `duplicate friend link url`
+- `duplicate tag slug`
+- `duplicate category slug`
 - `internal server error`
 
 ## 9. 后续实现顺序建议
 
 建议后续按以下顺序继续扩展：
-1. `Tag` 与 `Category` 模型及 CRUD
-2. 文章与标签/分类关联
-3. 管理端接口拆分到 `/api/v1/admin`
-4. 鉴权与权限控制
-5. OpenAPI 文档生成
+1. 文章与标签/分类关联
+2. 管理端接口拆分到 `/api/v1/admin`
+3. 鉴权与权限控制
+4. OpenAPI 文档生成
 
 ## 10. OpenAPI 规划
 
