@@ -15,8 +15,14 @@
   border-radius: 3px;
 }
 
-/* Semi Design 全局覆盖 */
-body {
+/* 全局布局约束 — 防止底部空白溢出 */
+html, body, #root {
+  height: 100%;
   margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }

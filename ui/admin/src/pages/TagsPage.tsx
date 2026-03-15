@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Card, Button, Input, Tag, Table, Typography, Empty } from '@douyinfe/semi-ui'
+import { Card, Button, ButtonGroup, Input, Tag, Table, Typography, Empty } from '@douyinfe/semi-ui'
 import { IconSearch, IconPlus, IconClose, IconDelete, IconHash, IconArticle } from '@douyinfe/semi-icons'
 import { useTagList, useCreateTag, useDeleteTag } from '@/hooks/use-tags'
 import type { ColumnProps } from '@douyinfe/semi-ui/lib/es/table'
@@ -98,10 +98,10 @@ export function TagsPage() {
         <Input prefix={<IconSearch />} placeholder="搜索标签…" value={keyword} onChange={(v) => setKeyword(v)} style={{ maxWidth: 360 }} showClear />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Text type="tertiary" size="small">{tags?.length ?? 0} 个标签 · {totalPosts} 次引用</Text>
-          <Button.Group>
+          <ButtonGroup>
             <Button theme={viewMode === 'cloud' ? 'solid' : 'light'} size="small" icon={<IconHash />} onClick={() => setViewMode('cloud')} />
             <Button theme={viewMode === 'list' ? 'solid' : 'light'} size="small" icon={<IconArticle />} onClick={() => setViewMode('list')} />
-          </Button.Group>
+          </ButtonGroup>
         </div>
       </div>
 
