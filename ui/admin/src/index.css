@@ -1,0 +1,67 @@
+/* Google Fonts - Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+/* ============================================
+   Kite Admin - 全局设计 Token 与 Reset
+   极致扁平化：无圆角、无阴影、硬线条
+   ============================================ */
+
+/* --- CSS 自定义属性 --- */
+:root {
+  --kite-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --kite-border: #e5e7eb;
+  --kite-border-hover: #9ca3af;
+  --kite-accent: #18181b;
+  --kite-bg: #ffffff;
+  --kite-bg-sidebar: #ffffff;
+  --kite-bg-hover: #f9fafb;
+  --kite-text: #475569;
+  --kite-text-muted: #64748b;
+  --kite-text-heading: #1e293b;
+}
+
+/* --- 全局 Reset：封杀圆角与阴影 --- */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* --- 基础排版 --- */
+body {
+  margin: 0;
+  font-family: var(--kite-font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--kite-text);
+  background-color: var(--kite-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- 滚动条极简化 --- */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--kite-border);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--kite-border-hover);
+}
+
+/* --- 选中文本样式 --- */
+::selection {
+  background-color: var(--kite-accent);
+  color: #ffffff;
+}

@@ -16,19 +16,6 @@
 - **跨库兼容**: 字段定义必须同时适配 SQLite (local) 和 PostgreSQL (prod)。
 - **GORM 钩子**: 必须在 `BaseModel` 中定义 `BeforeCreate`，确保在插入前执行 `b.ID = uuid.New()`。
 
-## 3. 前端开发规范 (React Admin)
-- **技术栈**: React 18+ / Vite / Shadcn UI / Tailwind CSS。
-- **数据流**: 
-  - 异步请求：使用 TanStack Query (React Query) 进行 Hooks 化管理。
-  - 全局状态：使用 Zustand 保持轻量。
-- **Shadcn UI 强制规范**: 
-  - **无圆角化**: Shadcn 组件默认带圆角，生成组件时必须手动移除 `rounded-md`, `rounded-lg` 等类名，统一改为 `rounded-none`。
-  - **去阴影化**: 移除所有 `shadow-*` 类名，改用 `border` 线条区分。
-- **Flat Design 视觉**: 
-  - 使用硬朗的边框（如 `border-black` 或 `border-slate-800`）。
-  - 禁止任何渐变（Gradient）和模糊（Blur）效果。
-- **代码风格**: 仅限函数式组件 (Functional Components)，严格遵循 Hooks 闭包规范。
-
 ## 4. 后端开发规范
 - **防御性编程**: 显式处理所有 `error`。API 统一响应结构：`{ "code": 200, "data": T, "msg": string }`。
 - **解耦**: 业务逻辑下沉到 `service` 层。预留 AI 接口抽象，以便接入 DeepSeek/OpenAI 处理文章摘要。
