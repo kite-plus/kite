@@ -1,20 +1,16 @@
 import { useState } from 'react'
-import { Search, Check, Trash2, AlertTriangle, MessageSquare, Clock, FileText, Shield, ChevronDown, ChevronUp } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Card, Button, Input, Tag, Tabs, TabPane, Divider, Typography, Empty, Avatar } from '@douyinfe/semi-ui'
+import { IconSearch, IconTick, IconDelete, IconClose, IconComment, IconClock, IconArticle, IconShield } from '@douyinfe/semi-icons'
 import { useComments, useCommentStats, useModerateComment } from '@/hooks/use-comments'
 import type { CommentStatus } from '@/types/comment'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+const { Title, Text, Paragraph } = Typography
 
 /** 状态徽标 */
-const statusBadge: Record<CommentStatus, { text: string; variant: 'default' | 'secondary' | 'destructive' }> = {
-  approved: { text: '已通过', variant: 'default' },
-  pending: { text: '待审核', variant: 'secondary' },
-  spam: { text: '垃圾', variant: 'destructive' },
+const statusBadge: Record<CommentStatus, { text: string; color: string }> = {
+  approved: { text: '已通过', color: 'blue' },
+  pending: { text: '待审核', color: 'orange' },
+  spam: { text: '垃圾', color: 'red' },
 }
 
 function timeAgo(dateStr: string): string {
@@ -29,7 +25,7 @@ function timeAgo(dateStr: string): string {
 }
 
 /**
- * 评论管理页面 - 使用 shadcn Tabs / Card / Badge / Button / Input / Separator
+ * 评论管理页面 — Semi Tabs / Card / Tag / Button / Input
  */
 export function CommentsPage() {
   const [statusFilter, setStatusFilter] = useState<CommentStatus | 'all'>('all')
@@ -47,14 +43,14 @@ export function CommentsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">评论管理</h1>
-        <p className="mt-1 text-sm text-muted-foreground">审核和管理读者的评论</p>
+      <div style={{ marginBottom: 24 }}>
+        <Title heading={4}>评论管理</Title>
+        <Text type="tertiary" size="small">审核和管理读者的评论</Text>
       </div>
 
       {/* 统计卡片 */}
       {stats && (
-        <div className="mb-6 grid grid-cols-4 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           {[
             { label: '全部评论', value: stats.total },
             { label: '待审核', value: stats.pending },
@@ -62,112 +58,76 @@ export function CommentsPage() {
             { label: '垃圾评论', value: stats.spam },
           ].map((card) => (
             <Card key={card.label}>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs text-muted-foreground">{card.label}</p>
-                <p className="mt-1 text-2xl font-semibold">{card.value}</p>
-              </CardContent>
+              <Text type="tertiary" size="small">{card.label}</Text>
+              <Title heading={3} style={{ margin: '4px 0 0' }}>{card.value}</Title>
             </Card>
           ))}
         </div>
       )}
 
       {/* 筛选栏 */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as CommentStatus | 'all')}>
-          <TabsList>
-            <TabsTrigger value="all">
-              <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-              全部 {stats?.total ?? 0}
-            </TabsTrigger>
-            <TabsTrigger value="pending">
-              <Clock className="mr-1.5 h-3.5 w-3.5" />
-              待审核 {stats?.pending ?? 0}
-            </TabsTrigger>
-            <TabsTrigger value="approved">
-              <Check className="mr-1.5 h-3.5 w-3.5" />
-              已通过 {stats?.approved ?? 0}
-            </TabsTrigger>
-            <TabsTrigger value="spam">
-              <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
-              垃圾 {stats?.spam ?? 0}
-            </TabsTrigger>
-          </TabsList>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <Tabs type="button" activeKey={statusFilter} onChange={(key) => setStatusFilter(key as CommentStatus | 'all')}>
+          <TabPane tab={<><IconComment size="small" /> 全部 {stats?.total ?? 0}</>} itemKey="all" />
+          <TabPane tab={<><IconClock size="small" /> 待审核 {stats?.pending ?? 0}</>} itemKey="pending" />
+          <TabPane tab={<><IconTick size="small" /> 已通过 {stats?.approved ?? 0}</>} itemKey="approved" />
+          <TabPane tab={<><IconClose size="small" /> 垃圾 {stats?.spam ?? 0}</>} itemKey="spam" />
         </Tabs>
-
-        <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="搜索评论内容、作者…" value={keyword} onChange={(e) => setKeyword(e.target.value)} className="pl-9" />
-        </div>
+        <Input prefix={<IconSearch />} placeholder="搜索评论内容、作者…" value={keyword} onChange={(v) => setKeyword(v)} style={{ maxWidth: 280 }} showClear />
       </div>
 
-      {isLoading && <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">加载中…</div>}
+      {isLoading && <div style={{ textAlign: 'center', padding: 64 }}><Text type="tertiary">加载中…</Text></div>}
 
       {!isLoading && comments?.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <MessageSquare className="mb-3 h-8 w-8" strokeWidth={1} />
-            <p className="text-sm">暂无评论</p>
-          </CardContent>
-        </Card>
+        <Card><Empty image={<IconComment style={{ fontSize: 48 }} />} description="暂无评论" /></Card>
       )}
 
       {/* 评论列表 */}
       {comments && comments.length > 0 && (
-        <Card>
+        <Card bodyStyle={{ padding: 0 }}>
           {comments.map((comment, index) => {
             const badge = statusBadge[comment.status]
             const isExpanded = expandedId === comment.id
             return (
               <div key={comment.id}>
-                {index > 0 && <Separator />}
-                <div className={cn('flex items-start gap-4 px-5 py-4', comment.status === 'spam' && 'bg-destructive/5')}>
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">
-                    {comment.author.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{comment.author}</span>
-                      <Badge variant={badge.variant}>{badge.text}</Badge>
-                      <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" strokeWidth={1.5} />
-                        {timeAgo(comment.createdAt)}
-                      </span>
+                {index > 0 && <Divider margin={0} />}
+                <div style={{ display: 'flex', gap: 12, padding: '16px 20px', background: comment.status === 'spam' ? 'rgba(255,0,0,0.02)' : undefined }}>
+                  <Avatar size="small" alt={comment.author}>{comment.author.charAt(0).toUpperCase()}</Avatar>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Text strong>{comment.author}</Text>
+                      <Tag color={badge.color} size="small">{badge.text}</Tag>
+                      <Text type="tertiary" size="small" style={{ marginLeft: 'auto' }}>
+                        <IconClock size="extra-small" /> {timeAgo(comment.createdAt)}
+                      </Text>
                     </div>
-                    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                      <FileText className="h-3 w-3" strokeWidth={1.5} />
-                      {comment.postTitle}
-                    </div>
-                    <p className={cn('mt-2 text-sm leading-relaxed', !isExpanded && 'line-clamp-2')}>{comment.content}</p>
-                    {comment.content.length > 100 && (
-                      <Button variant="link" size="sm" className="h-auto p-0 text-xs text-muted-foreground" onClick={() => setExpandedId(isExpanded ? null : comment.id)}>
-                        {isExpanded ? <>收起 <ChevronUp className="ml-0.5 h-3 w-3" /></> : <>展开 <ChevronDown className="ml-0.5 h-3 w-3" /></>}
-                      </Button>
-                    )}
+                    <Text type="tertiary" size="small" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                      <IconArticle size="extra-small" /> {comment.postTitle}
+                    </Text>
+                    <Paragraph
+                      ellipsis={!isExpanded ? { rows: 2, expandable: true, onExpand: () => setExpandedId(comment.id) } : undefined}
+                      style={{ marginTop: 8, fontSize: 14 }}
+                    >
+                      {comment.content}
+                    </Paragraph>
                     {isExpanded && (
                       <>
-                        <Separator className="my-3" />
-                        <div className="flex gap-4 text-xs text-muted-foreground">
-                          <span>邮箱：{comment.email}</span>
-                          <span>IP：{comment.ip}</span>
-                          <span>UA：{comment.userAgent}</span>
-                        </div>
+                        <Button theme="borderless" size="small" onClick={() => setExpandedId(null)}>收起</Button>
+                        <Divider margin={8} />
+                        <Text type="tertiary" size="small">
+                          邮箱：{comment.email} · IP：{comment.ip} · UA：{comment.userAgent}
+                        </Text>
                       </>
                     )}
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
                     {comment.status !== 'approved' && (
-                      <Button variant="outline" size="sm" disabled={moderateMutation.isPending} onClick={() => handleModerate(comment.id, 'approve')}>
-                        <Check className="mr-1 h-3.5 w-3.5" />通过
-                      </Button>
+                      <Button icon={<IconTick />} theme="light" size="small" disabled={moderateMutation.isPending} onClick={() => handleModerate(comment.id, 'approve')}>通过</Button>
                     )}
                     {comment.status !== 'spam' && (
-                      <Button variant="outline" size="sm" disabled={moderateMutation.isPending} onClick={() => handleModerate(comment.id, 'spam')}>
-                        <Shield className="mr-1 h-3.5 w-3.5" />垃圾
-                      </Button>
+                      <Button icon={<IconShield />} theme="light" size="small" disabled={moderateMutation.isPending} onClick={() => handleModerate(comment.id, 'spam')}>垃圾</Button>
                     )}
-                    <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={moderateMutation.isPending} onClick={() => handleModerate(comment.id, 'delete')}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <Button icon={<IconDelete />} theme="borderless" type="danger" size="small" disabled={moderateMutation.isPending} onClick={() => handleModerate(comment.id, 'delete')} />
                   </div>
                 </div>
               </div>

@@ -1,15 +1,13 @@
 import { useState } from 'react'
-import { Search, Plus, X, Tag as TagIcon, FileText, Trash2, Hash } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Card, Button, Input, Tag, Table, Typography, Empty } from '@douyinfe/semi-ui'
+import { IconSearch, IconPlus, IconClose, IconDelete, IconHash, IconArticle } from '@douyinfe/semi-icons'
 import { useTagList, useCreateTag, useDeleteTag } from '@/hooks/use-tags'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import type { ColumnProps } from '@douyinfe/semi-ui/lib/es/table'
+
+const { Title, Text } = Typography
 
 /**
- * 标签管理页面 - 使用 shadcn Card / Input / Badge / Button / Table
+ * 标签管理页面 — Semi Card / Input / Tag / Button / Table
  */
 export function TagsPage() {
   const [keyword, setKeyword] = useState('')
@@ -27,166 +25,116 @@ export function TagsPage() {
 
   function handleCreate() {
     if (!formData.name.trim()) return
-    createMutation.mutate(formData, {
-      onSuccess: () => { setFormData({ name: '', slug: '' }); setShowForm(false) },
-    })
+    createMutation.mutate(formData, { onSuccess: () => { setFormData({ name: '', slug: '' }); setShowForm(false) } })
   }
 
   function handleDelete(id: string, name: string) {
     if (window.confirm(`确定删除标签「${name}」吗？`)) deleteMutation.mutate(id)
   }
 
-  function getTagSize(postCount: number, maxCount: number): string {
-    if (maxCount === 0) return 'text-sm'
+  function getTagSize(postCount: number, maxCount: number): number {
+    if (maxCount === 0) return 14
     const ratio = postCount / maxCount
-    if (ratio > 0.7) return 'text-xl font-semibold'
-    if (ratio > 0.4) return 'text-base font-medium'
-    if (ratio > 0.15) return 'text-sm'
-    return 'text-xs'
+    if (ratio > 0.7) return 20
+    if (ratio > 0.4) return 16
+    if (ratio > 0.15) return 14
+    return 12
   }
 
   const maxPostCount = tags ? Math.max(...tags.map((t) => t.postCount), 1) : 1
   const totalPosts = tags ? tags.reduce((sum, t) => sum + t.postCount, 0) : 0
 
+  const columns: ColumnProps[] = [
+    {
+      title: '标签名称', dataIndex: 'name',
+      render: (val: string) => <Text strong><IconHash size="small" /> {val}</Text>,
+    },
+    { title: 'Slug', dataIndex: 'slug', width: 120, render: (val: string) => <Text type="tertiary">{val}</Text> },
+    {
+      title: '文章数', dataIndex: 'postCount', width: 100, align: 'center' as const,
+      render: (val: number) => <Text type="tertiary"><IconArticle size="small" /> {val}</Text>,
+    },
+    {
+      title: '操作', width: 60, align: 'center' as const,
+      render: (_: unknown, record: Record<string, unknown>) => (
+        <Button icon={<IconDelete />} theme="borderless" type="danger" size="small" onClick={() => handleDelete(record.id as string, record.name as string)} />
+      ),
+    },
+  ]
+
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">标签管理</h1>
-          <p className="mt-1 text-sm text-muted-foreground">管理文章标签，组织内容的细粒度分类</p>
+          <Title heading={4}>标签管理</Title>
+          <Text type="tertiary" size="small">管理文章标签，组织内容的细粒度分类</Text>
         </div>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          新建标签
-        </Button>
+        <Button icon={<IconPlus />} theme="solid" onClick={() => setShowForm(true)}>新建标签</Button>
       </div>
 
-      {/* 新建表单 */}
       {showForm && (
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">新建标签</CardTitle>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowForm(false)}>
-                <X className="h-4 w-4" />
+        <Card style={{ marginBottom: 24 }} title="新建标签" headerExtraContent={<Button icon={<IconClose />} theme="borderless" size="small" onClick={() => setShowForm(false)} />}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              <Text size="small" type="tertiary" style={{ display: 'block', marginBottom: 6 }}>标签名称</Text>
+              <Input value={formData.name} onChange={(v) => handleNameChange(v)} placeholder="例如：Kubernetes" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Text size="small" type="tertiary" style={{ display: 'block', marginBottom: 6 }}>Slug</Text>
+              <Input value={formData.slug} onChange={(v) => setFormData((p) => ({ ...p, slug: v }))} placeholder="例如：kubernetes" />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button theme="light" onClick={() => setShowForm(false)}>取消</Button>
+              <Button theme="solid" onClick={handleCreate} disabled={!formData.name.trim() || createMutation.isPending}>
+                {createMutation.isPending ? '创建中…' : '创建'}
               </Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">标签名称</label>
-                <Input value={formData.name} onChange={(e) => handleNameChange(e.target.value)} placeholder="例如：Kubernetes" />
-              </div>
-              <div className="flex-1">
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Slug</label>
-                <Input value={formData.slug} onChange={(e) => setFormData((p) => ({ ...p, slug: e.target.value }))} placeholder="例如：kubernetes" />
-              </div>
-              <div className="flex items-end gap-2">
-                <Button variant="outline" onClick={() => setShowForm(false)}>取消</Button>
-                <Button onClick={handleCreate} disabled={!formData.name.trim() || createMutation.isPending}>
-                  {createMutation.isPending ? '创建中…' : '创建'}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
+          </div>
         </Card>
       )}
 
       {/* 搜索 + 视图切换 */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="搜索标签…" value={keyword} onChange={(e) => setKeyword(e.target.value)} className="pl-9" />
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">{tags?.length ?? 0} 个标签 · {totalPosts} 次引用</span>
-          <div className="flex">
-            <Button variant={viewMode === 'cloud' ? 'default' : 'outline'} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode('cloud')} title="标签云">
-              <Hash className="h-3.5 w-3.5" />
-            </Button>
-            <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode('list')} title="列表">
-              <FileText className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <Input prefix={<IconSearch />} placeholder="搜索标签…" value={keyword} onChange={(v) => setKeyword(v)} style={{ maxWidth: 360 }} showClear />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Text type="tertiary" size="small">{tags?.length ?? 0} 个标签 · {totalPosts} 次引用</Text>
+          <Button.Group>
+            <Button theme={viewMode === 'cloud' ? 'solid' : 'light'} size="small" icon={<IconHash />} onClick={() => setViewMode('cloud')} />
+            <Button theme={viewMode === 'list' ? 'solid' : 'light'} size="small" icon={<IconArticle />} onClick={() => setViewMode('list')} />
+          </Button.Group>
         </div>
       </div>
 
-      {isLoading && <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">加载中…</div>}
+      {isLoading && <div style={{ textAlign: 'center', padding: 64 }}><Text type="tertiary">加载中…</Text></div>}
 
       {!isLoading && tags?.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <TagIcon className="mb-3 h-8 w-8" strokeWidth={1} />
-            <p className="text-sm">暂无标签，点击上方按钮创建</p>
-          </CardContent>
-        </Card>
+        <Card><Empty image={<IconHash style={{ fontSize: 48 }} />} description="暂无标签，点击上方按钮创建" /></Card>
       )}
 
       {/* 标签云 */}
       {tags && tags.length > 0 && viewMode === 'cloud' && (
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-2.5">
-              {tags.map((tag) => (
-                <div key={tag.id} className="group relative">
-                  <Badge variant="outline" className={cn('gap-1.5 px-3 py-1.5 cursor-default', getTagSize(tag.postCount, maxPostCount))}>
-                    <Hash className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
-                    {tag.name}
-                    <span className="text-xs font-normal text-muted-foreground">{tag.postCount}</span>
-                  </Badge>
-                  <Button
-                    variant="destructive" size="icon"
-                    className="absolute -right-1 -top-1 h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
-                    onClick={() => handleDelete(tag.id, tag.name)}
-                    title="删除"
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {tags.map((tag) => (
+              <Tag
+                key={tag.id}
+                closable
+                onClose={() => handleDelete(tag.id, tag.name)}
+                color="blue"
+                size="large"
+                style={{ fontSize: getTagSize(tag.postCount, maxPostCount), cursor: 'default' }}
+              >
+                # {tag.name} <Text type="tertiary" size="small" style={{ marginLeft: 4 }}>{tag.postCount}</Text>
+              </Tag>
+            ))}
+          </div>
         </Card>
       )}
 
       {/* 列表 */}
       {tags && tags.length > 0 && viewMode === 'list' && (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>标签名称</TableHead>
-                <TableHead className="w-[120px]">Slug</TableHead>
-                <TableHead className="w-[100px] text-center">文章数</TableHead>
-                <TableHead className="w-[60px] text-center">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tags.map((tag) => (
-                <TableRow key={tag.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Hash className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                      <span className="font-medium">{tag.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{tag.slug}</TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                      <FileText className="h-3 w-3" strokeWidth={1.5} />
-                      {tag.postCount}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(tag.id, tag.name)} title="删除">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <Card bodyStyle={{ padding: 0 }}>
+          <Table columns={columns} dataSource={tags} pagination={false} rowKey="id" />
         </Card>
       )}
     </div>
