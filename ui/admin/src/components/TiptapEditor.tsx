@@ -47,6 +47,17 @@ const turndown = new TurndownService({
   emDelimiter: '*',
   strongDelimiter: '**',
   hr: '---',
+  // 自定义空白节点处理：空 callout div 也需要输出 ::: 语法
+  blankReplacement: (_content: string, node: TurndownService.Node) => {
+    const el = node as HTMLElement
+    if (el.nodeName === 'DIV' && el.hasAttribute && el.hasAttribute('data-callout')) {
+      const type = el.getAttribute('data-callout') || 'info'
+      const title = el.getAttribute('data-callout-title') || ''
+      const header = title ? `${type} ${title}` : type
+      return `\n\n::: ${header}\n\n:::\n\n`
+    }
+    return '\n\n'
+  },
 })
 
 turndown.addRule('strikethrough', {
@@ -59,37 +70,64 @@ turndown.addRule('callout', {
   filter: (node) => {
     return node.nodeName === 'DIV' && node.hasAttribute('data-callout')
   },
-  replacement: (content, node) => {
+  replacement: (_content, node) => {
     const el = node as HTMLElement
     const type = el.getAttribute('data-callout') || 'info'
     const title = el.getAttribute('data-callout-title') || ''
     const header = title ? `${type} ${title}` : type
-    const trimmed = content.trim()
-    return `\n\n::: ${header}\n${trimmed}\n:::\n\n`
+
+    // 手动提取内部文本内容，不依赖 turndown 的 content 参数（它会把空 <p> 过滤掉）
+    const innerParts: string[] = []
+    el.childNodes.forEach((child) => {
+      if (child.nodeType === 3) {
+        const text = (child as Text).textContent?.trim()
+        if (text) innerParts.push(text)
+      } else if (child.nodeType === 1) {
+        const childEl = child as HTMLElement
+        const md = turndown.turndown(childEl.outerHTML).trim()
+        if (md) innerParts.push(md)
+      }
+    })
+
+    const body = innerParts.length > 0 ? innerParts.join('\n') : ''
+    return `\n\n::: ${header}\n${body}\n:::\n\n`
   },
 })
 
-/** Markdown ::: 容器语法 → Callout HTML（支持自定义标题） */
+/** Markdown ::: 容器语法 → Callout HTML（支持自定义标题，允许空内容） */
 const calloutExtension = {
   name: 'calloutContainer',
   level: 'block' as const,
   start(src: string) { return src.match(/^:::\s/)?.index },
   tokenizer(src: string) {
-    // 匹配 ::: type 可选标题\n内容\n:::
-    const match = src.match(/^:::\s*(\w+)(?: ([^\n]+))?\n([\s\S]*?)\n:::\s*(?:\n|$)/)
+    // 匹配 ::: type [可选标题]\n[可选内容]\n:::
+    const match = src.match(/^:::\s*(\w+)(?:\s+([^\n]*))?\n([\s\S]*?)\n:::\s*(?:\n|$)/)
     if (match) {
       return {
         type: 'calloutContainer',
         raw: match[0],
         calloutType: match[1],
         calloutTitle: match[2]?.trim() || '',
-        text: match[3].trim(),
+        text: match[3]?.trim() || '',
+      }
+    }
+    // 也匹配空内容：::: type\n:::  或  ::: type 标题\n:::
+    const emptyMatch = src.match(/^:::\s*(\w+)(?:\s+([^\n]*))?\n:::\s*(?:\n|$)/)
+    if (emptyMatch) {
+      return {
+        type: 'calloutContainer',
+        raw: emptyMatch[0],
+        calloutType: emptyMatch[1],
+        calloutTitle: emptyMatch[2]?.trim() || '',
+        text: '',
       }
     }
     return undefined
   },
   renderer(token: { calloutType: string; calloutTitle: string; text: string }) {
-    const inner = marked.parse(token.text, { async: false }) as string
+    const inner = token.text
+      ? marked.parse(token.text, { async: false }) as string
+      : '<p></p>'
     const titleAttr = token.calloutTitle ? ` data-callout-title="${token.calloutTitle}"` : ''
     return `<div data-callout="${token.calloutType}"${titleAttr} class="callout callout-${token.calloutType}">${inner}</div>`
   },
