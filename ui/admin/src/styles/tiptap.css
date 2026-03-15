@@ -646,3 +646,15 @@
 .table-grid-confirm:hover {
   opacity: 0.85;
 }
+
+/* ========== 底部状态栏 ========== */
+.tiptap-statusbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--semi-color-border);
+  font-size: 11px;
+  color: var(--semi-color-text-3);
+  user-select: none;
+}

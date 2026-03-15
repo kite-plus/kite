@@ -426,6 +426,14 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
         <EditorContent editor={editor} />
       )}
 
+      {/* 底部状态栏 */}
+      {!sourceMode && editor && (
+        <div className="tiptap-statusbar">
+          <span>{editor.storage.characterCount?.words?.() ?? editor.getText().split(/\s+/).filter(Boolean).length} 字</span>
+          <span>{editor.storage.characterCount?.characters?.() ?? editor.getText().length} 字符</span>
+        </div>
+      )}
+
       {/* 链接对话框 */}
       <Modal
         title="插入链接"
