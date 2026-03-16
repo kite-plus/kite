@@ -4,6 +4,7 @@ import { Layout, Breadcrumb, Button, Avatar, Dropdown, Badge, Tooltip, Typograph
 import { IconSetting, IconMenu, IconBell, IconExternalOpen, IconMoon, IconSun, IconLanguage, IconExit } from '@douyinfe/semi-icons'
 import { useSidebarStore } from '@/stores/use-sidebar-store'
 import { useThemeStore } from '@/stores/use-theme-store'
+import { useCurrentUser, useLogout } from '@/hooks/use-auth'
 
 const { Header: SemiHeader } = Layout
 const { Text } = Typography
@@ -30,6 +31,10 @@ export function Header() {
   const navigate = useNavigate()
   const headerRef = useRef<HTMLDivElement>(null)
   const { isDark, toggle: toggleTheme } = useThemeStore()
+  const { data: currentUser } = useCurrentUser()
+  const logoutMutation = useLogout()
+
+  const displayName = currentUser?.user?.displayName || currentUser?.user?.username || 'Admin'
 
   /* 解析面包屑 */
   const pathSegments = location.pathname.split('/').filter(Boolean)
@@ -132,15 +137,15 @@ export function Header() {
                 语言设置
               </Dropdown.Item>
               <Dropdown.Divider />
-              <Dropdown.Item icon={<IconExit />} type="danger">
+              <Dropdown.Item icon={<IconExit />} type="danger" onClick={() => logoutMutation.mutate()}>
                 退出登录
               </Dropdown.Item>
             </Dropdown.Menu>
           }
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>
-            <Avatar size="small" color="blue" alt="A">A</Avatar>
-            <Text style={{ fontSize: 13, fontWeight: 500 }}>Admin</Text>
+            <Avatar size="small" color="blue" alt={displayName}>{displayName.charAt(0).toUpperCase()}</Avatar>
+            <Text style={{ fontSize: 13, fontWeight: 500 }}>{displayName}</Text>
           </div>
         </Dropdown>
       </div>
