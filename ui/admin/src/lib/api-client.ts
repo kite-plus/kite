@@ -1,6 +1,6 @@
 /**
  * API 客户端基础设施
- * 封装 fetch 调用后端 API，处理统一响应和 camelCase/snake_case 转换
+ * 封装 fetch 调用后端 API，处理统一响应、camelCase/snake_case 转换和 401 自动跳转
  */
 import type { ApiResponse } from '@/types/api'
 
@@ -52,6 +52,37 @@ export class ApiError extends Error {
 }
 
 /**
+ * 处理 401 未授权：自动跳转登录页
+ * 排除 /auth/me 和 /auth/login 请求，避免循环跳转
+ */
+function handleUnauthorized(path: string): void {
+  // 排除鉴权相关路径，避免循环
+  if (path.includes('/auth/')) return
+  // 获取当前 base path
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  window.location.href = `${base}/login`
+}
+
+/**
+ * 通用请求处理：解析响应、处理 401、抛出错误
+ */
+async function handleResponse<T>(res: Response, path: string): Promise<T> {
+  // 401 自动跳转登录页
+  if (res.status === 401) {
+    handleUnauthorized(path)
+    throw new ApiError(401, 'unauthorized')
+  }
+
+  const json: ApiResponse<unknown> = await res.json()
+
+  if (json.code < 200 || json.code >= 300) {
+    throw new ApiError(json.code, json.msg)
+  }
+
+  return camelizeResponse<T>(json.data)
+}
+
+/**
  * 通用 GET 请求
  */
 export async function apiGet<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
@@ -65,13 +96,7 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
   }
 
   const res = await fetch(url.toString())
-  const json: ApiResponse<unknown> = await res.json()
-
-  if (json.code < 200 || json.code >= 300) {
-    throw new ApiError(json.code, json.msg)
-  }
-
-  return camelizeResponse<T>(json.data)
+  return handleResponse<T>(res, path)
 }
 
 /**
@@ -83,13 +108,7 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(snakeifyRequest(body)) : undefined,
   })
-  const json: ApiResponse<unknown> = await res.json()
-
-  if (json.code < 200 || json.code >= 300) {
-    throw new ApiError(json.code, json.msg)
-  }
-
-  return camelizeResponse<T>(json.data)
+  return handleResponse<T>(res, path)
 }
 
 /**
@@ -101,13 +120,7 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(snakeifyRequest(body)) : undefined,
   })
-  const json: ApiResponse<unknown> = await res.json()
-
-  if (json.code < 200 || json.code >= 300) {
-    throw new ApiError(json.code, json.msg)
-  }
-
-  return camelizeResponse<T>(json.data)
+  return handleResponse<T>(res, path)
 }
 
 /**
@@ -119,13 +132,7 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(snakeifyRequest(body)) : undefined,
   })
-  const json: ApiResponse<unknown> = await res.json()
-
-  if (json.code < 200 || json.code >= 300) {
-    throw new ApiError(json.code, json.msg)
-  }
-
-  return camelizeResponse<T>(json.data)
+  return handleResponse<T>(res, path)
 }
 
 /**
@@ -133,11 +140,5 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
  */
 export async function apiDelete<T = void>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { method: 'DELETE' })
-  const json: ApiResponse<unknown> = await res.json()
-
-  if (json.code < 200 || json.code >= 300) {
-    throw new ApiError(json.code, json.msg)
-  }
-
-  return camelizeResponse<T>(json.data)
+  return handleResponse<T>(res, path)
 }

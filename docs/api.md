@@ -224,7 +224,7 @@ admin:
   "description": "A friendly site about writing and engineering.",
   "logo": "https://example.com/logo.png",
   "sort": 10,
-  "is_active": true,
+  "status": "active",
   "created_at": "2026-03-15T10:00:00Z",
   "updated_at": "2026-03-15T10:00:00Z"
 }
@@ -233,7 +233,7 @@ admin:
 字段说明：
 - `url`: 全局唯一
 - `sort`: 数值越小越靠前
-- `is_active`: 是否启用该友情链接
+- `status`: `active` / `pending` / `down`
 
 ### 5.3 Tag
 
@@ -1030,13 +1030,13 @@ admin:
 - `duplicate category slug`
 - `internal server error`
 
-## 9. 后续实现顺序建议
+## 9. V1 已实现能力总结
 
-建议后续按以下顺序继续扩展：
-1. 文章与标签/分类关联
-2. 为 `/api/v1/admin` 接口补充鉴权中间件
-3. 角色与权限控制
-4. OpenAPI 文档生成
+- 全部 CRUD：文章、分类、标签、评论、独立页面、友情链接、系统设置
+- 鉴权：Cookie-based Session Auth（login/logout/middleware）
+- SSR 模板渲染 + Headless API 双模式
+- Admin SPA 嵌入 Go 二进制，生产环境单进程部署
+- Markdown → HTML 自动转换
 
 ## 10. OpenAPI 规划
 
