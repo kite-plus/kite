@@ -35,25 +35,36 @@
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────┐
-│              kite (single binary)            │
-├─────────────┬───────────────────────────────┤
-│  Admin SPA  │         Go Backend            │
-│  (React 19) │  ┌──────────┬──────────┐      │
-│  Semi Design│  │ Gin HTTP │ GORM ORM │      │
-│  Tiptap     │  │  Router  │          │      │
-│  TanStack   │  └────┬─────┴────┬─────┘      │
-│  Query      │       │          │             │
-├─────────────┤  ┌────┴────┐ ┌───┴──────┐     │
-│  Classic    │  │ Service │ │ Template │     │
-│  Theme (SSR)│  │  Layer  │ │  Engine  │     │
-├─────────────┤  └────┬────┘ └──────────┘     │
-│             │       │                        │
-│             │  ┌────┴────┐                   │
-│             │  │ SQLite  │ ← one kite.db     │
-│             │  └─────────┘   for everything  │
-└─────────────┴───────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Binary["🪁 Kite (Single Binary)"]
+        subgraph Frontend["Admin SPA"]
+            React["React 19 + TypeScript"]
+            Semi["Semi Design"]
+            Tiptap["Tiptap Editor"]
+            TanStack["TanStack Query"]
+        end
+
+        subgraph Backend["Go Backend"]
+            Gin["Gin HTTP Router"]
+            Service["Service Layer"]
+            GORM["GORM ORM"]
+            Template["Template Engine"]
+        end
+
+        subgraph Theme["Classic Theme (SSR)"]
+            GoTmpl["Go html/template"]
+        end
+    end
+
+    SQLite[("SQLite · kite.db")]
+
+    React --> Gin
+    Gin --> Service
+    Service --> GORM
+    GORM --> SQLite
+    GoTmpl --> Service
+    Template --> GoTmpl
 ```
 
 ## 🚀 Quick Start

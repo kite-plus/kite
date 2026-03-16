@@ -17,6 +17,8 @@ export interface Post {
   status: PostStatus
   coverImage: string
   showComments: boolean
+  hasPassword: boolean
+  hasProtected: boolean
   createdAt: string
   updatedAt: string
   publishedAt: string | null
@@ -58,4 +60,5 @@ export interface PostFormData {
   tagIds: string[]
   status: PostStatus
   coverImage: string
+  password: string
 }

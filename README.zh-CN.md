@@ -35,25 +35,36 @@
 
 ## 🏗️ 架构
 
-```
-┌─────────────────────────────────────────────┐
-│                  kite (单二进制)              │
-├─────────────┬───────────────────────────────┤
-│  Admin SPA  │         Go Backend            │
-│  (React 19) │  ┌──────────┬──────────┐      │
-│  Semi Design│  │ Gin HTTP │ GORM ORM │      │
-│  Tiptap     │  │  Router  │          │      │
-│  TanStack   │  └────┬─────┴────┬─────┘      │
-│  Query      │       │          │             │
-├─────────────┤  ┌────┴────┐ ┌───┴──────┐     │
-│  Classic    │  │ Service │ │ Template │     │
-│  Theme (SSR)│  │  Layer  │ │  Engine  │     │
-├─────────────┤  └────┬────┘ └──────────┘     │
-│             │       │                        │
-│             │  ┌────┴────┐                   │
-│             │  │ SQLite  │ ← 一个 kite.db    │
-│             │  └─────────┘   搞定一切        │
-└─────────────┴───────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Binary["🪁 Kite（单二进制）"]
+        subgraph Frontend["Admin 管理后台"]
+            React["React 19 + TypeScript"]
+            Semi["Semi Design 组件库"]
+            Tiptap["Tiptap 富文本编辑器"]
+            TanStack["TanStack Query"]
+        end
+
+        subgraph Backend["Go 后端"]
+            Gin["Gin HTTP 路由"]
+            Service["Service 业务层"]
+            GORM["GORM ORM"]
+            Template["模板引擎"]
+        end
+
+        subgraph Theme["Classic 主题（SSR）"]
+            GoTmpl["Go html/template"]
+        end
+    end
+
+    SQLite[("SQLite · kite.db\n一个文件搞定一切")]
+
+    React --> Gin
+    Gin --> Service
+    Service --> GORM
+    GORM --> SQLite
+    GoTmpl --> Service
+    Template --> GoTmpl
 ```
 
 ## 🚀 快速开始

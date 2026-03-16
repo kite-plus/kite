@@ -32,6 +32,7 @@ type CreatePostInput struct {
 	ContentMarkdown string     `json:"content_markdown"`
 	Status          string     `json:"status"`
 	CoverImage      string     `json:"cover_image"`
+	Password        string     `json:"password"`
 	PublishedAt     *time.Time `json:"published_at"`
 	ShowComments    *bool      `json:"show_comments"`
 	CategoryID      *string    `json:"category_id"`
@@ -45,6 +46,7 @@ type UpdatePostInput struct {
 	ContentMarkdown string     `json:"content_markdown"`
 	Status          string     `json:"status"`
 	CoverImage      string     `json:"cover_image"`
+	Password        string     `json:"password"`
 	PublishedAt     *time.Time `json:"published_at"`
 	ShowComments    *bool      `json:"show_comments"`
 	CategoryID      *string    `json:"category_id"`
@@ -58,6 +60,7 @@ type PatchPostInput struct {
 	ContentMarkdown *string    `json:"content_markdown"`
 	Status          *string    `json:"status"`
 	CoverImage      *string    `json:"cover_image"`
+	Password        *string    `json:"password"`
 	PublishedAt     *time.Time `json:"published_at"`
 	ShowComments    *bool      `json:"show_comments"`
 	CategoryID      *string    `json:"category_id"`
@@ -185,6 +188,7 @@ func (s *PostService) Create(input CreatePostInput) (*model.Post, error) {
 		ContentMarkdown: strings.TrimSpace(input.ContentMarkdown),
 		Status:          normalizeStatus(input.Status),
 		CoverImage:      strings.TrimSpace(input.CoverImage),
+		Password:        input.Password,
 		PublishedAt:     normalizeTimePointer(input.PublishedAt),
 		ShowComments:    normalizeShowComments(input.ShowComments, true),
 		CategoryID:      categoryID,
@@ -228,6 +232,7 @@ func (s *PostService) Update(id string, input UpdatePostInput) (*model.Post, err
 	existing.ContentMarkdown = strings.TrimSpace(input.ContentMarkdown)
 	existing.Status = normalizeStatus(input.Status)
 	existing.CoverImage = strings.TrimSpace(input.CoverImage)
+	existing.Password = input.Password
 	if input.PublishedAt != nil {
 		existing.PublishedAt = normalizeTimePointer(input.PublishedAt)
 	}
@@ -278,6 +283,9 @@ func (s *PostService) Patch(id string, input PatchPostInput) (*model.Post, error
 	}
 	if input.CoverImage != nil {
 		existing.CoverImage = strings.TrimSpace(*input.CoverImage)
+	}
+	if input.Password != nil {
+		existing.Password = *input.Password
 	}
 	if input.PublishedAt != nil {
 		existing.PublishedAt = normalizeTimePointer(input.PublishedAt)

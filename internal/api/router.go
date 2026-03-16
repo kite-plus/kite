@@ -105,6 +105,7 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	apiV1.GET("/posts/slug/:slug", postHandler.GetPublicBySlug)
 	apiV1.GET("/posts/:id/comments", commentHandler.ListByPost)
 	apiV1.POST("/posts/:id/comments", commentHandler.Create)
+	apiV1.POST("/posts/:id/verify-password", postHandler.VerifyPassword)
 	apiV1.GET("/friend-links", friendLinkHandler.ListPublic)
 	apiV1.GET("/friend-links/:id", friendLinkHandler.GetPublicByID)
 	apiV1.GET("/tags", tagHandler.List)

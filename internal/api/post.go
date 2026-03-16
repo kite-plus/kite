@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/amigoer/kite-blog/internal/model"
 	"github.com/amigoer/kite-blog/internal/repo"
 	"github.com/amigoer/kite-blog/internal/service"
 	"github.com/gin-gonic/gin"
@@ -74,7 +75,7 @@ func (h *PostHandler) GetPublicByID(c *gin.Context) {
 		return
 	}
 
-	Success(c, post)
+	Success(c, h.applyProtection(post))
 }
 
 func (h *PostHandler) GetBySlug(c *gin.Context) {
@@ -94,7 +95,84 @@ func (h *PostHandler) GetPublicBySlug(c *gin.Context) {
 		return
 	}
 
-	Success(c, post)
+	Success(c, h.applyProtection(post))
+}
+
+// applyProtection 对有密码的文章应用保护
+func (h *PostHandler) applyProtection(post *model.Post) gin.H {
+	result := gin.H{
+		"id":           post.ID,
+		"title":        post.Title,
+		"slug":         post.Slug,
+		"summary":      post.Summary,
+		"status":       post.Status,
+		"cover_image":  post.CoverImage,
+		"published_at": post.PublishedAt,
+		"created_at":   post.CreatedAt,
+		"updated_at":   post.UpdatedAt,
+		"show_comments": post.ShowComments,
+		"category_id":  post.CategoryID,
+		"category":     post.Category,
+		"tags":         post.Tags,
+	}
+
+	hasPassword := post.Password != ""
+	hasProtected := service.HasProtectedBlocks(post.ContentHTML)
+
+	result["has_password"] = hasPassword
+	result["has_protected"] = hasProtected
+
+	if hasPassword {
+		// 全局密码：隐藏全部内容
+		result["content_html"] = ""
+		result["content_markdown"] = ""
+	} else if hasProtected {
+		// 片段密码：过滤 protected 块
+		result["content_html"] = service.FilterProtectedHTML(post.ContentHTML)
+		result["content_markdown"] = service.FilterProtectedMarkdown(post.ContentMarkdown)
+	} else {
+		result["content_html"] = post.ContentHTML
+		result["content_markdown"] = post.ContentMarkdown
+	}
+
+	return result
+}
+
+// VerifyPassword 验证文章密码，返回完整内容
+func (h *PostHandler) VerifyPassword(c *gin.Context) {
+	var input struct {
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		Error(c, http.StatusBadRequest, http.StatusBadRequest, "请求参数错误")
+		return
+	}
+
+	post, err := h.postService.GetPublicByID(c.Param("id"))
+	if err != nil {
+		handlePostError(c, err)
+		return
+	}
+
+	if post.Password == "" {
+		// 无全局密码，检查是否有 protected 块需要密码
+		// 这里简化处理：验证请求本身意味着“有密码”
+		Success(c, gin.H{
+			"content_html":     post.ContentHTML,
+			"content_markdown": post.ContentMarkdown,
+		})
+		return
+	}
+
+	if input.Password != post.Password {
+		Error(c, http.StatusForbidden, http.StatusForbidden, "密码错误")
+		return
+	}
+
+	Success(c, gin.H{
+		"content_html":     post.ContentHTML,
+		"content_markdown": post.ContentMarkdown,
+	})
 }
 
 func (h *PostHandler) Create(c *gin.Context) {

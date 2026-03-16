@@ -11,8 +11,7 @@ import {
   IconSetting,
   IconSearch,
 } from '@douyinfe/semi-icons'
-import { mockPosts } from '@/mocks/posts'
-import { mockPages } from '@/mocks/pages'
+
 import '@/styles/command-palette.css'
 
 /** 命令项类型 */
@@ -51,37 +50,8 @@ export function CommandPalette() {
     { id: 'nav-new-page', title: '创建新页面', subtitle: '创建一个新的独立页面', icon: <IconCopy />, group: '操作', action: () => navigate('/pages/new') },
   ], [navigate])
 
-  /** 文章搜索命令 */
-  const postCommands: CommandItem[] = useMemo(() =>
-    mockPosts.map(post => ({
-      id: `post-${post.id}`,
-      title: post.title,
-      subtitle: `${post.category} · ${post.status === 'published' ? '已发布' : post.status === 'draft' ? '草稿' : '已归档'}`,
-      icon: <IconArticle />,
-      group: '文章',
-      action: () => navigate(`/posts/${post.id}/edit`),
-    })),
-    [navigate]
-  )
-
-  /** 页面搜索命令 */
-  const pageCommands: CommandItem[] = useMemo(() =>
-    mockPages.map(page => ({
-      id: `page-${page.id}`,
-      title: page.title,
-      subtitle: `/${page.slug}`,
-      icon: <IconCopy />,
-      group: '页面',
-      action: () => navigate(`/pages/${page.id}/edit`),
-    })),
-    [navigate]
-  )
-
   /** 所有命令 */
-  const allCommands = useMemo(
-    () => [...navCommands, ...postCommands, ...pageCommands],
-    [navCommands, postCommands, pageCommands]
-  )
+  const allCommands = navCommands
 
   /** 搜索过滤 */
   const filteredCommands = useMemo(() => {

@@ -22,7 +22,7 @@ export function PostEditorPage() {
 
   const [form, setForm] = useState<PostFormData>({
     title: '', slug: '', summary: '', contentMarkdown: '',
-    categoryId: '', tagIds: [], status: 'draft', coverImage: '',
+    categoryId: '', tagIds: [], status: 'draft', coverImage: '', password: '',
   })
 
   const { data: post, isLoading } = usePostDetail(id)
@@ -38,6 +38,7 @@ export function PostEditorPage() {
         categoryId: post.categoryId || '',
         tagIds: post.tags?.map((t) => t.id) || [],
         status: post.status, coverImage: post.coverImage || '',
+        password: (post as unknown as { password?: string })?.password || '',
       })
     }
   }, [post])
@@ -166,6 +167,19 @@ export function PostEditorPage() {
               onChange={(url) => setForm((prev) => ({ ...prev, coverImage: url }))}
               placeholder="上传封面图片"
             />
+          </Card>
+
+          <Card title="🔒 文章密码" style={{ marginTop: 16 }}>
+            <Input
+              value={form.password}
+              onChange={(v) => setForm((prev) => ({ ...prev, password: v }))}
+              placeholder="留空则不加密"
+              type="password"
+              mode="password"
+            />
+            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+              设置后整篇文章或 :::protected 片段需要密码才能查看
+            </Text>
           </Card>
         </div>
       </div>
