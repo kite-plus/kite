@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Table, Button, Input, Tag, Select, Card, Typography, Pagination, Tooltip, Popconfirm } from '@douyinfe/semi-ui'
+import { Table, Button, Input, Tag, Select, Card, Typography, Pagination, Tooltip, Modal } from '@douyinfe/semi-ui'
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconEyeOpened, IconComment } from '@douyinfe/semi-icons'
 import { usePosts, useCategories } from '@/hooks/use-posts'
 import type { PostStatus } from '@/types/post'
@@ -39,6 +39,7 @@ export function PostsPage() {
   const [category, setCategory] = useState('')
   const [page, setPage] = useState(1)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | 'batch' | null>(null)
   const pageSize = 10
 
   const { data, isLoading } = usePosts({ page, pageSize, keyword, status, category })
@@ -98,20 +99,23 @@ export function PostsPage() {
     {
       title: '操作', width: 100, align: 'center' as const,
       render: (_: unknown, record: Record<string, unknown>) => (
-        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+        <div
+          style={{ display: 'flex', gap: 4, justifyContent: 'center' }}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
           <Tooltip content="编辑" position="top">
             <Button icon={<IconEdit />} theme="borderless" size="small" onClick={() => navigate(`/posts/${record.id}/edit`)} />
           </Tooltip>
-          <Popconfirm
-            title="确认删除"
-            content={`确定要删除「${record.title}」吗？此操作不可撤销。`}
-            onConfirm={() => { /* TODO: 调用删除 mutation */ }}
-            position="topRight"
-          >
-            <Tooltip content="删除" position="top">
-              <Button icon={<IconDelete />} theme="borderless" type="danger" size="small" />
-            </Tooltip>
-          </Popconfirm>
+          <Tooltip content="删除" position="top">
+            <Button
+              icon={<IconDelete />}
+              theme="borderless"
+              type="danger"
+              size="small"
+              onClick={() => setDeleteTarget({ id: record.id as string, title: record.title as string })}
+            />
+          </Tooltip>
         </div>
       ),
     },
@@ -161,11 +165,14 @@ export function PostsPage() {
 
         {/* 批量操作 */}
         {selectedKeys.length > 0 && (
-          <Popconfirm title="批量删除" content={`确定要删除选中的 ${selectedKeys.length} 篇文章吗？`}>
-            <Button icon={<IconDelete />} type="danger" size="small">
-              删除 {selectedKeys.length} 篇
-            </Button>
-          </Popconfirm>
+          <Button
+            icon={<IconDelete />}
+            type="danger"
+            size="small"
+            onClick={() => setDeleteTarget('batch')}
+          >
+            删除 {selectedKeys.length} 篇
+          </Button>
         )}
       </div>
 
@@ -216,6 +223,51 @@ export function PostsPage() {
           <Pagination total={data.total} pageSize={pageSize} currentPage={page} onPageChange={setPage} showSizeChanger />
         </div>
       )}
+
+      {/* 删除确认弹窗 */}
+      <Modal
+        title={null}
+        header={null}
+        visible={deleteTarget !== null}
+        onOk={() => {
+          if (deleteTarget === 'batch') {
+            // TODO: 调用批量删除 mutation
+            setSelectedKeys([])
+          } else if (deleteTarget) {
+            // TODO: 调用删除 mutation
+          }
+          setDeleteTarget(null)
+        }}
+        onCancel={() => setDeleteTarget(null)}
+        okType="danger"
+        okText="确认删除"
+        cancelText="取消"
+        closeOnEsc
+        centered
+        width={420}
+        bodyStyle={{ padding: '32px 32px 24px' }}
+        footerStyle={{ padding: '12px 32px 24px', borderTop: 'none' }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%',
+            background: 'rgba(239, 68, 68, 0.08)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: 16,
+          }}>
+            <IconDelete style={{ fontSize: 24, color: '#ef4444' }} />
+          </div>
+          <Title heading={5} style={{ marginBottom: 8 }}>
+            {deleteTarget === 'batch' ? '批量删除文章' : '删除文章'}
+          </Title>
+          <Text type="tertiary" style={{ lineHeight: 1.6 }}>
+            {deleteTarget === 'batch'
+              ? `确定要删除选中的 ${selectedKeys.length} 篇文章吗？此操作不可撤销。`
+              : deleteTarget && `确定要删除「${deleteTarget.title}」吗？此操作不可撤销。`
+            }
+          </Text>
+        </div>
+      </Modal>
     </div>
   )
 }
