@@ -11,14 +11,56 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewRouter(cfg *config.Config, templateFS fs.FS, db *gorm.DB) *gin.Engine {
+func NewRouter(cfg *config.Config, templateFS fs.FS, adminFS fs.FS, db *gorm.DB) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery(), CORSMiddleware())
 
 	registerAPIRoutes(router, cfg, db)
+	registerAdminSPA(router, adminFS)
 	registerPageRoutes(router, cfg, templateFS, db)
 
 	return router
+}
+
+// registerAdminSPA 注册 Admin SPA 静态文件服务和 fallback
+func registerAdminSPA(router *gin.Engine, adminFS fs.FS) {
+	if adminFS == nil {
+		return
+	}
+
+	// 从嵌入的 FS 中提取 ui/admin/dist 子目录
+	distFS, err := fs.Sub(adminFS, "ui/admin/dist")
+	if err != nil {
+		return
+	}
+
+	// 读取 index.html 用于 SPA fallback
+	indexHTML, err := fs.ReadFile(distFS, "index.html")
+	if err != nil {
+		return
+	}
+
+	fileServer := http.StripPrefix("/admin", http.FileServer(http.FS(distFS)))
+
+	router.GET("/admin", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/admin/")
+	})
+
+	// 匹配 /admin/ 和 /admin/* 的所有请求
+	router.GET("/admin/*filepath", func(c *gin.Context) {
+		filepath := c.Param("filepath")
+
+		// 尝试打开静态文件
+		if filepath != "/" && filepath != "" {
+			if f, err := distFS.(fs.ReadFileFS).ReadFile(filepath[1:]); err == nil && f != nil {
+				fileServer.ServeHTTP(c.Writer, c.Request)
+				return
+			}
+		}
+
+		// SPA Fallback: 所有非静态文件路由返回 index.html
+		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
+	})
 }
 
 func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {

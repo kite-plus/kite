@@ -99,7 +99,7 @@ function LoginGuard() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <Routes>
           <Route path="/login" element={<LoginGuard />} />
           <Route path="/*" element={<ProtectedRoutes />} />

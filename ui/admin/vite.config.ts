@@ -4,7 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // 生产构建使用 /admin/ 前缀，开发模式使用 /
+  base: command === 'build' ? '/admin/' : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -19,4 +21,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))
