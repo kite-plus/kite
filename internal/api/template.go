@@ -33,5 +33,6 @@ func loadTemplateSet(templateFS fs.FS) (*template.Template, error) {
 		templateFS,
 		"templates/*.html",
 		"templates/partials/*.html",
+		"templates/pages/*.html",
 	)
 }

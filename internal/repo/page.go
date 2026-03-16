@@ -148,7 +148,7 @@ func (r *PageRepository) Update(page *model.Page) error {
 	}
 
 	result := r.db.Model(page).
-		Select("title", "slug", "content_markdown", "content_html", "status", "sort_order", "show_in_nav", "published_at").
+		Select("title", "slug", "content_markdown", "content_html", "status", "sort_order", "show_in_nav", "published_at", "template", "config").
 		Updates(page)
 	if result.Error != nil {
 		return fmt.Errorf("update page: %w", result.Error)

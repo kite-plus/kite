@@ -1,0 +1,25 @@
+{
+  "name": "GitHub 仓库展示",
+  "description": "展示指定 GitHub 用户的公开仓库，按 Star 数排序",
+  "fields": [
+    {
+      "key": "username",
+      "label": "GitHub 用户名",
+      "type": "string",
+      "required": true,
+      "placeholder": "例如：amigoer"
+    },
+    {
+      "key": "count",
+      "label": "展示数量",
+      "type": "number",
+      "default": 6
+    },
+    {
+      "key": "show_fork",
+      "label": "显示 Fork 项目",
+      "type": "boolean",
+      "default": false
+    }
+  ]
+}

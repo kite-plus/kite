@@ -32,6 +32,8 @@ type CreatePageInput struct {
 	Status          string `json:"status"`
 	SortOrder       int    `json:"sort_order"`
 	ShowInNav       bool   `json:"show_in_nav"`
+	Template        string `json:"template"`
+	Config          string `json:"config"`
 }
 
 // UpdatePageInput 全量更新页面输入
@@ -42,6 +44,8 @@ type UpdatePageInput struct {
 	Status          string `json:"status"`
 	SortOrder       int    `json:"sort_order"`
 	ShowInNav       bool   `json:"show_in_nav"`
+	Template        string `json:"template"`
+	Config          string `json:"config"`
 }
 
 // PatchPageInput 局部更新页面输入
@@ -52,6 +56,8 @@ type PatchPageInput struct {
 	Status          *string `json:"status"`
 	SortOrder       *int    `json:"sort_order"`
 	ShowInNav       *bool   `json:"show_in_nav"`
+	Template        *string `json:"template"`
+	Config          *string `json:"config"`
 }
 
 // PageListResult 页面列表结果
@@ -151,6 +157,8 @@ func (s *PageService) Create(input CreatePageInput) (*model.Page, error) {
 		Status:          normalizePageStatus(input.Status),
 		SortOrder:       input.SortOrder,
 		ShowInNav:       input.ShowInNav,
+		Template:        normalizePageTemplate(input.Template),
+		Config:          input.Config,
 	}
 
 	if err := preparePageForSave(page); err != nil {
@@ -188,6 +196,8 @@ func (s *PageService) Update(idStr string, input UpdatePageInput) (*model.Page, 
 	existing.Status = normalizePageStatus(input.Status)
 	existing.SortOrder = input.SortOrder
 	existing.ShowInNav = input.ShowInNav
+	existing.Template = normalizePageTemplate(input.Template)
+	existing.Config = input.Config
 
 	if err := preparePageForSave(existing); err != nil {
 		return nil, err
@@ -234,6 +244,12 @@ func (s *PageService) Patch(idStr string, input PatchPageInput) (*model.Page, er
 	}
 	if input.ShowInNav != nil {
 		existing.ShowInNav = *input.ShowInNav
+	}
+	if input.Template != nil {
+		existing.Template = normalizePageTemplate(*input.Template)
+	}
+	if input.Config != nil {
+		existing.Config = *input.Config
 	}
 
 	if err := preparePageForSave(existing); err != nil {
@@ -307,6 +323,14 @@ func ensurePageSlugAvailable(pageRepo *repo.PageRepository, slug string, current
 		return err
 	}
 	return nil
+}
+
+func normalizePageTemplate(tmpl string) string {
+	tmpl = strings.TrimSpace(tmpl)
+	if tmpl == "" {
+		return "default"
+	}
+	return tmpl
 }
 
 func normalizePageStatus(status string) string {
