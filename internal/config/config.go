@@ -2,9 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
-
-	"github.com/goccy/go-yaml"
 )
 
 const (
@@ -15,92 +12,74 @@ const (
 )
 
 type Config struct {
-	RenderMode string         `yaml:"render_mode"`
-	Database   DatabaseConfig `yaml:"database"`
-	Admin      AdminConfig    `yaml:"admin"`
-	Site       SiteConfig     `yaml:"site"`
-	Post       PostConfig     `yaml:"post"`
-	AI         AIConfig       `yaml:"ai"`
+	RenderMode string         `json:"render_mode"`
+	Database   DatabaseConfig `json:"database"`
+	Admin      AdminConfig    `json:"admin"`
+	Site       SiteConfig     `json:"site"`
+	Post       PostConfig     `json:"post"`
+	AI         AIConfig       `json:"ai"`
 }
 
 type DatabaseConfig struct {
-	Driver   string `yaml:"driver"`
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	Name     string `yaml:"name"`
-	SSLMode  string `yaml:"ssl_mode"`
-	Path     string `yaml:"path"`
+	Driver   string `json:"driver"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	Name     string `json:"name"`
+	SSLMode  string `json:"ssl_mode"`
+	Path     string `json:"path"`
 }
 
 type AdminConfig struct {
-	Enabled         bool               `yaml:"enabled"`
-	Username        string             `yaml:"username"`
-	PasswordHash    string             `yaml:"password_hash"`
-	SessionSecret   string             `yaml:"session_secret"`
-	SessionTTLHours int                `yaml:"session_ttl_hours"`
-	Profile         AdminProfileConfig `yaml:"profile"`
+	Enabled         bool               `json:"enabled"`
+	Username        string             `json:"username"`
+	PasswordHash    string             `json:"password_hash"`
+	SessionSecret   string             `json:"session_secret"`
+	SessionTTLHours int                `json:"session_ttl_hours"`
+	Profile         AdminProfileConfig `json:"profile"`
 }
 
 type AdminProfileConfig struct {
-	DisplayName string `yaml:"display_name"`
-	Email       string `yaml:"email"`
-	Bio         string `yaml:"bio"`
-	Avatar      string `yaml:"avatar"`
-	Website     string `yaml:"website"`
-	Location    string `yaml:"location"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	Bio         string `json:"bio"`
+	Avatar      string `json:"avatar"`
+	Website     string `json:"website"`
+	Location    string `json:"location"`
 }
 
 // SiteConfig 站点基础设置
 type SiteConfig struct {
-	SiteName    string `yaml:"site_name"`
-	SiteURL     string `yaml:"site_url"`
-	Description string `yaml:"description"`
-	Keywords    string `yaml:"keywords"`
-	Favicon     string `yaml:"favicon"`
-	Logo        string `yaml:"logo"`
-	ICP         string `yaml:"icp"`
-	Footer      string `yaml:"footer"`
+	SiteName    string `json:"site_name"`
+	SiteURL     string `json:"site_url"`
+	Description string `json:"description"`
+	Keywords    string `json:"keywords"`
+	Favicon     string `json:"favicon"`
+	Logo        string `json:"logo"`
+	ICP         string `json:"icp"`
+	Footer      string `json:"footer"`
 }
 
 // PostConfig 文章相关设置
 type PostConfig struct {
-	PostsPerPage    int    `yaml:"posts_per_page"`
-	EnableComment   bool   `yaml:"enable_comment"`
-	EnableToc       bool   `yaml:"enable_toc"`
-	SummaryLength   int    `yaml:"summary_length"`
-	DefaultCoverURL string `yaml:"default_cover_url"`
+	PostsPerPage    int    `json:"posts_per_page"`
+	EnableComment   bool   `json:"enable_comment"`
+	EnableToc       bool   `json:"enable_toc"`
+	SummaryLength   int    `json:"summary_length"`
+	DefaultCoverURL string `json:"default_cover_url"`
 }
 
 // AIConfig AI 集成设置
 type AIConfig struct {
-	Enabled     bool   `yaml:"enabled"`
-	Provider    string `yaml:"provider"`
-	APIKey      string `yaml:"api_key"`
-	Model       string `yaml:"model"`
-	AutoSummary bool   `yaml:"auto_summary"`
-	AutoTag     bool   `yaml:"auto_tag"`
+	Enabled     bool   `json:"enabled"`
+	Provider    string `json:"provider"`
+	APIKey      string `json:"api_key"`
+	Model       string `json:"model"`
+	AutoSummary bool   `json:"auto_summary"`
+	AutoTag     bool   `json:"auto_tag"`
 }
 
-func Load(path string) (*Config, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read config file: %w", err)
-	}
-
-	cfg := Default()
-	if err := yaml.Unmarshal(content, cfg); err != nil {
-		return nil, fmt.Errorf("unmarshal config yaml: %w", err)
-	}
-
-	cfg.ApplyDefaults()
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
-}
 
 func Default() *Config {
 	cfg := &Config{

@@ -17,7 +17,7 @@
 config.yaml
 config.local.yaml
 config.*.local.yaml
-kite.yaml
+
 
 # Logs
 *.log

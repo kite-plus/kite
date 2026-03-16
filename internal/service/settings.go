@@ -1,62 +1,120 @@
 package service
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/amigoer/kite-blog/internal/config"
+	"github.com/amigoer/kite-blog/internal/repo"
+)
+
+// 设置存储的 key 常量
+const (
+	SettingKeySite       = "site"
+	SettingKeyPost       = "post"
+	SettingKeyRender     = "render"
+	SettingKeyAI         = "ai"
+	SettingKeyAdmin      = "admin"
+	SettingKeyDBDriver   = "db_driver"
+	SettingKeyDBPath     = "db_path"
+	SettingKeyRenderMode = "render_mode"
 )
 
 // SiteSettings 站点基础设置
 type SiteSettings struct {
-	SiteName    string `json:"site_name" yaml:"site_name"`
-	SiteURL     string `json:"site_url" yaml:"site_url"`
-	Description string `json:"description" yaml:"description"`
-	Keywords    string `json:"keywords" yaml:"keywords"`
-	Favicon     string `json:"favicon" yaml:"favicon"`
-	Logo        string `json:"logo" yaml:"logo"`
-	ICP         string `json:"icp" yaml:"icp"`
-	Footer      string `json:"footer" yaml:"footer"`
+	SiteName    string `json:"site_name"`
+	SiteURL     string `json:"site_url"`
+	Description string `json:"description"`
+	Keywords    string `json:"keywords"`
+	Favicon     string `json:"favicon"`
+	Logo        string `json:"logo"`
+	ICP         string `json:"icp"`
+	Footer      string `json:"footer"`
 }
 
 // PostSettingsResp 文章相关设置
 type PostSettingsResp struct {
-	PostsPerPage    int    `json:"posts_per_page" yaml:"posts_per_page"`
-	EnableComment   bool   `json:"enable_comment" yaml:"enable_comment"`
-	EnableToc       bool   `json:"enable_toc" yaml:"enable_toc"`
-	SummaryLength   int    `json:"summary_length" yaml:"summary_length"`
-	DefaultCoverURL string `json:"default_cover_url" yaml:"default_cover_url"`
+	PostsPerPage    int    `json:"posts_per_page"`
+	EnableComment   bool   `json:"enable_comment"`
+	EnableToc       bool   `json:"enable_toc"`
+	SummaryLength   int    `json:"summary_length"`
+	DefaultCoverURL string `json:"default_cover_url"`
 }
 
 // RenderSettingsResp 渲染模式设置
 type RenderSettingsResp struct {
-	RenderMode string `json:"render_mode" yaml:"render_mode"`
-	APIPrefix  string `json:"api_prefix" yaml:"api_prefix"`
-	EnableCORS bool   `json:"enable_cors" yaml:"enable_cors"`
+	RenderMode string `json:"render_mode"`
+	APIPrefix  string `json:"api_prefix"`
+	EnableCORS bool   `json:"enable_cors"`
 }
 
 // AISettings AI 集成设置
 type AISettings struct {
-	Enabled     bool   `json:"enabled" yaml:"enabled"`
-	Provider    string `json:"provider" yaml:"provider"`
-	APIKey      string `json:"api_key" yaml:"api_key"`
-	Model       string `json:"model" yaml:"model"`
-	AutoSummary bool   `json:"auto_summary" yaml:"auto_summary"`
-	AutoTag     bool   `json:"auto_tag" yaml:"auto_tag"`
+	Enabled     bool   `json:"enabled"`
+	Provider    string `json:"provider"`
+	APIKey      string `json:"api_key"`
+	Model       string `json:"model"`
+	AutoSummary bool   `json:"auto_summary"`
+	AutoTag     bool   `json:"auto_tag"`
 }
 
 // AllSettings 全部设置聚合
 type AllSettings struct {
-	Site   SiteSettings       `json:"site" yaml:"site"`
-	Post   PostSettingsResp   `json:"post" yaml:"post"`
-	Render RenderSettingsResp `json:"render" yaml:"render"`
-	AI     AISettings         `json:"ai" yaml:"ai"`
+	Site   SiteSettings       `json:"site"`
+	Post   PostSettingsResp   `json:"post"`
+	Render RenderSettingsResp `json:"render"`
+	AI     AISettings         `json:"ai"`
 }
 
-// SettingsService 设置服务
+// SettingsService 设置服务（从 SQLite 读写）
 type SettingsService struct {
-	cfg *config.Config
+	settingsRepo *repo.SettingsRepository
+	cfg          *config.Config // 运行时缓存
 }
 
-func NewSettingsService(cfg *config.Config) *SettingsService {
-	return &SettingsService{cfg: cfg}
+func NewSettingsService(cfg *config.Config, settingsRepo *repo.SettingsRepository) *SettingsService {
+	svc := &SettingsService{settingsRepo: settingsRepo, cfg: cfg}
+	// 启动时从 DB 加载到内存缓存
+	svc.loadFromDB()
+	return svc
+}
+
+// loadFromDB 从 DB 加载所有设置到运行时 config 缓存
+func (s *SettingsService) loadFromDB() {
+	all := s.settingsRepo.GetAll()
+
+	if v, ok := all[SettingKeySite]; ok {
+		var site config.SiteConfig
+		if json.Unmarshal([]byte(v), &site) == nil {
+			s.cfg.Site = site
+		}
+	}
+	if v, ok := all[SettingKeyPost]; ok {
+		var post config.PostConfig
+		if json.Unmarshal([]byte(v), &post) == nil {
+			s.cfg.Post = post
+		}
+	}
+	if v, ok := all[SettingKeyRender]; ok {
+		var render struct {
+			RenderMode string `json:"render_mode"`
+		}
+		if json.Unmarshal([]byte(v), &render) == nil && render.RenderMode != "" {
+			s.cfg.RenderMode = render.RenderMode
+		}
+	}
+	if v, ok := all[SettingKeyAI]; ok {
+		var ai config.AIConfig
+		if json.Unmarshal([]byte(v), &ai) == nil {
+			s.cfg.AI = ai
+		}
+	}
+	if v, ok := all[SettingKeyAdmin]; ok {
+		var admin config.AdminConfig
+		if json.Unmarshal([]byte(v), &admin) == nil {
+			s.cfg.Admin = admin
+		}
+	}
 }
 
 // Get 获取当前全部设置
@@ -95,9 +153,9 @@ func (s *SettingsService) Get() *AllSettings {
 	}
 }
 
-// Update 更新设置（运行时覆盖，不持久化）
-func (s *SettingsService) Update(input AllSettings) *AllSettings {
-	// 站点设置
+// Update 更新设置（内存缓存 + 持久化到 DB）
+func (s *SettingsService) Update(input AllSettings) (*AllSettings, error) {
+	// 更新内存缓存
 	s.cfg.Site.SiteName = input.Site.SiteName
 	s.cfg.Site.SiteURL = input.Site.SiteURL
 	s.cfg.Site.Description = input.Site.Description
@@ -107,7 +165,6 @@ func (s *SettingsService) Update(input AllSettings) *AllSettings {
 	s.cfg.Site.ICP = input.Site.ICP
 	s.cfg.Site.Footer = input.Site.Footer
 
-	// 文章设置
 	if input.Post.PostsPerPage > 0 {
 		s.cfg.Post.PostsPerPage = input.Post.PostsPerPage
 	}
@@ -118,15 +175,12 @@ func (s *SettingsService) Update(input AllSettings) *AllSettings {
 	}
 	s.cfg.Post.DefaultCoverURL = input.Post.DefaultCoverURL
 
-	// 渲染模式
 	if input.Render.RenderMode == config.RenderModeClassic || input.Render.RenderMode == config.RenderModeHeadless {
 		s.cfg.RenderMode = input.Render.RenderMode
 	}
 
-	// AI 设置
 	s.cfg.AI.Enabled = input.AI.Enabled
 	s.cfg.AI.Provider = input.AI.Provider
-	// 仅当收到非掩码值时更新 API Key
 	if input.AI.APIKey != "" && input.AI.APIKey != maskAPIKey(s.cfg.AI.APIKey) {
 		s.cfg.AI.APIKey = input.AI.APIKey
 	}
@@ -134,7 +188,56 @@ func (s *SettingsService) Update(input AllSettings) *AllSettings {
 	s.cfg.AI.AutoSummary = input.AI.AutoSummary
 	s.cfg.AI.AutoTag = input.AI.AutoTag
 
-	return s.Get()
+	// 持久化到 DB
+	if err := s.saveToDB(); err != nil {
+		return nil, fmt.Errorf("保存设置失败: %w", err)
+	}
+
+	return s.Get(), nil
+}
+
+// saveToDB 将当前内存配置写入 DB
+func (s *SettingsService) saveToDB() error {
+	kvs := make(map[string]string)
+
+	siteJSON, _ := json.Marshal(s.cfg.Site)
+	kvs[SettingKeySite] = string(siteJSON)
+
+	postJSON, _ := json.Marshal(s.cfg.Post)
+	kvs[SettingKeyPost] = string(postJSON)
+
+	renderJSON, _ := json.Marshal(map[string]string{"render_mode": s.cfg.RenderMode})
+	kvs[SettingKeyRender] = string(renderJSON)
+
+	aiJSON, _ := json.Marshal(s.cfg.AI)
+	kvs[SettingKeyAI] = string(aiJSON)
+
+	return s.settingsRepo.SetBatch(kvs)
+}
+
+// SaveInitialSettings 安装引导时写入初始设置（包含 admin）
+func (s *SettingsService) SaveInitialSettings() error {
+	kvs := make(map[string]string)
+
+	siteJSON, _ := json.Marshal(s.cfg.Site)
+	kvs[SettingKeySite] = string(siteJSON)
+
+	postJSON, _ := json.Marshal(s.cfg.Post)
+	kvs[SettingKeyPost] = string(postJSON)
+
+	renderJSON, _ := json.Marshal(map[string]string{"render_mode": s.cfg.RenderMode})
+	kvs[SettingKeyRender] = string(renderJSON)
+
+	aiJSON, _ := json.Marshal(s.cfg.AI)
+	kvs[SettingKeyAI] = string(aiJSON)
+
+	adminJSON, _ := json.Marshal(s.cfg.Admin)
+	kvs[SettingKeyAdmin] = string(adminJSON)
+
+	kvs[SettingKeyDBDriver] = s.cfg.Database.Driver
+	kvs[SettingKeyDBPath] = s.cfg.Database.Path
+
+	return s.settingsRepo.SetBatch(kvs)
 }
 
 // maskAPIKey 掩盖 API Key 中间部分

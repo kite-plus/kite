@@ -111,11 +111,11 @@ export function SettingsPage() {
               </FormRow>
               {form.ai.enabled && (
                 <>
-                  <FormRow label="AI 服务商">
-                    <Select value={form.ai.provider} onChange={(v) => updateField(setForm, 'ai', 'provider', v as string)} style={{ maxWidth: 480 }}>
-                      <Select.Option value="deepseek">DeepSeek</Select.Option>
-                      <Select.Option value="openai">OpenAI</Select.Option>
-                    </Select>
+                  <FormRow label="API 地址" description="OpenAI 兼容接口地址">
+                    <Input value={form.ai.provider} onChange={(v) => updateField(setForm, 'ai', 'provider', v)} placeholder="https://api.deepseek.com" style={{ maxWidth: 480 }} />
+                    <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                      常用地址：DeepSeek: https://api.deepseek.com、OpenAI: https://api.openai.com
+                    </Text>
                   </FormRow>
                   <FormRow label="模型名称">
                     <Input value={form.ai.model} onChange={(v) => updateField(setForm, 'ai', 'model', v)} placeholder="deepseek-chat" style={{ maxWidth: 480 }} />

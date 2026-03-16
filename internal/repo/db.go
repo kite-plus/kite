@@ -41,6 +41,18 @@ func InitDB(cfg *config.Config) (*gorm.DB, error) {
 	return db, nil
 }
 
+// InitSQLiteDB 直接用 SQLite 路径初始化数据库（安装引导用）
+func InitSQLiteDB(dbPath string) (*gorm.DB, error) {
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("open sqlite: %w", err)
+	}
+	if err := autoMigrate(db); err != nil {
+		return nil, fmt.Errorf("auto migrate: %w", err)
+	}
+	return db, nil
+}
+
 func autoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&model.AdminSession{},
@@ -50,6 +62,7 @@ func autoMigrate(db *gorm.DB) error {
 		&model.FriendLink{},
 		&model.Comment{},
 		&model.Page{},
+		&model.Setting{},
 	)
 }
 

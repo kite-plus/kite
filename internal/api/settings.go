@@ -30,6 +30,10 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		return
 	}
 
-	result := h.settingsService.Update(input)
+	result, err := h.settingsService.Update(input)
+	if err != nil {
+		Error(c, http.StatusInternalServerError, http.StatusInternalServerError, err.Error())
+		return
+	}
 	Success(c, result)
 }
