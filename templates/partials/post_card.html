@@ -5,23 +5,23 @@
   </h2>
   <div class="post-card-meta">
     {{ if .PublishedAt }}
-      <time>{{ formatDate .PublishedAt }}</time>
+      <time>📅 {{ formatDate .PublishedAt }}</time>
     {{ else }}
-      <time>{{ formatDate .CreatedAt }}</time>
+      <time>📅 {{ formatDate .CreatedAt }}</time>
     {{ end }}
     {{ if .Category }}
       <a class="category-badge" href="/categories/{{ .Category.Slug }}">{{ .Category.Name }}</a>
     {{ end }}
   </div>
   {{ if .Summary }}
-  <p class="post-card-summary">{{ .Summary }}</p>
+    <p class="post-card-summary">{{ .Summary }}</p>
   {{ end }}
   {{ if .Tags }}
-  <div class="post-card-tags">
-    {{ range .Tags }}
-      <a class="tag" href="/tags/{{ .Slug }}">{{ .Name }}</a>
-    {{ end }}
-  </div>
+    <div class="post-card-tags">
+      {{ range .Tags }}
+        <a class="tag" href="/tags/{{ .Slug }}">{{ .Name }}</a>
+      {{ end }}
+    </div>
   {{ end }}
 </article>
 {{ end }}

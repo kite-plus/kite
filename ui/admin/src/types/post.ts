@@ -56,6 +56,7 @@ export interface PostFormData {
   slug: string
   summary: string
   contentMarkdown: string
+  contentHtml: string
   categoryId: string
   tagIds: string[]
   status: PostStatus

@@ -13,6 +13,11 @@ export default defineConfig(({ command }) => ({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    // TiptapEditor (~685KB) 和 Semi Design (~617KB) 是大型依赖，
+    // 已通过路由懒加载做了 code splitting，这个阈值设为合理范围
+    chunkSizeWarningLimit: 700,
+  },
   server: {
     proxy: {
       '/api': {

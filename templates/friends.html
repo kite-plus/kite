@@ -7,26 +7,28 @@
 
   <main>
     <div class="container">
-      <h1 class="page-title">友情链接</h1>
+      <div class="page-header">
+        <h1>🤝 友情链接</h1>
+      </div>
 
       {{ if .FriendLinks }}
-        <div class="friend-grid">
+        <div class="friend-links-grid">
           {{ range .FriendLinks }}
-          <a class="friend-card" href="{{ .URL }}" target="_blank" rel="noopener noreferrer">
-            {{ if .Logo }}
-              <img src="{{ .Logo }}" alt="{{ .Name }}" loading="lazy">
-            {{ else }}
-              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect fill='%23e2e8f0' width='40' height='40' rx='20'/%3E%3Ctext x='50%25' y='54%25' text-anchor='middle' dominant-baseline='middle' font-size='16' fill='%2394a3b8'%3E{{ slice .Name 0 1 }}%3C/text%3E%3C/svg%3E" alt="{{ .Name }}">
-            {{ end }}
-            <div class="friend-card-info">
-              <h3>{{ .Name }}</h3>
-              {{ if .Description }}<p>{{ .Description }}</p>{{ end }}
-            </div>
-          </a>
+            <a href="{{ .URL }}" target="_blank" rel="noopener" class="friend-link-card">
+              {{ if .Avatar }}
+                <img src="{{ .Avatar }}" alt="{{ .Name }}" class="friend-link-avatar">
+              {{ else }}
+                <div class="friend-link-avatar" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem;">🌐</div>
+              {{ end }}
+              <div class="friend-link-info">
+                <h3>{{ .Name }}</h3>
+                {{ if .Description }}<p>{{ .Description }}</p>{{ end }}
+              </div>
+            </a>
           {{ end }}
         </div>
       {{ else }}
-        <p style="text-align:center;color:var(--c-text-secondary);padding:3rem 0;">暂无友情链接</p>
+        <div class="empty-state">暂无友情链接</div>
       {{ end }}
     </div>
   </main>

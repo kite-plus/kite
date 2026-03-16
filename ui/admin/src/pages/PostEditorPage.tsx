@@ -21,7 +21,7 @@ export function PostEditorPage() {
   const [saved, setSaved] = useState(false)
 
   const [form, setForm] = useState<PostFormData>({
-    title: '', slug: '', summary: '', contentMarkdown: '',
+    title: '', slug: '', summary: '', contentMarkdown: '', contentHtml: '',
     categoryId: '', tagIds: [], status: 'draft', coverImage: '', password: '',
   })
 
@@ -35,6 +35,7 @@ export function PostEditorPage() {
       setForm({
         title: post.title, slug: post.slug, summary: post.summary,
         contentMarkdown: post.contentMarkdown || '',
+        contentHtml: post.contentHtml || '',
         categoryId: post.categoryId || '',
         tagIds: post.tags?.map((t) => t.id) || [],
         status: post.status, coverImage: post.coverImage || '',
@@ -102,8 +103,9 @@ export function PostEditorPage() {
             size="large"
           />
           <TiptapEditor
-            content={form.contentMarkdown}
-            onChange={(html) => setForm((prev) => ({ ...prev, contentMarkdown: html }))}
+            key={post?.id || 'new'}
+            content={post ? (post.contentHtml || post.contentMarkdown || '') : ''}
+            onChange={(html, markdown) => setForm((prev) => ({ ...prev, contentHtml: html, contentMarkdown: markdown }))}
             placeholder="开始写作…"
           />
         </div>

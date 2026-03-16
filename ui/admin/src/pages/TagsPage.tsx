@@ -3,11 +3,12 @@ import { Card, Button, ButtonGroup, Input, Tag, Table, Typography, Empty, Toolti
 import { IconSearch, IconPlus, IconClose, IconDelete, IconHash, IconArticle, IconList } from '@douyinfe/semi-icons'
 import { useTagList, useCreateTag, useDeleteTag } from '@/hooks/use-tags'
 import type { ColumnProps } from '@douyinfe/semi-ui/lib/es/table'
+import type { TagColor } from '@douyinfe/semi-ui/lib/es/tag/interface'
 
 const { Title, Text } = Typography
 
 /** 根据引用数获取标签颜色 */
-function getTagColor(postCount: number, maxCount: number): string {
+function getTagColor(postCount: number, maxCount: number): TagColor {
   if (maxCount === 0) return 'blue'
   const ratio = postCount / maxCount
   if (ratio > 0.7) return 'blue'
@@ -163,7 +164,7 @@ export function TagsPage() {
                 onChange={(v) => handleNameChange(v)}
                 placeholder="例如：Kubernetes"
                 prefix={<IconHash />}
-                autofocus
+                autoFocus
               />
             </div>
             <div style={{ flex: 1 }}>
@@ -239,10 +240,8 @@ export function TagsPage() {
                     padding: '6px 14px',
                     transition: 'transform 0.2s, box-shadow 0.2s',
                     opacity: tag.postCount === 0 ? 0.5 : 1,
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.08)' }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
-                >
+                  }}>
+                
                   # {tag.name}
                   <Text type="tertiary" size="small" style={{ marginLeft: 6 }}>{tag.postCount}</Text>
                 </Tag>

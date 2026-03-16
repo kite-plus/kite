@@ -1,8 +1,8 @@
 {{ define "footer" }}
-<footer class="site-footer">
-  <div class="container-wide">
-    <span>{{ if .Footer }}{{ .Footer }}{{ else }}© {{ .SiteName }}{{ end }}</span>
-    <span>{{ if .ICP }}{{ .ICP }}{{ end }}</span>
+<footer class="footer">
+  <div class="container">
+    <p>{{ if .Footer }}{{ .Footer }}{{ else }}&copy; 2025 {{ .SiteName }}. Powered by <a href="https://github.com/amigoer/kite-blog" target="_blank">Kite</a>.{{ end }}</p>
+    {{ if .ICP }}<p class="icp"><a href="https://beian.miit.gov.cn/" target="_blank" rel="nofollow">{{ .ICP }}</a></p>{{ end }}
   </div>
 </footer>
 {{ end }}

@@ -11,7 +11,7 @@
 
       {{ if .Page.ContentHTML }}
       <div class="post-content" style="margin-bottom: 2rem;">
-        {{ .Page.ContentHTML }}
+        {{ .Page.ContentHTML | safeHTML }}
       </div>
       {{ end }}
 

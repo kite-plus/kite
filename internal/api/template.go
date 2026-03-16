@@ -22,6 +22,10 @@ var templateFuncs = template.FuncMap{
 			return ""
 		}
 	},
+	// safeHTML 将字符串标记为安全 HTML，不做转义
+	"safeHTML": func(s string) template.HTML {
+		return template.HTML(s)
+	},
 	// add 加法
 	"add": func(a, b int) int { return a + b },
 	// subtract 减法

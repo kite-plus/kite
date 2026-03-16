@@ -1,13 +1,18 @@
 {{ define "header" }}
-<header class="site-header">
-  <div class="container-wide">
-    <a class="site-logo" href="/">{{ .SiteName }}</a>
-    <nav class="site-nav">
-      <a href="/">首页</a>
-      {{ range .NavPages }}
-      <a href="/pages/{{ .Slug }}">{{ .Title }}</a>
-      {{ end }}
-      <a href="/friends">友链</a>
+<header class="header">
+  <div class="container" style="max-width:var(--nav-width);">
+    <a href="/" class="site-logo">
+      <span class="logo-emoji">🪁</span>
+      {{ .SiteName }}
+    </a>
+    <nav>
+      <ul class="nav-links">
+        <li><a href="/">首页</a></li>
+        {{ range .NavPages }}
+          <li><a href="/pages/{{ .Slug }}">{{ .Title }}</a></li>
+        {{ end }}
+        <li><a href="/friends">友链</a></li>
+      </ul>
     </nav>
   </div>
 </header>

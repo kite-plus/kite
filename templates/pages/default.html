@@ -9,7 +9,7 @@
     <div class="container">
       <h1 class="page-title">{{ .Page.Title }}</h1>
       <div class="post-content">
-        {{ .Page.ContentHTML }}
+        {{ .Page.ContentHTML | safeHTML }}
       </div>
     </div>
   </main>

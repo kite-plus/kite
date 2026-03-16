@@ -3,6 +3,8 @@
 <nav class="pagination">
   {{ if gt .CurrentPage 1 }}
     <a href="{{ .BasePath }}?page={{ subtract .CurrentPage 1 }}">← 上一页</a>
+  {{ else }}
+    <span class="disabled">← 上一页</span>
   {{ end }}
 
   {{ range .PageNumbers }}
@@ -15,6 +17,8 @@
 
   {{ if lt .CurrentPage .TotalPages }}
     <a href="{{ .BasePath }}?page={{ add .CurrentPage 1 }}">下一页 →</a>
+  {{ else }}
+    <span class="disabled">下一页 →</span>
   {{ end }}
 </nav>
 {{ end }}

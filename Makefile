@@ -1,5 +1,5 @@
 BINARY_NAME=kite
-MAIN_PATH=cmd/kite/main.go
+MAIN_PATH=./cmd/kite
 ADMIN_DIR=ui/admin
 ADMIN_DIST_DIR=$(ADMIN_DIR)/dist
 GO_FLAGS=-ldflags="-s -w"

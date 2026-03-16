@@ -12,9 +12,9 @@
           <h1 class="post-title">{{ .Post.Title }}</h1>
           <div class="post-meta">
             {{ if .Post.PublishedAt }}
-              <time>{{ formatDate .Post.PublishedAt }}</time>
+              <time>📅 {{ formatDate .Post.PublishedAt }}</time>
             {{ else }}
-              <time>{{ formatDate .Post.CreatedAt }}</time>
+              <time>📅 {{ formatDate .Post.CreatedAt }}</time>
             {{ end }}
             {{ if .Post.Category }}
               <a class="category-badge" href="/categories/{{ .Post.Category.Slug }}">{{ .Post.Category.Name }}</a>
@@ -29,8 +29,12 @@
           {{ end }}
         </header>
 
+        {{ if .Post.CoverImage }}
+        <img src="{{ .Post.CoverImage }}" alt="{{ .Post.Title }}" style="width:100%;border-radius:var(--radius);margin-bottom:var(--gap);">
+        {{ end }}
+
         <div class="post-content">
-          {{ .Post.ContentHTML }}
+          {{ .Post.ContentHTML | safeHTML }}
         </div>
       </article>
     </div>

@@ -214,11 +214,13 @@
 }
 
 .tiptap-wrapper .tiptap blockquote {
-  border-left: 3px solid var(--semi-color-text-3);
-  padding-left: 1rem;
+  border-left: 3px solid #2563eb;
+  padding: 0.5em 1em;
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
   color: var(--semi-color-text-2);
+  background: #f6f6f6;
+  border-radius: 0 8px 8px 0;
   font-style: italic;
 }
 
@@ -304,6 +306,42 @@
   border-radius: 2px;
   padding: 1px 2px;
   box-decoration-break: clone;
+}
+
+/* ========== 局部加密块 ========== */
+.tiptap-wrapper .protected-block-wrapper {
+  border: 2px dashed #f59e0b;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  background: #fffbeb;
+}
+.tiptap-wrapper .protected-block-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #d97706;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  user-select: none;
+}
+.tiptap-wrapper .protected-block-hint-input {
+  border: none;
+  background: transparent;
+  color: #d97706;
+  font-size: 0.8rem;
+  font-weight: 600;
+  outline: none;
+  flex: 1;
+  padding: 0;
+}
+.tiptap-wrapper .protected-block-hint-input::placeholder {
+  color: #d9770680;
+}
+.tiptap-wrapper .protected-block-body {
+  border-top: 1px dashed #f59e0b40;
+  padding-top: 0.5rem;
 }
 
 /* ========== 任务列表 ========== */

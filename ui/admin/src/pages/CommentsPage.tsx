@@ -7,10 +7,10 @@ import type { CommentStatus } from '@/types/comment'
 const { Title, Text, Paragraph } = Typography
 
 /** 状态徽标 */
-const statusBadge: Record<CommentStatus, { text: string; color: string }> = {
-  approved: { text: '已通过', color: 'blue' },
-  pending: { text: '待审核', color: 'orange' },
-  spam: { text: '垃圾', color: 'red' },
+const statusBadge = {
+  approved: { text: '已通过', color: 'blue' as const },
+  pending: { text: '待审核', color: 'orange' as const },
+  spam: { text: '垃圾', color: 'red' as const },
 }
 
 function timeAgo(dateStr: string): string {

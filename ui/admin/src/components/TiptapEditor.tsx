@@ -28,9 +28,10 @@ import {
   Link as LinkIcon, Image as ImageIcon, Undo2, Redo2, FileCode,
   CodeXml, UnderlineIcon, Highlighter, SuperscriptIcon, SubscriptIcon,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  ListTodo, TableIcon, Upload, Lightbulb,
+  ListTodo, TableIcon, Upload, Lightbulb, Lock,
 } from 'lucide-react'
 import { Callout, CALLOUT_TYPES, type CalloutType } from '@/extensions/callout/callout-extension'
+import { ProtectedBlock } from '@/extensions/protected-block/protected-block-extension'
 import { SlashCommand } from '@/extensions/slash-command/slash-command-extension'
 import { slashCommandSuggestion } from '@/extensions/slash-command/suggestion'
 import '@/styles/tiptap.css'
@@ -56,6 +57,11 @@ const turndown = new TurndownService({
       const title = el.getAttribute('data-callout-title') || ''
       const header = title ? `${type} ${title}` : type
       return `\n\n::: ${header}\n\n:::\n\n`
+    }
+    if (el.nodeName === 'DIV' && el.hasAttribute && el.hasAttribute('data-protected')) {
+      const hint = el.getAttribute('data-hint') || ''
+      const header = hint ? `protected ${hint}` : 'protected'
+      return `\n\n:::${header}\n\n:::\n\n`
     }
     return '\n\n'
   },
@@ -95,6 +101,23 @@ turndown.addRule('callout', {
   },
 })
 
+/** ProtectedBlock HTML → Markdown :::protected 容器语法 */
+turndown.addRule('protectedBlock', {
+  filter: (node) => {
+    if (node.nodeName !== 'DIV') return false
+    // 直接检查 data-protected 属性
+    if ((node as HTMLElement).getAttribute('data-protected') === 'true') return true
+    return false
+  },
+  replacement: (content, node) => {
+    const el = node as HTMLElement
+    const hint = el.getAttribute('data-hint') || ''
+    const header = hint ? `protected ${hint}` : 'protected'
+    const body = content.trim()
+    return `\n\n:::${header}\n${body}\n:::\n\n`
+  },
+})
+
 /** Markdown ::: 容器语法 → Callout HTML（支持自定义标题，允许空内容） */
 const calloutExtension = {
   name: 'calloutContainer',
@@ -129,6 +152,14 @@ const calloutExtension = {
     const inner = token.text
       ? marked.parse(token.text, { async: false }) as string
       : '<p></p>'
+
+    // :::protected 类型 → 加密块
+    if (token.calloutType === 'protected') {
+      const hint = token.calloutTitle || '输入密码查看隐藏内容'
+      return `<div data-protected="true" data-hint="${hint}">${inner}</div>`
+    }
+
+    // 其他类型 → Callout
     const titleAttr = token.calloutTitle ? ` data-callout-title="${token.calloutTitle}"` : ''
     return `<div data-callout="${token.calloutType}"${titleAttr} class="callout callout-${token.calloutType}">${inner}</div>`
   },
@@ -137,7 +168,7 @@ marked.use({ extensions: [calloutExtension] })
 
 interface TiptapEditorProps {
   content?: string
-  onChange?: (html: string) => void
+  onChange?: (html: string, markdown: string) => void
   placeholder?: string
 }
 
@@ -187,10 +218,15 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
       TextStyle,
       Color,
       Callout,
+      ProtectedBlock,
       SlashCommand.configure({ suggestion: slashCommandSuggestion() }),
     ],
     content,
-    onUpdate: ({ editor }) => { onChange?.(editor.getHTML()) },
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML()
+      const markdown = turndown.turndown(html)
+      onChange?.(html, markdown)
+    },
     editorProps: {
       handleDrop: (_view, event) => {
         const file = event.dataTransfer?.files?.[0]
@@ -217,6 +253,19 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
     },
   })
 
+  // 当外部 content 变化时（如异步加载文章），同步到编辑器
+  const contentSyncedRef = useRef(false)
+  useEffect(() => {
+    if (editor && content && !contentSyncedRef.current) {
+      const currentContent = editor.getHTML()
+      const isEmpty = !currentContent || currentContent === '<p></p>'
+      if (isEmpty) {
+        editor.commands.setContent(content, { emitUpdate: false })
+        contentSyncedRef.current = true
+      }
+    }
+  }, [editor, content])
+
   /** 切换 Markdown 源码模式 */
   const toggleSourceMode = useCallback(() => {
     if (!editor) return
@@ -227,7 +276,7 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
     } else {
       const html = marked.parse(sourceCode, { async: false }) as string
       editor.commands.setContent(html, { emitUpdate: true })
-      onChange?.(html)
+      onChange?.(html, sourceCode)
     }
     setSourceMode(!sourceMode)
   }, [editor, sourceMode, sourceCode, onChange])
@@ -477,6 +526,11 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
             <ToolBtn icon={LinkIcon} tooltip="链接" onClick={openLinkModal} active={editor.isActive('link')} />
             <ToolBtn icon={ImageIcon} tooltip="图片" onClick={openImageModal} />
             <ToolBtn icon={Minus} tooltip="分隔线" onClick={() => editor.chain().focus().setHorizontalRule().run()} />
+
+            {/* 局部加锁 */}
+            <ToolBtn icon={Lock} tooltip="局部加密" onClick={() => {
+              (editor.commands as any).toggleProtectedBlock()
+            }} />
           </>
         )}
 

@@ -7,6 +7,11 @@
 
   <main>
     <div class="container">
+      <div class="home-profile">
+        <h1>{{ .SiteName }}</h1>
+        {{ if .Description }}<p>{{ .Description }}</p>{{ end }}
+      </div>
+
       {{ if .Posts }}
         <div class="post-list">
           {{ range .Posts }}
@@ -15,7 +20,7 @@
         </div>
         {{ template "pagination" .Pagination }}
       {{ else }}
-        <p style="text-align:center;color:var(--c-text-secondary);padding:3rem 0;">暂无文章</p>
+        <div class="empty-state">✍️ 暂无文章，快去写一篇吧~</div>
       {{ end }}
     </div>
   </main>

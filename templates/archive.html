@@ -7,10 +7,10 @@
 
   <main>
     <div class="container">
-      <h1 class="archive-title">
-        {{ .ArchiveType }}：{{ .ArchiveName }}
-        <span class="archive-count">（共 {{ .Pagination.Total }} 篇）</span>
-      </h1>
+      <div class="archive-header">
+        <h1>{{ .ArchiveType }}：{{ .ArchiveName }}</h1>
+        <p class="archive-desc">共 {{ .Pagination.Total }} 篇文章</p>
+      </div>
 
       {{ if .Posts }}
         <div class="post-list">
@@ -20,7 +20,7 @@
         </div>
         {{ template "pagination" .Pagination }}
       {{ else }}
-        <p style="text-align:center;color:var(--c-text-secondary);padding:3rem 0;">该{{ .ArchiveType }}下暂无文章</p>
+        <div class="empty-state">该{{ .ArchiveType }}下暂无文章</div>
       {{ end }}
     </div>
   </main>

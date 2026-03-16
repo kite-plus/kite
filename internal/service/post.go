@@ -30,6 +30,7 @@ type CreatePostInput struct {
 	Slug            string     `json:"slug"`
 	Summary         string     `json:"summary"`
 	ContentMarkdown string     `json:"content_markdown"`
+	ContentHTML     string     `json:"content_html"`
 	Status          string     `json:"status"`
 	CoverImage      string     `json:"cover_image"`
 	Password        string     `json:"password"`
@@ -44,6 +45,7 @@ type UpdatePostInput struct {
 	Slug            string     `json:"slug"`
 	Summary         string     `json:"summary"`
 	ContentMarkdown string     `json:"content_markdown"`
+	ContentHTML     string     `json:"content_html"`
 	Status          string     `json:"status"`
 	CoverImage      string     `json:"cover_image"`
 	Password        string     `json:"password"`
@@ -58,6 +60,7 @@ type PatchPostInput struct {
 	Slug            *string    `json:"slug"`
 	Summary         *string    `json:"summary"`
 	ContentMarkdown *string    `json:"content_markdown"`
+	ContentHTML     *string    `json:"content_html"`
 	Status          *string    `json:"status"`
 	CoverImage      *string    `json:"cover_image"`
 	Password        *string    `json:"password"`
@@ -186,6 +189,7 @@ func (s *PostService) Create(input CreatePostInput) (*model.Post, error) {
 		Slug:            strings.TrimSpace(input.Slug),
 		Summary:         strings.TrimSpace(input.Summary),
 		ContentMarkdown: strings.TrimSpace(input.ContentMarkdown),
+		ContentHTML:     input.ContentHTML,
 		Status:          normalizeStatus(input.Status),
 		CoverImage:      strings.TrimSpace(input.CoverImage),
 		Password:        input.Password,
@@ -230,6 +234,7 @@ func (s *PostService) Update(id string, input UpdatePostInput) (*model.Post, err
 	existing.Slug = strings.TrimSpace(input.Slug)
 	existing.Summary = strings.TrimSpace(input.Summary)
 	existing.ContentMarkdown = strings.TrimSpace(input.ContentMarkdown)
+	existing.ContentHTML = input.ContentHTML
 	existing.Status = normalizeStatus(input.Status)
 	existing.CoverImage = strings.TrimSpace(input.CoverImage)
 	existing.Password = input.Password
@@ -277,6 +282,9 @@ func (s *PostService) Patch(id string, input PatchPostInput) (*model.Post, error
 	}
 	if input.ContentMarkdown != nil {
 		existing.ContentMarkdown = strings.TrimSpace(*input.ContentMarkdown)
+	}
+	if input.ContentHTML != nil {
+		existing.ContentHTML = *input.ContentHTML
 	}
 	if input.Status != nil {
 		existing.Status = normalizeStatus(*input.Status)
@@ -427,11 +435,9 @@ func validatePost(post *model.Post) error {
 	if post.Slug == "" {
 		return fmt.Errorf("%w: slug is required", ErrInvalidPostPayload)
 	}
-	if post.ContentMarkdown == "" {
-		return fmt.Errorf("%w: content_markdown is required", ErrInvalidPostPayload)
-	}
-	if post.ContentHTML == "" {
-		return fmt.Errorf("%w: content_html is required", ErrInvalidPostPayload)
+	// 内容可以是 Markdown 或 HTML 任意一个非空
+	if post.ContentMarkdown == "" && post.ContentHTML == "" {
+		return fmt.Errorf("%w: content is required", ErrInvalidPostPayload)
 	}
 	if !isValidStatus(post.Status) {
 		return fmt.Errorf("%w: invalid status", ErrInvalidPostPayload)
@@ -455,11 +461,14 @@ func preparePostForSave(post *model.Post) error {
 		return nil
 	}
 
-	contentHTML, err := renderPostMarkdown(post.ContentMarkdown)
-	if err != nil {
-		return fmt.Errorf("%w: invalid markdown content", ErrInvalidPostPayload)
+	// 如果前端已传 ContentHTML，直接使用；否则从 Markdown 渲染
+	if post.ContentHTML == "" && post.ContentMarkdown != "" {
+		contentHTML, err := renderPostMarkdown(post.ContentMarkdown)
+		if err != nil {
+			return fmt.Errorf("%w: invalid markdown content", ErrInvalidPostPayload)
+		}
+		post.ContentHTML = contentHTML
 	}
-	post.ContentHTML = contentHTML
 
 	if post.Status == model.PostStatusPublished && post.PublishedAt == nil {
 		now := time.Now().UTC()
