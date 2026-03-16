@@ -7,6 +7,7 @@ import { usePostDetail, useSavePost } from '@/hooks/use-posts'
 import { useCategoryList } from '@/hooks/use-categories'
 import { useTagList } from '@/hooks/use-tags'
 import type { PostFormData } from '@/types/post'
+import { ImageUploader } from '@/components/ImageUploader'
 
 const { Title, Text } = Typography
 
@@ -160,14 +161,11 @@ export function PostEditorPage() {
           </Card>
 
           <Card title="封面图">
-            <Input
+            <ImageUploader
               value={form.coverImage}
-              onChange={(v) => setForm((prev) => ({ ...prev, coverImage: v }))}
-              placeholder="https://example.com/cover.jpg"
+              onChange={(url) => setForm((prev) => ({ ...prev, coverImage: url }))}
+              placeholder="上传封面图片"
             />
-            {form.coverImage && (
-              <img src={form.coverImage} alt="封面预览" style={{ marginTop: 8, width: '100%', borderRadius: 4, border: '1px solid var(--semi-color-border)' }} />
-            )}
           </Card>
         </div>
       </div>

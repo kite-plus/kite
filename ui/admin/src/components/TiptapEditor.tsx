@@ -35,6 +35,7 @@ import { SlashCommand } from '@/extensions/slash-command/slash-command-extension
 import { slashCommandSuggestion } from '@/extensions/slash-command/suggestion'
 import '@/styles/tiptap.css'
 import '@/styles/callout.css'
+import { apiUpload } from '@/lib/api-client'
 
 /** 代码高亮引擎 */
 const lowlight = createLowlight(common)
@@ -150,6 +151,7 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
   const [imageTab, setImageTab] = useState<'url' | 'upload'>('url')
   const [uploadPreview, setUploadPreview] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [linkModalVisible, setLinkModalVisible] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [sourceMode, setSourceMode] = useState(false)
@@ -189,6 +191,30 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
     ],
     content,
     onUpdate: ({ editor }) => { onChange?.(editor.getHTML()) },
+    editorProps: {
+      handleDrop: (_view, event) => {
+        const file = event.dataTransfer?.files?.[0]
+        if (file?.type.startsWith('image/')) {
+          event.preventDefault()
+          apiUpload(file).then((result) => {
+            editor?.chain().focus().setImage({ src: result.url }).run()
+          })
+          return true
+        }
+        return false
+      },
+      handlePaste: (_view, event) => {
+        const file = event.clipboardData?.files?.[0]
+        if (file?.type.startsWith('image/')) {
+          event.preventDefault()
+          apiUpload(file).then((result) => {
+            editor?.chain().focus().setImage({ src: result.url }).run()
+          })
+          return true
+        }
+        return false
+      },
+    },
   })
 
   /** 切换 Markdown 源码模式 */
@@ -247,15 +273,24 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
     setUploadPreview('')
   }, [editor, imageUrl, uploadPreview, imageTab])
 
-  /** 处理文件上传（转 base64） */
-  const handleFileUpload = useCallback((file: File) => {
+  /** 处理文件上传（上传到服务器） */
+  const handleFileUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) return
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const result = e.target?.result as string
-      if (result) setUploadPreview(result)
+    setUploading(true)
+    try {
+      const result = await apiUpload(file)
+      setUploadPreview(result.url)
+    } catch {
+      // 上传失败时 fallback 到 base64 预览
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string
+        if (dataUrl) setUploadPreview(dataUrl)
+      }
+      reader.readAsDataURL(file)
+    } finally {
+      setUploading(false)
     }
-    reader.readAsDataURL(file)
   }, [])
 
   /** 拖拽处理 */
@@ -559,7 +594,7 @@ export function TiptapEditor({ content = '', onChange, placeholder = '开始写�
                 onDrop={handleDrop}
               >
                 <Upload className="img-dropzone-icon" />
-                <p className="img-dropzone-title">点击选择图片或拖拽到此处</p>
+                <p className="img-dropzone-title">{uploading ? '上传中…' : '点击选择图片或拖拽到此处'}</p>
                 <p className="img-dropzone-hint">支持 JPG、PNG、GIF、WebP 格式</p>
               </div>
             ) : (

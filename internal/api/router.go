@@ -93,6 +93,9 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	uploadService := service.NewUploadService("")
 	uploadHandler := NewUploadHandler(uploadService)
 	feedHandler := NewFeedHandler(cfg, postService, pageService)
+	aiService := service.NewAIService(&cfg.AI)
+	aiHandler := NewAIHandler(aiService)
+	searchHandler := NewSearchHandler(postService)
 
 	apiV1 := router.Group("/api/v1")
 	apiV1.GET("/health", healthHandler.Get)
@@ -109,6 +112,7 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	apiV1.GET("/categories/:id", categoryHandler.GetByID)
 	apiV1.GET("/pages", pageHandler.ListPublic)
 	apiV1.GET("/pages/slug/:slug", pageHandler.GetPublicBySlug)
+	apiV1.GET("/search", searchHandler.Search)
 
 	// RSS 和 Sitemap
 	router.GET("/feed.xml", feedHandler.RSS)
@@ -162,6 +166,8 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	protectedAdminV1.GET("/settings", settingsHandler.Get)
 	protectedAdminV1.PUT("/settings", settingsHandler.Update)
 	protectedAdminV1.POST("/upload/image", uploadHandler.Image)
+	protectedAdminV1.POST("/ai/summary", aiHandler.Summary)
+	protectedAdminV1.POST("/ai/tags", aiHandler.Tags)
 }
 
 func registerPageRoutes(router *gin.Engine, cfg *config.Config, templateFS fs.FS, db *gorm.DB) {
