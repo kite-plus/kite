@@ -57,8 +57,8 @@ export function Header() {
         position: 'relative',
       }}
     >
-      {/* 用于弹出层定位的容器 ref */}
-      <div ref={headerRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
+      {/* 弹出层定位容器：自身不拦截事件，但子元素（弹出菜单）可交互 */}
+      <div ref={headerRef} className="header-popup-anchor" />
 
       {/* 左侧：菜单 + 面包屑 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -126,6 +126,7 @@ export function Header() {
 
         {/* 用户菜单 */}
         <Dropdown
+          trigger="click"
           position="bottomRight"
           getPopupContainer={getContainer}
           render={
@@ -143,7 +144,7 @@ export function Header() {
             </Dropdown.Menu>
           }
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>
+          <div className="header-user-trigger">
             <Avatar size="small" color="blue" alt={displayName}>{displayName.charAt(0).toUpperCase()}</Avatar>
             <Text style={{ fontSize: 13, fontWeight: 500 }}>{displayName}</Text>
           </div>

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* 极简滚动条 */
+/* 极简滚动条 — 跟随主题 */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -11,8 +11,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d9d9d9;
+  background: var(--semi-color-fill-2, #d9d9d9);
   border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--semi-color-fill-3, #bfbfbf);
 }
 
 /* 全局布局约束 — 防止底部空白溢出 */
@@ -25,4 +29,132 @@ html, body, #root {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ========== Sidebar 整体样式 ========== */
+
+/* Sider 容器 — 亮色/暗色模式通过 Semi 变量自动切换 */
+.kite-sider {
+  background: var(--semi-color-bg-0);
+  border-right: 1px solid var(--semi-color-border);
+}
+
+/* 暗色模式下：让 Sider 的背景匹配 Semi Nav 的暗色背景 */
+body[theme-mode="dark"] .kite-sider {
+  background: var(--semi-color-nav-bg);
+}
+
+/* Semi Nav 在暗色模式下的背景已由组件自动处理，
+   但我们需要覆盖其默认内联样式使其透明化，
+   以便与 Sider 背景融合 */
+body[theme-mode="dark"] .kite-sider .semi-navigation {
+  background: transparent !important;
+}
+
+/* Sidebar 底部用户信息区域 */
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--semi-color-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.sidebar-footer-name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--semi-color-text-0);
+}
+
+.sidebar-footer-role {
+  font-size: 11px;
+  color: var(--semi-color-text-2);
+}
+
+.sidebar-footer-exit {
+  cursor: pointer;
+  color: var(--semi-color-text-2);
+  transition: color 0.15s;
+}
+
+.sidebar-footer-exit:hover {
+  color: var(--semi-color-danger);
+}
+
+/* Sidebar 搜索栏 */
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--semi-color-border);
+  cursor: pointer;
+  color: var(--semi-color-text-2);
+  font-size: 13px;
+  background: var(--semi-color-fill-0);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.sidebar-search:hover {
+  border-color: var(--semi-color-primary);
+  background: var(--semi-color-fill-1);
+}
+
+.sidebar-search kbd {
+  font-size: 10px;
+  color: var(--semi-color-text-2);
+  background: var(--semi-color-bg-0);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--semi-color-border);
+  font-family: inherit;
+}
+
+/* Sidebar Logo 区域 */
+.sidebar-logo {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sidebar-logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--semi-color-text-0);
+}
+
+/* ========== Header 用户菜单触发区 ========== */
+.header-user-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.header-user-trigger:hover {
+  background: var(--semi-color-fill-0);
+}
+
+/* Header 弹出层定位锚点 — 自身不拦截事件，弹出子元素可交互 */
+.header-popup-anchor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.header-popup-anchor > * {
+  pointer-events: auto;
 }

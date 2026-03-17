@@ -13,6 +13,7 @@ import {
   IconExit,
 } from '@douyinfe/semi-icons'
 import { useSidebarStore } from '@/stores/use-sidebar-store'
+import { useCurrentUser, useLogout } from '@/hooks/use-auth'
 
 const { Sider } = Layout
 
@@ -30,20 +31,26 @@ const navItems = [
 
 /**
  * 侧边栏组件
- * 使用 Semi Nav 组件替代 shadcn Button/Tooltip
+ * 使用 Semi Nav 组件，通过 CSS 类名适配暗色模式
  */
 export function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { isCollapsed } = useSidebarStore()
+  const { data: currentUser } = useCurrentUser()
+  const logoutMutation = useLogout()
+
+  // 取实际登录用户信息
+  const displayName = currentUser?.user?.displayName || currentUser?.user?.username || 'Admin'
+  const username = currentUser?.user?.username || ''
 
   return (
-    <Sider style={{ background: 'var(--semi-color-bg-0)', borderRight: '1px solid var(--semi-color-border)' }}>
-      {/* 内层 flex 容器 — Sider 自身样式会被 Semi 覆盖，需要额外包一层 */}
+    <Sider className="kite-sider">
+      {/* 内层 flex 容器 */}
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {/* Logo 区域 */}
-        <div style={{ height: 56, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 10, flexShrink: 0 }}>
-          <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: -0.5 }}>
+        <div className="sidebar-logo">
+          <span className="sidebar-logo-text">
             {isCollapsed ? 'K' : 'Kite'}
           </span>
         </div>
@@ -52,26 +59,12 @@ export function Sidebar() {
         {!isCollapsed && (
           <div style={{ padding: '0 12px 8px', flexShrink: 0 }}>
             <div
+              className="sidebar-search"
               onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: '1px solid var(--semi-color-border)',
-                cursor: 'pointer',
-                color: 'var(--semi-color-text-2)',
-                fontSize: 13,
-                background: 'var(--semi-color-bg-0)',
-                transition: 'border-color 0.2s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--semi-color-primary)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--semi-color-border)')}
             >
               <IconSearch style={{ fontSize: 14 }} />
               <span style={{ flex: 1 }}>搜索</span>
-              <kbd style={{ fontSize: 10, color: 'var(--semi-color-text-2)', background: 'var(--semi-color-fill-0)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--semi-color-border)' }}>⌘K</kbd>
+              <kbd>⌘K</kbd>
             </div>
           </div>
         )}
@@ -85,16 +78,21 @@ export function Sidebar() {
           style={{ flex: 1, overflow: 'auto' }}
         />
 
-        {/* 底部用户信息 — 固定在底部 */}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--semi-color-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <Avatar size="small" alt="A">A</Avatar>
+        {/* 底部用户信息 — 使用实际登录用户数据 */}
+        <div className="sidebar-footer">
+          <Avatar size="small" color="blue" alt={displayName}>
+            {displayName.charAt(0).toUpperCase()}
+          </Avatar>
           {!isCollapsed && (
             <>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Admin</div>
-                <div style={{ fontSize: 11, color: 'var(--semi-color-text-2)' }}>超级管理员</div>
+                <div className="sidebar-footer-name">{displayName}</div>
+                <div className="sidebar-footer-role">{username}</div>
               </div>
-              <IconExit style={{ cursor: 'pointer', color: 'var(--semi-color-text-2)' }} />
+              <IconExit
+                className="sidebar-footer-exit"
+                onClick={() => logoutMutation.mutate()}
+              />
             </>
           )}
         </div>
