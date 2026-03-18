@@ -24,7 +24,7 @@ config.*.local.yaml
 logs/
 
 # Go build artifacts
-kite
+/kite
 *.exe
 *.exe~
 *.dll
