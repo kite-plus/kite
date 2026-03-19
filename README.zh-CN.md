@@ -40,7 +40,7 @@ graph TB
     subgraph Binary["🪁 Kite（单二进制）"]
         subgraph Frontend["Admin 管理后台"]
             React["React 19 + TypeScript"]
-            Semi["Semi Design 组件库"]
+            shadcn["shadcn/ui (Tailwind CSS)"]
             Tiptap["Tiptap 富文本编辑器"]
             TanStack["TanStack Query"]
         end
@@ -252,7 +252,7 @@ docker run -d -p 8080:8080 -v kite-data:/app/data kite
 | ORM | GORM |
 | 数据库 | SQLite (glebarez/sqlite, 纯 Go) |
 | 前端框架 | React 19, TypeScript, Vite |
-| UI 组件库 | Semi Design (@douyinfe/semi-ui) |
+| UI 组件库 | shadcn/ui + Tailwind CSS |
 | 富文本编辑器 | Tiptap (ProseMirror) |
 | 数据请求 | TanStack Query |
 | 模板引擎 | Go html/template |

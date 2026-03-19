@@ -40,7 +40,7 @@ graph TB
     subgraph Binary["🪁 Kite (Single Binary)"]
         subgraph Frontend["Admin SPA"]
             React["React 19 + TypeScript"]
-            Semi["Semi Design"]
+            shadcn["shadcn/ui (Tailwind CSS)"]
             Tiptap["Tiptap Editor"]
             TanStack["TanStack Query"]
         end
@@ -252,7 +252,7 @@ docker run -d -p 8080:8080 -v kite-data:/app/data kite
 | ORM | GORM |
 | Database | SQLite (glebarez/sqlite, pure Go) |
 | Frontend | React 19, TypeScript, Vite |
-| UI Library | Semi Design (@douyinfe/semi-ui) |
+| UI Library | shadcn/ui + Tailwind CSS |
 | Rich Editor | Tiptap (ProseMirror) |
 | Data Fetching | TanStack Query |
 | Template Engine | Go html/template |
