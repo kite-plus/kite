@@ -7,8 +7,8 @@ import {
   MessageSquare,
   Link2,
   Settings,
-  Command,
 } from 'lucide-react'
+import { KiteIcon } from '@/components/KiteIcon'
 import { type SidebarData } from '../types'
 
 /**
@@ -23,7 +23,7 @@ export const sidebarData: SidebarData = {
   teams: [
     {
       name: 'Kite',
-      logo: Command,
+      logo: KiteIcon,
       plan: '轻量级博客引擎',
     },
   ],

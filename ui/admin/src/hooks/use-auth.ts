@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost } from '@/lib/api-client'
+import { toast } from 'sonner'
 
 /** 管理员个人资料 */
 export interface AdminProfile {
@@ -43,6 +44,7 @@ export function useLogin() {
     mutationFn: (data: { username: string; password: string }) =>
       apiPost<AdminCurrentUser>('/admin/auth/login', data),
     onSuccess: (data) => {
+      toast.success('登录成功', { description: '欢迎回来！' })
       queryClient.setQueryData(['auth', 'me'], data)
     },
   })

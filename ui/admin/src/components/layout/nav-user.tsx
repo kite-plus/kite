@@ -2,6 +2,7 @@ import {
   ChevronsUpDown,
   LogOut,
   Settings,
+  User,
 } from 'lucide-react'
 import { Link } from 'react-router'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -20,6 +21,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { useLogout } from '@/hooks/use-auth'
 
 type NavUserProps = {
   user: {
@@ -31,6 +33,18 @@ type NavUserProps = {
 
 export function NavUser({ user }: NavUserProps) {
   const { isMobile } = useSidebar()
+  const logoutMutation = useLogout()
+
+  /** 获取名字首字母作为 Avatar fallback */
+  const initials = user.name.slice(0, 2).toUpperCase()
+
+  function handleLogout() {
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        window.location.href = '/admin/login'
+      },
+    })
+  }
 
   return (
     <SidebarMenu>
@@ -42,15 +56,15 @@ export function NavUser({ user }: NavUserProps) {
               className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
             >
               <Avatar className='h-8 w-8 rounded-lg'>
-                <AvatarFallback className='rounded-lg'>
-                  {user.name.slice(0, 2).toUpperCase()}
+                <AvatarFallback className='rounded-lg bg-primary/10 text-primary font-medium'>
+                  {initials}
                 </AvatarFallback>
               </Avatar>
               <div className='grid flex-1 text-start text-sm leading-tight'>
                 <span className='truncate font-semibold'>{user.name}</span>
-                <span className='truncate text-xs'>{user.email}</span>
+                <span className='truncate text-xs text-muted-foreground'>{user.email}</span>
               </div>
-              <ChevronsUpDown className='ms-auto size-4' />
+              <ChevronsUpDown className='ms-auto size-4 text-muted-foreground' />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -60,15 +74,15 @@ export function NavUser({ user }: NavUserProps) {
             sideOffset={4}
           >
             <DropdownMenuLabel className='p-0 font-normal'>
-              <div className='flex items-center gap-2 px-1 py-1.5 text-start text-sm'>
-                <Avatar className='h-8 w-8 rounded-lg'>
-                  <AvatarFallback className='rounded-lg'>
-                    {user.name.slice(0, 2).toUpperCase()}
+              <div className='flex items-center gap-3 px-2 py-2.5 text-start text-sm'>
+                <Avatar className='h-9 w-9 rounded-lg'>
+                  <AvatarFallback className='rounded-lg bg-primary/10 text-primary font-medium'>
+                    {initials}
                   </AvatarFallback>
                 </Avatar>
                 <div className='grid flex-1 text-start text-sm leading-tight'>
                   <span className='truncate font-semibold'>{user.name}</span>
-                  <span className='truncate text-xs'>{user.email}</span>
+                  <span className='truncate text-xs text-muted-foreground'>{user.email}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
@@ -76,22 +90,25 @@ export function NavUser({ user }: NavUserProps) {
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
                 <Link to='/settings'>
-                  <Settings />
-                  设置
+                  <User className='mr-2 h-4 w-4' />
+                  个人资料
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to='/settings'>
+                  <Settings className='mr-2 h-4 w-4' />
+                  系统设置
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant='destructive'
-              onClick={() => {
-                // 调用登出 API
-                fetch('/api/v1/admin/auth/logout', { method: 'POST' })
-                  .then(() => { window.location.href = '/admin/login' })
-              }}
+              onClick={handleLogout}
+              disabled={logoutMutation.isPending}
             >
-              <LogOut />
-              退出登录
+              <LogOut className='mr-2 h-4 w-4' />
+              {logoutMutation.isPending ? '退出中...' : '退出登录'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
