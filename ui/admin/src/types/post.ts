@@ -19,6 +19,7 @@ export interface Post {
   showComments: boolean
   hasPassword: boolean
   hasProtected: boolean
+  viewCount: number
   createdAt: string
   updatedAt: string
   publishedAt: string | null

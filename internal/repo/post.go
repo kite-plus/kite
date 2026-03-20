@@ -200,6 +200,15 @@ func (r *PostRepository) reloadAssociations(post *model.Post) error {
 	return r.db.Preload("Category").Preload("Tags").First(post, "id = ?", post.ID).Error
 }
 
+// IncrementViewCount 原子自增文章浏览计数
+func (r *PostRepository) IncrementViewCount(id uuid.UUID) error {
+	if r == nil || r.db == nil {
+		return fmt.Errorf("post repository is unavailable")
+	}
+	return r.db.Model(&model.Post{}).Where("id = ?", id).
+		UpdateColumn("view_count", gorm.Expr("view_count + 1")).Error
+}
+
 func applyPublicPostScope(query *gorm.DB, now time.Time) *gorm.DB {
 	return query.Where(
 		"status = ? AND (published_at IS NULL OR published_at <= ?)",

@@ -40,7 +40,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'
-import { Plus, Pencil, Trash2, FileText, Loader2, ExternalLink, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, FileText, Loader2, ExternalLink, X, Eye } from 'lucide-react'
 import { usePosts, useDeletePost } from '@/hooks/use-posts'
 import { useCategoryList } from '@/hooks/use-categories'
 import type { PostStatus } from '@/types/post'
@@ -159,6 +159,7 @@ export function PostsPage() {
               <TableHead className="w-[100px]">状态</TableHead>
               <TableHead className="w-[100px]">分类</TableHead>
               <TableHead>文章信息</TableHead>
+              <TableHead className="w-[80px] text-center">浏览</TableHead>
               <TableHead className="w-[120px]">日期</TableHead>
               <TableHead className="w-[100px] text-right">操作</TableHead>
             </TableRow>
@@ -166,7 +167,7 @@ export function PostsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-16">
+                <TableCell colSpan={6} className="text-center py-16">
                   <Loader2 className="w-5 h-5 animate-spin text-zinc-400 mx-auto" />
                 </TableCell>
               </TableRow>
@@ -195,6 +196,12 @@ export function PostsPage() {
                   <TableCell onClick={() => navigate(`/posts/${post.id}/edit`)}>
                     <p className="text-sm font-medium text-foreground">{post.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[400px] leading-relaxed">{post.summary}</p>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Eye className="w-3.5 h-3.5" />
+                      {post.viewCount ?? 0}
+                    </span>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{formatDate(post.updatedAt)}</TableCell>
                   <TableCell className="text-right">
@@ -232,7 +239,7 @@ export function PostsPage() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-16">
+                <TableCell colSpan={6} className="text-center py-16">
                   <div className="flex flex-col items-center">
                     <FileText className="w-10 h-10 text-muted-foreground mb-3" />
                     <p className="text-sm font-medium text-foreground">没有找到匹配的文章</p>

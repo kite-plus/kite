@@ -107,6 +107,7 @@ func (h *PostHandler) applyProtection(post *model.Post) gin.H {
 		"summary":      post.Summary,
 		"status":       post.Status,
 		"cover_image":  post.CoverImage,
+		"view_count":   post.ViewCount,
 		"published_at": post.PublishedAt,
 		"created_at":   post.CreatedAt,
 		"updated_at":   post.UpdatedAt,

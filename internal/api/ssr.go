@@ -21,6 +21,7 @@ type SSRHandler struct {
 	categoryRepo    *repo.CategoryRepository
 	tagRepo         *repo.TagRepository
 	pageRepo        *repo.PageRepository
+	postRepo        *repo.PostRepository
 }
 
 func NewSSRHandler(
@@ -31,6 +32,7 @@ func NewSSRHandler(
 	categoryRepo *repo.CategoryRepository,
 	tagRepo *repo.TagRepository,
 	pageRepo *repo.PageRepository,
+	postRepo *repo.PostRepository,
 ) *SSRHandler {
 	return &SSRHandler{
 		cfg:           cfg,
@@ -40,6 +42,7 @@ func NewSSRHandler(
 		categoryRepo:  categoryRepo,
 		tagRepo:       tagRepo,
 		pageRepo:      pageRepo,
+		postRepo:      postRepo,
 	}
 }
 
@@ -134,6 +137,12 @@ func (h *SSRHandler) PostDetail(c *gin.Context) {
 	if err != nil {
 		h.renderError(c, http.StatusNotFound)
 		return
+	}
+
+	// 自增浏览计数
+	if h.postRepo != nil {
+		_ = h.postRepo.IncrementViewCount(post.ID)
+		post.ViewCount++
 	}
 
 	data := h.commonData(post.Title)

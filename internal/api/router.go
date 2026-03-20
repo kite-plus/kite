@@ -209,7 +209,7 @@ func registerPageRoutes(router *gin.Engine, cfg *config.Config, templateFS fs.FS
 	friendLinkRepo := repo.NewFriendLinkRepository(db)
 	friendLinkService := service.NewFriendLinkService(friendLinkRepo)
 
-	ssr := NewSSRHandler(cfg, postService, pageService, friendLinkService, categoryRepo, tagRepo, pageRepo)
+	ssr := NewSSRHandler(cfg, postService, pageService, friendLinkService, categoryRepo, tagRepo, pageRepo, postRepo)
 
 	// 前台页面路由
 	router.GET("/", ssr.Index)
