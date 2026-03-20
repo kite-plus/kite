@@ -5,7 +5,7 @@ import {
   User,
 } from 'lucide-react'
 import { Link } from 'react-router'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +56,7 @@ export function NavUser({ user }: NavUserProps) {
               className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
             >
               <Avatar className='h-8 w-8 rounded-lg'>
+                {user.avatar && <AvatarImage src={user.avatar} alt={user.name} className='rounded-lg' />}
                 <AvatarFallback className='rounded-lg bg-primary/10 text-primary font-medium'>
                   {initials}
                 </AvatarFallback>
@@ -76,6 +77,7 @@ export function NavUser({ user }: NavUserProps) {
             <DropdownMenuLabel className='p-0 font-normal'>
               <div className='flex items-center gap-3 px-2 py-2.5 text-start text-sm'>
                 <Avatar className='h-9 w-9 rounded-lg'>
+                  {user.avatar && <AvatarImage src={user.avatar} alt={user.name} className='rounded-lg' />}
                   <AvatarFallback className='rounded-lg bg-primary/10 text-primary font-medium'>
                     {initials}
                   </AvatarFallback>

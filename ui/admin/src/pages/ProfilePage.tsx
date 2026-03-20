@@ -9,9 +9,10 @@ import { cn } from '@/lib/utils'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { Search as HeaderSearch } from '@/components/search'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { PasswordInput } from '@/components/PasswordInput'
+import { ImageUploader } from '@/components/ImageUploader'
 
 const inputCls = 'border-zinc-200 dark:border-zinc-700 bg-transparent rounded-md shadow-none focus-visible:ring-1 focus-visible:ring-zinc-400'
 
@@ -107,6 +108,7 @@ export function ProfilePage() {
           {/* 头像预览区 */}
           <div className="flex items-center gap-5 p-8 border-b border-zinc-100 dark:border-zinc-800">
             <Avatar className="h-16 w-16 rounded-xl">
+              {form.avatar && <AvatarImage src={form.avatar} alt={form.display_name} className="rounded-xl" />}
               <AvatarFallback className="rounded-xl bg-primary/10 text-primary text-xl font-medium">
                 {initials}
               </AvatarFallback>
@@ -150,14 +152,14 @@ export function ProfilePage() {
               />
             </FormRow>
 
-            <FormRow label="头像 URL" icon={User}>
-              <Input
-                value={form.avatar}
-                onChange={(e) => updateField('avatar', e.target.value)}
-                placeholder="https://example.com/avatar.jpg"
-                className={cn(inputCls, 'max-w-md')}
-              />
-              <p className="text-xs text-zinc-500 mt-1.5">输入头像图片的 URL 地址</p>
+            <FormRow label="头像" icon={User}>
+              <div className="max-w-md">
+                <ImageUploader
+                  value={form.avatar}
+                  onChange={(url) => updateField('avatar', url)}
+                  placeholder="上传头像图片"
+                />
+              </div>
             </FormRow>
 
             <FormRow label="个人网站" icon={Globe}>

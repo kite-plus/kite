@@ -15,11 +15,6 @@ import { type SidebarData } from '../types'
  * Kite 博客管理后台侧边栏导航数据
  */
 export const sidebarData: SidebarData = {
-  user: {
-    name: 'Admin',
-    email: 'admin@kite.blog',
-    avatar: '',
-  },
   teams: [
     {
       name: 'Kite',
