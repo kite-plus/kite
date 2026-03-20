@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -161,6 +162,50 @@ func (s *AdminAuthService) Logout(rawToken string) error {
 	if err := s.sessionRepo.DeleteByTokenHash(tokenHash); err != nil && !errors.Is(err, repo.ErrAdminSessionNotFound) {
 		return err
 	}
+	return nil
+}
+
+// ChangePasswordInput 修改密码请求
+type ChangePasswordInput struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+// ChangePassword 验证旧密码并更新为新密码
+func (s *AdminAuthService) ChangePassword(input ChangePasswordInput, settingsRepo *repo.SettingsRepository) error {
+	if !s.IsEnabled() {
+		return ErrAdminAuthDisabled
+	}
+
+	oldPwd := strings.TrimSpace(input.OldPassword)
+	newPwd := strings.TrimSpace(input.NewPassword)
+	if oldPwd == "" || newPwd == "" {
+		return fmt.Errorf("密码不能为空")
+	}
+	if len(newPwd) < 6 {
+		return fmt.Errorf("新密码长度不能少于 6 位")
+	}
+
+	// 验证旧密码
+	if err := bcrypt.CompareHashAndPassword([]byte(s.cfg.Admin.PasswordHash), []byte(oldPwd)); err != nil {
+		return fmt.Errorf("旧密码不正确")
+	}
+
+	// 生成新的 bcrypt hash
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPwd), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("生成密码哈希失败: %w", err)
+	}
+
+	// 更新内存中的密码哈希
+	s.cfg.Admin.PasswordHash = string(hash)
+
+	// 持久化到 DB
+	adminJSON, _ := json.Marshal(s.cfg.Admin)
+	if err := settingsRepo.SetBatch(map[string]string{"admin": string(adminJSON)}); err != nil {
+		return fmt.Errorf("保存密码失败: %w", err)
+	}
+
 	return nil
 }
 

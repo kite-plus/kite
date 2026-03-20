@@ -247,3 +247,65 @@ func maskAPIKey(key string) string {
 	}
 	return key[:4] + "****" + key[len(key)-4:]
 }
+
+// ProfileInput 个人资料更新输入
+type ProfileInput struct {
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	Bio         string `json:"bio"`
+	Avatar      string `json:"avatar"`
+	Website     string `json:"website"`
+	Location    string `json:"location"`
+}
+
+// ProfileOutput 个人资料响应
+type ProfileOutput struct {
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	Bio         string `json:"bio"`
+	Avatar      string `json:"avatar"`
+	Website     string `json:"website"`
+	Location    string `json:"location"`
+}
+
+// GetProfile 获取当前管理员个人资料
+func (s *SettingsService) GetProfile() *ProfileOutput {
+	p := s.cfg.Admin.Profile
+	displayName := p.DisplayName
+	if displayName == "" {
+		displayName = s.cfg.Admin.Username
+	}
+	return &ProfileOutput{
+		Username:    s.cfg.Admin.Username,
+		DisplayName: displayName,
+		Email:       p.Email,
+		Bio:         p.Bio,
+		Avatar:      p.Avatar,
+		Website:     p.Website,
+		Location:    p.Location,
+	}
+}
+
+// UpdateProfile 更新管理员个人资料并持久化
+func (s *SettingsService) UpdateProfile(input ProfileInput) (*ProfileOutput, error) {
+	s.cfg.Admin.Profile.DisplayName = input.DisplayName
+	s.cfg.Admin.Profile.Email = input.Email
+	s.cfg.Admin.Profile.Bio = input.Bio
+	s.cfg.Admin.Profile.Avatar = input.Avatar
+	s.cfg.Admin.Profile.Website = input.Website
+	s.cfg.Admin.Profile.Location = input.Location
+
+	if err := s.saveAdminToDB(); err != nil {
+		return nil, fmt.Errorf("保存个人资料失败: %w", err)
+	}
+	return s.GetProfile(), nil
+}
+
+// saveAdminToDB 将 admin 配置持久化到 DB
+func (s *SettingsService) saveAdminToDB() error {
+	adminJSON, _ := json.Marshal(s.cfg.Admin)
+	return s.settingsRepo.SetBatch(map[string]string{
+		SettingKeyAdmin: string(adminJSON),
+	})
+}

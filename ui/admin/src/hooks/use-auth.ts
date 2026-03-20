@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPost } from '@/lib/api-client'
+import { apiGet, apiPost, apiPut } from '@/lib/api-client'
 import { toast } from 'sonner'
 
 /** 管理员个人资料 */
@@ -62,5 +62,59 @@ export function useLogout() {
       queryClient.setQueryData(['auth', 'me'], null)
       queryClient.clear()
     },
+  })
+}
+
+/** 个人资料更新输入 */
+export interface ProfileInput {
+  display_name: string
+  email: string
+  bio: string
+  avatar: string
+  website: string
+  location: string
+}
+
+/** 个人资料响应 */
+export interface ProfileOutput {
+  username: string
+  display_name: string
+  email: string
+  bio: string
+  avatar: string
+  website: string
+  location: string
+}
+
+/**
+ * 更新个人资料 Hook
+ * 调用 PUT /admin/profile
+ */
+export function useUpdateProfile() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: ProfileInput) =>
+      apiPut<ProfileOutput>('/admin/profile', data),
+    onSuccess: () => {
+      // 刷新当前用户信息以同步侧边栏等展示
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
+    },
+  })
+}
+
+/** 修改密码输入 */
+export interface ChangePasswordInput {
+  old_password: string
+  new_password: string
+}
+
+/**
+ * 修改密码 Hook
+ * 调用 PUT /admin/profile/password
+ */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (data: ChangePasswordInput) =>
+      apiPut<{ changed: boolean }>('/admin/profile/password', data),
   })
 }
