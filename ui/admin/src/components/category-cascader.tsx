@@ -114,6 +114,7 @@ function TreeNode({
   value,
   depth,
   siblings,
+  allowSelectParent,
   onSelect,
   expandedIds,
   onHoverNode,
@@ -122,6 +123,7 @@ function TreeNode({
   value: string | null
   depth: number
   siblings: CascaderNode[]
+  allowSelectParent: boolean
   onSelect: (id: string) => void
   expandedIds: Set<string>
   onHoverNode: (id: string, siblings: CascaderNode[]) => void
@@ -129,13 +131,13 @@ function TreeNode({
   const hasChildren = !!(node.children?.length)
   const isSelected = node.id === value
   const isExpanded = expandedIds.has(node.id)
+  const canSelect = !hasChildren || allowSelectParent
 
   return (
     <>
       <div
         className={cn(
-          'flex items-center gap-1.5 py-1.5 px-2 rounded-md text-sm transition-colors',
-          hasChildren ? 'cursor-default' : 'cursor-pointer',
+          'flex items-center gap-1.5 py-1.5 px-2 rounded-md text-sm transition-colors cursor-pointer',
           isSelected
             ? 'bg-blue-500 text-white'
             : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
@@ -147,7 +149,7 @@ function TreeNode({
           }
         }}
         onClick={() => {
-          if (!hasChildren) {
+          if (canSelect) {
             onSelect(node.id)
           }
         }}
@@ -176,6 +178,7 @@ function TreeNode({
               value={value}
               depth={depth + 1}
               siblings={node.children!}
+              allowSelectParent={allowSelectParent}
               onSelect={onSelect}
               expandedIds={expandedIds}
               onHoverNode={onHoverNode}
@@ -192,7 +195,7 @@ function TreeNode({
  * - hover 展开当前项，自动收起同级兄弟
  * - 鼠标移出面板后全部收起，只显示根分类
  */
-function TreePanel({ options, value, onSelect }: ColumnPanelProps) {
+function TreePanel({ options, value, allowSelectParent, onSelect }: ColumnPanelProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
     const ids = new Set<string>()
     if (value) {
@@ -244,6 +247,7 @@ function TreePanel({ options, value, onSelect }: ColumnPanelProps) {
               value={value}
               depth={0}
               siblings={options}
+              allowSelectParent={allowSelectParent}
               onSelect={onSelect}
               expandedIds={expandedIds}
               onHoverNode={onHoverNode}

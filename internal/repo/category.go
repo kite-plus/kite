@@ -106,7 +106,7 @@ func (r *CategoryRepository) Update(item *model.Category) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("category repository is unavailable")
 	}
-	result := r.db.Model(item).Select("name", "slug", "description", "parent_id").Updates(item)
+	result := r.db.Model(item).Select("name", "slug", "description", "icon", "parent_id").Updates(item)
 	if result.Error != nil {
 		return fmt.Errorf("update category: %w", result.Error)
 	}
@@ -128,4 +128,16 @@ func (r *CategoryRepository) Delete(id uuid.UUID) error {
 		return ErrCategoryNotFound
 	}
 	return nil
+}
+
+// HasChildren 检查指定分类是否有子分类
+func (r *CategoryRepository) HasChildren(id uuid.UUID) (bool, error) {
+	if r == nil || r.db == nil {
+		return false, fmt.Errorf("category repository is unavailable")
+	}
+	var count int64
+	if err := r.db.Model(&model.Category{}).Where("parent_id = ?", id).Count(&count).Error; err != nil {
+		return false, fmt.Errorf("count children: %w", err)
+	}
+	return count > 0, nil
 }

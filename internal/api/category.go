@@ -102,6 +102,8 @@ func handleCategoryError(c *gin.Context, err error) {
 		Error(c, http.StatusBadRequest, http.StatusBadRequest, err.Error())
 	case errors.Is(err, service.ErrDuplicateCategorySlug):
 		Error(c, http.StatusConflict, http.StatusConflict, "duplicate category slug")
+	case errors.Is(err, service.ErrCategoryHasChildren):
+		Error(c, http.StatusConflict, http.StatusConflict, "该分类存在子分类，无法删除")
 	case errors.Is(err, repo.ErrCategoryNotFound):
 		Error(c, http.StatusNotFound, http.StatusNotFound, "resource not found")
 	default:

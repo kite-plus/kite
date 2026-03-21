@@ -8,6 +8,7 @@ export interface Category {
   name: string
   slug: string
   description: string
+  icon: string
   parentId: string | null
   postCount: number
   children?: Category[]

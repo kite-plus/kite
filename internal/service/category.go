@@ -13,6 +13,7 @@ import (
 var (
 	ErrInvalidCategoryPayload = errors.New("invalid category payload")
 	ErrDuplicateCategorySlug  = errors.New("duplicate category slug")
+	ErrCategoryHasChildren    = errors.New("category has children, cannot delete")
 )
 
 type CategoryListParams struct {
@@ -22,21 +23,27 @@ type CategoryListParams struct {
 }
 
 type CreateCategoryInput struct {
-	Name     string  `json:"name"`
-	Slug     string  `json:"slug"`
-	ParentID *string `json:"parent_id"`
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	Description string  `json:"description"`
+	Icon        string  `json:"icon"`
+	ParentID    *string `json:"parent_id"`
 }
 
 type UpdateCategoryInput struct {
-	Name     string  `json:"name"`
-	Slug     string  `json:"slug"`
-	ParentID *string `json:"parent_id"`
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	Description string  `json:"description"`
+	Icon        string  `json:"icon"`
+	ParentID    *string `json:"parent_id"`
 }
 
 type PatchCategoryInput struct {
-	Name     *string `json:"name"`
-	Slug     *string `json:"slug"`
-	ParentID *string `json:"parent_id"`
+	Name        *string `json:"name"`
+	Slug        *string `json:"slug"`
+	Description *string `json:"description"`
+	Icon        *string `json:"icon"`
+	ParentID    *string `json:"parent_id"`
 }
 
 type CategoryListResult struct {
@@ -92,9 +99,11 @@ func (s *CategoryService) Create(input CreateCategoryInput) (*model.Category, er
 		return nil, err
 	}
 	item := &model.Category{
-		Name:     strings.TrimSpace(input.Name),
-		Slug:     strings.TrimSpace(input.Slug),
-		ParentID: parentID,
+		Name:        strings.TrimSpace(input.Name),
+		Slug:        strings.TrimSpace(input.Slug),
+		Description: strings.TrimSpace(input.Description),
+		Icon:        strings.TrimSpace(input.Icon),
+		ParentID:    parentID,
 	}
 	if err := validateCategory(item); err != nil {
 		return nil, err
@@ -123,6 +132,8 @@ func (s *CategoryService) Update(id string, input UpdateCategoryInput) (*model.C
 	}
 	item.Name = strings.TrimSpace(input.Name)
 	item.Slug = strings.TrimSpace(input.Slug)
+	item.Description = strings.TrimSpace(input.Description)
+	item.Icon = strings.TrimSpace(input.Icon)
 	item.ParentID = parentID
 	if err := validateCategory(item); err != nil {
 		return nil, err
@@ -151,6 +162,12 @@ func (s *CategoryService) Patch(id string, input PatchCategoryInput) (*model.Cat
 	if input.Slug != nil {
 		item.Slug = strings.TrimSpace(*input.Slug)
 	}
+	if input.Description != nil {
+		item.Description = strings.TrimSpace(*input.Description)
+	}
+	if input.Icon != nil {
+		item.Icon = strings.TrimSpace(*input.Icon)
+	}
 	if input.ParentID != nil {
 		parentID, err := parseOptionalCategoryUUID(input.ParentID)
 		if err != nil {
@@ -174,6 +191,14 @@ func (s *CategoryService) Delete(id string) error {
 	parsedID, err := uuid.Parse(strings.TrimSpace(id))
 	if err != nil {
 		return fmt.Errorf("%w: invalid category id", ErrInvalidCategoryPayload)
+	}
+	// 检查是否有子分类
+	hasChildren, err := s.repo.HasChildren(parsedID)
+	if err != nil {
+		return fmt.Errorf("check children: %w", err)
+	}
+	if hasChildren {
+		return ErrCategoryHasChildren
 	}
 	return s.repo.Delete(parsedID)
 }
