@@ -40,7 +40,7 @@ export function NavUser({ user }: NavUserProps) {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <div className="flex items-center gap-2 px-2 py-1.5">
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent/50 transition-colors">
           {/* 头像 + 名称：可点击跳转个人中心 */}
           <Link to="/profile" className="flex items-center gap-2 flex-1 min-w-0 group">
             <Avatar className="h-8 w-8 rounded-lg shrink-0">

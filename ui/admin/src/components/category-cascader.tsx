@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -109,125 +109,148 @@ interface ColumnPanelProps {
  * 多列并排模式（macOS Finder 风格）
  * 选中父级后，右侧平滑展开子级列表
  */
-function ColumnPanel({ options, value, allowSelectParent, onSelect }: ColumnPanelProps) {
-  // 每一级选中的节点 ID
-  const [activePath, setActivePath] = useState<string[]>([])
+function TreeNode({
+  node,
+  value,
+  depth,
+  siblings,
+  onSelect,
+  expandedIds,
+  onHoverNode,
+}: {
+  node: CascaderNode
+  value: string | null
+  depth: number
+  siblings: CascaderNode[]
+  onSelect: (id: string) => void
+  expandedIds: Set<string>
+  onHoverNode: (id: string, siblings: CascaderNode[]) => void
+}) {
+  const hasChildren = !!(node.children?.length)
+  const isSelected = node.id === value
+  const isExpanded = expandedIds.has(node.id)
 
-  // value 变化时，自动展开到对应路径
-  useEffect(() => {
+  return (
+    <>
+      <div
+        className={cn(
+          'flex items-center gap-1.5 py-1.5 px-2 rounded-md text-sm transition-colors',
+          hasChildren ? 'cursor-default' : 'cursor-pointer',
+          isSelected
+            ? 'bg-blue-500 text-white'
+            : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+        )}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        onMouseEnter={() => {
+          if (hasChildren) {
+            onHoverNode(node.id, siblings)
+          }
+        }}
+        onClick={() => {
+          if (!hasChildren) {
+            onSelect(node.id)
+          }
+        }}
+      >
+        {hasChildren ? (
+          <ChevronRight
+            className={cn(
+              'w-3.5 h-3.5 shrink-0 transition-transform duration-150',
+              isExpanded && 'rotate-90',
+              isSelected ? 'opacity-80' : 'opacity-50'
+            )}
+          />
+        ) : (
+          <span className="w-3.5 shrink-0" />
+        )}
+        <FolderOpen className={cn('w-3.5 h-3.5 shrink-0', isSelected ? 'opacity-80' : 'text-zinc-400')} />
+        <span className="flex-1 truncate">{node.name}</span>
+        {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+      </div>
+      {hasChildren && isExpanded && (
+        <div className="animate-in slide-in-from-top-1 fade-in-70 duration-150">
+          {node.children!.map((child) => (
+            <TreeNode
+              key={child.id}
+              node={child}
+              value={value}
+              depth={depth + 1}
+              siblings={node.children!}
+              onSelect={onSelect}
+              expandedIds={expandedIds}
+              onHoverNode={onHoverNode}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+/**
+ * 树形面板（手风琴模式）
+ * - hover 展开当前项，自动收起同级兄弟
+ * - 鼠标移出面板后全部收起，只显示根分类
+ */
+function TreePanel({ options, value, onSelect }: ColumnPanelProps) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
+    const ids = new Set<string>()
     if (value) {
       const path = findPathById(options, value)
       if (path) {
-        setActivePath(path.map((n) => n.id))
-        return
+        for (let i = 0; i < path.length - 1; i++) ids.add(path[i].id)
       }
     }
-    setActivePath([])
-  }, [value, options])
+    return ids
+  })
 
-  /**
-   * 构建待渲染的列集合
-   * columns[0] = 顶层列表, columns[1] = 第一级选中节点的子列表, ...
-   */
-  const columns = useMemo(() => {
-    const cols: { items: CascaderNode[]; activeId: string | null }[] = []
-    let currentItems = options
-
-    for (let depth = 0; depth <= activePath.length; depth++) {
-      const activeId = activePath[depth] ?? null
-      cols.push({ items: currentItems, activeId })
-
-      // 找到当前级别选中的节点，取其 children 作为下一列
-      if (activeId) {
-        const activeNode = currentItems.find((n) => n.id === activeId)
-        if (activeNode?.children?.length) {
-          currentItems = activeNode.children
-        } else {
-          break
-        }
-      } else {
-        break
+  // hover 某个父节点时：展开它，关闭同级其他兄弟
+  const onHoverNode = useCallback((id: string, siblings: CascaderNode[]) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      // 收起同级兄弟
+      for (const sib of siblings) {
+        if (sib.id !== id) next.delete(sib.id)
       }
-    }
-
-    return cols
-  }, [options, activePath])
-
-  /** 处理某一级节点的 hover/click，更新 activePath */
-  function handleNodeHover(depth: number, nodeId: string) {
-    setActivePath((prev) => {
-      const next = prev.slice(0, depth)
-      next[depth] = nodeId
+      next.add(id)
       return next
     })
+  }, [])
+
+  // 鼠标移出整个面板，全部收起
+  function handleMouseLeave() {
+    // 保留选中项的展开路径
+    const keep = new Set<string>()
+    if (value) {
+      const path = findPathById(options, value)
+      if (path) {
+        for (let i = 0; i < path.length - 1; i++) keep.add(path[i].id)
+      }
+    }
+    setExpandedIds(keep)
   }
 
   return (
-    <div
-      className="flex overflow-hidden transition-all duration-200"
-      style={{ width: `${columns.length * 200}px`, maxWidth: '600px' }}
-    >
-      {columns.map((col, colIdx) => (
-        <div
-          key={colIdx}
-          className={cn(
-            'w-[200px] shrink-0 animate-in slide-in-from-right-2 fade-in-50 duration-150',
-            colIdx > 0 && 'border-l border-zinc-100 dark:border-zinc-800'
+    <div className="w-[240px]" onMouseLeave={handleMouseLeave}>
+      <ScrollArea className="max-h-64">
+        <div className="p-1.5">
+          {options.length === 0 && (
+            <div className="px-3 py-5 text-center text-xs text-zinc-400">暂无分类数据</div>
           )}
-        >
-          {/* 列标题 */}
-          {colIdx === 0 && (
-            <div className="px-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800">
-              <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">全部分类</span>
-            </div>
-          )}
-          {colIdx > 0 && (
-            <div className="px-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800">
-              <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">子分类</span>
-            </div>
-          )}
-
-          <ScrollArea className="max-h-52">
-            <div className="py-1">
-              {col.items.length === 0 && (
-                <div className="px-3 py-4 text-center text-xs text-zinc-400">暂无</div>
-              )}
-              {col.items.map((node) => {
-                const isActive = col.activeId === node.id
-                const isSelected = node.id === value
-                const hasChildren = !!(node.children?.length)
-
-                return (
-                  <div
-                    key={node.id}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors text-sm',
-                      isSelected
-                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
-                        : isActive
-                          ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
-                          : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/60'
-                    )}
-                    onMouseEnter={() => handleNodeHover(colIdx, node.id)}
-                    onClick={() => {
-                      if (!hasChildren || allowSelectParent) {
-                        onSelect(node.id)
-                      } else {
-                        // 有子级且不允许选父级，仅展开
-                        handleNodeHover(colIdx, node.id)
-                      }
-                    }}
-                  >
-                    {isSelected && <Check className="w-3 h-3 shrink-0" />}
-                    <span className="flex-1 truncate">{node.name}</span>
-                    {hasChildren && <ChevronRight className="w-3 h-3 shrink-0 opacity-40" />}
-                  </div>
-                )
-              })}
-            </div>
-          </ScrollArea>
+          {options.map((node) => (
+            <TreeNode
+              key={node.id}
+              node={node}
+              value={value}
+              depth={0}
+              siblings={options}
+              onSelect={onSelect}
+              expandedIds={expandedIds}
+              onHoverNode={onHoverNode}
+            />
+          ))}
         </div>
-      ))}
+      </ScrollArea>
     </div>
   )
 }
@@ -332,7 +355,7 @@ export function CategoryCascader({
         {options.length === 0 ? (
           <div className="px-4 py-6 text-center text-xs text-zinc-400">暂无分类数据</div>
         ) : (
-          <ColumnPanel
+          <TreePanel
             options={options}
             value={value}
             allowSelectParent={allowSelectParent}
