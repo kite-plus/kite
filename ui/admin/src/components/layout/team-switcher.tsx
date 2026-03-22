@@ -21,17 +21,20 @@ export function TeamSwitcher({ teams }: TeamSwitcherProps) {
       <SidebarMenuItem>
         <SidebarMenuButton
           size='lg'
-          className='hover:bg-transparent hover:text-sidebar-accent-foreground cursor-default'
+          className='hover:bg-transparent hover:text-sidebar-accent-foreground'
+          asChild
         >
-          <div className='flex aspect-square size-8 items-center justify-center'>
-            <activeTeam.logo className='size-5' />
+          <a href='https://www.kite.plus' target='_blank' rel='noopener noreferrer'>
+          <div className='flex aspect-square size-12 items-center justify-center'>
+            <activeTeam.logo className='size-12' />
           </div>
-          <div className='grid flex-1 text-start text-sm leading-tight'>
-            <span className='truncate font-semibold'>
+          <div className='grid flex-1 text-start leading-tight'>
+            <span className='truncate text-lg font-bold tracking-tight'>
               {activeTeam.name}
             </span>
-            <span className='truncate text-xs'>{activeTeam.plan}</span>
+            <span className='truncate text-[11px] text-muted-foreground'>{activeTeam.plan}</span>
           </div>
+          </a>
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>

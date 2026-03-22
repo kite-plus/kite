@@ -27,7 +27,7 @@ export function AdminLayout() {
             <Outlet />
             <footer className='mt-auto border-t px-4 py-4 text-center text-xs text-muted-foreground'>
               © {new Date().getFullYear()}{' '}
-              <a href='https://github.com/amigoer/kite' target='_blank' rel='noopener noreferrer' className='hover:text-primary underline-offset-4 hover:underline'>
+              <a href='https://www.kite.plus' target='_blank' rel='noopener noreferrer' className='hover:text-primary underline-offset-4 hover:underline'>
                 Kite
               </a>{' '}
               · 轻量级博客引擎
