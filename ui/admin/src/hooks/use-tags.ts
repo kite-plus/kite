@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPost, apiDelete } from '@/lib/api-client'
+import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api-client'
 import type { Tag } from '@/types/tag'
 
 export interface TagListResponse {
@@ -28,6 +28,20 @@ export function useCreateTag() {
   return useMutation({
     mutationFn: (data: Pick<Tag, 'name' | 'slug'>) =>
       apiPost<Tag>('/admin/tags', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tagList'] })
+    },
+  })
+}
+
+/**
+ * 更新标签 Hook
+ */
+export function useUpdateTag() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...data }: Pick<Tag, 'id' | 'name' | 'slug'>) =>
+      apiPut<Tag>(`/admin/tags/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tagList'] })
     },

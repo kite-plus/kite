@@ -9,7 +9,7 @@ GO_FLAGS=-ldflags="-s -w"
 all: tidy build-server
 
 ## build: Build backend and frontend if available
-build: tidy build-server build-ui
+build: tidy build-ui build-server
 	@echo "✅ Kite build completed."
 
 ## build-ui: Build React admin if package.json exists
