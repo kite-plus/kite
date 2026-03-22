@@ -152,6 +152,48 @@ main {
   color: var(--primary);
 }
 
+/* 二级下拉菜单 */
+.nav-dropdown {
+  position: relative;
+}
+.nav-icon {
+  margin-right: 4px;
+  vertical-align: -0.125em;
+  font-size: 1.1em;
+}
+.nav-arrow {
+  font-size: 0.7em;
+  margin-left: 2px;
+  opacity: 0.6;
+}
+.nav-sub {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--theme);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0;
+  min-width: 140px;
+  box-shadow: var(--shadow);
+  list-style: none;
+  z-index: 200;
+}
+.nav-dropdown:hover .nav-sub {
+  display: block;
+}
+.nav-sub li a {
+  display: block;
+  padding: 0.4rem 1rem;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+.nav-sub li a:hover {
+  background: var(--entry);
+}
+
 /* ===== 首页 Profile ===== */
 .home-profile {
   text-align: center;

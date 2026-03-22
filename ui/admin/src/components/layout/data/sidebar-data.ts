@@ -8,6 +8,7 @@ import {
   Link2,
   Settings,
   Bell,
+  Menu,
 } from 'lucide-react'
 import { KiteIcon } from '@/components/KiteIcon'
 import { type SidebarData } from '../types'
@@ -82,6 +83,11 @@ export const sidebarData: SidebarData = {
     {
       title: '系统',
       items: [
+        {
+          title: '菜单',
+          url: '/menus',
+          icon: Menu,
+        },
         {
           title: '设置',
           url: '/settings',

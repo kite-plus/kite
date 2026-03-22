@@ -18,6 +18,7 @@ const (
 	SettingKeyDBDriver   = "db_driver"
 	SettingKeyDBPath     = "db_path"
 	SettingKeyRenderMode = "render_mode"
+	SettingKeyNavMenus   = "nav_menus"
 )
 
 // SiteSettings 站点基础设置
@@ -308,4 +309,35 @@ func (s *SettingsService) saveAdminToDB() error {
 	return s.settingsRepo.SetBatch(map[string]string{
 		SettingKeyAdmin: string(adminJSON),
 	})
+}
+
+// NavMenuItem 导航菜单项（最多支持二级）
+type NavMenuItem struct {
+	Title        string         `json:"title"`
+	URL          string         `json:"url"`
+	Icon         string         `json:"icon,omitempty"`
+	OpenInNewTab bool           `json:"open_in_new_tab"`
+	Children     []NavMenuItem  `json:"children,omitempty"`
+}
+
+// GetNavMenus 获取导航菜单列表
+func (s *SettingsService) GetNavMenus() []NavMenuItem {
+	raw := s.settingsRepo.Get(SettingKeyNavMenus)
+	if raw == "" {
+		return nil
+	}
+	var menus []NavMenuItem
+	if err := json.Unmarshal([]byte(raw), &menus); err != nil {
+		return nil
+	}
+	return menus
+}
+
+// SaveNavMenus 保存导航菜单列表
+func (s *SettingsService) SaveNavMenus(menus []NavMenuItem) error {
+	data, err := json.Marshal(menus)
+	if err != nil {
+		return fmt.Errorf("序列化菜单失败: %w", err)
+	}
+	return s.settingsRepo.Set(SettingKeyNavMenus, string(data))
 }

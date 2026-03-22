@@ -182,6 +182,8 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	protectedAdminV1.DELETE("/pages/:id", pageHandler.Delete)
 	protectedAdminV1.GET("/settings", settingsHandler.Get)
 	protectedAdminV1.PUT("/settings", settingsHandler.Update)
+	protectedAdminV1.GET("/settings/nav-menus", settingsHandler.GetNavMenus)
+	protectedAdminV1.PUT("/settings/nav-menus", settingsHandler.SaveNavMenus)
 	protectedAdminV1.POST("/upload/image", uploadHandler.Image)
 	protectedAdminV1.POST("/ai/summary", aiHandler.Summary)
 	protectedAdminV1.POST("/ai/tags", aiHandler.Tags)
@@ -224,8 +226,10 @@ func registerPageRoutes(router *gin.Engine, cfg *config.Config, templateFS fs.FS
 	pageService := service.NewPageService(pageRepo)
 	friendLinkRepo := repo.NewFriendLinkRepository(db)
 	friendLinkService := service.NewFriendLinkService(friendLinkRepo)
+	settingsRepo := repo.NewSettingsRepository(db)
+	settingsService := service.NewSettingsService(cfg, settingsRepo)
 
-	ssr := NewSSRHandler(cfg, postService, pageService, friendLinkService, categoryRepo, tagRepo, pageRepo, postRepo)
+	ssr := NewSSRHandler(cfg, postService, pageService, friendLinkService, categoryRepo, tagRepo, pageRepo, postRepo, settingsService)
 
 	// 前台页面路由
 	router.GET("/", ssr.Index)

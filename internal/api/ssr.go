@@ -22,6 +22,7 @@ type SSRHandler struct {
 	tagRepo         *repo.TagRepository
 	pageRepo        *repo.PageRepository
 	postRepo        *repo.PostRepository
+	settingsService *service.SettingsService
 }
 
 func NewSSRHandler(
@@ -33,16 +34,18 @@ func NewSSRHandler(
 	tagRepo *repo.TagRepository,
 	pageRepo *repo.PageRepository,
 	postRepo *repo.PostRepository,
+	settingsService *service.SettingsService,
 ) *SSRHandler {
 	return &SSRHandler{
-		cfg:           cfg,
-		postService:   postService,
-		pageService:   pageService,
-		friendLinkSvc: friendLinkSvc,
-		categoryRepo:  categoryRepo,
-		tagRepo:       tagRepo,
-		pageRepo:      pageRepo,
-		postRepo:      postRepo,
+		cfg:             cfg,
+		postService:     postService,
+		pageService:     pageService,
+		friendLinkSvc:   friendLinkSvc,
+		categoryRepo:    categoryRepo,
+		tagRepo:         tagRepo,
+		pageRepo:        pageRepo,
+		postRepo:        postRepo,
+		settingsService: settingsService,
 	}
 }
 
@@ -59,7 +62,15 @@ func (h *SSRHandler) commonData(pageTitle string) gin.H {
 		"PageTitle":   pageTitle,
 	}
 
-	// 注入导航栏页面
+	// 优先使用自定义菜单，否则 fallback 到 NavPages
+	if h.settingsService != nil {
+		if menus := h.settingsService.GetNavMenus(); len(menus) > 0 {
+			data["NavMenus"] = menus
+			return data
+		}
+	}
+
+	// Fallback：使用获取 NavPages 的方式
 	if navPages, err := h.pageRepo.ListNavPages(); err == nil {
 		data["NavPages"] = navPages
 	}

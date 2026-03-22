@@ -7,11 +7,28 @@
     </a>
     <nav>
       <ul class="nav-links">
-        <li><a href="/">首页</a></li>
-        {{ range .NavPages }}
-          <li><a href="/pages/{{ .Slug }}">{{ .Title }}</a></li>
+        {{ if .NavMenus }}
+          {{ range .NavMenus }}
+            {{ if .Children }}
+              <li class="nav-dropdown">
+                <a href="{{ .URL }}"{{ if .OpenInNewTab }} target="_blank" rel="noopener noreferrer"{{ end }}>{{ if .Icon }}<iconify-icon icon="{{ .Icon }}" class="nav-icon"></iconify-icon>{{ end }}{{ .Title }} <span class="nav-arrow">▾</span></a>
+                <ul class="nav-sub">
+                  {{ range .Children }}
+                    <li><a href="{{ .URL }}"{{ if .OpenInNewTab }} target="_blank" rel="noopener noreferrer"{{ end }}>{{ if .Icon }}<iconify-icon icon="{{ .Icon }}" class="nav-icon"></iconify-icon>{{ end }}{{ .Title }}</a></li>
+                  {{ end }}
+                </ul>
+              </li>
+            {{ else }}
+              <li><a href="{{ .URL }}"{{ if .OpenInNewTab }} target="_blank" rel="noopener noreferrer"{{ end }}>{{ if .Icon }}<iconify-icon icon="{{ .Icon }}" class="nav-icon"></iconify-icon>{{ end }}{{ .Title }}</a></li>
+            {{ end }}
+          {{ end }}
+        {{ else }}
+          <li><a href="/">首页</a></li>
+          {{ range .NavPages }}
+            <li><a href="/pages/{{ .Slug }}">{{ .Title }}</a></li>
+          {{ end }}
+          <li><a href="/friends">友链</a></li>
         {{ end }}
-        <li><a href="/friends">友链</a></li>
       </ul>
     </nav>
   </div>
