@@ -58,6 +58,7 @@ body.dark {
   --code-bg: #282c34;
   --code-text: #a9a9b3;
   --link: #60a5fa;
+  --icon-filter: invert(0.7);
 }
 
 /* Common Reset */
@@ -147,38 +148,76 @@ main.main {
 .menu {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 4px;
   list-style: none;
 }
-.menu a {
-  display: inline-block;
-  padding: 4px;
-  font-size: 16px;
+.menu li {
+  position: relative;
+}
+.menu > li > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--primary);
   border-radius: var(--radius);
-  transition: background 0.2s;
+  transition: background 0.15s, color 0.15s;
+  text-decoration: none;
 }
-.menu a:hover {
+.menu > li > a span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.menu > li > a:hover {
   background: var(--tertiary);
+}
+
+/* Nav icons */
+.menu-icon {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  vertical-align: middle;
+  opacity: 0.7;
+  filter: var(--icon-filter, none);
+}
+
+/* Dropdown chevron */
+.chevron-down {
+  opacity: 0.4;
+  transition: transform 0.2s, opacity 0.2s;
+  margin-left: 1px;
+}
+.has-children:hover .chevron-down {
+  transform: rotate(180deg);
+  opacity: 0.7;
 }
 
 /* Sub-menu Dropdown */
 .menu .sub-menu {
   display: none;
   position: absolute;
-  top: 100%;
+  top: calc(100% + 4px);
   left: 50%;
   transform: translateX(-50%);
   background: var(--theme);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 8px 0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+  padding: 6px;
   min-width: 140px;
   z-index: 100;
   list-style: none;
+  animation: fadeInDown 0.15s ease;
 }
-.menu .has-children:hover .sub-menu {
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.menu .has-children:hover > .sub-menu {
   display: flex;
   flex-direction: column;
 }
@@ -186,12 +225,22 @@ main.main {
   margin: 0;
 }
 .menu .sub-menu a {
-  padding: 8px 16px;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
   font-size: 14px;
-  border-radius: 0;
+  font-weight: 400;
+  color: var(--secondary);
+  border-radius: 6px;
   white-space: nowrap;
-  text-align: center;
+  transition: background 0.15s, color 0.15s;
+  text-decoration: none;
+}
+.menu .sub-menu a span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .menu .sub-menu a:hover {
   background: var(--tertiary);

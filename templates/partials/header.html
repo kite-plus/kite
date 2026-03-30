@@ -28,17 +28,17 @@
             {{ if .NavMenus }}
               {{ range .NavMenus }}
                 {{ if .Children }}
-                <li class="has-children" style="position: relative;">
-                  <a href="{{ .URL }}" title="{{ .Title }}"><span>{{ .Title }} ▾</span></a>
+                <li class="has-children">
+                  <a href="{{ .URL }}" title="{{ .Title }}"><span>{{ if .Icon }}<img src="{{ iconifyURL .Icon }}" alt="" class="menu-icon" />{{ end }}{{ .Title }}</span><svg class="chevron-down" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></a>
                   <ul class="sub-menu">
                     {{ range .Children }}
-                    <li><a href="{{ .URL }}" title="{{ .Title }}"><span>{{ .Title }}</span></a></li>
+                    <li><a href="{{ .URL }}" title="{{ .Title }}"><span>{{ if .Icon }}<img src="{{ iconifyURL .Icon }}" alt="" class="menu-icon" />{{ end }}{{ .Title }}</span></a></li>
                     {{ end }}
                   </ul>
                 </li>
                 {{ else }}
                 <li>
-                  <a href="{{ .URL }}" title="{{ .Title }}"><span>{{ .Title }}</span></a>
+                  <a href="{{ .URL }}" title="{{ .Title }}"><span>{{ if .Icon }}<img src="{{ iconifyURL .Icon }}" alt="" class="menu-icon" />{{ end }}{{ .Title }}</span></a>
                 </li>
                 {{ end }}
               {{ end }}

@@ -3,6 +3,7 @@ package api
 import (
 	"html/template"
 	"io/fs"
+	"strings"
 	"time"
 )
 
@@ -32,6 +33,15 @@ var templateFuncs = template.FuncMap{
 	"subtract": func(a, b int) int { return a - b },
 	// currentYear 返回当前年份
 	"currentYear": func() int { return time.Now().Year() },
+	// iconifyURL 将 Iconify icon ID（如 "lucide:home"）转换为 SVG API URL
+	"iconifyURL": func(icon string) string {
+		if icon == "" {
+			return ""
+		}
+		// 将 "lucide:home" 转为 "lucide/home"
+		path := strings.Replace(icon, ":", "/", 1)
+		return "https://api.iconify.design/" + path + ".svg"
+	},
 }
 
 func loadTemplateSet(templateFS fs.FS) (*template.Template, error) {

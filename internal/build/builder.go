@@ -128,6 +128,14 @@ var templateFuncs = template.FuncMap{
 	"add":         func(a, b int) int { return a + b },
 	"subtract":    func(a, b int) int { return a - b },
 	"currentYear": func() int { return time.Now().Year() },
+	// iconifyURL 将 Iconify icon ID（如 "lucide:home"）转换为 SVG API URL
+	"iconifyURL": func(icon string) string {
+		if icon == "" {
+			return ""
+		}
+		path := strings.Replace(icon, ":", "/", 1)
+		return "https://api.iconify.design/" + path + ".svg"
+	},
 }
 
 func (b *StaticBuilder) loadTemplates() (*template.Template, error) {
