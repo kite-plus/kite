@@ -27,9 +27,20 @@
         <ul id="menu" class="menu">
             {{ if .NavMenus }}
               {{ range .NavMenus }}
+                {{ if .Children }}
+                <li class="has-children" style="position: relative;">
+                  <a href="{{ .URL }}" title="{{ .Title }}"><span>{{ .Title }} ▾</span></a>
+                  <ul class="sub-menu">
+                    {{ range .Children }}
+                    <li><a href="{{ .URL }}" title="{{ .Title }}"><span>{{ .Title }}</span></a></li>
+                    {{ end }}
+                  </ul>
+                </li>
+                {{ else }}
                 <li>
                   <a href="{{ .URL }}" title="{{ .Title }}"><span>{{ .Title }}</span></a>
                 </li>
+                {{ end }}
               {{ end }}
             {{ else }}
                 <li><a href="/" title="Home"><span>Home</span></a></li>

@@ -162,6 +162,42 @@ main.main {
   background: var(--tertiary);
 }
 
+/* Sub-menu Dropdown */
+.menu .sub-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--theme);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 8px 0;
+  min-width: 140px;
+  z-index: 100;
+  list-style: none;
+}
+.menu .has-children:hover .sub-menu {
+  display: flex;
+  flex-direction: column;
+}
+.menu .sub-menu li {
+  margin: 0;
+}
+.menu .sub-menu a {
+  padding: 8px 16px;
+  display: block;
+  font-size: 14px;
+  border-radius: 0;
+  white-space: nowrap;
+  text-align: center;
+}
+.menu .sub-menu a:hover {
+  background: var(--tertiary);
+  color: var(--primary);
+}
+
 /* ===== Index Profile ===== */
 .profile {
   display: flex;
