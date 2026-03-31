@@ -57,22 +57,24 @@
     const moon = document.getElementById("moon");
     const sun = document.getElementById("sun");
     
-    if (document.body.classList.contains("dark")) {
+    if (document.documentElement.classList.contains("dark") || document.body.classList.contains("dark")) {
+        document.documentElement.classList.add("dark");
+        document.body.classList.add("dark");
         sun.style.display = "block";
     } else {
         moon.style.display = "block";
     }
 
     themeToggle.addEventListener("click", () => {
-        if (document.body.classList.contains("dark")) {
-            document.body.classList.remove("dark");
+        if (document.documentElement.classList.contains("dark") || document.body.classList.contains("dark")) {
             document.documentElement.classList.remove("dark");
+            document.body.classList.remove("dark");
             localStorage.setItem("pref-theme", "light");
             sun.style.display = "none";
             moon.style.display = "block";
         } else {
-            document.body.classList.add("dark");
             document.documentElement.classList.add("dark");
+            document.body.classList.add("dark");
             localStorage.setItem("pref-theme", "dark");
             moon.style.display = "none";
             sun.style.display = "block";

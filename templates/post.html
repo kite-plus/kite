@@ -30,16 +30,65 @@
       </figure>
       {{ end }}
 
+      <script>
+        function copyTextFallback(text) {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          ta.style.top = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta);
+        }
+
+        function copyText(text) {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            return navigator.clipboard.writeText(text).catch(function() {
+              copyTextFallback(text);
+            });
+          }
+          copyTextFallback(text);
+          return Promise.resolve();
+        }
+
+        function addCopyButtons(root) {
+          var scope = root || document;
+          scope.querySelectorAll('.post-content pre').forEach(function(pre) {
+            if (pre.querySelector('.code-copy-btn')) return;
+            var btn = document.createElement('button');
+            btn.className = 'code-copy-btn';
+            btn.type = 'button';
+            btn.textContent = 'copy';
+            pre.style.position = 'relative';
+
+            btn.addEventListener('click', function() {
+              var code = pre.querySelector('code');
+              var text = code ? code.textContent : pre.textContent;
+              copyText(text).then(function() {
+                btn.textContent = 'copied!';
+                setTimeout(function() {
+                  btn.textContent = 'copy';
+                }, 2000);
+              });
+            });
+            pre.appendChild(btn);
+          });
+        }
+      </script>
+
       {{ if .NeedPassword }}
       <!-- Password Protection -->
-      <div class="kite-password-form" id="password-form" style="background:var(--tertiary); padding: 40px; text-align:center; border-radius: var(--radius); margin: 30px 0;">
-        <div style="font-size:32px; margin-bottom:10px;">🔒</div>
-        <p style="color:var(--secondary); margin-bottom:20px;">本文已加密，请输入密码查看全文</p>
-        <div style="display:flex; justify-content:center; gap:10px; max-width: 400px; margin: 0 auto;">
-          <input type="password" id="post-password" placeholder="请输入密码" style="flex:1; padding:10px; border-radius:var(--radius); border:1px solid var(--border); background:var(--theme); color:var(--content);" />
-          <button onclick="verifyPassword()" style="padding:10px 20px; border-radius:var(--radius); border:none; background:var(--primary); color:var(--theme); cursor:pointer; font-weight:600;">解锁</button>
+      <div class="kite-password-form" id="password-form">
+        <div class="kite-lock-icon">🔒</div>
+        <p class="kite-password-hint">本文已加密，请输入密码查看全文</p>
+        <div class="kite-password-row">
+          <input type="password" id="post-password" class="kite-password-input" placeholder="请输入密码" />
+          <button type="button" class="kite-password-btn" onclick="verifyPassword()">解锁</button>
         </div>
-        <p id="password-error" style="display:none; color: #ef4444; margin-top:10px;">密码错误，请重试</p>
+        <p id="password-error" class="kite-password-error">密码错误，请重试</p>
       </div>
       <div class="post-content" id="post-content" style="display:none;"></div>
       <script>
@@ -62,13 +111,13 @@
              var contentEl = document.getElementById('post-content');
              contentEl.innerHTML = data.content_html;
              contentEl.style.display = 'block';
-             addCopyButtons();
+             if (typeof addCopyButtons === 'function') addCopyButtons(contentEl);
           })
           .catch(function() {
              errorEl.style.display = 'block';
           });
         }
-        document.getElementById('post-password').addEventListener('keypress', function(e) {
+        document.getElementById('post-password').addEventListener('keydown', function(e) {
           if (e.key === 'Enter') verifyPassword();
         });
       </script>
@@ -99,44 +148,7 @@
 
   {{ template "footer" . }}
 
-  <!-- Copy Code Button Script -->
   <script>
-    function addCopyButtons() {
-      document.querySelectorAll('.post-content pre').forEach(function(pre) {
-        if (pre.querySelector('.code-copy-btn')) return;
-        var btn = document.createElement('button');
-        btn.className = 'code-copy-btn';
-        btn.textContent = 'copy';
-        btn.style.position = 'absolute';
-        btn.style.right = '8px';
-        btn.style.top = '8px';
-        btn.style.padding = '4px 8px';
-        btn.style.fontSize = '12px';
-        btn.style.color = 'var(--secondary)';
-        btn.style.background = 'var(--theme)';
-        btn.style.border = '1px solid var(--border)';
-        btn.style.borderRadius = '4px';
-        btn.style.cursor = 'pointer';
-        btn.style.opacity = '0';
-        btn.style.transition = 'opacity 0.2s';
-        
-        pre.style.position = 'relative';
-        pre.addEventListener('mouseenter', () => btn.style.opacity = '1');
-        pre.addEventListener('mouseleave', () => btn.style.opacity = '0');
-
-        btn.addEventListener('click', function() {
-          var code = pre.querySelector('code');
-          var text = code ? code.textContent : pre.textContent;
-          navigator.clipboard.writeText(text).then(function() {
-            btn.textContent = 'copied!';
-            setTimeout(function() {
-              btn.textContent = 'copy';
-            }, 2000);
-          });
-        });
-        pre.appendChild(btn);
-      });
-    }
     addCopyButtons();
   </script>
 </body>

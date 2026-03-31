@@ -8,7 +8,7 @@
   --gap: 24px;
   --header-height: 80px;
 
-  --font-sans: -apple-system, BlinkMacSystemFont, 'segoe ui', Roboto, Oxygen, Ubuntu, Cantarell, 'open sans', 'helvetica neue', sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'segoe ui', Roboto, Oxygen, Ubuntu, Cantarell, 'open sans', 'helvetica neue', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   /* PaperMod Light Theme Color Palette */
@@ -46,7 +46,8 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* PaperMod Dark Theme Default Variables (if body gets .dark class) */
+/* PaperMod Dark Theme Default Variables (if html/body gets .dark class) */
+html.dark,
 body.dark {
   --theme: #1d1e20;
   --entry: #1d1e20;
@@ -163,7 +164,8 @@ main.main {
   font-weight: 500;
   color: var(--primary);
   border-radius: var(--radius);
-  transition: background 0.15s, color 0.15s;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
   text-decoration: none;
 }
 .menu > li > a span {
@@ -173,6 +175,11 @@ main.main {
 }
 .menu > li > a:hover {
   background: var(--tertiary);
+}
+.menu > li > a:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--link) 35%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--link) 18%, transparent);
 }
 
 /* Nav icons */
@@ -200,24 +207,29 @@ main.main {
 .menu .sub-menu {
   display: none;
   position: absolute;
-  top: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  transform: none;
   background: var(--theme);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
-  padding: 6px;
-  min-width: 140px;
+  border-radius: var(--radius);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 8px;
+  min-width: 180px;
   z-index: 100;
   list-style: none;
-  animation: fadeInDown 0.15s ease;
+  animation: fadeInDown 0.14s ease;
 }
 @keyframes fadeInDown {
-  from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .menu .has-children:hover > .sub-menu {
+  display: flex;
+  flex-direction: column;
+}
+.menu .has-children:focus-within > .sub-menu {
   display: flex;
   flex-direction: column;
 }
@@ -228,11 +240,11 @@ main.main {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
+  padding: 8px 10px;
   font-size: 14px;
   font-weight: 400;
-  color: var(--secondary);
-  border-radius: 6px;
+  color: var(--primary);
+  border-radius: 8px;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
   text-decoration: none;
@@ -245,6 +257,10 @@ main.main {
 .menu .sub-menu a:hover {
   background: var(--tertiary);
   color: var(--primary);
+}
+.menu .sub-menu a:focus-visible {
+  outline: none;
+  background: var(--tertiary);
 }
 
 /* ===== Index Profile ===== */
@@ -440,6 +456,7 @@ main.main {
 .post-content img {
   border-radius: var(--radius);
   margin: 1rem 0;
+  max-width: 100%;
 }
 .post-content a {
   text-decoration: underline;
@@ -490,30 +507,84 @@ body.dark .callout-danger { background: rgba(239, 68, 68, 0.2); }
   color: var(--secondary);
   font-size: 0.9rem;
 }
-.post-content pre {
-  background: var(--code-bg);
-  padding: 1em;
+
+/* Password Form (Post) */
+.kite-password-form {
+  background: var(--entry);
+  border: 1px solid var(--border);
+  padding: 32px;
   border-radius: var(--radius);
-  overflow-x: auto;
-  margin: 1.5em 0;
+  margin: 28px 0;
+  text-align: center;
+}
+.kite-password-form .kite-lock-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+.kite-password-form .kite-password-hint {
+  color: var(--secondary);
+  margin-bottom: 18px;
+}
+.kite-password-form .kite-password-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+.kite-password-form .kite-password-input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--theme);
+  color: var(--content);
+  outline: none;
+}
+.kite-password-form .kite-password-input:focus {
+  border-color: color-mix(in srgb, var(--link) 35%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--link) 18%, transparent);
+}
+.kite-password-form .kite-password-btn {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--primary);
+  color: var(--theme);
+  cursor: pointer;
+  font-weight: 600;
+}
+.kite-password-form .kite-password-btn:active {
+  transform: translateY(1px);
+}
+.kite-password-form .kite-password-error {
+  display: none;
+  color: #ef4444;
+  margin-top: 10px;
   font-size: 14px;
 }
-.post-content code {
-  font-family: var(--font-mono);
-  background: var(--tertiary);
-  color: var(--primary);
-  padding: 2px 5px;
-  border-radius: 4px;
-  font-size: 0.9em;
+
+/* Copy Code Button */
+.post-content pre .code-copy-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--secondary);
+  background: var(--theme);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
-.post-content pre code {
-  background: none;
-  padding: 0;
+.post-content pre:hover .code-copy-btn,
+.post-content pre:focus-within .code-copy-btn {
+  opacity: 1;
 }
-.post-content img {
-  max-width: 100%;
-  border-radius: var(--radius);
-  margin: 1.5em 0;
+.post-content pre .code-copy-btn:active {
+  transform: translateY(1px);
 }
 
 /* Tags on Single Page */
@@ -610,5 +681,30 @@ body.dark .callout-danger { background: rgba(239, 68, 68, 0.2); }
 @media screen and (max-width: 768px) {
   .post-single .post-title {
     font-size: 30px;
+  }
+  .profile {
+    min-height: 28vh;
+    padding-top: 20px;
+  }
+  .profile h1 {
+    font-size: 28px;
+  }
+  .profile p {
+    font-size: 16px;
+  }
+  .kite-password-form .kite-password-row {
+    flex-direction: column;
+  }
+  .kite-password-form .kite-password-btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
