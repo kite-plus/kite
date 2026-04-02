@@ -101,6 +101,7 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	uploadHandler := NewUploadHandler(uploadService)
 	feedHandler := NewFeedHandler(cfg, postService, pageService)
 	aiService := service.NewAIService(&cfg.AI)
+	postService.SetAIService(aiService, &cfg.AI)
 	aiHandler := NewAIHandler(aiService)
 	searchHandler := NewSearchHandler(postService)
 	notificationRepo := repo.NewNotificationRepository(db)
