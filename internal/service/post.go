@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"log"
+
+	"github.com/amigoer/kite-blog/internal/config"
 	"github.com/amigoer/kite-blog/internal/model"
 	"github.com/amigoer/kite-blog/internal/repo"
 	"github.com/google/uuid"
@@ -85,10 +88,18 @@ type PostService struct {
 	postRepo     *repo.PostRepository
 	tagRepo      *repo.TagRepository
 	categoryRepo *repo.CategoryRepository
+	aiService    *AIService
+	aiCfg        *config.AIConfig
 }
 
 func NewPostService(postRepo *repo.PostRepository, tagRepo *repo.TagRepository, categoryRepo *repo.CategoryRepository) *PostService {
 	return &PostService{postRepo: postRepo, tagRepo: tagRepo, categoryRepo: categoryRepo}
+}
+
+// SetAIService 注入 AI 服务，用于自动摘要和自动标签
+func (s *PostService) SetAIService(aiService *AIService, aiCfg *config.AIConfig) {
+	s.aiService = aiService
+	s.aiCfg = aiCfg
 }
 
 func (s *PostService) List(params PostListParams) (*PostListResult, error) {
@@ -199,6 +210,15 @@ func (s *PostService) Create(input CreatePostInput) (*model.Post, error) {
 		Tags:            tags,
 	}
 
+	// 自动生成摘要
+	if post.Summary == "" {
+		s.autoGenerateSummary(post)
+	}
+	// 自动生成标签
+	if len(post.Tags) == 0 {
+		s.autoGenerateTags(post)
+	}
+
 	if err := preparePostForSave(post); err != nil {
 		return nil, err
 	}
@@ -245,6 +265,15 @@ func (s *PostService) Update(id string, input UpdatePostInput) (*model.Post, err
 	existing.ShowComments = normalizeShowComments(input.ShowComments, existing.ShowComments)
 	existing.CategoryID = categoryID
 	existing.Tags = tags
+
+	// 自动生成摘要
+	if existing.Summary == "" {
+		s.autoGenerateSummary(existing)
+	}
+	// 自动生成标签
+	if len(existing.Tags) == 0 {
+		s.autoGenerateTags(existing)
+	}
 
 	if err := preparePostForSave(existing); err != nil {
 		return nil, err
@@ -519,5 +548,69 @@ func isValidStatus(status string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// autoGenerateSummary 当 autoSummary 开启且摘要为空时，自动生成摘要
+func (s *PostService) autoGenerateSummary(post *model.Post) {
+	if s.aiService == nil || s.aiCfg == nil || !s.aiCfg.AutoSummary {
+		return
+	}
+	content := post.ContentMarkdown
+	if content == "" {
+		return
+	}
+	summary, err := s.aiService.GenerateSummary(SummaryInput{Content: content})
+	if err != nil {
+		log.Printf("[AI] 自动生成摘要失败: %v", err)
+		return
+	}
+	post.Summary = summary
+}
+
+// autoGenerateTags 当 autoTag 开启且标签为空时，自动生成标签
+func (s *PostService) autoGenerateTags(post *model.Post) {
+	if s.aiService == nil || s.aiCfg == nil || !s.aiCfg.AutoTag {
+		return
+	}
+	if s.tagRepo == nil {
+		return
+	}
+	content := post.ContentMarkdown
+	if content == "" {
+		return
+	}
+	tagNames, err := s.aiService.SuggestTags(TagSuggestionInput{
+		Title:   post.Title,
+		Content: content,
+	})
+	if err != nil {
+		log.Printf("[AI] 自动生成标签失败: %v", err)
+		return
+	}
+
+	var tags []model.Tag
+	for _, name := range tagNames {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		// 先按名称查找已有标签
+		tag, err := s.tagRepo.GetByName(name)
+		if err == nil {
+			tags = append(tags, *tag)
+			continue
+		}
+		// 不存在则创建新标签
+		slug := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+		newTag := &model.Tag{Name: name, Slug: slug}
+		if err := s.tagRepo.Create(newTag); err != nil {
+			log.Printf("[AI] 自动创建标签 %q 失败: %v", name, err)
+			continue
+		}
+		tags = append(tags, *newTag)
+	}
+	if len(tags) > 0 {
+		post.Tags = tags
 	}
 }

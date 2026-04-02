@@ -92,6 +92,22 @@ func (r *TagRepository) GetBySlug(slug string) (*model.Tag, error) {
 	return &item, nil
 }
 
+func (r *TagRepository) GetByName(name string) (*model.Tag, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("tag repository is unavailable")
+	}
+
+	var item model.Tag
+	if err := r.db.First(&item, "name = ?", name).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrTagNotFound
+		}
+		return nil, fmt.Errorf("get tag by name: %w", err)
+	}
+
+	return &item, nil
+}
+
 func (r *TagRepository) Create(item *model.Tag) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("tag repository is unavailable")
