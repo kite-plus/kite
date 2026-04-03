@@ -5,6 +5,16 @@
 <body class="list">
   {{ template "header" . }}
 
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "{{ .SiteName }}",
+    {{ if .Description }}"description": "{{ .Description }}",{{ end }}
+    "url": "{{ .SiteURL }}"
+  }
+  </script>
+
   <main class="main">
     <div class="profile">
       <h1>{{ .SiteName }}</h1>

@@ -2,9 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/amigoer/kite-blog/internal/config"
 	"github.com/amigoer/kite-blog/internal/repo"
@@ -51,8 +53,10 @@ func NewSSRHandler(
 
 // commonData 构建所有页面共享的模板数据
 func (h *SSRHandler) commonData(pageTitle string) gin.H {
+	siteURL := strings.TrimRight(h.cfg.Site.SiteURL, "/")
 	data := gin.H{
 		"SiteName":    h.cfg.Site.SiteName,
+		"SiteURL":     siteURL,
 		"Description": h.cfg.Site.Description,
 		"Keywords":    h.cfg.Site.Keywords,
 		"Favicon":     h.cfg.Site.Favicon,
@@ -137,6 +141,11 @@ func (h *SSRHandler) Index(c *gin.Context) {
 	data := h.commonData("")
 	data["Posts"] = result.Items
 	data["Pagination"] = paginationData(page, pageSize, result.Pagination.Total, "/")
+	if page > 1 {
+		data["CanonicalURL"] = data["SiteURL"].(string) + fmt.Sprintf("/?page=%d", page)
+	} else {
+		data["CanonicalURL"] = data["SiteURL"].(string) + "/"
+	}
 
 	c.HTML(http.StatusOK, "index.html", data)
 }
@@ -157,6 +166,7 @@ func (h *SSRHandler) PostDetail(c *gin.Context) {
 	}
 
 	data := h.commonData(post.Title)
+	data["CanonicalURL"] = data["SiteURL"].(string) + "/posts/" + post.Slug
 
 	hasPassword := post.Password != ""
 	hasProtected := service.HasProtectedBlocks(post.ContentHTML)
@@ -209,6 +219,11 @@ func (h *SSRHandler) CategoryArchive(c *gin.Context) {
 	data["ArchiveType"] = "分类"
 	data["ArchiveName"] = category.Name
 	data["Pagination"] = paginationData(page, pageSize, result.Pagination.Total, "/categories/"+slug)
+	canonicalPath := "/categories/" + slug
+	if page > 1 {
+		canonicalPath += fmt.Sprintf("?page=%d", page)
+	}
+	data["CanonicalURL"] = data["SiteURL"].(string) + canonicalPath
 
 	c.HTML(http.StatusOK, "archive.html", data)
 }
@@ -246,6 +261,11 @@ func (h *SSRHandler) TagArchive(c *gin.Context) {
 	data["ArchiveType"] = "标签"
 	data["ArchiveName"] = tag.Name
 	data["Pagination"] = paginationData(page, pageSize, result.Pagination.Total, "/tags/"+slug)
+	canonicalPath := "/tags/" + slug
+	if page > 1 {
+		canonicalPath += fmt.Sprintf("?page=%d", page)
+	}
+	data["CanonicalURL"] = data["SiteURL"].(string) + canonicalPath
 
 	c.HTML(http.StatusOK, "archive.html", data)
 }
@@ -261,6 +281,7 @@ func (h *SSRHandler) PageDetail(c *gin.Context) {
 
 	data := h.commonData(pg.Title)
 	data["Page"] = pg
+	data["CanonicalURL"] = data["SiteURL"].(string) + "/pages/" + pg.Slug
 
 	// 解析页面 Config JSON 注入模板上下文
 	pageConfig := make(map[string]interface{})

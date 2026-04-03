@@ -150,8 +150,10 @@ func (b *StaticBuilder) loadTemplates() (*template.Template, error) {
 // ─── 公共数据构建 ───
 
 func (b *StaticBuilder) commonData(pageTitle string) map[string]interface{} {
+	siteURL := strings.TrimRight(b.cfg.Site.SiteURL, "/")
 	data := map[string]interface{}{
 		"SiteName":    b.cfg.Site.SiteName,
+		"SiteURL":     siteURL,
 		"Description": b.cfg.Site.Description,
 		"Keywords":    b.cfg.Site.Keywords,
 		"Favicon":     b.cfg.Site.Favicon,
@@ -261,9 +263,15 @@ func (b *StaticBuilder) buildIndex() error {
 			return err
 		}
 
+		siteURL := strings.TrimRight(b.cfg.Site.SiteURL, "/")
 		data := b.commonData("")
 		data["Posts"] = result.Items
 		data["Pagination"] = paginationData(page, pageSize, result.Pagination.Total, "/")
+		if page > 1 {
+			data["CanonicalURL"] = siteURL + fmt.Sprintf("/?page=%d", page)
+		} else {
+			data["CanonicalURL"] = siteURL + "/"
+		}
 
 		var filePath string
 		if page == 1 {
@@ -290,10 +298,12 @@ func (b *StaticBuilder) buildPosts() error {
 		return err
 	}
 
+	siteURL := strings.TrimRight(b.cfg.Site.SiteURL, "/")
 	count := 0
 	for _, post := range allPosts {
 		data := b.commonData(post.Title)
 		data["Post"] = post
+		data["CanonicalURL"] = siteURL + "/posts/" + post.Slug
 
 		filePath := fmt.Sprintf("posts/%s/index.html", post.Slug)
 		if err := b.renderToFile("post.html", filePath, data); err != nil {
@@ -349,11 +359,17 @@ func (b *StaticBuilder) buildCategories() error {
 				continue
 			}
 
+			siteURL := strings.TrimRight(b.cfg.Site.SiteURL, "/")
 			data := b.commonData(category.Name)
 			data["Posts"] = result.Items
 			data["ArchiveType"] = "分类"
 			data["ArchiveName"] = category.Name
 			data["Pagination"] = paginationData(page, pageSize, result.Pagination.Total, "/categories/"+category.Slug)
+			canonicalPath := "/categories/" + category.Slug
+			if page > 1 {
+				canonicalPath += fmt.Sprintf("?page=%d", page)
+			}
+			data["CanonicalURL"] = siteURL + canonicalPath
 
 			var filePath string
 			if page == 1 {
@@ -415,11 +431,17 @@ func (b *StaticBuilder) buildTags() error {
 				continue
 			}
 
+			siteURL := strings.TrimRight(b.cfg.Site.SiteURL, "/")
 			data := b.commonData(tag.Name)
 			data["Posts"] = result.Items
 			data["ArchiveType"] = "标签"
 			data["ArchiveName"] = tag.Name
 			data["Pagination"] = paginationData(page, pageSize, result.Pagination.Total, "/tags/"+tag.Slug)
+			canonicalPath := "/tags/" + tag.Slug
+			if page > 1 {
+				canonicalPath += fmt.Sprintf("?page=%d", page)
+			}
+			data["CanonicalURL"] = siteURL + canonicalPath
 
 			var filePath string
 			if page == 1 {
@@ -449,8 +471,10 @@ func (b *StaticBuilder) buildPages() error {
 
 	count := 0
 	for _, pg := range result.Items {
+		siteURL := strings.TrimRight(b.cfg.Site.SiteURL, "/")
 		data := b.commonData(pg.Title)
 		data["Page"] = pg
+		data["CanonicalURL"] = siteURL + "/pages/" + pg.Slug
 
 		// 解析页面 Config JSON
 		pageConfig := make(map[string]interface{})
