@@ -5,6 +5,33 @@
 <body class="single">
   {{ template "header" . }}
 
+  {{ if .Post }}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "{{ .Post.Title }}",
+    {{ if .Post.Summary }}"description": "{{ .Post.Summary }}",{{ end }}
+    {{ if .Post.CoverImage }}"image": "{{ .Post.CoverImage }}",{{ end }}
+    {{ if .CanonicalURL }}"url": "{{ .CanonicalURL }}",{{ end }}
+    {{ if .Post.PublishedAt }}"datePublished": "{{ formatDate .Post.PublishedAt }}",{{ end }}
+    "dateModified": "{{ formatDate .Post.UpdatedAt }}",
+    "author": {
+      "@type": "Person",
+      "name": "{{ .SiteName }}"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "{{ .SiteName }}"
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "{{ .CanonicalURL }}"
+    }
+  }
+  </script>
+  {{ end }}
+
   <main class="main">
     <article class="post-single">
       <header class="post-header">

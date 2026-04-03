@@ -6,6 +6,37 @@
   {{ if .Description }}<meta name="description" content="{{ .Description }}">{{ end }}
   {{ if .Keywords }}<meta name="keywords" content="{{ .Keywords }}">{{ end }}
   {{ if .Favicon }}<link rel="icon" href="{{ .Favicon }}">{{ end }}
+
+  {{/* Canonical URL */}}
+  {{ if .CanonicalURL }}<link rel="canonical" href="{{ .CanonicalURL }}">{{ end }}
+
+  {{/* OpenGraph */}}
+  <meta property="og:site_name" content="{{ .SiteName }}">
+  {{ if .Post }}
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="{{ .Post.Title }}">
+    <meta property="og:description" content="{{ if .Post.Summary }}{{ .Post.Summary }}{{ else }}{{ .Description }}{{ end }}">
+    {{ if .Post.CoverImage }}<meta property="og:image" content="{{ .Post.CoverImage }}">{{ end }}
+    {{ if .CanonicalURL }}<meta property="og:url" content="{{ .CanonicalURL }}">{{ end }}
+  {{ else }}
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ if .PageTitle }}{{ .PageTitle }} — {{ end }}{{ .SiteName }}">
+    {{ if .Description }}<meta property="og:description" content="{{ .Description }}">{{ end }}
+    {{ if .CanonicalURL }}<meta property="og:url" content="{{ .CanonicalURL }}">{{ end }}
+  {{ end }}
+
+  {{/* Twitter Card */}}
+  {{ if .Post }}
+    <meta name="twitter:card" content="{{ if .Post.CoverImage }}summary_large_image{{ else }}summary{{ end }}">
+    <meta name="twitter:title" content="{{ .Post.Title }}">
+    <meta name="twitter:description" content="{{ if .Post.Summary }}{{ .Post.Summary }}{{ else }}{{ .Description }}{{ end }}">
+    {{ if .Post.CoverImage }}<meta name="twitter:image" content="{{ .Post.CoverImage }}">{{ end }}
+  {{ else }}
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ if .PageTitle }}{{ .PageTitle }} — {{ end }}{{ .SiteName }}">
+    {{ if .Description }}<meta name="twitter:description" content="{{ .Description }}">{{ end }}
+  {{ end }}
+
   <link rel="alternate" type="application/rss+xml" title="{{ .SiteName }}" href="/feed.xml">
   <link rel="stylesheet" href="/static/css/kite.css?v={{ currentYear }}{{ .SiteName }}v2">
   <script>
