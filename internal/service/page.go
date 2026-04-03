@@ -128,6 +128,15 @@ func (s *PageService) ListPublic() (*PageListResult, error) {
 	}, nil
 }
 
+// ListAll 导出用：获取所有页面（包括草稿）
+func (s *PageService) ListAll() ([]model.Page, error) {
+	pages, _, err := s.pageRepo.List(repo.PageListParams{
+		Page:     1,
+		PageSize: 1000,
+	})
+	return pages, err
+}
+
 // GetByID 管理端获取页面详情
 func (s *PageService) GetByID(idStr string) (*model.Page, error) {
 	id, err := uuid.Parse(strings.TrimSpace(idStr))

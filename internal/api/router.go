@@ -110,6 +110,7 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	notificationService := service.NewNotificationService(notificationRepo)
 	notificationHandler := NewNotificationHandler(notificationService)
 	commentService.SetNotificationService(notificationService)
+	exportHandler := NewExportHandler(postService, pageService, friendLinkService, categoryRepository, tagRepository, commentRepository)
 
 	apiV1 := router.Group("/api/v1")
 	apiV1.GET("/health", healthHandler.Get)
@@ -199,6 +200,7 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	protectedAdminV1.GET("/notifications/unread-count", notificationHandler.UnreadCount)
 	protectedAdminV1.PATCH("/notifications/:id/read", notificationHandler.MarkRead)
 	protectedAdminV1.PATCH("/notifications/read-all", notificationHandler.MarkAllRead)
+	protectedAdminV1.GET("/export", exportHandler.Export)
 }
 
 func registerPageRoutes(router *gin.Engine, cfg *config.Config, templateFS fs.FS, db *gorm.DB) {
