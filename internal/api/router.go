@@ -141,7 +141,7 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	profileHandler := NewProfileHandler(settingsService, adminAuthService, settingsRepo)
 
 	protectedAdminV1 := adminV1.Group("/")
-	protectedAdminV1.Use(adminAuthMiddleware.Require())
+	protectedAdminV1.Use(adminAuthMiddleware.Require(), CSRFMiddleware())
 	protectedAdminV1.POST("/auth/logout", adminAuthHandler.Logout)
 	protectedAdminV1.GET("/profile", profileHandler.Get)
 	protectedAdminV1.PUT("/profile", profileHandler.Update)

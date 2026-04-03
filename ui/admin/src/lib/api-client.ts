@@ -7,6 +7,12 @@ import type { ApiResponse } from '@/types/api'
 /** API 基础路径 */
 const API_BASE = '/api/v1'
 
+/** 从 cookie 中读取 CSRF token */
+function getCSRFToken(): string {
+  const match = document.cookie.match(/(^|;\s*)csrf_token=([^;]+)/)
+  return match ? match[2] : ''
+}
+
 /** snake_case → camelCase */
 function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
@@ -105,7 +111,7 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRFToken() },
     body: body ? JSON.stringify(snakeifyRequest(body)) : undefined,
   })
   return handleResponse<T>(res, path)
@@ -117,7 +123,7 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRFToken() },
     body: body ? JSON.stringify(snakeifyRequest(body)) : undefined,
   })
   return handleResponse<T>(res, path)
@@ -129,7 +135,7 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
 export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRFToken() },
     body: body ? JSON.stringify(snakeifyRequest(body)) : undefined,
   })
   return handleResponse<T>(res, path)
@@ -139,7 +145,10 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
  * 通用 DELETE 请求
  */
 export async function apiDelete<T = void>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { method: 'DELETE' })
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    headers: { 'X-CSRF-Token': getCSRFToken() },
+  })
   return handleResponse<T>(res, path)
 }
 
@@ -159,6 +168,7 @@ export async function apiUpload(file: File): Promise<UploadResult> {
 
   const res = await fetch(`${API_BASE}/admin/upload/image`, {
     method: 'POST',
+    headers: { 'X-CSRF-Token': getCSRFToken() },
     body: formData,
   })
   return handleResponse<UploadResult>(res, '/admin/upload/image')
