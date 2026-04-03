@@ -64,6 +64,7 @@ func autoMigrate(db *gorm.DB) error {
 		&model.Page{},
 		&model.Setting{},
 		&model.Notification{},
+		&model.SlugHistory{},
 	)
 }
 

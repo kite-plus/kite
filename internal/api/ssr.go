@@ -25,6 +25,7 @@ type SSRHandler struct {
 	pageRepo        *repo.PageRepository
 	postRepo        *repo.PostRepository
 	settingsService *service.SettingsService
+	slugHistoryRepo *repo.SlugHistoryRepository
 }
 
 func NewSSRHandler(
@@ -37,6 +38,7 @@ func NewSSRHandler(
 	pageRepo *repo.PageRepository,
 	postRepo *repo.PostRepository,
 	settingsService *service.SettingsService,
+	slugHistoryRepo *repo.SlugHistoryRepository,
 ) *SSRHandler {
 	return &SSRHandler{
 		cfg:             cfg,
@@ -48,6 +50,7 @@ func NewSSRHandler(
 		pageRepo:        pageRepo,
 		postRepo:        postRepo,
 		settingsService: settingsService,
+		slugHistoryRepo: slugHistoryRepo,
 	}
 }
 
@@ -155,6 +158,16 @@ func (h *SSRHandler) PostDetail(c *gin.Context) {
 	slug := c.Param("slug")
 	post, err := h.postService.GetPublicBySlug(slug)
 	if err != nil {
+		// 查找 slug 历史记录，如存在则 301 重定向到新 slug
+		if h.slugHistoryRepo != nil {
+			if history, hErr := h.slugHistoryRepo.FindBySlug(slug); hErr == nil {
+				newPost, pErr := h.postService.GetPublicByID(history.PostID.String())
+				if pErr == nil {
+					c.Redirect(http.StatusMovedPermanently, "/posts/"+newPost.Slug)
+					return
+				}
+			}
+		}
 		h.renderError(c, http.StatusNotFound)
 		return
 	}

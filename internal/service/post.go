@@ -85,15 +85,21 @@ type Pagination struct {
 }
 
 type PostService struct {
-	postRepo     *repo.PostRepository
-	tagRepo      *repo.TagRepository
-	categoryRepo *repo.CategoryRepository
-	aiService    *AIService
-	aiCfg        *config.AIConfig
+	postRepo        *repo.PostRepository
+	tagRepo         *repo.TagRepository
+	categoryRepo    *repo.CategoryRepository
+	slugHistoryRepo *repo.SlugHistoryRepository
+	aiService       *AIService
+	aiCfg           *config.AIConfig
 }
 
 func NewPostService(postRepo *repo.PostRepository, tagRepo *repo.TagRepository, categoryRepo *repo.CategoryRepository) *PostService {
 	return &PostService{postRepo: postRepo, tagRepo: tagRepo, categoryRepo: categoryRepo}
+}
+
+// SetSlugHistoryRepo 注入 slug 历史仓库
+func (s *PostService) SetSlugHistoryRepo(r *repo.SlugHistoryRepository) {
+	s.slugHistoryRepo = r
 }
 
 // SetAIService 注入 AI 服务，用于自动摘要和自动标签
@@ -251,8 +257,14 @@ func (s *PostService) Update(id string, input UpdatePostInput) (*model.Post, err
 		return nil, err
 	}
 
+	// 记录 slug 变更历史
+	newSlug := strings.TrimSpace(input.Slug)
+	if s.slugHistoryRepo != nil && existing.Slug != "" && existing.Slug != newSlug {
+		_ = s.slugHistoryRepo.Record(existing.ID, existing.Slug)
+	}
+
 	existing.Title = strings.TrimSpace(input.Title)
-	existing.Slug = strings.TrimSpace(input.Slug)
+	existing.Slug = newSlug
 	existing.Summary = strings.TrimSpace(input.Summary)
 	existing.ContentMarkdown = strings.TrimSpace(input.ContentMarkdown)
 	existing.ContentHTML = input.ContentHTML

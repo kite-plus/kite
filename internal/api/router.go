@@ -72,6 +72,8 @@ func registerAPIRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB) {
 	categoryRepository := repo.NewCategoryRepository(db)
 	postRepository := repo.NewPostRepository(db)
 	postService := service.NewPostService(postRepository, tagRepository, categoryRepository)
+	slugHistoryRepo := repo.NewSlugHistoryRepository(db)
+	postService.SetSlugHistoryRepo(slugHistoryRepo)
 	postHandler := NewPostHandler(postService)
 
 	// 启动定时发布调度器
@@ -232,8 +234,9 @@ func registerPageRoutes(router *gin.Engine, cfg *config.Config, templateFS fs.FS
 	friendLinkService := service.NewFriendLinkService(friendLinkRepo)
 	settingsRepo := repo.NewSettingsRepository(db)
 	settingsService := service.NewSettingsService(cfg, settingsRepo)
+	slugHistoryRepo := repo.NewSlugHistoryRepository(db)
 
-	ssr := NewSSRHandler(cfg, postService, pageService, friendLinkService, categoryRepo, tagRepo, pageRepo, postRepo, settingsService)
+	ssr := NewSSRHandler(cfg, postService, pageService, friendLinkService, categoryRepo, tagRepo, pageRepo, postRepo, settingsService, slugHistoryRepo)
 
 	// 前台页面路由
 	router.GET("/", ssr.Index)
