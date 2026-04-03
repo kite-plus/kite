@@ -74,14 +74,15 @@ func (r *CommentRepository) List(params CommentListParams) ([]model.Comment, int
 	return comments, total, nil
 }
 
-// ListPublicByPostID 查询指定文章的已审核评论
+// ListPublicByPostID 查询指定文章的已审核评论（树形结构：仅查顶层，预加载子回复）
 func (r *CommentRepository) ListPublicByPostID(postID uuid.UUID, page, pageSize int) ([]model.Comment, int64, error) {
 	if r == nil || r.db == nil {
 		return nil, 0, fmt.Errorf("comment repository is unavailable")
 	}
 
+	// 只统计和分页顶层评论（parent_id IS NULL）
 	query := r.db.Model(&model.Comment{}).
-		Where("post_id = ? AND status = ?", postID, model.CommentStatusApproved)
+		Where("post_id = ? AND status = ? AND parent_id IS NULL", postID, model.CommentStatusApproved)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -99,7 +100,9 @@ func (r *CommentRepository) ListPublicByPostID(postID uuid.UUID, page, pageSize 
 	}
 
 	var comments []model.Comment
-	if err := query.Order("created_at ASC").
+	if err := r.db.Where("post_id = ? AND status = ? AND parent_id IS NULL", postID, model.CommentStatusApproved).
+		Preload("Replies", "status = ?", model.CommentStatusApproved).
+		Order("created_at ASC").
 		Offset((page - 1) * pageSize).Limit(pageSize).
 		Find(&comments).Error; err != nil {
 		return nil, 0, fmt.Errorf("list public comments: %w", err)

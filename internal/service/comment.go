@@ -25,9 +25,10 @@ type CommentListParams struct {
 
 // CreateCommentInput 前台访客提交评论的输入
 type CreateCommentInput struct {
-	Author  string `json:"author"`
-	Email   string `json:"email"`
-	Content string `json:"content"`
+	Author   string `json:"author"`
+	Email    string `json:"email"`
+	Content  string `json:"content"`
+	ParentID string `json:"parent_id"`
 }
 
 // ModerateCommentInput 管理端审核评论的输入
@@ -164,6 +165,16 @@ func (s *CommentService) Create(postIDStr string, input CreateCommentInput, ip, 
 		return nil, fmt.Errorf("%w: content is required", ErrInvalidCommentPayload)
 	}
 
+	// 解析 parent_id
+	var parentID *uuid.UUID
+	if input.ParentID != "" {
+		pid, err := uuid.Parse(strings.TrimSpace(input.ParentID))
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid parent_id", ErrInvalidCommentPayload)
+		}
+		parentID = &pid
+	}
+
 	// 垃圾评论检查：命中则自动标记为 spam
 	status := model.CommentStatusPending
 	if s.spamChecker != nil && s.spamChecker.IsSpam(content) {
@@ -172,6 +183,7 @@ func (s *CommentService) Create(postIDStr string, input CreateCommentInput, ip, 
 
 	comment := &model.Comment{
 		PostID:    postID,
+		ParentID:  parentID,
 		Author:    author,
 		Email:     email,
 		Content:   content,
