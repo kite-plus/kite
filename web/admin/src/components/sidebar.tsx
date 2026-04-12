@@ -10,22 +10,24 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { useI18n } from "@/i18n";
 
 const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/files", icon: Upload, label: "Files" },
-  { to: "/albums", icon: FolderOpen, label: "Albums" },
-  { to: "/tokens", icon: Key, label: "API Tokens" },
+  { to: "/", icon: LayoutDashboard, labelKey: "nav.dashboard" },
+  { to: "/files", icon: Upload, labelKey: "nav.files" },
+  { to: "/albums", icon: FolderOpen, labelKey: "nav.albums" },
+  { to: "/tokens", icon: Key, labelKey: "nav.tokens" },
 ];
 
 const adminItems = [
-  { to: "/admin/storage", icon: HardDrive, label: "Storage" },
-  { to: "/admin/users", icon: Users, label: "Users" },
-  { to: "/admin/settings", icon: Settings, label: "Settings" },
+  { to: "/admin/storage", icon: HardDrive, labelKey: "nav.storage" },
+  { to: "/admin/users", icon: Users, labelKey: "nav.users" },
+  { to: "/admin/settings", icon: Settings, labelKey: "nav.settings" },
 ];
 
 export function Sidebar() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const isAdmin = user?.role === "admin";
 
   return (
@@ -39,7 +41,7 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-1 p-3">
         <div className="mb-2 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          General
+          {t("nav.general")}
         </div>
         {navItems.map((item) => (
           <NavLink
@@ -56,14 +58,14 @@ export function Sidebar() {
             }
           >
             <item.icon className="size-4" />
-            {item.label}
+            {t(item.labelKey)}
           </NavLink>
         ))}
 
         {isAdmin && (
           <>
             <div className="mb-2 mt-6 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Admin
+              {t("nav.admin")}
             </div>
             {adminItems.map((item) => (
               <NavLink
@@ -79,7 +81,7 @@ export function Sidebar() {
                 }
               >
                 <item.icon className="size-4" />
-                {item.label}
+                {t(item.labelKey)}
               </NavLink>
             ))}
           </>

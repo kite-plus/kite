@@ -1,6 +1,8 @@
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Languages } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useI18n, localeLabels, type Locale } from "@/i18n";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,9 +14,29 @@ import {
 
 export function Header() {
   const { user, logout } = useAuth();
+  const { t, locale, setLocale } = useI18n();
 
   return (
-    <header className="flex h-14 items-center justify-end border-b px-6">
+    <header className="flex h-14 items-center justify-end gap-2 border-b px-6">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon-sm">
+            <Languages className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {(Object.keys(localeLabels) as Locale[]).map((l) => (
+            <DropdownMenuItem
+              key={l}
+              onClick={() => setLocale(l)}
+              className={locale === l ? "font-medium" : ""}
+            >
+              {localeLabels[l]}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1 text-sm outline-none hover:bg-accent">
           <Avatar>
@@ -32,12 +54,12 @@ export function Header() {
           <DropdownMenuSeparator />
           <DropdownMenuItem>
             <User className="size-4" />
-            Profile
+            {t("auth.profile")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onClick={logout}>
             <LogOut className="size-4" />
-            Log out
+            {t("auth.logout")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

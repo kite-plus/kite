@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	kite "github.com/amigoer/kite"
 	"github.com/amigoer/kite/internal/api"
 	"github.com/amigoer/kite/internal/config"
 	"github.com/amigoer/kite/internal/model"
@@ -71,8 +75,18 @@ func main() {
 	fileRepo := repo.NewFileRepo(db)
 
 	authSvc := service.NewAuthService(userRepo, tokenRepo, cfg.Auth)
+
+	// 首次启动：无用户时自动创建默认管理员
+	seedDefaultAdmin(userRepo, authSvc)
+
 	imageSvc := service.NewImageService(cfg.Upload.ThumbWidth, cfg.Upload.ThumbQuality)
 	fileSvc := service.NewFileService(fileRepo, userRepo, storageMgr, imageSvc, cfg.Upload, cfg.Site.URL)
+
+	// 加载内嵌前端资产
+	var adminFS fs.FS
+	if sub, err := fs.Sub(kite.AdminFS, "web/admin/dist"); err == nil {
+		adminFS = sub
+	}
 
 	// 设置路由
 	router := api.SetupRouter(api.RouterConfig{
@@ -80,6 +94,7 @@ func main() {
 		StorageMgr: storageMgr,
 		AuthSvc:    authSvc,
 		FileSvc:    fileSvc,
+		AdminFS:    adminFS,
 	})
 
 	// 启动 HTTP 服务
@@ -146,6 +161,35 @@ func loadRuntimeConfig(settingRepo *repo.SettingRepo, cfg *config.Config) {
 	if _, ok := settings["allow_registration"]; ok {
 		cfg.Auth.AllowRegistration = settings["allow_registration"] == "true"
 	}
+}
+
+// seedDefaultAdmin 首次启动时自动创建默认管理员账号。
+// 密码随机生成并打印到控制台，仅此一次。
+func seedDefaultAdmin(userRepo *repo.UserRepo, authSvc *service.AuthService) {
+	ctx := context.Background()
+	count, err := userRepo.Count(ctx)
+	if err != nil || count > 0 {
+		return
+	}
+
+	// 生成 8 字节随机密码（16 个 hex 字符）
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatalf("failed to generate random password: %v", err)
+	}
+	password := hex.EncodeToString(b)
+
+	_, err = authSvc.CreateAdminUser(ctx, "admin", "admin@kite.local", password)
+	if err != nil {
+		log.Fatalf("failed to create default admin: %v", err)
+	}
+
+	log.Println("========================================")
+	log.Println("  Default admin account created:")
+	log.Printf("  Username: admin")
+	log.Printf("  Password: %s", password)
+	log.Println("  Please change the password after login.")
+	log.Println("========================================")
 }
 
 // loadStorageConfigs 从数据库加载所有活跃的存储配置到管理器。

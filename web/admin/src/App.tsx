@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthContext, useAuthProvider } from "@/hooks/use-auth";
+import { I18nContext, useI18nProvider } from "@/i18n";
 import { AppLayout, AuthLayout } from "@/components/layout";
 
 import LoginPage from "@/pages/login";
@@ -25,13 +26,10 @@ function AppRoutes() {
   return (
     <AuthContext.Provider value={auth}>
       <Routes>
-        {/* Auth pages (no sidebar) */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
-
-        {/* App pages (with sidebar) */}
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/files" element={<FilesPage />} />
@@ -47,11 +45,15 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const i18n = useI18nProvider();
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </QueryClientProvider>
+    <I18nContext.Provider value={i18n}>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </I18nContext.Provider>
   );
 }

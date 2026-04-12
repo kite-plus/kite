@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, FolderOpen, Pencil } from "lucide-react";
 import { albumApi } from "@/lib/api";
+import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AlbumsPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
@@ -45,31 +47,31 @@ export default function AlbumsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Albums</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("albums.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Organize your files into albums
+            {t("albums.description")}
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="size-4" />
-              New Album
+              {t("albums.newAlbum")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Album</DialogTitle>
+              <DialogTitle>{t("albums.createAlbum")}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Name</Label>
+                <Label>{t("common.name")}</Label>
                 <Input
                   value={newAlbum.name}
                   onChange={(e) =>
                     setNewAlbum((a) => ({ ...a, name: e.target.value }))
                   }
-                  placeholder="Album name"
+                  placeholder={t("albums.albumName")}
                 />
               </div>
               <div className="space-y-2">
@@ -79,7 +81,7 @@ export default function AlbumsPage() {
                   onChange={(e) =>
                     setNewAlbum((a) => ({ ...a, description: e.target.value }))
                   }
-                  placeholder="Optional description"
+                  placeholder={t("albums.albumDesc")}
                 />
               </div>
             </div>
@@ -88,7 +90,7 @@ export default function AlbumsPage() {
                 onClick={() => createMutation.mutate()}
                 disabled={!newAlbum.name || createMutation.isPending}
               >
-                {createMutation.isPending ? "Creating..." : "Create"}
+                {createMutation.isPending ? t("albums.creating") : t("common.create")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -142,11 +144,11 @@ export default function AlbumsPage() {
                   )}
                   <div className="mt-auto flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">
-                      {album.file_count} files
+                      {album.file_count} {t("albums.files")}
                     </span>
                     {album.is_public && (
                       <Badge variant="outline" className="text-[10px]">
-                        Public
+                        {t("common.public")}
                       </Badge>
                     )}
                   </div>
@@ -158,7 +160,7 @@ export default function AlbumsPage() {
           {data?.items?.length === 0 && (
             <div className="flex flex-col items-center py-16 text-center">
               <FolderOpen className="mb-3 size-12 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No albums yet</p>
+              <p className="text-sm text-muted-foreground">{t("albums.noAlbums")}</p>
             </div>
           )}
 
@@ -170,10 +172,10 @@ export default function AlbumsPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Previous
+                {t("common.previous")}
               </Button>
               <span className="text-sm text-muted-foreground">
-                Page {page} of {Math.ceil(data.total / 20)}
+                {t("common.page")} {page} {t("common.of")} {Math.ceil(data.total / 20)}
               </span>
               <Button
                 variant="outline"
@@ -181,7 +183,7 @@ export default function AlbumsPage() {
                 disabled={page >= Math.ceil(data.total / 20)}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           )}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
+import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import {
 
 export default function RegisterPage() {
   const { register } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [form, setForm] = useState({
     username: "",
@@ -30,7 +32,7 @@ export default function RegisterPage() {
     setError("");
 
     if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("auth.passwordMismatch"));
       return;
     }
 
@@ -41,7 +43,7 @@ export default function RegisterPage() {
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? "Registration failed";
+          ?.message ?? t("auth.registrationFailed");
       setError(msg);
     } finally {
       setLoading(false);
@@ -57,8 +59,8 @@ export default function RegisterPage() {
         <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
           K
         </div>
-        <CardTitle className="text-xl">Create account</CardTitle>
-        <CardDescription>Get started with Kite</CardDescription>
+        <CardTitle className="text-xl">{t("auth.createAccount")}</CardTitle>
+        <CardDescription>{t("auth.getStarted")}</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -68,59 +70,59 @@ export default function RegisterPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="username">{t("auth.username")}</Label>
             <Input
               id="username"
               value={form.username}
               onChange={update("username")}
-              placeholder="Choose a username"
+              placeholder={t("auth.chooseUsername")}
               required
               minLength={3}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("auth.email")}</Label>
             <Input
               id="email"
               type="email"
               value={form.email}
               onChange={update("email")}
-              placeholder="you@example.com"
+              placeholder={t("auth.emailPlaceholder")}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.password")}</Label>
             <Input
               id="password"
               type="password"
               value={form.password}
               onChange={update("password")}
-              placeholder="At least 6 characters"
+              placeholder={t("auth.passwordHint")}
               required
               minLength={6}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Label htmlFor="confirmPassword">{t("auth.confirmPassword")}</Label>
             <Input
               id="confirmPassword"
               type="password"
               value={form.confirmPassword}
               onChange={update("confirmPassword")}
-              placeholder="Confirm your password"
+              placeholder={t("auth.confirmPasswordPlaceholder")}
               required
             />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account..." : "Sign up"}
+            {loading ? t("auth.creatingAccount") : t("auth.register")}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
+            {t("auth.hasAccount")}{" "}
             <Link to="/login" className="text-primary hover:underline">
-              Sign in
+              {t("auth.login")}
             </Link>
           </p>
         </CardFooter>

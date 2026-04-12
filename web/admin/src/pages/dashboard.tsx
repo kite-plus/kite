@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Image, Video, Music, FileText, HardDrive, Users } from "lucide-react";
 import { statsApi } from "@/lib/api";
+import { useI18n } from "@/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -13,6 +14,7 @@ function formatBytes(bytes: number) {
 }
 
 export default function DashboardPage() {
+  const { t } = useI18n();
   const { data, isLoading } = useQuery({
     queryKey: ["stats"],
     queryFn: () => statsApi.get().then((r) => r.data.data),
@@ -20,36 +22,36 @@ export default function DashboardPage() {
 
   const cards = [
     {
-      title: "Total Files",
+      titleKey: "dashboard.totalFiles",
       value: data?.total_files ?? 0,
       icon: FileText,
     },
     {
-      title: "Storage Used",
+      titleKey: "dashboard.storageUsed",
       value: data ? formatBytes(data.total_size) : "0 B",
       icon: HardDrive,
     },
-    { title: "Images", value: data?.images ?? 0, icon: Image },
-    { title: "Videos", value: data?.videos ?? 0, icon: Video },
-    { title: "Audio", value: data?.audios ?? 0, icon: Music },
-    { title: "Users", value: data?.users ?? 0, icon: Users },
+    { titleKey: "dashboard.images", value: data?.images ?? 0, icon: Image },
+    { titleKey: "dashboard.videos", value: data?.videos ?? 0, icon: Video },
+    { titleKey: "dashboard.audio", value: data?.audios ?? 0, icon: Music },
+    { titleKey: "dashboard.users", value: data?.users ?? 0, icon: Users },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("dashboard.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Overview of your media hosting
+          {t("dashboard.description")}
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((card) => (
-          <Card key={card.title}>
+          <Card key={card.titleKey}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {card.title}
+                {t(card.titleKey)}
               </CardTitle>
               <card.icon className="size-4 text-muted-foreground" />
             </CardHeader>

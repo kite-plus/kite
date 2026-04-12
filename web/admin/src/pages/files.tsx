@@ -11,6 +11,7 @@ import {
   Search,
 } from "lucide-react";
 import { fileApi } from "@/lib/api";
+import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,7 @@ function formatBytes(bytes: number) {
 }
 
 export default function FilesPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
@@ -85,32 +87,32 @@ export default function FilesPage() {
   };
 
   const types = [
-    { value: "", label: "All" },
-    { value: "image", label: "Images" },
-    { value: "video", label: "Videos" },
-    { value: "audio", label: "Audio" },
-    { value: "file", label: "Files" },
+    { value: "", labelKey: "common.all" },
+    { value: "image", labelKey: "files.images" },
+    { value: "video", labelKey: "files.videos" },
+    { value: "audio", labelKey: "files.audio" },
+    { value: "file", labelKey: "files.otherFiles" },
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Files</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("files.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Manage your uploaded files
+            {t("files.description")}
           </p>
         </div>
         <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
           <DialogTrigger asChild>
             <Button>
               <Upload className="size-4" />
-              Upload
+              {t("common.upload")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Upload File</DialogTitle>
+              <DialogTitle>{t("files.uploadFile")}</DialogTitle>
             </DialogHeader>
             <div
               onDragOver={(e) => e.preventDefault()}
@@ -119,7 +121,7 @@ export default function FilesPage() {
             >
               <Upload className="mb-3 size-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Drag & drop or click to upload
+                {t("files.dragOrClick")}
               </p>
               <input
                 type="file"
@@ -129,7 +131,7 @@ export default function FilesPage() {
             </div>
             {uploadMutation.isPending && (
               <p className="text-center text-sm text-muted-foreground">
-                Uploading...
+                {t("files.uploading")}
               </p>
             )}
           </DialogContent>
@@ -141,7 +143,7 @@ export default function FilesPage() {
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search files..."
+            placeholder={t("files.searchFiles")}
             value={keyword}
             onChange={(e) => {
               setKeyword(e.target.value);
@@ -151,17 +153,17 @@ export default function FilesPage() {
           />
         </div>
         <div className="flex gap-1">
-          {types.map((t) => (
+          {types.map((tp) => (
             <Button
-              key={t.value}
-              variant={fileType === t.value ? "default" : "outline"}
+              key={tp.value}
+              variant={fileType === tp.value ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                setFileType(t.value);
+                setFileType(tp.value);
                 setPage(1);
               }}
             >
-              {t.label}
+              {t(tp.labelKey)}
             </Button>
           ))}
         </div>
@@ -248,7 +250,7 @@ export default function FilesPage() {
           {data?.items?.length === 0 && (
             <div className="flex flex-col items-center py-16 text-center">
               <FileText className="mb-3 size-12 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No files yet</p>
+              <p className="text-sm text-muted-foreground">{t("files.noFiles")}</p>
             </div>
           )}
 
@@ -261,10 +263,10 @@ export default function FilesPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Previous
+                {t("common.previous")}
               </Button>
               <span className="text-sm text-muted-foreground">
-                Page {page} of {Math.ceil(data.total / 20)}
+                {t("common.page")} {page} {t("common.of")} {Math.ceil(data.total / 20)}
               </span>
               <Button
                 variant="outline"
@@ -272,7 +274,7 @@ export default function FilesPage() {
                 disabled={page >= Math.ceil(data.total / 20)}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           )}

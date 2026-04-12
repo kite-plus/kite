@@ -1,6 +1,8 @@
 package api
 
 import (
+	"io/fs"
+	"net/http"
 	"time"
 
 	"github.com/amigoer/kite/internal/api/middleware"
@@ -17,6 +19,7 @@ type RouterConfig struct {
 	StorageMgr *storage.Manager
 	AuthSvc    *service.AuthService
 	FileSvc    *service.FileService
+	AdminFS    fs.FS // 内嵌的前端资产，nil 时不提供前端服务
 }
 
 // SetupRouter 注册所有路由并返回 gin.Engine 实例。
@@ -119,6 +122,23 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 			admin.PUT("/admin/users/:id", userHandler.Update)
 			admin.DELETE("/admin/users/:id", userHandler.Delete)
 		}
+	}
+
+	// 前端静态资源服务（生产模式，前端内嵌到二进制中）
+	if cfg.AdminFS != nil {
+		// SPA: 所有未匹配的路由返回 index.html
+		r.NoRoute(func(c *gin.Context) {
+			// 先尝试提供静态文件
+			path := c.Request.URL.Path
+			f, err := cfg.AdminFS.Open(path[1:]) // 去掉开头的 /
+			if err == nil {
+				f.Close()
+				c.FileFromFS(path, http.FS(cfg.AdminFS))
+				return
+			}
+			// 回退到 index.html（SPA 路由）
+			c.FileFromFS("index.html", http.FS(cfg.AdminFS))
+		})
 	}
 
 	return r

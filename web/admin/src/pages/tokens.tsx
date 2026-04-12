@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Key, Copy, Check } from "lucide-react";
 import { tokenApi } from "@/lib/api";
+import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TokensPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
@@ -51,9 +53,9 @@ export default function TokensPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">API Tokens</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("tokens.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Manage tokens for third-party tools like PicGo
+            {t("tokens.description")}
           </p>
         </div>
         <Dialog
@@ -66,19 +68,19 @@ export default function TokensPage() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="size-4" />
-              New Token
+              {t("tokens.newToken")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {newToken ? "Token Created" : "Create API Token"}
+                {newToken ? t("tokens.tokenCreated") : t("tokens.createToken")}
               </DialogTitle>
             </DialogHeader>
             {newToken ? (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Copy this token now. It won't be shown again.
+                  {t("tokens.copyWarning")}
                 </p>
                 <div className="flex gap-2">
                   <Input value={newToken} readOnly className="font-mono" />
@@ -90,11 +92,11 @@ export default function TokensPage() {
             ) : (
               <>
                 <div className="space-y-2">
-                  <Label>Token Name</Label>
+                  <Label>{t("tokens.tokenName")}</Label>
                   <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. PicGo"
+                    placeholder={t("tokens.tokenNamePlaceholder")}
                   />
                 </div>
                 <DialogFooter>
@@ -102,7 +104,7 @@ export default function TokensPage() {
                     onClick={() => createMutation.mutate()}
                     disabled={!name || createMutation.isPending}
                   >
-                    {createMutation.isPending ? "Creating..." : "Create"}
+                    {createMutation.isPending ? t("tokens.creating") : t("common.create")}
                   </Button>
                 </DialogFooter>
               </>
@@ -136,10 +138,10 @@ export default function TokensPage() {
                   <div>
                     <p className="text-sm font-medium">{token.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Created{" "}
+                      {t("tokens.created")}{" "}
                       {new Date(token.created_at).toLocaleDateString()}
                       {token.last_used &&
-                        ` · Last used ${new Date(token.last_used).toLocaleDateString()}`}
+                        ` · ${t("tokens.lastUsed")} ${new Date(token.last_used).toLocaleDateString()}`}
                     </p>
                   </div>
                 </div>
@@ -157,7 +159,7 @@ export default function TokensPage() {
           {data?.length === 0 && (
             <div className="flex flex-col items-center py-16 text-center">
               <Key className="mb-3 size-12 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No API tokens yet</p>
+              <p className="text-sm text-muted-foreground">{t("tokens.noTokens")}</p>
             </div>
           )}
         </div>

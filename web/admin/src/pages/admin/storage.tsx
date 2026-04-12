@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { HardDrive, Trash2, Check } from "lucide-react";
 import { storageApi } from "@/lib/api";
+import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function StoragePage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -25,9 +27,9 @@ export default function StoragePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Storage</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("storage.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Manage storage backends
+          {t("storage.description")}
         </p>
       </div>
 
@@ -61,12 +63,12 @@ export default function StoragePage() {
                       </Badge>
                       {cfg.is_default && (
                         <Badge variant="secondary" className="text-[10px]">
-                          Default
+                          {t("common.default")}
                         </Badge>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {cfg.is_active ? "Active" : "Inactive"}
+                      {cfg.is_active ? t("common.active") : t("common.inactive")}
                     </p>
                   </div>
                 </div>
@@ -80,7 +82,7 @@ export default function StoragePage() {
                     {testMutation.isSuccess ? (
                       <Check className="size-4 text-green-600" />
                     ) : (
-                      "Test"
+                      t("common.test")
                     )}
                   </Button>
                   <Button
@@ -100,7 +102,7 @@ export default function StoragePage() {
             <div className="flex flex-col items-center py-16 text-center">
               <HardDrive className="mb-3 size-12 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">
-                No storage configured
+                {t("storage.noStorage")}
               </p>
             </div>
           )}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, Trash2 } from "lucide-react";
 import { userApi } from "@/lib/api";
+import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +16,7 @@ function formatBytes(bytes: number) {
 }
 
 export default function UsersPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
 
@@ -31,8 +33,8 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
-        <p className="text-sm text-muted-foreground">Manage user accounts</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("users.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("users.description")}</p>
       </div>
 
       {isLoading ? (
@@ -45,10 +47,10 @@ export default function UsersPage() {
         <>
           <div className="rounded-lg border">
             <div className="grid grid-cols-[1fr_1fr_auto_auto_auto] gap-4 border-b px-4 py-2 text-xs font-medium text-muted-foreground">
-              <span>Username</span>
-              <span>Email</span>
-              <span>Role</span>
-              <span>Storage</span>
+              <span>{t("users.username")}</span>
+              <span>{t("users.email")}</span>
+              <span>{t("users.role")}</span>
+              <span>{t("users.storageCol")}</span>
               <span />
             </div>
             {data?.items?.map(
@@ -69,7 +71,7 @@ export default function UsersPage() {
                     <span className="font-medium">{user.username}</span>
                     {!user.is_active && (
                       <Badge variant="outline" className="text-[10px]">
-                        Disabled
+                        {t("common.disabled")}
                       </Badge>
                     )}
                   </div>
@@ -102,7 +104,7 @@ export default function UsersPage() {
           {data?.items?.length === 0 && (
             <div className="flex flex-col items-center py-16 text-center">
               <Users className="mb-3 size-12 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No users</p>
+              <p className="text-sm text-muted-foreground">{t("users.noUsers")}</p>
             </div>
           )}
 
@@ -114,10 +116,10 @@ export default function UsersPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Previous
+                {t("common.previous")}
               </Button>
               <span className="text-sm text-muted-foreground">
-                Page {page} of {Math.ceil(data.total / 20)}
+                {t("common.page")} {page} {t("common.of")} {Math.ceil(data.total / 20)}
               </span>
               <Button
                 variant="outline"
@@ -125,7 +127,7 @@ export default function UsersPage() {
                 disabled={page >= Math.ceil(data.total / 20)}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           )}

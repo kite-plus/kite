@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
+import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import {
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const { t } = useI18n();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,7 +29,7 @@ export default function LoginPage() {
     try {
       await login(username, password);
     } catch {
-      setError("Invalid username or password");
+      setError(t("auth.invalidCredentials"));
     } finally {
       setLoading(false);
     }
@@ -39,8 +41,8 @@ export default function LoginPage() {
         <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
           K
         </div>
-        <CardTitle className="text-xl">Welcome back</CardTitle>
-        <CardDescription>Sign in to your account</CardDescription>
+        <CardTitle className="text-xl">{t("auth.welcomeBack")}</CardTitle>
+        <CardDescription>{t("auth.signInDesc")}</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -50,35 +52,35 @@ export default function LoginPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="username">Username or Email</Label>
+            <Label htmlFor="username">{t("auth.usernameOrEmail")}</Label>
             <Input
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              placeholder={t("auth.enterUsername")}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.password")}</Label>
             <Input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder={t("auth.enterPassword")}
               required
             />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? t("auth.signingIn") : t("auth.login")}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
-            Don't have an account?{" "}
+            {t("auth.noAccount")}{" "}
             <Link to="/register" className="text-primary hover:underline">
-              Sign up
+              {t("auth.register")}
             </Link>
           </p>
         </CardFooter>

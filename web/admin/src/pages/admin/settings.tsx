@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { settingsApi } from "@/lib/api";
+import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Record<string, string>>({});
 
@@ -41,29 +43,29 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">System configuration</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("settings.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("settings.description")}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Site</CardTitle>
+          <CardTitle className="text-base">{t("settings.site")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Site Name</Label>
+              <Label>{t("settings.siteName")}</Label>
               <Input
                 value={form.site_name ?? ""}
                 onChange={(e) => updateField("site_name", e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>Site URL</Label>
+              <Label>{t("settings.siteUrl")}</Label>
               <Input
                 value={form.site_url ?? ""}
                 onChange={(e) => updateField("site_url", e.target.value)}
-                placeholder="https://kite.plus"
+                placeholder={t("settings.siteUrlPlaceholder")}
               />
             </div>
           </div>
@@ -72,14 +74,14 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Registration</CardTitle>
+          <CardTitle className="text-base">{t("settings.registration")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">Allow Registration</p>
+              <p className="text-sm font-medium">{t("settings.allowRegistration")}</p>
               <p className="text-xs text-muted-foreground">
-                Let new users create accounts
+                {t("settings.allowRegistrationDesc")}
               </p>
             </div>
             <Button
@@ -94,7 +96,7 @@ export default function SettingsPage() {
                 )
               }
             >
-              {form.allow_registration === "true" ? "Enabled" : "Disabled"}
+              {form.allow_registration === "true" ? t("common.enabled") : t("common.disabled")}
             </Button>
           </div>
         </CardContent>
@@ -104,7 +106,7 @@ export default function SettingsPage() {
 
       <div className="flex justify-end">
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-          {mutation.isPending ? "Saving..." : "Save Settings"}
+          {mutation.isPending ? t("settings.saving") : t("settings.saveSettings")}
         </Button>
       </div>
     </div>
