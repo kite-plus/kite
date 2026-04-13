@@ -5,8 +5,7 @@ import { I18nContext, useI18nProvider } from "@/i18n";
 import { ThemeProvider } from "@/components/theme-provider";
 
 // Layouts
-import { UserLayout } from "@/components/layouts/user-layout";
-import { AdminLayout } from "@/components/layouts/admin-layout";
+import { UserCenterLayout, AdminPanelLayout } from "@/components/layouts/app-layout";
 import { AuthLayout } from "@/components/layout";
 
 // Auth pages
@@ -38,14 +37,14 @@ function AppRoutes() {
   return (
     <AuthContext.Provider value={auth}>
       <Routes>
-        {/* ── Auth (centered card) ── */}
+        {/* Auth (centered card) */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
 
-        {/* ── User center (user sidebar) ── */}
-        <Route element={<UserLayout />}>
+        {/* User center (top nav) */}
+        <Route element={<UserCenterLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<UserDashboard />} />
           <Route path="/files" element={<FilesPage />} />
@@ -53,8 +52,8 @@ function AppRoutes() {
           <Route path="/tokens" element={<TokensPage />} />
         </Route>
 
-        {/* ── Admin panel (admin sidebar, admin-only) ── */}
-        <Route element={<AdminLayout />}>
+        {/* Admin panel (top nav, admin-only) */}
+        <Route element={<AdminPanelLayout />}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/files" element={<AdminFilesPage />} />
           <Route path="/admin/storage" element={<StoragePage />} />
