@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,6 +76,77 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 	v1.GET("/setup/status", setupHandler.CheckSetup)
 	v1.POST("/setup", setupHandler.Setup)
 
+	// 公开接口（无需认证）
+	pub := v1.Group("/public")
+	{
+		// 站点公开统计
+		pub.GET("/stats", func(c *gin.Context) {
+			stats, err := fileRepo.GetStats(c.Request.Context())
+			if err != nil {
+				serverError(c, "failed to get stats")
+				return
+			}
+			success(c, gin.H{
+				"total_files": stats.TotalFiles,
+				"total_size":  stats.TotalSize,
+				"images":      stats.ImageCount,
+				"videos":      stats.VideoCount,
+				"audios":      stats.AudioCount,
+			})
+		})
+
+		// 公开图片/文件列表（探索广场）
+		pub.GET("/files", func(c *gin.Context) {
+			// 检查是否开启了公开广场
+			val, _ := settingRepo.Get(c.Request.Context(), "allow_public_gallery")
+			if val != "true" {
+				fail(c, http.StatusForbidden, 40300, "public gallery is disabled")
+				return
+			}
+
+			page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+			size, _ := strconv.Atoi(c.DefaultQuery("size", "24"))
+			if page < 1 {
+				page = 1
+			}
+			if size < 1 || size > 100 {
+				size = 24
+			}
+
+			files, total, err := fileRepo.List(c.Request.Context(), repo.FileListParams{
+				FileType: c.Query("file_type"),
+				Page:     page,
+				PageSize: size,
+				OrderBy:  "created_at",
+				Order:    "DESC",
+			})
+			if err != nil {
+				serverError(c, "failed to list files")
+				return
+			}
+			success(c, gin.H{
+				"items": files,
+				"total": total,
+				"page":  page,
+				"size":  size,
+			})
+		})
+
+		// 游客上传
+		uploadGroup := pub.Group("")
+		uploadGroup.Use(middleware.RateLimit(10, time.Minute))
+		{
+			uploadGroup.POST("/upload", func(c *gin.Context) {
+				val, err := settingRepo.Get(c.Request.Context(), "allow_guest_upload")
+				if err != nil || val != "true" {
+					fail(c, http.StatusForbidden, 40300, "guest upload is disabled")
+					return
+				}
+				fileHandler.GuestUpload(c)
+			})
+		}
+	}
+
 	// ========== 需要认证的接口 ==========
 	authed := v1.Group("")
 	authed.Use(middleware.Auth(cfg.AuthSvc))
@@ -135,8 +207,34 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		}
 	}
 	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "base.html", gin.H{})
+		c.HTML(http.StatusOK, "index.html", gin.H{})
 	})
+	r.GET("/explore", func(c *gin.Context) {
+		val, _ := settingRepo.Get(c.Request.Context(), "allow_public_gallery")
+		c.HTML(http.StatusOK, "explore.html", gin.H{
+			"GalleryEnabled": val == "true",
+		})
+	})
+	r.GET("/upload", func(c *gin.Context) {
+		// 检查是否开启了游客上传
+		val, _ := settingRepo.Get(c.Request.Context(), "allow_guest_upload")
+		c.HTML(http.StatusOK, "upload.html", gin.H{
+			"GuestUploadEnabled": val == "true",
+		})
+	})
+
+	// 前台模板静态资源（背景图等）
+	if cfg.TemplateFS != nil {
+		r.GET("/static/*filepath", func(c *gin.Context) {
+			fp := strings.TrimPrefix(c.Param("filepath"), "/")
+			if f, err := cfg.TemplateFS.Open("static/" + fp); err == nil {
+				f.Close()
+				c.FileFromFS("static/"+fp, http.FS(cfg.TemplateFS))
+			} else {
+				c.String(http.StatusNotFound, "not found")
+			}
+		})
+	}
 
 	// 前端 SPA 静态资源服务（用户中心 + 管理后台）
 	if cfg.AdminFS != nil {

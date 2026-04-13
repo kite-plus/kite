@@ -1,0 +1,134 @@
+{{define "upload.html"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    {{template "head_common"}}
+    <title>上传文件 - Kite</title>
+</head>
+<body hx-boost="true" class="font-sans antialiased bg-white text-gray-900 min-h-screen flex flex-col">
+    {{template "header"}}
+
+    <main class="flex-1">
+        <div class="max-w-3xl mx-auto px-6 py-16 md:py-24">
+            <div class="text-center mb-10">
+                <h1 class="text-3xl font-bold tracking-tight">上传文件</h1>
+                <p class="mt-3 text-gray-500">拖拽或点击选择文件，上传后即刻获取分享链接。</p>
+            </div>
+
+            {{if .GuestUploadEnabled}}
+            <div id="dropZone"
+                 class="relative border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center cursor-pointer transition hover:border-gray-400 hover:bg-gray-50/50"
+                 onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" class="hidden" multiple>
+                <div class="mx-auto w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                </div>
+                <p class="text-gray-600 font-medium">拖拽文件到此处，或点击选择</p>
+                <p class="mt-1 text-sm text-gray-400">支持图片、视频、音频和文档</p>
+            </div>
+
+            <div id="uploadList" class="mt-6 space-y-3 hidden"></div>
+            <div id="resultList" class="mt-6 space-y-4 hidden"></div>
+
+            <script>
+            (function() {
+                var dropZone = document.getElementById('dropZone');
+                var fileInput = document.getElementById('fileInput');
+                var uploadList = document.getElementById('uploadList');
+                var resultList = document.getElementById('resultList');
+
+                ['dragenter','dragover'].forEach(function(e) {
+                    dropZone.addEventListener(e, function(ev) { ev.preventDefault(); dropZone.classList.add('border-gray-900','bg-gray-50'); });
+                });
+                ['dragleave','drop'].forEach(function(e) {
+                    dropZone.addEventListener(e, function(ev) { ev.preventDefault(); dropZone.classList.remove('border-gray-900','bg-gray-50'); });
+                });
+                dropZone.addEventListener('drop', function(e) { if(e.dataTransfer.files.length>0) handleFiles(e.dataTransfer.files); });
+                fileInput.addEventListener('change', function() { if(fileInput.files.length>0) handleFiles(fileInput.files); fileInput.value=''; });
+
+                function fmtSize(b) { if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(2)+' MB'; }
+
+                function handleFiles(files) { uploadList.classList.remove('hidden'); Array.from(files).forEach(uploadFile); }
+
+                function uploadFile(file) {
+                    var id = 'f_' + Math.random().toString(36).slice(2,10);
+                    var item = document.createElement('div');
+                    item.id = id;
+                    item.className = 'flex items-center gap-4 bg-white border border-gray-100 rounded-xl p-4 shadow-sm';
+                    item.innerHTML = '<div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0"><svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>'
+                        + '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900 truncate">'+file.name+'</p><p class="text-xs text-gray-400">'+fmtSize(file.size)+'</p>'
+                        + '<div class="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-gray-900 rounded-full transition-all duration-300" style="width:0%" id="'+id+'_bar"></div></div></div>'
+                        + '<span class="text-xs text-gray-400 shrink-0" id="'+id+'_pct">0%</span>';
+                    uploadList.appendChild(item);
+
+                    var fd = new FormData(); fd.append('file', file);
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/v1/public/upload');
+                    xhr.upload.onprogress = function(e) {
+                        if(e.lengthComputable) { var p=Math.round(e.loaded/e.total*100); document.getElementById(id+'_bar').style.width=p+'%'; document.getElementById(id+'_pct').textContent=p+'%'; }
+                    };
+                    xhr.onload = function() {
+                        if(xhr.status===200) {
+                            var res=JSON.parse(xhr.responseText);
+                            if(res.status&&res.data) { document.getElementById(id).remove(); if(uploadList.children.length===0) uploadList.classList.add('hidden'); showResult(file.name, res.data); }
+                        } else {
+                            document.getElementById(id+'_pct').textContent='失败';
+                            document.getElementById(id+'_bar').classList.replace('bg-gray-900','bg-red-500');
+                            document.getElementById(id+'_bar').style.width='100%';
+                        }
+                    };
+                    xhr.onerror = function() { document.getElementById(id+'_pct').textContent='失败'; };
+                    xhr.send(fd);
+                }
+
+                function showResult(filename, data) {
+                    resultList.classList.remove('hidden');
+                    var links = data.links || {};
+                    var card = document.createElement('div');
+                    card.className = 'bg-white border border-gray-100 rounded-2xl p-5 shadow-sm';
+                    var isImg = (data.mimetype||'').startsWith('image/');
+                    var preview = isImg
+                        ? '<img src="'+links.url+'" class="w-16 h-16 object-cover rounded-lg border border-gray-100 shrink-0" alt="">'
+                        : '<div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center shrink-0"><svg class="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>';
+                    card.innerHTML = '<div class="flex items-center gap-4 mb-4">'+preview
+                        + '<div class="min-w-0"><p class="font-medium text-gray-900 truncate">'+filename+'</p><p class="text-xs text-gray-400 mt-0.5">'+fmtSize(data.size)+' · '+data.mimetype+'</p></div>'
+                        + '<div class="ml-auto"><span class="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-100 rounded-full px-2.5 py-1"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>已上传</span></div></div>'
+                        + '<div class="space-y-2">'+lr('链接',links.url)+lr('Markdown',links.markdown)+lr('HTML',links.html)+lr('BBCode',links.bbcode)+'</div>';
+                    resultList.prepend(card);
+                }
+
+                function lr(label, val) {
+                    if(!val) return '';
+                    var e=val.replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    return '<div class="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2"><span class="text-xs text-gray-400 w-16 shrink-0">'+label+'</span>'
+                        + '<input type="text" readonly value="'+e+'" class="flex-1 bg-transparent text-sm text-gray-700 outline-none truncate" onclick="this.select()">'
+                        + '<button onclick="copyText(this,\''+e+'\')" class="text-xs text-gray-400 hover:text-gray-900 transition shrink-0 px-2 py-1 rounded hover:bg-gray-200">复制</button></div>';
+                }
+
+                window.copyText = function(btn, text) {
+                    var el=document.createElement('textarea'); el.innerHTML=text;
+                    navigator.clipboard.writeText(el.value).then(function() { var o=btn.textContent; btn.textContent='已复制'; setTimeout(function(){btn.textContent=o;},1500); });
+                };
+            })();
+            </script>
+
+            {{else}}
+            <div class="border-2 border-dashed border-gray-200 rounded-2xl p-16 text-center">
+                <div class="mx-auto w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <p class="text-gray-500 font-medium">游客上传未开启</p>
+                <p class="mt-2 text-sm text-gray-400">请<a href="/login" class="text-gray-900 underline underline-offset-4 hover:text-gray-700">登录</a>后上传文件，或联系管理员开启游客上传。</p>
+            </div>
+            {{end}}
+        </div>
+    </main>
+
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

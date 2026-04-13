@@ -1,145 +1,104 @@
-{{template "base.html" .}}
+{{define "index.html"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    {{template "head_common"}}
+    <title>Kite - 自部署媒体托管系统</title>
+    <style>
+        .hero-glow {
+            position: absolute;
+            width: 800px; height: 800px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0,0,0,0.03) 0%, transparent 60%);
+            top: 0%; left: 50%;
+            transform: translate(-50%, -30%);
+            pointer-events: none;
+        }
+        .bg-grid {
+            mask-image: radial-gradient(ellipse at center, white, transparent 75%);
+            -webkit-mask-image: radial-gradient(ellipse at center, white, transparent 75%);
+        }
+        .fade-in { animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .fade-in-delay-1 { animation-delay: 0.1s; }
+        .fade-in-delay-2 { animation-delay: 0.2s; }
+        .fade-in-delay-3 { animation-delay: 0.3s; }
+        .fade-in-delay-4 { animation-delay: 0.4s; }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body hx-boost="true" class="font-sans antialiased bg-[#fafafa] text-gray-900 min-h-screen flex flex-col selection:bg-gray-200">
+    {{template "header"}}
 
-{{define "content"}}
-<!-- Hero -->
-<section class="relative overflow-hidden">
-    <div class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_60%_50%_at_50%_-20%,rgba(120,119,198,0.08),transparent)]"></div>
-    <div class="max-w-6xl mx-auto px-6 pt-20 pb-24 md:pt-28 md:pb-32 text-center">
-        <div class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 text-xs font-medium text-gray-600 mb-8">
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            开源 · 自部署 · 单文件运行
-        </div>
-        <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-gray-900 leading-tight">
-            托管你的媒体<br class="hidden sm:block">掌控你的数据
-        </h1>
-        <p class="mt-6 text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            Kite 是一个开源的自部署媒体托管系统。上传图片、视频、音频和文件，即刻获取分享链接。支持本地存储与 S3 兼容后端，单个可执行文件即可部署。
-        </p>
-        <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="/register" class="w-full sm:w-auto px-8 py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition shadow-sm text-center">
-                免费开始使用
-            </a>
-            <a href="/login" class="w-full sm:w-auto px-8 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 transition shadow-sm text-center">
-                登录账号
-            </a>
-        </div>
+    <main class="flex-1 flex flex-col relative overflow-hidden">
+        <!-- Grid Background -->
+        <div class="absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] bg-grid"></div>
+        <div class="hero-glow z-0"></div>
+        
+        <div class="max-w-4xl mx-auto px-6 py-24 text-center relative z-10 w-full flex-1 flex flex-col justify-center">
+            
 
-        <!-- Supported types -->
-        <div class="mt-16 flex flex-wrap items-center justify-center gap-3">
-            <span class="flex items-center gap-2 rounded-full border border-amber-100 bg-amber-50 px-4 py-2 text-sm text-amber-700">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                图片
-            </span>
-            <span class="flex items-center gap-2 rounded-full border border-violet-100 bg-violet-50 px-4 py-2 text-sm text-violet-700">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                视频
-            </span>
-            <span class="flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm text-blue-700">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
-                音频
-            </span>
-            <span class="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-600">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                文件
-            </span>
-        </div>
-    </div>
-</section>
+            <div class="fade-in inline-flex items-center gap-2.5 rounded-full border border-gray-200/80 bg-white/50 backdrop-blur-md px-4 py-1.5 text-xs font-semibold text-gray-900 mb-10 shadow-sm hover:shadow transition-all mx-auto cursor-default">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                开源 · 自部署 · 单文件极速启动
+            </div>
 
-<!-- Features -->
-<section id="features" class="py-20 md:py-28 bg-gray-50/70">
-    <div class="max-w-6xl mx-auto px-6">
-        <div class="text-center max-w-2xl mx-auto">
-            <h2 class="text-3xl md:text-4xl font-bold tracking-tight">你需要的一切功能</h2>
-            <p class="mt-4 text-gray-500 text-lg">为个人和团队打造的完整媒体托管解决方案。</p>
-        </div>
-        <div class="mt-16 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div class="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mb-4">
-                    <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                </div>
-                <h3 class="font-semibold text-gray-900 mb-2">拖拽上传</h3>
-                <p class="text-sm text-gray-500 leading-relaxed">拖拽即可上传任何文件类型，图片自动生成缩略图，体验流畅。</p>
-            </div>
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div class="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mb-4">
-                    <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-                </div>
-                <h3 class="font-semibold text-gray-900 mb-2">即时分享链接</h3>
-                <p class="text-sm text-gray-500 leading-relaxed">每个文件自动生成短链接，方便嵌入博客、文档或应用中分享。</p>
-            </div>
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div class="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mb-4">
-                    <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-                </div>
-                <h3 class="font-semibold text-gray-900 mb-2">相册管理</h3>
-                <p class="text-sm text-gray-500 leading-relaxed">将文件整理到相册中，支持公开或私有权限，轻松管理资源。</p>
-            </div>
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div class="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mb-4">
-                    <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                </div>
-                <h3 class="font-semibold text-gray-900 mb-2">API 令牌接入</h3>
-                <p class="text-sm text-gray-500 leading-relaxed">生成独立的 API 令牌，无缝对接 PicGo、ShareX 等第三方上传工具。</p>
-            </div>
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div class="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mb-4">
-                    <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <h3 class="font-semibold text-gray-900 mb-2">多语言支持</h3>
-                <p class="text-sm text-gray-500 leading-relaxed">内置国际化支持，中英文无缝切换，面向全球用户。</p>
-            </div>
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div class="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mb-4">
-                    <svg class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
-                </div>
-                <h3 class="font-semibold text-gray-900 mb-2">S3 兼容存储</h3>
-                <p class="text-sm text-gray-500 leading-relaxed">支持本地存储、AWS S3、Cloudflare R2、MinIO 等 S3 兼容后端。</p>
-            </div>
-        </div>
-    </div>
-</section>
+            <h1 class="fade-in fade-in-delay-1 text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] pb-2 text-transparent bg-clip-text bg-gradient-to-br from-gray-900 via-gray-800 to-gray-500">
+                极简体验 · 极速分发<br>你的专属云端图床
+            </h1>
+            
+            <p class="fade-in fade-in-delay-2 mt-8 text-lg text-gray-500 max-w-xl mx-auto leading-relaxed">
+                为创作者打造的专业级媒体托管平台。<br class="hidden sm:block">拖拽即刻上传，全球节点极速分发，让你的每一次分享都畅快淋漓。
+            </p>
 
-<!-- How it works -->
-<section id="usage" class="py-20 md:py-28">
-    <div class="max-w-6xl mx-auto px-6">
-        <div class="text-center max-w-2xl mx-auto">
-            <h2 class="text-3xl md:text-4xl font-bold tracking-tight">三步开始使用</h2>
-            <p class="mt-4 text-gray-500 text-lg">从零到完整功能，只需几分钟。</p>
-        </div>
-        <div class="mt-16 grid md:grid-cols-3 gap-10">
-            <div class="text-center">
-                <div class="mx-auto w-14 h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center text-xl font-bold mb-5">1</div>
-                <h3 class="font-semibold text-lg mb-2">创建账号</h3>
-                <p class="text-sm text-gray-500 leading-relaxed">使用邮箱注册，或使用首次启动时生成的管理员账号登录。</p>
-            </div>
-            <div class="text-center">
-                <div class="mx-auto w-14 h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center text-xl font-bold mb-5">2</div>
-                <h3 class="font-semibold text-lg mb-2">上传文件</h3>
-                <p class="text-sm text-gray-500 leading-relaxed">拖拽上传图片、视频、音频或文档，自动生成缩略图和访问链接。</p>
-            </div>
-            <div class="text-center">
-                <div class="mx-auto w-14 h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center text-xl font-bold mb-5">3</div>
-                <h3 class="font-semibold text-lg mb-2">分享与嵌入</h3>
-                <p class="text-sm text-gray-500 leading-relaxed">复制生成的链接，在博客、文档或应用中使用，即贴即用。</p>
-            </div>
-        </div>
-    </div>
-</section>
+            <!-- Stats -->
+            <div id="siteStats" class="fade-in fade-in-delay-2 mt-8 inline-flex items-center gap-3 rounded-xl border border-gray-200/50 bg-white/50 backdrop-blur-sm px-6 py-2 text-sm font-medium text-gray-500 shadow-sm mx-auto w-fit"></div>
 
-<!-- CTA -->
-<section class="py-20 md:py-24 bg-gray-900">
-    <div class="max-w-3xl mx-auto px-6 text-center">
-        <h2 class="text-3xl md:text-4xl font-bold text-white tracking-tight">准备好了吗？</h2>
-        <p class="mt-4 text-gray-400 text-lg">立即部署你自己的媒体托管服务，完全掌控你的数据。</p>
-        <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="/register" class="w-full sm:w-auto px-8 py-3 bg-white text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition text-center">
-                免费注册
-            </a>
-            <a href="https://github.com/amigoer/kite" target="_blank" class="w-full sm:w-auto px-8 py-3 border border-gray-600 text-gray-300 rounded-lg font-medium hover:border-gray-400 hover:text-white transition text-center">
-                查看源码
-            </a>
+            <!-- CTA -->
+            <div class="fade-in fade-in-delay-3 mt-12 flex items-center justify-center gap-4">
+                <a href="/upload" class="group relative inline-flex items-center gap-2 px-8 py-3.5 bg-gray-900 border border-gray-800 text-white rounded-xl font-medium text-sm hover:bg-black transition-all shadow-[0_0_20px_rgba(0,0,0,0.06)] hover:shadow-[0_0_25px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-t from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <svg class="w-4 h-4 transition-transform group-hover:-translate-y-0.5 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    <span class="relative z-10">立刻上传</span>
+                </a>
+                <a href="/explore" class="group inline-flex items-center gap-2 px-8 py-3.5 border border-gray-200 bg-white/60 backdrop-blur-md text-gray-700 rounded-xl font-medium text-sm hover:bg-white hover:border-gray-300 transition-all hover:-translate-y-0.5 shadow-sm hover:shadow">
+                    探索广场
+                    <svg class="w-4 h-4 transition-transform group-hover:translate-x-1 text-gray-400 group-hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </a>
+            </div>
+
+
+            
         </div>
-    </div>
-</section>
+    </main>
+
+    {{template "footer"}}
+
+<script>
+(function() {
+    fetch('/api/v1/public/stats')
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.code === 0 && res.data) {
+                var d = res.data;
+                var size = d.total_size, unit = 'B';
+                if (size >= 1073741824) { size = (size / 1073741824).toFixed(2); unit = 'GB'; }
+                else if (size >= 1048576) { size = (size / 1048576).toFixed(2); unit = 'MB'; }
+                else if (size >= 1024) { size = (size / 1024).toFixed(1); unit = 'KB'; }
+                document.getElementById('siteStats').innerHTML =
+                    '<span class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>' + d.total_files + ' 个文件</span>'
+                    + '<span class="text-gray-300">|</span>'
+                    + '<span class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>' + size + ' ' + unit + '</span>';
+            }
+        })
+        .catch(function() {});
+})();
+</script>
+</body>
+</html>
 {{end}}

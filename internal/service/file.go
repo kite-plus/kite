@@ -64,6 +64,7 @@ type UploadParams struct {
 	Filename string
 	Reader   io.Reader
 	Size     int64
+	IsGuest  bool // 游客上传模式，跳过用户配额检查
 }
 
 // UploadResult 上传结果。
@@ -89,13 +90,15 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		return nil, ErrFileTooLarge
 	}
 
-	// 2. 检查用户存储配额
-	user, err := s.userRepo.GetByID(ctx, params.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("upload get user: %w", err)
-	}
-	if !user.HasStorageSpace(params.Size) {
-		return nil, ErrStorageFull
+	// 2. 检查用户存储配额（游客模式跳过）
+	if !params.IsGuest {
+		user, err := s.userRepo.GetByID(ctx, params.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("upload get user: %w", err)
+		}
+		if !user.HasStorageSpace(params.Size) {
+			return nil, ErrStorageFull
+		}
 	}
 
 	// 3. 读取全部内容到内存以进行 MIME 检测和 MD5 计算
@@ -199,10 +202,12 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		return nil, fmt.Errorf("upload create record: %w", err)
 	}
 
-	// 15. 更新用户已用存储量
-	if err := s.userRepo.UpdateStorageUsed(ctx, params.UserID, int64(len(data))); err != nil {
-		// 非致命错误，记录日志即可
-		_ = err
+	// 15. 更新用户已用存储量（游客模式跳过）
+	if !params.IsGuest {
+		if err := s.userRepo.UpdateStorageUsed(ctx, params.UserID, int64(len(data))); err != nil {
+			// 非致命错误，记录日志即可
+			_ = err
+		}
 	}
 
 	return &UploadResult{

@@ -1,0 +1,140 @@
+{{define "explore.html"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    {{template "head_common"}}
+    <title>探索广场 - Kite</title>
+    <style>
+        .masonry { columns: 2; column-gap: 1rem; }
+        @media (min-width: 640px) { .masonry { columns: 3; } }
+        @media (min-width: 1024px) { .masonry { columns: 4; } }
+        .masonry-item { break-inside: avoid; margin-bottom: 1rem; }
+        .masonry-item img { opacity: 0; transition: opacity 0.3s; }
+        .masonry-item img.loaded { opacity: 1; }
+    </style>
+</head>
+<body hx-boost="true" class="font-sans antialiased bg-white text-gray-900 min-h-screen flex flex-col">
+    {{template "header"}}
+
+    <main class="flex-1">
+        <div class="max-w-6xl mx-auto px-6 py-10">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">探索广场</h1>
+                    <p class="mt-1 text-sm text-gray-500">浏览站内公开分享的图片和文件</p>
+                </div>
+                <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                    <button onclick="loadFiles('')" id="tab_all" class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition bg-white text-gray-900 shadow-sm">全部</button>
+                    <button onclick="loadFiles('image')" id="tab_image" class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">图片</button>
+                    <button onclick="loadFiles('video')" id="tab_video" class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">视频</button>
+                    <button onclick="loadFiles('audio')" id="tab_audio" class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">音频</button>
+                    <button onclick="loadFiles('file')" id="tab_file" class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">文件</button>
+                </div>
+            </div>
+
+            {{if .GalleryEnabled}}
+            <div id="gallery" class="masonry"></div>
+
+            <div id="loadingState" class="py-20 text-center">
+                <div class="inline-flex items-center gap-2 text-gray-400 text-sm">
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    加载中...
+                </div>
+            </div>
+            <div id="emptyState" class="hidden py-20 text-center">
+                <div class="mx-auto w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                <p class="text-gray-400">暂无公开文件</p>
+            </div>
+            <div id="loadMore" class="hidden py-8 text-center">
+                <button onclick="loadNextPage()" class="px-6 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition">加载更多</button>
+            </div>
+
+            <!-- Lightbox -->
+            <div id="lightbox" class="fixed inset-0 z-50 bg-black/90 hidden items-center justify-center cursor-zoom-out" onclick="closeLightbox()">
+                <img id="lightboxImg" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" src="" alt="">
+                <button class="absolute top-6 right-6 text-white/60 hover:text-white transition" onclick="closeLightbox()">
+                    <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <script>
+            (function() {
+                var currentType = '', currentPage = 1, totalFiles = 0, pageSize = 24;
+
+                window.loadFiles = function(type) {
+                    currentType = type; currentPage = 1;
+                    document.getElementById('gallery').innerHTML = '';
+                    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('bg-white','text-gray-900','shadow-sm'); b.classList.add('text-gray-500'); });
+                    var el = document.getElementById(type ? 'tab_'+type : 'tab_all');
+                    if (el) { el.classList.add('bg-white','text-gray-900','shadow-sm'); el.classList.remove('text-gray-500'); }
+                    fetchFiles();
+                };
+                window.loadNextPage = function() { currentPage++; fetchFiles(); };
+
+                function fetchFiles() {
+                    var ld = document.getElementById('loadingState'), em = document.getElementById('emptyState'), mo = document.getElementById('loadMore');
+                    ld.classList.remove('hidden'); em.classList.add('hidden'); mo.classList.add('hidden');
+                    var url = '/api/v1/public/files?page=' + currentPage + '&size=' + pageSize;
+                    if (currentType) url += '&file_type=' + currentType;
+                    fetch(url).then(function(r){return r.json()}).then(function(res) {
+                        ld.classList.add('hidden');
+                        if (res.code !== 0) { em.classList.remove('hidden'); var p=em.querySelector('p'); if(p) p.textContent=res.message||'暂无公开文件'; return; }
+                        var items = res.data.items || []; totalFiles = res.data.total || 0;
+                        if (items.length === 0 && currentPage === 1) { em.classList.remove('hidden'); return; }
+                        var g = document.getElementById('gallery');
+                        items.forEach(function(f) { g.appendChild(createCard(f)); });
+                        if (currentPage * pageSize < totalFiles) mo.classList.remove('hidden');
+                    }).catch(function() { ld.classList.add('hidden'); em.classList.remove('hidden'); });
+                }
+
+                function createCard(file) {
+                    var div = document.createElement('div'); div.className = 'masonry-item';
+                    if (file.file_type === 'image') {
+                        div.innerHTML = '<div class="group relative rounded-xl overflow-hidden bg-gray-100 border border-gray-100 cursor-pointer shadow-sm hover:shadow-md transition-shadow" onclick="openLightbox(\''+file.url+'\')">'
+                            + '<img src="'+file.url+'" alt="'+esc(file.original_name)+'" class="w-full block" onload="this.classList.add(\'loaded\')" loading="lazy">'
+                            + '<div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">'
+                            + '<p class="text-white text-xs truncate">'+esc(file.original_name)+'</p>'
+                            + '<p class="text-white/60 text-xs mt-0.5">'+fmtSize(file.size_bytes)+'</p></div></div>';
+                    } else {
+                        var ic = file.file_type==='video'?'<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>'
+                            : file.file_type==='audio'?'<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>'
+                            : '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>';
+                        var cl = file.file_type==='video'?'bg-violet-50 text-violet-600':file.file_type==='audio'?'bg-blue-50 text-blue-600':'bg-gray-100 text-gray-600';
+                        div.innerHTML = '<div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"><div class="flex items-center gap-3">'
+                            + '<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 '+cl+'">'+ic+'</div>'
+                            + '<div class="min-w-0 flex-1"><p class="text-sm font-medium text-gray-900 truncate">'+esc(file.original_name)+'</p>'
+                            + '<p class="text-xs text-gray-400 mt-0.5">'+fmtSize(file.size_bytes)+' · '+file.mime_type+'</p></div>'
+                            + '<a href="'+file.url+'" target="_blank" class="shrink-0 text-gray-300 hover:text-gray-600 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>'
+                            + '</div></div>';
+                    }
+                    return div;
+                }
+
+                function fmtSize(b) { if(b>=1073741824) return (b/1073741824).toFixed(2)+' GB'; if(b>=1048576) return (b/1048576).toFixed(2)+' MB'; if(b>=1024) return (b/1024).toFixed(1)+' KB'; return b+' B'; }
+                function esc(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+                window.openLightbox = function(url) { var lb=document.getElementById('lightbox'); document.getElementById('lightboxImg').src=url; lb.classList.remove('hidden'); lb.classList.add('flex'); document.body.style.overflow='hidden'; };
+                window.closeLightbox = function() { var lb=document.getElementById('lightbox'); lb.classList.add('hidden'); lb.classList.remove('flex'); document.body.style.overflow=''; };
+                document.addEventListener('keydown', function(e) { if(e.key==='Escape') closeLightbox(); });
+
+                fetchFiles();
+            })();
+            </script>
+            {{else}}
+            <div class="py-20 text-center">
+                <div class="mx-auto w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                </div>
+                <p class="text-gray-500 font-medium">探索广场未开启</p>
+                <p class="mt-2 text-sm text-gray-400">管理员尚未开启公开浏览功能。</p>
+            </div>
+            {{end}}
+        </div>
+    </main>
+
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

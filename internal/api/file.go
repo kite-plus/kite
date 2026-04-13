@@ -79,6 +79,50 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	})
 }
 
+// GuestUpload 处理游客文件上传（无需登录）。
+func (h *FileHandler) GuestUpload(c *gin.Context) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		badRequest(c, "file is required")
+		return
+	}
+	defer file.Close()
+
+	result, err := h.fileSvc.Upload(c.Request.Context(), service.UploadParams{
+		UserID:   "guest",
+		IsGuest:  true,
+		Filename: header.Filename,
+		Reader:   file,
+		Size:     header.Size,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrFileTooLarge):
+			fail(c, http.StatusRequestEntityTooLarge, 41300, err.Error())
+		case errors.Is(err, service.ErrFileTypeDenied):
+			fail(c, http.StatusUnsupportedMediaType, 41500, err.Error())
+		default:
+			serverError(c, "upload failed")
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"message": "success",
+		"data": gin.H{
+			"key":         result.File.StorageKey,
+			"name":        result.File.OriginalName,
+			"origin_name": result.File.OriginalName,
+			"size":        result.File.SizeBytes,
+			"mimetype":    result.File.MimeType,
+			"extension":   fileExtension(result.File.OriginalName),
+			"md5":         result.File.HashMD5,
+			"links":       result.Links,
+		},
+	})
+}
+
 // List 获取当前用户的文件列表。
 func (h *FileHandler) List(c *gin.Context) {
 	userID := c.GetString(middleware.ContextKeyUserID)
