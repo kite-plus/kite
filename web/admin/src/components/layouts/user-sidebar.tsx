@@ -5,7 +5,7 @@ import {
   FolderOpen,
   KeyRound,
   LogOut,
-  User,
+  Shield,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -68,6 +68,21 @@ export function UserSidebar({ onClose }: UserSidebarProps) {
             {t(item.labelKey)}
           </NavLink>
         ))}
+
+        {/* Admin panel entry */}
+        {user?.role === "admin" && (
+          <>
+            <div className="my-2 border-t border-sidebar-border" />
+            <Link
+              to="/admin"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Shield size={18} />
+              {t("nav.adminPanel")}
+            </Link>
+          </>
+        )}
       </nav>
 
       {/* User */}
@@ -84,25 +99,13 @@ export function UserSidebar({ onClose }: UserSidebarProps) {
               {user?.role === "admin" ? t("nav.roleAdmin") : t("nav.roleUser")}
             </p>
           </div>
-          <div className="flex gap-1">
-            {user?.role === "admin" && (
-              <Link
-                to="/admin"
-                onClick={onClose}
-                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                title={t("nav.admin")}
-              >
-                <User size={14} />
-              </Link>
-            )}
-            <button
-              onClick={logout}
-              className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-              title={t("auth.logout")}
-            >
-              <LogOut size={14} />
-            </button>
-          </div>
+          <button
+            onClick={logout}
+            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            title={t("auth.logout")}
+          >
+            <LogOut size={14} />
+          </button>
         </div>
       </div>
     </aside>
