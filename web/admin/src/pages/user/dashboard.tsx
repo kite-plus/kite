@@ -55,18 +55,18 @@ export default function UserDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {statCards.map((card) => (
           <Card key={card.label}>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className={`flex size-10 items-center justify-center rounded-lg ${card.bg}`}>
-                <card.icon size={20} className={card.color} />
+            <CardContent className="flex items-center gap-3 p-4 sm:p-5">
+              <div className={`flex size-9 sm:size-10 items-center justify-center rounded-lg shrink-0 ${card.bg}`}>
+                <card.icon size={18} className={card.color} />
               </div>
-              <div>
+              <div className="min-w-0">
                 {statsLoading ? (
                   <Skeleton className="h-7 w-16" />
                 ) : (
-                  <p className="text-2xl font-semibold tracking-tight">
+                  <p className="text-xl sm:text-2xl font-semibold tracking-tight">
                     {typeof card.value === "number" ? card.value.toLocaleString() : card.value}
                   </p>
                 )}

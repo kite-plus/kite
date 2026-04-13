@@ -51,7 +51,7 @@ export default function TokensPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("tokens.title")}</h1>
           <p className="text-sm text-muted-foreground">
@@ -131,13 +131,13 @@ export default function TokensPage() {
             }) => (
               <div
                 key={token.id}
-                className="flex items-center justify-between rounded-lg border bg-card p-4"
+                className="flex items-center justify-between gap-3 rounded-lg border bg-card p-4"
               >
-                <div className="flex items-center gap-3">
-                  <Key className="size-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">{token.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Key className="size-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{token.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
                       {t("tokens.created")}{" "}
                       {new Date(token.created_at).toLocaleDateString()}
                       {token.last_used &&
@@ -148,6 +148,7 @@ export default function TokensPage() {
                 <Button
                   size="icon-sm"
                   variant="ghost"
+                  className="shrink-0"
                   onClick={() => deleteMutation.mutate(token.id)}
                 >
                   <Trash2 className="size-4 text-destructive" />
