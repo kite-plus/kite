@@ -146,6 +146,14 @@ const zh: Translations = {
     title: "存储配置",
     description: "管理存储后端",
     noStorage: "暂未配置存储",
+    addStorage: "添加存储",
+    editStorage: "编辑存储",
+    namePlaceholder: "例如 主存储",
+    driver: "驱动",
+    local: "本地存储",
+    rootPath: "根目录",
+    baseUrl: "访问 URL",
+    cdnDomain: "CDN 域名",
   },
 
   users: {

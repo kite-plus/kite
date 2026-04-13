@@ -144,6 +144,14 @@ const en = {
     title: "Storage",
     description: "Manage storage backends",
     noStorage: "No storage configured",
+    addStorage: "Add Storage",
+    editStorage: "Edit Storage",
+    namePlaceholder: "e.g. Main Storage",
+    driver: "Driver",
+    local: "Local",
+    rootPath: "Root Path",
+    baseUrl: "Base URL",
+    cdnDomain: "CDN Domain",
   },
 
   users: {
