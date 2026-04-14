@@ -173,7 +173,7 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden flex-1 items-center gap-0.5 md:flex">
+          <nav className="hidden flex-1 items-center gap-1 md:flex">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -181,10 +181,14 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
                 end={item.end}
                 className={({ isActive }) =>
                   cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200",
+                    "relative px-3 py-1.5 text-sm font-medium transition-colors duration-200",
                     isActive
-                      ? "bg-accent text-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                    "after:absolute after:inset-x-1 after:-bottom-[17px] after:h-0.5 after:rounded-full after:transition-all after:duration-200",
+                    isActive
+                      ? "after:bg-foreground"
+                      : "after:bg-transparent"
                   )
                 }
               >
