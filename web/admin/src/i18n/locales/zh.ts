@@ -217,6 +217,10 @@ const zh: Translations = {
     saved: "已保存",
     saveSettings: "保存设置",
   },
+
+  footer: {
+    description: "开源自部署媒体托管系统",
+  },
 };
 
 export default zh;

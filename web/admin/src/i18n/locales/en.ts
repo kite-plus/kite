@@ -215,6 +215,10 @@ const en = {
     saved: "Saved",
     saveSettings: "Save Settings",
   },
+
+  footer: {
+    description: "Open-source self-hosted media hosting",
+  },
 } as const;
 
 export default en;

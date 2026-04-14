@@ -84,7 +84,7 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex h-14 max-w-screen-xl items-center gap-4 px-4 sm:px-6">
@@ -265,11 +265,40 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
       </header>
 
       {/* ── Content ── */}
-      <main className="mx-auto max-w-screen-xl px-4 py-6 sm:px-6">
+      <main className="mx-auto max-w-screen-xl flex-1 px-4 py-6 sm:px-6">
         <div key={location.pathname} className="page-transition">
           <Outlet />
         </div>
       </main>
+
+      {/* ── Footer ── */}
+      <footer className="border-t">
+        <div className="mx-auto flex h-14 max-w-screen-xl items-center justify-between px-4 text-xs text-muted-foreground sm:px-6">
+          <div className="flex items-center gap-1.5">
+            <div className="flex size-4 items-center justify-center rounded bg-primary text-primary-foreground text-[8px] font-bold">
+              K
+            </div>
+            <span className="font-medium text-foreground/70">Kite</span>
+            <span className="mx-0.5 text-border">·</span>
+            <span className="hidden sm:inline">{t("footer.description")}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a
+              href="https://github.com/amigoer/kite"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+            >
+              <svg className="size-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+              </svg>
+              <span className="hidden sm:inline">GitHub</span>
+            </a>
+            <span className="text-border">·</span>
+            <span>&copy; 2026 Kite</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
