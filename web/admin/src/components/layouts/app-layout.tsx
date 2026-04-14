@@ -87,7 +87,7 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
     <div className="flex min-h-screen flex-col bg-background">
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex h-14 max-w-screen-xl items-center gap-4 px-4 sm:px-6">
+        <div className="flex h-14 items-center gap-4 px-4 sm:px-6 lg:px-8">
           {/* Mobile menu trigger */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
@@ -265,7 +265,7 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
       </header>
 
       {/* ── Content ── */}
-      <main className="mx-auto max-w-screen-xl flex-1 px-4 py-6 sm:px-6">
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
         <div key={location.pathname} className="page-transition">
           <Outlet />
         </div>
@@ -273,7 +273,7 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
 
       {/* ── Footer ── */}
       <footer className="border-t">
-        <div className="mx-auto flex h-14 max-w-screen-xl items-center justify-between px-4 text-xs text-muted-foreground sm:px-6">
+        <div className="flex h-14 items-center justify-between px-4 text-xs text-muted-foreground sm:px-6 lg:px-8">
           <div className="flex items-center gap-1.5">
             <div className="flex size-4 items-center justify-center rounded bg-primary text-primary-foreground text-[8px] font-bold">
               K
