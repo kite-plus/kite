@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet, NavLink, Link, Navigate, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, Link, Navigate, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Upload,
@@ -65,6 +65,7 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
   const { t } = useI18n();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navItems = context === "admin" ? adminNavItems : userNavItems;
@@ -181,9 +182,9 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
                 end={item.end}
                 className={({ isActive }) =>
                   cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200",
                     isActive
-                      ? "bg-accent text-foreground"
+                      ? "bg-accent text-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                   )
                 }
@@ -265,7 +266,9 @@ function AppLayout({ context }: { context: "user" | "admin" }) {
 
       {/* ── Content ── */}
       <main className="mx-auto max-w-screen-xl px-4 py-6 sm:px-6">
-        <Outlet />
+        <div key={location.pathname} className="page-transition">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

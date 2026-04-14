@@ -109,3 +109,44 @@
     margin: 0;
   }
 }
+
+/* Page transition animations */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.page-transition {
+  animation: page-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Subtle stagger for cards within transitioning pages */
+.page-transition [data-slot="card"] {
+  animation: page-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.page-transition [data-slot="card"]:nth-child(1) { animation-delay: 0.03s; }
+.page-transition [data-slot="card"]:nth-child(2) { animation-delay: 0.06s; }
+.page-transition [data-slot="card"]:nth-child(3) { animation-delay: 0.09s; }
+.page-transition [data-slot="card"]:nth-child(4) { animation-delay: 0.12s; }
+.page-transition [data-slot="card"]:nth-child(5) { animation-delay: 0.15s; }
+.page-transition [data-slot="card"]:nth-child(6) { animation-delay: 0.18s; }
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .page-transition,
+  .page-transition [data-slot="card"] {
+    animation: none;
+  }
+}
