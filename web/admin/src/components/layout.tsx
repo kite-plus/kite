@@ -3,6 +3,7 @@ import { FolderKanban, Images, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { PageTransition } from "@/components/page-transition";
 import { KiteLogo } from "@/components/kite-logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const features = [
   {
@@ -45,26 +46,30 @@ export function AuthLayout() {
   }
 
   return (
-    <div className="grid h-svh lg:grid-cols-2">
+    <div className="relative grid h-svh lg:grid-cols-2">
+      {/* Floating theme toggle — top-right */}
+      <ThemeToggle className="absolute top-4 right-4 z-20" />
+
       {/* Left: form */}
       <div className="flex items-center justify-center px-4 py-8 lg:p-8">
         <PageTransition />
       </div>
 
       {/* Right: hero — desktop only */}
-      <div className="relative hidden h-full flex-col overflow-hidden p-10 lg:flex">
+      <div className="relative hidden h-full flex-col overflow-hidden border-l p-10 lg:flex">
         {/* Layered gradient backdrop */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-sky-50 to-rose-50"
+          className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-sky-50 to-rose-50 dark:from-indigo-950/40 dark:via-slate-950 dark:to-rose-950/40"
         />
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(129,140,248,0.25),transparent_45%),radial-gradient(circle_at_80%_75%,rgba(251,113,133,0.18),transparent_50%),radial-gradient(circle_at_60%_40%,rgba(56,189,248,0.18),transparent_50%)]"
+          className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(129,140,248,0.28),transparent_45%),radial-gradient(circle_at_80%_75%,rgba(251,113,133,0.2),transparent_50%),radial-gradient(circle_at_60%_40%,rgba(56,189,248,0.2),transparent_50%)] dark:bg-[radial-gradient(circle_at_25%_20%,rgba(99,102,241,0.22),transparent_45%),radial-gradient(circle_at_80%_75%,rgba(244,63,94,0.18),transparent_50%),radial-gradient(circle_at_60%_40%,rgba(14,165,233,0.2),transparent_50%)]"
         />
-        {/* Giant watermark logo */}
-        <KiteLogo
-          className="pointer-events-none absolute -right-10 -bottom-10 size-[28rem] text-foreground/5 select-none"
+        {/* Dot grid texture */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 opacity-40 [background-image:radial-gradient(circle,rgba(15,23,42,0.08)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_85%)] dark:opacity-30 dark:[background-image:radial-gradient(circle,rgba(255,255,255,0.12)_1px,transparent_1px)]"
         />
 
         {/* Brand */}

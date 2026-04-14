@@ -55,7 +55,7 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-sm flex-col justify-center space-y-2">
+      <div className="mx-auto flex w-full max-w-sm flex-col justify-center">
         <div className="flex flex-col space-y-2 text-start">
           <h2 className="text-2xl font-semibold tracking-tight">创建账号</h2>
           <p className="text-sm text-muted-foreground">
@@ -134,18 +134,18 @@ export default function RegisterPage() {
           </Link>
         </p>
 
-        <p className="px-8 text-center text-sm text-muted-foreground">
+        <p className="mt-4 text-center text-xs text-muted-foreground">
           点击注册即表示您同意我们的{" "}
           <a
             href="#"
-            className="underline underline-offset-4 hover:text-primary"
+            className="underline underline-offset-4 hover:text-foreground"
           >
             服务条款
           </a>{" "}
           和{" "}
           <a
             href="#"
-            className="underline underline-offset-4 hover:text-primary"
+            className="underline underline-offset-4 hover:text-foreground"
           >
             隐私政策
           </a>

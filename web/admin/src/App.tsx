@@ -84,7 +84,18 @@ export default function App() {
           <BrowserRouter>
             <AppRoutes />
           </BrowserRouter>
-          <Toaster richColors closeButton position="top-center" />
+          <Toaster
+            richColors
+            closeButton
+            position="top-center"
+            offset={16}
+            toastOptions={{
+              classNames: {
+                toast:
+                  "rounded-lg border shadow-lg backdrop-blur-md bg-background/95",
+              },
+            }}
+          />
         </QueryClientProvider>
       </I18nContext.Provider>
     </ThemeProvider>
