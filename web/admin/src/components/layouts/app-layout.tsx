@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useLocation } from "react-router-dom";
 import { PageTransition } from "@/components/page-transition";
 import { Menu } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -18,6 +18,7 @@ import {
 export default function AppLayout() {
   const { user, loading } = useAuth();
   const { t } = useI18n();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   if (loading) {
@@ -28,7 +29,15 @@ export default function AppLayout() {
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname + location.search }}
+      />
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background relative">

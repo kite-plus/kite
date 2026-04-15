@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { toast } from "sonner";
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,9 +24,15 @@ export default function LoginPage() {
     try {
       await Promise.all([login(username, password), minDelay]);
       toast.success("登录成功啦！");
-    } catch {
+      const redirectTo =
+        (location.state as { from?: string } | null)?.from ?? "/dashboard";
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
       await minDelay;
-      toast.error("账号或密码错误，请重试");
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "账号或密码错误，请重试";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
