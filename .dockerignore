@@ -1,0 +1,53 @@
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Build outputs
+build/
+kite
+web/admin/dist/
+web/admin/node_modules/
+
+# Local data
+data/
+logs/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Go
+vendor/
+*.test
+*.out
+coverage.out
+
+# Env
+.env
+.env.*
+
+# Docker (avoid recursive COPY pulls)
+Dockerfile
+.dockerignore
+
+# Local agent tooling
+.claude/
+.agents/
