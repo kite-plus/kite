@@ -29,13 +29,16 @@
         }
     </style>
 </head>
-<body hx-boost="true" class="font-sans antialiased bg-[#fafafa] text-gray-900 min-h-screen flex flex-col selection:bg-gray-200">
+<body hx-boost="true" class="font-sans antialiased bg-[#fafafa] text-gray-900 min-h-[100dvh] flex flex-col selection:bg-gray-200">
+    <!-- 全局背景网格与高光 (固定在底部) -->
+    <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div class="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] bg-grid"></div>
+        <div class="hero-glow z-0"></div>
+    </div>
+
     {{template "header"}}
 
-    <main class="flex-1 flex flex-col relative overflow-hidden">
-        <!-- Grid Background -->
-        <div class="absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] bg-grid"></div>
-        <div class="hero-glow z-0"></div>
+    <main class="flex-1 flex flex-col relative z-10 w-full">
         
         <div class="max-w-4xl mx-auto px-6 py-2 sm:py-24 text-center relative z-10 w-full flex-1 flex flex-col justify-center">
 
