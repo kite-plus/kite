@@ -65,6 +65,11 @@ func main() {
 	settingRepo := repo.NewSettingRepo(db)
 	loadRuntimeConfig(settingRepo, &cfg)
 
+	// 确保 JWT 密钥存在（首次启动自动生成并持久化）
+	if err := ensureJWTSecret(settingRepo, &cfg); err != nil {
+		log.Fatalf("failed to ensure jwt secret: %v", err)
+	}
+
 	// 初始化存储管理器
 	storageMgr := storage.NewManager()
 	loadStorageConfigs(db, storageMgr)
@@ -166,6 +171,25 @@ func loadRuntimeConfig(settingRepo *repo.SettingRepo, cfg *config.Config) {
 	if _, ok := settings["allow_registration"]; ok {
 		cfg.Auth.AllowRegistration = settings["allow_registration"] == "true"
 	}
+}
+
+// ensureJWTSecret 保证 JWT 签名密钥存在。
+// 若 settings 表中未配置，则生成 32 字节随机密钥并持久化，避免空密钥导致 token 可伪造。
+func ensureJWTSecret(settingRepo *repo.SettingRepo, cfg *config.Config) error {
+	if cfg.Auth.JWTSecret != "" {
+		return nil
+	}
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Errorf("generate jwt secret: %w", err)
+	}
+	secret := hex.EncodeToString(b)
+	if err := settingRepo.Set(context.Background(), "jwt_secret", secret); err != nil {
+		return fmt.Errorf("persist jwt secret: %w", err)
+	}
+	cfg.Auth.JWTSecret = secret
+	log.Println("generated new JWT secret and saved to settings")
+	return nil
 }
 
 // seedDefaultAdmin 首次启动时自动创建默认管理员账号。

@@ -74,7 +74,8 @@ func AdminOnly() gin.HandlerFunc {
 }
 
 // extractToken 从请求中提取 token。
-// 优先从 Authorization header 提取，其次从 cookie 提取。
+// 仅支持 Authorization header 和 cookie。
+// 不支持 query 参数，避免 token 泄露到浏览器历史、访问日志、Referer 头。
 func extractToken(c *gin.Context) string {
 	// Authorization: Bearer <token>
 	auth := c.GetHeader("Authorization")
@@ -85,11 +86,6 @@ func extractToken(c *gin.Context) string {
 	// Cookie
 	if cookie, err := c.Cookie("access_token"); err == nil && cookie != "" {
 		return cookie
-	}
-
-	// Query parameter（兼容某些场景）
-	if token := c.Query("token"); token != "" {
-		return token
 	}
 
 	return ""

@@ -288,25 +288,12 @@ func (h *FileHandler) ServeDownload(c *gin.Context) {
 func (h *FileHandler) ServeThumbnail(c *gin.Context) {
 	hash := c.Param("hash")
 
-	files, _, err := h.fileRepo.List(c.Request.Context(), repo.FileListParams{
-		Page:     1,
-		PageSize: 1,
-	})
-	if err != nil || len(files) == 0 {
+	file, err := h.fileRepo.GetByHashPrefix(c.Request.Context(), hash)
+	if err != nil {
 		notFound(c, "file not found")
 		return
 	}
-
-	// 查找匹配 hash 前缀的文件
-	var file *model.File
-	for i := range files {
-		if len(files[i].HashMD5) >= len(hash) && files[i].HashMD5[:len(hash)] == hash {
-			file = &files[i]
-			break
-		}
-	}
-
-	if file == nil || file.ThumbURL == nil {
+	if file.ThumbURL == nil {
 		notFound(c, "thumbnail not found")
 		return
 	}
@@ -359,22 +346,7 @@ func (h *FileHandler) serveFile(c *gin.Context, expectedType string, forceDownlo
 }
 
 func (h *FileHandler) findFileByHash(c *gin.Context, hash string) (*model.File, error) {
-	// 使用 hash 前缀匹配文件
-	files, _, err := h.fileRepo.List(c.Request.Context(), repo.FileListParams{
-		Page:     1,
-		PageSize: 100,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range files {
-		if len(files[i].HashMD5) >= len(hash) && files[i].HashMD5[:len(hash)] == hash {
-			return &files[i], nil
-		}
-	}
-
-	return nil, fmt.Errorf("file not found")
+	return h.fileRepo.GetByHashPrefix(c.Request.Context(), hash)
 }
 
 func fileExtension(name string) string {

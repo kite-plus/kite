@@ -41,10 +41,31 @@ func NewLocalDriver(cfg LocalConfig) (*LocalDriver, error) {
 	}, nil
 }
 
+// resolveKey 将外部 key 解析为位于 basePath 之内的绝对路径。
+// 拒绝包含 ".." 等导致路径穿越的输入。
+func (d *LocalDriver) resolveKey(key string) (string, error) {
+	if key == "" {
+		return "", fmt.Errorf("local driver: empty key")
+	}
+	clean := filepath.Clean(filepath.FromSlash(key))
+	if filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
+		return "", fmt.Errorf("local driver: invalid key %q", key)
+	}
+	fullPath := filepath.Join(d.basePath, clean)
+	rel, err := filepath.Rel(d.basePath, fullPath)
+	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
+		return "", fmt.Errorf("local driver: path traversal detected in key %q", key)
+	}
+	return fullPath, nil
+}
+
 // Put 将文件写入本地磁盘。
 // 自动创建 key 路径中的中间目录。
 func (d *LocalDriver) Put(_ context.Context, key string, reader io.Reader, _ int64, _ string) error {
-	fullPath := filepath.Join(d.basePath, filepath.FromSlash(key))
+	fullPath, err := d.resolveKey(key)
+	if err != nil {
+		return err
+	}
 
 	// 创建父目录
 	dir := filepath.Dir(fullPath)
@@ -82,7 +103,10 @@ func (d *LocalDriver) Put(_ context.Context, key string, reader io.Reader, _ int
 // Get 从本地磁盘读取文件。
 // 返回的 ReadCloser 由调用方负责关闭。
 func (d *LocalDriver) Get(_ context.Context, key string) (io.ReadCloser, int64, error) {
-	fullPath := filepath.Join(d.basePath, filepath.FromSlash(key))
+	fullPath, err := d.resolveKey(key)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	file, err := os.Open(fullPath)
 	if err != nil {
@@ -101,10 +125,12 @@ func (d *LocalDriver) Get(_ context.Context, key string) (io.ReadCloser, int64, 
 // Delete 从本地磁盘删除文件。
 // 文件不存在时返回 nil（幂等删除）。
 func (d *LocalDriver) Delete(_ context.Context, key string) error {
-	fullPath := filepath.Join(d.basePath, filepath.FromSlash(key))
+	fullPath, err := d.resolveKey(key)
+	if err != nil {
+		return err
+	}
 
-	err := os.Remove(fullPath)
-	if err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("local delete %q: %w", key, err)
 	}
 	return nil
@@ -112,9 +138,12 @@ func (d *LocalDriver) Delete(_ context.Context, key string) error {
 
 // Exists 检查本地磁盘上文件是否存在。
 func (d *LocalDriver) Exists(_ context.Context, key string) (bool, error) {
-	fullPath := filepath.Join(d.basePath, filepath.FromSlash(key))
+	fullPath, err := d.resolveKey(key)
+	if err != nil {
+		return false, err
+	}
 
-	_, err := os.Stat(fullPath)
+	_, err = os.Stat(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil

@@ -3,10 +3,38 @@ package repo
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/amigoer/kite/internal/model"
 	"gorm.io/gorm"
 )
+
+// allowedOrderByFields 文件列表允许的排序字段白名单，防止 SQL 注入。
+var allowedOrderByFields = map[string]bool{
+	"created_at":    true,
+	"updated_at":    true,
+	"size_bytes":    true,
+	"original_name": true,
+	"file_type":     true,
+}
+
+func sanitizeOrderBy(v string) string {
+	if allowedOrderByFields[v] {
+		return v
+	}
+	return "created_at"
+}
+
+func sanitizeOrder(v string) string {
+	switch strings.ToUpper(v) {
+	case "ASC":
+		return "ASC"
+	case "DESC":
+		return "DESC"
+	default:
+		return "DESC"
+	}
+}
 
 // FileRepo 文件数据访问层。
 type FileRepo struct {
@@ -47,6 +75,26 @@ func (r *FileRepo) GetByHashMD5(ctx context.Context, userID, hashMD5 string) (*m
 	return &file, nil
 }
 
+// minHashPrefixLen 短链 hash 前缀的最小长度。
+// 8 hex 字符 = 32 bit，足够避免枚举攻击，同时与 path_pattern 中的 {md5_8} 对齐。
+const minHashPrefixLen = 8
+
+// GetByHashPrefix 通过 MD5 哈希前缀查询文件，用于短链访问。
+// 要求前缀至少 minHashPrefixLen 个字符，且结果按 id 排序保证确定性。
+func (r *FileRepo) GetByHashPrefix(ctx context.Context, prefix string) (*model.File, error) {
+	if len(prefix) < minHashPrefixLen {
+		return nil, fmt.Errorf("hash prefix too short")
+	}
+	var file model.File
+	if err := r.db.WithContext(ctx).
+		Where("hash_md5 LIKE ? AND is_deleted = ?", prefix+"%", false).
+		Order("id ASC").
+		First(&file).Error; err != nil {
+		return nil, fmt.Errorf("get file by hash prefix: %w", err)
+	}
+	return &file, nil
+}
+
 // FileListParams 文件列表查询参数。
 type FileListParams struct {
 	UserID   string
@@ -83,14 +131,8 @@ func (r *FileRepo) List(ctx context.Context, params FileListParams) ([]model.Fil
 		return nil, 0, fmt.Errorf("count files: %w", err)
 	}
 
-	orderBy := "created_at"
-	if params.OrderBy != "" {
-		orderBy = params.OrderBy
-	}
-	order := "DESC"
-	if params.Order != "" {
-		order = params.Order
-	}
+	orderBy := sanitizeOrderBy(params.OrderBy)
+	order := sanitizeOrder(params.Order)
 
 	offset := (params.Page - 1) * params.PageSize
 	if err := db.Order(orderBy + " " + order).
@@ -174,12 +216,12 @@ func (r *FileRepo) UpdateAlbumID(ctx context.Context, fileID string, albumID *st
 
 // Stats 全站文件统计。
 type FileStats struct {
-	TotalFiles  int64 `json:"total_files"`
-	TotalSize   int64 `json:"total_size"`
-	ImageCount  int64 `json:"image_count"`
-	VideoCount  int64 `json:"video_count"`
-	AudioCount  int64 `json:"audio_count"`
-	OtherCount  int64 `json:"other_count"`
+	TotalFiles int64 `json:"total_files"`
+	TotalSize  int64 `json:"total_size"`
+	ImageCount int64 `json:"image_count"`
+	VideoCount int64 `json:"video_count"`
+	AudioCount int64 `json:"audio_count"`
+	OtherCount int64 `json:"other_count"`
 }
 
 // GetStats 获取全站文件统计数据。
