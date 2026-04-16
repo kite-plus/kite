@@ -153,6 +153,192 @@
                         }).catch(function () { ld.classList.add('hidden'); em.classList.remove('hidden'); });
                     }
 
+                    /* ── 文件图标：根据扩展名 / MIME 精确匹配 ── */
+                    var _extMap = {
+                        /* 文档 */
+                        'pdf': 'bg-red-50 text-red-600', 'doc': 'bg-blue-50 text-blue-700', 'docx': 'bg-blue-50 text-blue-700',
+                        'odt': 'bg-blue-50 text-blue-600', 'rtf': 'bg-blue-50 text-blue-500', 'pages': 'bg-blue-50 text-blue-600',
+                        'xls': 'bg-green-50 text-green-700', 'xlsx': 'bg-green-50 text-green-700', 'ods': 'bg-green-50 text-green-600',
+                        'numbers': 'bg-green-50 text-green-600',
+                        'ppt': 'bg-orange-50 text-orange-600', 'pptx': 'bg-orange-50 text-orange-600',
+                        'odp': 'bg-orange-50 text-orange-500', 'key': 'bg-orange-50 text-orange-600',
+                        'csv': 'bg-green-50 text-green-600',
+                        /* 纯文本 & 配置 */
+                        'txt': 'bg-gray-100 text-gray-600', 'log': 'bg-gray-100 text-gray-500',
+                        'ini': 'bg-slate-100 text-slate-600', 'cfg': 'bg-slate-100 text-slate-600',
+                        'conf': 'bg-slate-100 text-slate-600', 'env': 'bg-slate-100 text-slate-700',
+                        'properties': 'bg-slate-100 text-slate-600',
+                        /* 标记 & 数据 */
+                        'md': 'bg-gray-100 text-gray-700', 'mdx': 'bg-gray-100 text-gray-700',
+                        'yaml': 'bg-purple-50 text-purple-600', 'yml': 'bg-purple-50 text-purple-600',
+                        'json': 'bg-amber-50 text-amber-700', 'jsonc': 'bg-amber-50 text-amber-700',
+                        'json5': 'bg-amber-50 text-amber-600',
+                        'xml': 'bg-orange-50 text-orange-600', 'xsl': 'bg-orange-50 text-orange-500',
+                        'toml': 'bg-violet-50 text-violet-600', 'svg': 'bg-pink-50 text-pink-600',
+                        'graphql': 'bg-pink-50 text-pink-700', 'gql': 'bg-pink-50 text-pink-700',
+                        'proto': 'bg-blue-50 text-blue-600',
+                        /* Web 前端 */
+                        'html': 'bg-orange-50 text-orange-700', 'htm': 'bg-orange-50 text-orange-700',
+                        'css': 'bg-sky-50 text-sky-600', 'scss': 'bg-pink-50 text-pink-600',
+                        'sass': 'bg-pink-50 text-pink-600', 'less': 'bg-indigo-50 text-indigo-500',
+                        'styl': 'bg-green-50 text-green-600',
+                        /* JavaScript 系 */
+                        'js': 'bg-yellow-50 text-yellow-700', 'jsx': 'bg-yellow-50 text-yellow-700',
+                        'mjs': 'bg-yellow-50 text-yellow-600', 'cjs': 'bg-yellow-50 text-yellow-600',
+                        'ts': 'bg-blue-50 text-blue-600', 'tsx': 'bg-blue-50 text-blue-600',
+                        'mts': 'bg-blue-50 text-blue-500', 'cts': 'bg-blue-50 text-blue-500',
+                        'vue': 'bg-emerald-50 text-emerald-600', 'svelte': 'bg-orange-50 text-orange-600',
+                        /* 后端语言 */
+                        'py': 'bg-blue-50 text-blue-600', 'pyw': 'bg-blue-50 text-blue-500',
+                        'go': 'bg-cyan-50 text-cyan-700',
+                        'rs': 'bg-orange-50 text-orange-700',
+                        'java': 'bg-red-50 text-red-600', 'kt': 'bg-purple-50 text-purple-600',
+                        'kts': 'bg-purple-50 text-purple-500', 'scala': 'bg-red-50 text-red-500',
+                        'c': 'bg-blue-50 text-blue-700', 'cpp': 'bg-blue-50 text-blue-700',
+                        'cc': 'bg-blue-50 text-blue-700', 'cxx': 'bg-blue-50 text-blue-700',
+                        'h': 'bg-blue-50 text-blue-600', 'hpp': 'bg-blue-50 text-blue-600',
+                        'cs': 'bg-purple-50 text-purple-700', 'fs': 'bg-blue-50 text-blue-600',
+                        'rb': 'bg-red-50 text-red-500', 'php': 'bg-violet-50 text-violet-600',
+                        'swift': 'bg-orange-50 text-orange-600', 'm': 'bg-orange-50 text-orange-500',
+                        'dart': 'bg-cyan-50 text-cyan-600',
+                        'lua': 'bg-blue-50 text-blue-700', 'r': 'bg-blue-50 text-blue-600',
+                        'pl': 'bg-blue-50 text-blue-500', 'pm': 'bg-blue-50 text-blue-500',
+                        'ex': 'bg-purple-50 text-purple-600', 'exs': 'bg-purple-50 text-purple-500',
+                        'erl': 'bg-red-50 text-red-500', 'hrl': 'bg-red-50 text-red-400',
+                        'zig': 'bg-amber-50 text-amber-600', 'nim': 'bg-yellow-50 text-yellow-700',
+                        'v': 'bg-blue-50 text-blue-600', 'clj': 'bg-green-50 text-green-700',
+                        'cljs': 'bg-green-50 text-green-600',
+                        'hs': 'bg-purple-50 text-purple-700', 'ml': 'bg-orange-50 text-orange-600',
+                        'lisp': 'bg-gray-100 text-gray-700', 'el': 'bg-purple-50 text-purple-600',
+                        'wasm': 'bg-violet-50 text-violet-700',
+                        /* Shell & 脚本 */
+                        'sh': 'bg-emerald-50 text-emerald-700', 'bash': 'bg-emerald-50 text-emerald-700',
+                        'zsh': 'bg-emerald-50 text-emerald-700', 'fish': 'bg-emerald-50 text-emerald-600',
+                        'ps1': 'bg-blue-50 text-blue-600', 'bat': 'bg-gray-100 text-gray-700',
+                        'cmd': 'bg-gray-100 text-gray-700',
+                        /* 数据库 & SQL */
+                        'sql': 'bg-blue-50 text-blue-600', 'db': 'bg-blue-50 text-blue-700',
+                        'sqlite': 'bg-blue-50 text-blue-700', 'sqlite3': 'bg-blue-50 text-blue-700',
+                        /* 压缩包 */
+                        'zip': 'bg-amber-50 text-amber-600', 'rar': 'bg-amber-50 text-amber-600',
+                        '7z': 'bg-amber-50 text-amber-600', 'tar': 'bg-amber-50 text-amber-700',
+                        'gz': 'bg-amber-50 text-amber-700', 'tgz': 'bg-amber-50 text-amber-700',
+                        'bz2': 'bg-amber-50 text-amber-700', 'xz': 'bg-amber-50 text-amber-700',
+                        'lz': 'bg-amber-50 text-amber-600', 'zst': 'bg-amber-50 text-amber-600',
+                        'lzma': 'bg-amber-50 text-amber-600',
+                        /* 字体 */
+                        'ttf': 'bg-fuchsia-50 text-fuchsia-600', 'otf': 'bg-fuchsia-50 text-fuchsia-600',
+                        'woff': 'bg-fuchsia-50 text-fuchsia-500', 'woff2': 'bg-fuchsia-50 text-fuchsia-500',
+                        'eot': 'bg-fuchsia-50 text-fuchsia-500',
+                        /* 可执行 / 安装包 */
+                        'exe': 'bg-slate-100 text-slate-700', 'msi': 'bg-slate-100 text-slate-700',
+                        'dmg': 'bg-slate-100 text-slate-700', 'app': 'bg-slate-100 text-slate-600',
+                        'deb': 'bg-red-50 text-red-500', 'rpm': 'bg-red-50 text-red-500',
+                        'apk': 'bg-green-50 text-green-600', 'ipa': 'bg-blue-50 text-blue-600',
+                        'pkg': 'bg-slate-100 text-slate-600', 'snap': 'bg-orange-50 text-orange-600',
+                        'jar': 'bg-red-50 text-red-500', 'war': 'bg-red-50 text-red-500',
+                        /* 设计 */
+                        'psd': 'bg-blue-50 text-blue-700', 'ai': 'bg-orange-50 text-orange-700',
+                        'sketch': 'bg-amber-50 text-amber-600', 'fig': 'bg-purple-50 text-purple-600',
+                        'xd': 'bg-pink-50 text-pink-600',
+                        /* 电子书 */
+                        'epub': 'bg-teal-50 text-teal-600', 'mobi': 'bg-teal-50 text-teal-600',
+                        'azw': 'bg-teal-50 text-teal-700', 'azw3': 'bg-teal-50 text-teal-700',
+                        /* Docker / DevOps */
+                        'dockerfile': 'bg-blue-50 text-blue-600',
+                        'makefile': 'bg-gray-100 text-gray-700',
+                        'gradle': 'bg-green-50 text-green-700',
+                        'lock': 'bg-gray-100 text-gray-500',
+                        /* 证书 & 密钥 */
+                        'pem': 'bg-green-50 text-green-700', 'crt': 'bg-green-50 text-green-700',
+                        'cer': 'bg-green-50 text-green-600', 'key': 'bg-yellow-50 text-yellow-700',
+                        'pub': 'bg-green-50 text-green-600', 'p12': 'bg-green-50 text-green-600',
+                        'pfx': 'bg-green-50 text-green-600',
+                        /* 虚拟机 & 磁盘 */
+                        'iso': 'bg-slate-100 text-slate-700', 'img': 'bg-slate-100 text-slate-600',
+                        'vmdk': 'bg-slate-100 text-slate-600', 'vdi': 'bg-slate-100 text-slate-600',
+                        'qcow2': 'bg-slate-100 text-slate-600'
+                    };
+                    /* MIME → 扩展名映射 (当文件名没有扩展名时回退) */
+                    var _mimeExt = {
+                        'application/pdf': 'pdf', 'application/msword': 'doc',
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+                        'application/vnd.ms-excel': 'xls',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+                        'application/vnd.ms-powerpoint': 'ppt',
+                        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+                        'text/csv': 'csv', 'text/markdown': 'md', 'text/html': 'html', 'text/css': 'css',
+                        'text/xml': 'xml', 'application/xml': 'xml',
+                        'application/json': 'json', 'text/yaml': 'yaml', 'application/x-yaml': 'yaml',
+                        'application/javascript': 'js', 'text/javascript': 'js',
+                        'application/typescript': 'ts',
+                        'application/x-sh': 'sh', 'application/x-python-code': 'py',
+                        'application/sql': 'sql',
+                        'application/zip': 'zip', 'application/x-rar-compressed': 'rar',
+                        'application/gzip': 'gz', 'application/x-7z-compressed': '7z',
+                        'application/x-tar': 'tar', 'application/x-bzip2': 'bz2',
+                        'application/epub+zip': 'epub',
+                        'font/ttf': 'ttf', 'font/otf': 'otf', 'font/woff': 'woff', 'font/woff2': 'woff2',
+                        'application/java-archive': 'jar'
+                    };
+                    /* 生成文档形状 + 扩展名标签的 SVG */
+                    function _docSvg(label) {
+                        var fs = label.length <= 2 ? 7 : label.length <= 3 ? 6 : label.length <= 4 ? 5 : 4;
+                        return '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none">'
+                            + '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.5"/>'
+                            + '<path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5"/>'
+                            + '<text x="12" y="17.5" text-anchor="middle" fill="currentColor" font-size="' + fs + '" font-weight="700" style="font-family:ui-monospace,monospace">' + label + '</text></svg>';
+                    }
+                    /* 特殊类型的 SVG 图标 */
+                    var _archiveSvg = '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="5" rx="1.5"/><path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8"/><path d="M10 13h4v3h-4z"/></svg>';
+                    var _videoSvg = '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
+                    var _audioSvg = '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>';
+                    var _fontSvg = '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>';
+                    var _dbSvg = '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>';
+                    var _chipSvg = '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>';
+                    var _archiveExts = ['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'bz2', 'xz', 'lz', 'zst', 'lzma'];
+                    var _fontExts = ['ttf', 'otf', 'woff', 'woff2', 'eot'];
+                    var _dbExts = ['db', 'sqlite', 'sqlite3'];
+                    var _execExts = ['exe', 'msi', 'dmg', 'app', 'deb', 'rpm', 'apk', 'ipa', 'pkg', 'snap', 'jar', 'war'];
+
+                    function getFileIcon(file) {
+                        if (file.file_type === 'video') return { icon: _videoSvg, cls: 'bg-violet-50 text-violet-600' };
+                        if (file.file_type === 'audio') return { icon: _audioSvg, cls: 'bg-blue-50 text-blue-600' };
+                        var nm = (file.original_name || '').toLowerCase();
+                        var mt = (file.mime_type || '').toLowerCase();
+                        var ext = nm.lastIndexOf('.') > 0 ? nm.substring(nm.lastIndexOf('.') + 1) : '';
+                        /* 没有扩展名时尝试从 MIME 推断 */
+                        if (!ext && _mimeExt[mt]) ext = _mimeExt[mt];
+                        var cls = _extMap[ext] || 'bg-gray-100 text-gray-500';
+                        /* 如果扩展名映射也没命中，再用 MIME 模糊匹配 */
+                        if (!_extMap[ext]) {
+                            if (/pdf/.test(mt)) { ext = 'pdf'; cls = _extMap['pdf']; }
+                            else if (/wordprocessingml|msword|opendocument\.text/.test(mt)) { ext = 'docx'; cls = _extMap['docx']; }
+                            else if (/spreadsheet|excel/.test(mt)) { ext = 'xlsx'; cls = _extMap['xlsx']; }
+                            else if (/presentation|powerpoint/.test(mt)) { ext = 'pptx'; cls = _extMap['pptx']; }
+                            else if (/zip|rar|7z|tar|gzip|compress|bzip/.test(mt)) { ext = 'zip'; cls = _extMap['zip']; }
+                            else if (/font/.test(mt)) { ext = 'ttf'; cls = _extMap['ttf']; }
+                            else if (/json/.test(mt)) { ext = 'json'; cls = _extMap['json']; }
+                            else if (/xml/.test(mt)) { ext = 'xml'; cls = _extMap['xml']; }
+                            else if (/yaml/.test(mt)) { ext = 'yaml'; cls = _extMap['yaml']; }
+                            else if (/html/.test(mt)) { ext = 'html'; cls = _extMap['html']; }
+                            else if (/css/.test(mt)) { ext = 'css'; cls = _extMap['css']; }
+                            else if (/javascript/.test(mt)) { ext = 'js'; cls = _extMap['js']; }
+                            else if (/python/.test(mt)) { ext = 'py'; cls = _extMap['py']; }
+                            else if (/octet-stream|executable/.test(mt)) { ext = 'exe'; cls = _extMap['exe']; }
+                            else if (mt.startsWith('text/')) { ext = 'txt'; cls = _extMap['txt']; }
+                        }
+                        /* 根据类别选择不同的基础图标形状 */
+                        var label = ext ? ext.toUpperCase() : 'FILE';
+                        if (label.length > 5) label = label.substring(0, 4);
+                        if (_archiveExts.indexOf(ext) >= 0) return { icon: _archiveSvg, cls: cls };
+                        if (_fontExts.indexOf(ext) >= 0) return { icon: _fontSvg, cls: cls };
+                        if (_dbExts.indexOf(ext) >= 0) return { icon: _dbSvg, cls: cls };
+                        if (_execExts.indexOf(ext) >= 0) return { icon: _chipSvg, cls: cls };
+                        if (ext === 'sql') return { icon: _dbSvg, cls: cls };
+                        return { icon: _docSvg(label), cls: cls };
+                    }
+
                     function createCard(file) {
                         var div = document.createElement('div'); div.className = 'masonry-item';
                         if (file.file_type === 'image') {
@@ -164,15 +350,12 @@
                                 + '<button onclick="event.stopPropagation();openDetail(\'' + file.id + '\')" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 hover:bg-black/60 text-white rounded-lg p-1.5" title="详情">'
                                 + '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button></div>';
                         } else {
-                            var ic = file.file_type === 'video' ? '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>'
-                                : file.file_type === 'audio' ? '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>'
-                                    : '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>';
-                            var cl = file.file_type === 'video' ? 'bg-violet-50 text-violet-600' : file.file_type === 'audio' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-600';
-                            div.innerHTML = '<div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onclick="openDetail(\'' + file.id + '\')">'
+                            var fi = getFileIcon(file);
+                            div.innerHTML = '<div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden" onclick="openDetail(\'' + file.id + '\')">'
                                 + '<div class="flex items-center gap-3">'
-                                + '<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ' + cl + '">' + ic + '</div>'
+                                + '<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ' + fi.cls + '">' + fi.icon + '</div>'
                                 + '<div class="min-w-0 flex-1"><p class="text-sm font-medium text-gray-900 truncate">' + esc(file.original_name) + '</p>'
-                                + '<p class="text-xs text-gray-400 mt-0.5">' + fmtSize(file.size_bytes) + ' · ' + file.mime_type + '</p></div>'
+                                + '<p class="text-xs text-gray-400 mt-0.5 truncate">' + fmtSize(file.size_bytes) + ' · ' + fmtType(file) + '</p></div>'
                                 + '<a href="' + esc(file.url) + '" target="_blank" onclick="event.stopPropagation()" class="shrink-0 text-gray-300 hover:text-gray-600 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>'
                                 + '</div></div>';
                         }
@@ -180,6 +363,44 @@
                     }
 
                     function fmtSize(b) { if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' GB'; if (b >= 1048576) return (b / 1048576).toFixed(2) + ' MB'; if (b >= 1024) return (b / 1024).toFixed(1) + ' KB'; return b + ' B'; }
+                    var _typeNames = {
+                        'pdf': 'PDF 文档', 'doc': 'Word 文档', 'docx': 'Word 文档', 'odt': 'ODT 文档', 'rtf': 'RTF 文档', 'pages': 'Pages 文档',
+                        'xls': 'Excel 表格', 'xlsx': 'Excel 表格', 'ods': 'ODS 表格', 'numbers': 'Numbers 表格', 'csv': 'CSV 表格',
+                        'ppt': 'PPT 演示', 'pptx': 'PPT 演示', 'odp': 'ODP 演示', 'key': 'Keynote 演示',
+                        'txt': '纯文本', 'log': '日志文件', 'ini': 'INI 配置', 'cfg': '配置文件', 'conf': '配置文件', 'env': '环境变量', 'properties': '属性文件',
+                        'md': 'Markdown', 'mdx': 'MDX', 'yaml': 'YAML', 'yml': 'YAML', 'json': 'JSON', 'jsonc': 'JSONC', 'json5': 'JSON5',
+                        'xml': 'XML', 'xsl': 'XSL', 'toml': 'TOML', 'svg': 'SVG', 'graphql': 'GraphQL', 'proto': 'Protobuf',
+                        'html': 'HTML', 'htm': 'HTML', 'css': 'CSS', 'scss': 'SCSS', 'sass': 'Sass', 'less': 'Less',
+                        'js': 'JavaScript', 'jsx': 'JSX', 'mjs': 'JavaScript', 'ts': 'TypeScript', 'tsx': 'TSX',
+                        'vue': 'Vue', 'svelte': 'Svelte',
+                        'py': 'Python', 'go': 'Go', 'rs': 'Rust', 'java': 'Java', 'kt': 'Kotlin', 'scala': 'Scala',
+                        'c': 'C', 'cpp': 'C++', 'cc': 'C++', 'h': 'C 头文件', 'hpp': 'C++ 头文件', 'cs': 'C#',
+                        'rb': 'Ruby', 'php': 'PHP', 'swift': 'Swift', 'dart': 'Dart', 'lua': 'Lua', 'r': 'R',
+                        'sh': 'Shell', 'bash': 'Bash', 'zsh': 'Zsh', 'fish': 'Fish', 'ps1': 'PowerShell', 'bat': '批处理', 'cmd': '批处理',
+                        'sql': 'SQL', 'db': '数据库', 'sqlite': 'SQLite', 'sqlite3': 'SQLite',
+                        'zip': 'ZIP 压缩包', 'rar': 'RAR 压缩包', '7z': '7z 压缩包', 'tar': 'TAR 归档', 'gz': 'GZ 压缩包', 'tgz': 'TGZ 压缩包', 'bz2': 'BZ2 压缩包', 'xz': 'XZ 压缩包',
+                        'ttf': 'TrueType 字体', 'otf': 'OpenType 字体', 'woff': 'WOFF 字体', 'woff2': 'WOFF2 字体',
+                        'exe': '可执行文件', 'msi': '安装包', 'dmg': 'DMG 镜像', 'app': '应用程序', 'deb': 'DEB 安装包', 'rpm': 'RPM 安装包', 'apk': 'APK 安装包', 'ipa': 'IPA 安装包',
+                        'jar': 'JAR 包', 'war': 'WAR 包',
+                        'psd': 'Photoshop', 'ai': 'Illustrator', 'sketch': 'Sketch', 'fig': 'Figma', 'xd': 'Adobe XD',
+                        'epub': 'EPUB 电子书', 'mobi': 'Mobi 电子书', 'azw': 'Kindle 电子书', 'azw3': 'Kindle 电子书',
+                        'iso': 'ISO 镜像', 'img': '磁盘映像', 'vmdk': 'VMDK 虚拟盘',
+                        'pem': 'PEM 证书', 'crt': '证书文件', 'cer': '证书文件', 'p12': 'PKCS12 证书', 'pfx': 'PFX 证书',
+                        'dockerfile': 'Dockerfile', 'makefile': 'Makefile', 'gradle': 'Gradle', 'lock': 'Lock 文件',
+                        'wasm': 'WebAssembly', 'hs': 'Haskell', 'ml': 'OCaml', 'clj': 'Clojure', 'el': 'Emacs Lisp', 'nim': 'Nim', 'zig': 'Zig', 'v': 'V'
+                    };
+                    function fmtType(file) {
+                        var nm = (file.original_name || '').toLowerCase();
+                        var ext = nm.lastIndexOf('.') > 0 ? nm.substring(nm.lastIndexOf('.') + 1) : '';
+                        if (_typeNames[ext]) return _typeNames[ext];
+                        if (ext) return ext.toUpperCase() + ' 文件';
+                        var mt = (file.mime_type || '').split(';')[0].trim();
+                        if (mt.startsWith('image/')) return '图片';
+                        if (mt.startsWith('video/')) return '视频';
+                        if (mt.startsWith('audio/')) return '音频';
+                        if (mt.startsWith('text/')) return '文本文件';
+                        return mt || '未知类型';
+                    }
                     function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
                     window.openLightbox = function (url) { var lb = document.getElementById('lightbox'); document.getElementById('lightboxImg').src = url; lb.classList.remove('hidden'); lb.classList.add('flex'); document.body.style.overflow = 'hidden'; };
@@ -194,7 +415,8 @@
                         }
                         html += '<h3 class="text-lg font-semibold text-gray-900 truncate pr-8 mb-3">' + esc(f.original_name) + '</h3>';
                         html += '<div class="grid grid-cols-2 gap-2 text-sm mb-4">';
-                        html += '<div><span class="text-xs text-gray-400">类型</span><p class="font-medium text-gray-700">' + esc(f.mime_type) + '</p></div>';
+                        html += '<div><span class="text-xs text-gray-400">类型</span><p class="font-medium text-gray-700">' + fmtType(f) + '</p></div>';
+                        html += '<div><span class="text-xs text-gray-400">MIME</span><p class="font-medium text-gray-700 text-xs break-all">' + esc(f.mime_type) + '</p></div>';
                         html += '<div><span class="text-xs text-gray-400">大小</span><p class="font-medium text-gray-700">' + fmtSize(f.size_bytes) + '</p></div>';
                         html += '<div><span class="text-xs text-gray-400">日期</span><p class="font-medium text-gray-700">' + new Date(f.created_at).toLocaleString() + '</p></div>';
                         if (f.width && f.height) html += '<div><span class="text-xs text-gray-400">尺寸</span><p class="font-medium text-gray-700">' + f.width + ' x ' + f.height + '</p></div>';
