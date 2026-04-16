@@ -38,6 +38,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
 
 const SIDEBAR_COLLAPSED_KEY = "kite_sidebar_collapsed";
 
@@ -263,16 +264,16 @@ export default function AppLayout() {
 
               <button
                 type="button"
-                className="flex h-9 w-[clamp(300px,34vw,430px)] shrink-0 items-center justify-between rounded-lg border border-input/90 bg-background px-2.5 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent/30"
+                className="flex h-9 w-[clamp(180px,18vw,240px)] shrink-0 items-center justify-between rounded-lg border border-input/90 bg-background px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent/30"
                 onClick={() => setCommandOpen(true)}
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <Search className="size-4" />
+                  <Search className="size-4 shrink-0" />
                   <span className="truncate">{t("common.search")}</span>
                 </span>
-                <kbd className="inline-flex h-6 shrink-0 items-center rounded-md border bg-muted px-1.5 text-[11px] font-medium text-foreground/70">
-                  ⌘ K
-                </kbd>
+                <Badge variant="secondary" className="ml-auto shrink-0">
+                  ⌘K
+                </Badge>
               </button>
             </div>
 
@@ -340,7 +341,7 @@ export default function AppLayout() {
             if (!open) setGlobalQuery("");
           }}
         >
-          <DialogContent className="max-w-170 gap-0 overflow-hidden border-border/80 p-0 shadow-2xl [&>button]:hidden">
+          <DialogContent className="max-h-[min(85vh,600px)] w-[min(90vw,500px)] gap-0 overflow-hidden border-border/80 p-0 shadow-2xl md:max-h-[600px] md:w-170 [&>button]:hidden">
             <DialogTitle className="sr-only">Search</DialogTitle>
             <Command shouldFilter={false} className="rounded-none">
               <CommandInput
@@ -349,7 +350,7 @@ export default function AppLayout() {
                 onValueChange={setGlobalQuery}
                 placeholder={`${t("common.search")}...`}
               />
-              <CommandList>
+              <CommandList className="max-h-[min(70vh,520px)]">
                 <CommandEmpty>{t("common.noData")}</CommandEmpty>
                 {Object.entries(groupedTargets).map(([groupName, items], index) => (
                   <div key={groupName}>
