@@ -10,6 +10,7 @@ services:
       KITE_PORT: "8080"
       KITE_DB_DRIVER: sqlite
       KITE_DSN: /app/data/kite.db
+      KITE_SITE_URL: https://demo.kite.plus
       GIN_MODE: release
       TZ: Asia/Shanghai
     volumes:

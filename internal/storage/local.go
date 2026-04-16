@@ -22,10 +22,6 @@ func NewLocalDriver(cfg LocalConfig) (*LocalDriver, error) {
 	if cfg.BasePath == "" {
 		return nil, fmt.Errorf("local driver: base_path is required")
 	}
-	if cfg.BaseURL == "" {
-		return nil, fmt.Errorf("local driver: base_url is required")
-	}
-
 	// 确保存储目录存在
 	absPath, err := filepath.Abs(cfg.BasePath)
 	if err != nil {
@@ -154,7 +150,11 @@ func (d *LocalDriver) Exists(_ context.Context, key string) (bool, error) {
 }
 
 // URL 生成文件的访问 URL。
+// 未配置 baseURL 时返回空字符串（本地存储通过短链访问，不需要直接 URL）。
 func (d *LocalDriver) URL(key string) string {
+	if d.baseURL == "" {
+		return ""
+	}
 	return d.baseURL + "/" + key
 }
 

@@ -31,12 +31,11 @@ var (
 
 // FileService 文件处理核心业务逻辑。
 type FileService struct {
-	fileRepo    *repo.FileRepo
-	userRepo    *repo.UserRepo
-	storageMgr  *storage.Manager
-	imageSvc    *ImageService
-	cfg         config.UploadConfig
-	siteURL     string
+	fileRepo   *repo.FileRepo
+	userRepo   *repo.UserRepo
+	storageMgr *storage.Manager
+	imageSvc   *ImageService
+	cfg        config.UploadConfig
 }
 
 func NewFileService(
@@ -45,7 +44,6 @@ func NewFileService(
 	storageMgr *storage.Manager,
 	imageSvc *ImageService,
 	cfg config.UploadConfig,
-	siteURL string,
 ) *FileService {
 	return &FileService{
 		fileRepo:   fileRepo,
@@ -53,7 +51,6 @@ func NewFileService(
 		storageMgr: storageMgr,
 		imageSvc:   imageSvc,
 		cfg:        cfg,
-		siteURL:    strings.TrimRight(siteURL, "/"),
 	}
 }
 
@@ -64,7 +61,8 @@ type UploadParams struct {
 	Filename string
 	Reader   io.Reader
 	Size     int64
-	IsGuest  bool // 游客上传模式，跳过用户配额检查
+	IsGuest  bool   // 游客上传模式，跳过用户配额检查
+	BaseURL  string // 请求来源（如 "https://demo.kite.plus"），用于生成完整链接
 }
 
 // UploadResult 上传结果。
@@ -130,7 +128,7 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		if err == nil && existing != nil {
 			return &UploadResult{
 				File:  existing,
-				Links: s.generateLinks(existing),
+				Links: s.generateLinks(existing, params.BaseURL),
 			}, nil
 		}
 	}
@@ -170,8 +168,7 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		if err == nil {
 			thumbKey := "thumb/" + storageKey
 			if putErr := driver.Put(ctx, thumbKey, thumbBuf, int64(thumbBuf.Len()), "image/jpeg"); putErr == nil {
-				// 使用短链 /t/:hash，由 ServeThumbnail 从存储流式读取，避免依赖存储 BaseURL 的可访问性
-				u := s.siteURL + "/t/" + hashMD5[:8]
+				u := "/t/" + hashMD5[:8]
 				thumbURL = &u
 			}
 		}
@@ -214,7 +211,7 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 
 	return &UploadResult{
 		File:  file,
-		Links: s.generateLinks(file),
+		Links: s.generateLinks(file, params.BaseURL),
 	}, nil
 }
 
@@ -325,22 +322,34 @@ func (s *FileService) buildAccessURL(fileType, hashShort string) string {
 	default:
 		prefix = "/f/"
 	}
-	return s.siteURL + prefix + hashShort
+	return prefix + hashShort
 }
 
-func (s *FileService) generateLinks(file *model.File) FileLinks {
+func (s *FileService) generateLinks(file *model.File, baseURL string) FileLinks {
+	base := strings.TrimRight(baseURL, "/")
+	url := file.URL
+	if base != "" && !strings.HasPrefix(url, "http") {
+		url = base + url
+	}
+
 	links := FileLinks{
-		URL:              file.URL,
-		HTML:             fmt.Sprintf(`<img src="%s">`, file.URL),
-		BBCode:           fmt.Sprintf(`[img]%s[/img]`, file.URL),
-		Markdown:         fmt.Sprintf(`![%s](%s)`, file.OriginalName, file.URL),
-		MarkdownWithLink: fmt.Sprintf(`[![%s](%s)](%s)`, file.OriginalName, file.URL, file.URL),
+		URL:              url,
+		HTML:             fmt.Sprintf(`<img src="%s">`, url),
+		BBCode:           fmt.Sprintf(`[img]%s[/img]`, url),
+		Markdown:         fmt.Sprintf(`![%s](%s)`, file.OriginalName, url),
+		MarkdownWithLink: fmt.Sprintf(`[![%s](%s)](%s)`, file.OriginalName, url, url),
 	}
 	if driver, err := s.storageMgr.Get(file.StorageConfigID); err == nil {
-		links.SourceURL = driver.URL(file.StorageKey)
+		if sourceURL := driver.URL(file.StorageKey); sourceURL != "" {
+			links.SourceURL = sourceURL
+		}
 	}
 	if file.ThumbURL != nil {
-		links.ThumbnailURL = *file.ThumbURL
+		thumbURL := *file.ThumbURL
+		if base != "" && !strings.HasPrefix(thumbURL, "http") {
+			thumbURL = base + thumbURL
+		}
+		links.ThumbnailURL = thumbURL
 	}
 	return links
 }

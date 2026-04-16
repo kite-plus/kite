@@ -43,6 +43,9 @@ func main() {
 	if driver := os.Getenv("KITE_DB_DRIVER"); driver != "" {
 		cfg.Database.Driver = driver
 	}
+	if siteURL := os.Getenv("KITE_SITE_URL"); siteURL != "" {
+		cfg.Site.URL = siteURL
+	}
 
 	// 确保数据目录存在
 	dataDir := filepath.Dir(cfg.Database.DSN)
@@ -67,8 +70,8 @@ func main() {
 	settingRepo := repo.NewSettingRepo(db)
 	loadRuntimeConfig(settingRepo, &cfg)
 
-	// 将旧格式的缩略图 URL 迁移到 /t/:hash 短链格式
-	migrateThumbURLs(db, cfg.Site.URL)
+	// 将存量绝对 URL 迁移为相对路径
+	migrateAbsoluteURLs(db)
 
 	// 确保 JWT 密钥存在（首次启动自动生成并持久化）
 	if err := ensureJWTSecret(settingRepo, &cfg); err != nil {
@@ -78,7 +81,7 @@ func main() {
 	// 初始化存储管理器
 	storageMgr := storage.NewManager()
 	storageRepo := repo.NewStorageConfigRepo(db)
-	seedDefaultStorage(storageRepo, dataDir, cfg.Site.URL)
+	seedDefaultStorage(storageRepo, dataDir)
 	loadStorageConfigs(storageRepo, storageMgr)
 
 	// 初始化服务
@@ -92,7 +95,7 @@ func main() {
 	seedDefaultAdmin(userRepo, authSvc)
 
 	imageSvc := service.NewImageService(cfg.Upload.ThumbWidth, cfg.Upload.ThumbQuality)
-	fileSvc := service.NewFileService(fileRepo, userRepo, storageMgr, imageSvc, cfg.Upload, cfg.Site.URL)
+	fileSvc := service.NewFileService(fileRepo, userRepo, storageMgr, imageSvc, cfg.Upload)
 
 	// 加载内嵌资产
 	var adminFS fs.FS
@@ -222,30 +225,48 @@ func seedDefaultAdmin(userRepo *repo.UserRepo, authSvc *service.AuthService) {
 	log.Println("============================================================")
 }
 
-// migrateThumbURLs 将存量记录中旧格式的缩略图 URL（指向存储 BaseURL 路径）改写为 /t/:hash 短链。
-// 旧格式依赖 BaseURL 可公开访问，对默认本机存储无效；新格式由 ServeThumbnail 从存储流式读取。
-func migrateThumbURLs(db *gorm.DB, siteURL string) {
+// migrateAbsoluteURLs 将存量记录中的绝对 URL（如 http://localhost:8080/i/xxx）改写为相对路径（/i/xxx）。
+// 相对路径在响应时由 handler 根据请求 Host 动态拼接，不再依赖启动时配置的 site_url。
+func migrateAbsoluteURLs(db *gorm.DB) {
+	var count int64
 	var files []model.File
-	if err := db.Where("thumb_url IS NOT NULL AND thumb_url NOT LIKE ?", "%/t/%").Find(&files).Error; err != nil {
+	if err := db.Where("url LIKE ?", "http%").Find(&files).Error; err != nil {
 		return
 	}
-	if len(files) == 0 {
-		return
-	}
-	base := strings.TrimRight(siteURL, "/")
 	for _, f := range files {
-		if len(f.HashMD5) < 8 {
-			continue
+		for _, prefix := range []string{"/i/", "/v/", "/a/", "/f/"} {
+			if idx := strings.Index(f.URL, prefix); idx >= 0 {
+				_ = db.Model(&model.File{}).Where("id = ?", f.ID).Update("url", f.URL[idx:]).Error
+				count++
+				break
+			}
 		}
-		newURL := base + "/t/" + f.HashMD5[:8]
-		_ = db.Model(&model.File{}).Where("id = ?", f.ID).Update("thumb_url", newURL).Error
 	}
-	log.Printf("migrated %d thumbnail URLs to /t/:hash short-link format", len(files))
+	var thumbFiles []model.File
+	if err := db.Where("thumb_url IS NOT NULL AND thumb_url LIKE ?", "http%").Find(&thumbFiles).Error; err == nil {
+		for _, f := range thumbFiles {
+			if f.ThumbURL == nil {
+				continue
+			}
+			if idx := strings.Index(*f.ThumbURL, "/t/"); idx >= 0 {
+				newURL := (*f.ThumbURL)[idx:]
+				_ = db.Model(&model.File{}).Where("id = ?", f.ID).Update("thumb_url", newURL).Error
+				count++
+			} else if len(f.HashMD5) >= 8 {
+				newURL := "/t/" + f.HashMD5[:8]
+				_ = db.Model(&model.File{}).Where("id = ?", f.ID).Update("thumb_url", newURL).Error
+				count++
+			}
+		}
+	}
+	if count > 0 {
+		log.Printf("migrated %d URLs from absolute to relative paths", count)
+	}
 }
 
 // seedDefaultStorage 首次启动时自动创建一个本地存储作为兜底，避免用户必须先手动添加存储才能使用上传功能。
 // 仅在数据库中不存在任何存储配置时才创建；用户手动删除后重启不会被再次创建。
-func seedDefaultStorage(storageRepo *repo.StorageConfigRepo, dataDir, siteURL string) {
+func seedDefaultStorage(storageRepo *repo.StorageConfigRepo, dataDir string) {
 	ctx := context.Background()
 	existing, err := storageRepo.List(ctx)
 	if err != nil {
@@ -257,7 +278,7 @@ func seedDefaultStorage(storageRepo *repo.StorageConfigRepo, dataDir, siteURL st
 	}
 
 	basePath := filepath.Join(dataDir, "uploads")
-	lc := storage.LocalConfig{BasePath: basePath, BaseURL: siteURL}
+	lc := storage.LocalConfig{BasePath: basePath}
 	raw, err := json.Marshal(lc)
 	if err != nil {
 		log.Printf("warning: failed to marshal default storage config: %v", err)

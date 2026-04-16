@@ -47,6 +47,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		Filename: header.Filename,
 		Reader:   file,
 		Size:     header.Size,
+		BaseURL:  requestBaseURL(c),
 	})
 	if err != nil {
 		switch {
@@ -94,6 +95,7 @@ func (h *FileHandler) GuestUpload(c *gin.Context) {
 		Filename: header.Filename,
 		Reader:   file,
 		Size:     header.Size,
+		BaseURL:  requestBaseURL(c),
 	})
 	if err != nil {
 		switch {
@@ -362,6 +364,16 @@ func (h *FileHandler) serveFile(c *gin.Context, expectedType string, forceDownlo
 
 func (h *FileHandler) findFileByHash(c *gin.Context, hash string) (*model.File, error) {
 	return h.fileRepo.GetByHashPrefix(c.Request.Context(), hash)
+}
+
+func requestBaseURL(c *gin.Context) string {
+	scheme := "https"
+	if proto := c.GetHeader("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	} else if c.Request.TLS == nil {
+		scheme = "http"
+	}
+	return scheme + "://" + c.Request.Host
 }
 
 func fileExtension(name string) string {
