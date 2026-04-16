@@ -150,10 +150,10 @@ func (d *LocalDriver) Exists(_ context.Context, key string) (bool, error) {
 }
 
 // URL 生成文件的访问 URL。
-// 未配置 baseURL 时返回空字符串（本地存储通过短链访问，不需要直接 URL）。
+// 未配置 baseURL 时返回 /uploads/{key}，通过 Go 服务内置的静态文件路由访问。
 func (d *LocalDriver) URL(key string) string {
 	if d.baseURL == "" {
-		return ""
+		return "/uploads/" + key
 	}
 	return d.baseURL + "/" + key
 }

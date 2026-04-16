@@ -4,6 +4,7 @@ import {
   Upload,
   FolderOpen,
   KeyRound,
+  FileText,
   HardDrive,
   Users,
   Settings,
@@ -25,6 +26,7 @@ const userNavItems = [
 ];
 
 const adminNavItems = [
+  { to: "/admin/files", icon: FileText, labelKey: "nav.adminFiles" },
   { to: "/admin/storage", icon: HardDrive, labelKey: "nav.storage" },
   { to: "/admin/users", icon: Users, labelKey: "nav.users" },
   { to: "/admin/settings", icon: Settings, labelKey: "nav.settings" },
@@ -39,7 +41,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const { t } = useI18n();
 
   return (
-    <aside className="flex h-full w-[220px] flex-col bg-background">
+    <aside className="flex h-full w-55 flex-col bg-background">
       {/* Logo — h-14 + border-b aligns with desktop header */}
       <div className="flex h-14 shrink-0 items-center border-b px-5">
         <Link
@@ -75,7 +77,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
         {user?.role === "admin" && (
           <>
-            <Separator className="!my-3" />
+            <Separator className="my-3!" />
             <p className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
               {t("nav.admin")}
             </p>

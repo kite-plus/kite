@@ -120,6 +120,7 @@ const zh: Translations = {
     failed: "失败",
     dimensions: "尺寸",
     linkFormats: "链接格式",
+    sourceUrl: "源站 URL",
     openOriginal: "打开",
     adminTitle: "全站文件",
     adminDescription: "管理系统中所有用户的文件",

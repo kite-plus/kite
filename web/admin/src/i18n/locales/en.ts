@@ -118,6 +118,7 @@ const en = {
     failed: "Failed",
     dimensions: "Dimensions",
     linkFormats: "Link Formats",
+    sourceUrl: "Source URL",
     openOriginal: "Open",
     adminTitle: "All Files",
     adminDescription: "Manage all files across the system",

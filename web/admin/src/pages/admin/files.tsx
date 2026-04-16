@@ -59,6 +59,7 @@ interface FileItem {
   mime_type: string;
   size_bytes: number;
   url: string;
+  source_url?: string;
   thumb_url?: string;
   created_at: string;
   width?: number;
@@ -311,7 +312,7 @@ export default function AdminFilesPage() {
               >
                 <ChevronLeft className="size-4" />
               </Button>
-              <span className="min-w-[60px] text-center text-sm text-muted-foreground">
+              <span className="min-w-15 text-center text-sm text-muted-foreground">
                 {page} / {totalPages}
               </span>
               <Button
@@ -389,6 +390,7 @@ export default function AdminFilesPage() {
                 </span>
                 {[
                   { label: "URL", value: detailFile.url },
+                  ...(detailFile.source_url ? [{ label: t("files.sourceUrl"), value: detailFile.source_url }] : []),
                   {
                     label: "Markdown",
                     value: `![${detailFile.original_name}](${detailFile.url})`,

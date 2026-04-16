@@ -21,12 +21,12 @@ import (
 )
 
 var (
-	ErrFileTooLarge    = errors.New("file exceeds maximum size limit")
-	ErrFileTypeDenied  = errors.New("file type is not allowed")
-	ErrStorageFull     = errors.New("storage quota exceeded")
-	ErrFileNotFound    = errors.New("file not found")
-	ErrNotFileOwner    = errors.New("not the owner of this file")
-	ErrDuplicateFile   = errors.New("file already exists")
+	ErrFileTooLarge   = errors.New("file exceeds maximum size limit")
+	ErrFileTypeDenied = errors.New("file type is not allowed")
+	ErrStorageFull    = errors.New("storage quota exceeded")
+	ErrFileNotFound   = errors.New("file not found")
+	ErrNotFileOwner   = errors.New("not the owner of this file")
+	ErrDuplicateFile  = errors.New("file already exists")
 )
 
 // FileService 文件处理核心业务逻辑。
@@ -73,7 +73,7 @@ type UploadResult struct {
 
 // FileLinks 各种格式的访问链接（兼容兰空格式）。
 type FileLinks struct {
-	URL              string `json:"url"`               // 短链接，形如 /i/{hash}
+	URL              string `json:"url"`                  // 短链接，形如 /i/{hash}
 	SourceURL        string `json:"source_url,omitempty"` // 原始存储 URL，指向存储后端中的真实路径
 	HTML             string `json:"html"`
 	BBCode           string `json:"bbcode"`
@@ -251,6 +251,23 @@ func (s *FileService) ListFiles(ctx context.Context, params repo.FileListParams)
 	return s.fileRepo.List(ctx, params)
 }
 
+// GetSourceURL 返回文件在存储后端中的源站 URL。
+func (s *FileService) GetSourceURL(file *model.File, baseURL string) string {
+	driver, err := s.storageMgr.Get(file.StorageConfigID)
+	if err != nil {
+		return ""
+	}
+	sourceURL := driver.URL(file.StorageKey)
+	if sourceURL == "" {
+		return ""
+	}
+	base := strings.TrimRight(baseURL, "/")
+	if base != "" && !strings.HasPrefix(sourceURL, "http") {
+		sourceURL = base + sourceURL
+	}
+	return sourceURL
+}
+
 // GetFileContent 获取文件内容流（用于文件访问/下载）。
 func (s *FileService) GetFileContent(ctx context.Context, file *model.File) (io.ReadCloser, int64, error) {
 	driver, err := s.storageMgr.Get(file.StorageConfigID)
@@ -341,6 +358,9 @@ func (s *FileService) generateLinks(file *model.File, baseURL string) FileLinks 
 	}
 	if driver, err := s.storageMgr.Get(file.StorageConfigID); err == nil {
 		if sourceURL := driver.URL(file.StorageKey); sourceURL != "" {
+			if base != "" && !strings.HasPrefix(sourceURL, "http") {
+				sourceURL = base + sourceURL
+			}
 			links.SourceURL = sourceURL
 		}
 	}

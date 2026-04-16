@@ -22,8 +22,9 @@ type RouterConfig struct {
 	StorageMgr *storage.Manager
 	AuthSvc    *service.AuthService
 	FileSvc    *service.FileService
-	AdminFS    fs.FS // 内嵌的 SPA 资产（web/admin/dist）
-	TemplateFS fs.FS // 内嵌的 Go 模板（web/template）
+	AdminFS    fs.FS  // 内嵌的 SPA 资产（web/admin/dist）
+	TemplateFS fs.FS  // 内嵌的 Go 模板（web/template）
+	DataDir    string // 数据目录（用于本地存储文件的静态服务）
 }
 
 // SetupRouter 注册所有路由并返回 gin.Engine 实例。
@@ -245,6 +246,11 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 				c.String(http.StatusNotFound, "not found")
 			}
 		})
+	}
+
+	// 本地存储文件直接访问（source_url）
+	if cfg.DataDir != "" {
+		r.Static("/uploads", cfg.DataDir+"/uploads")
 	}
 
 	// 前端 SPA 静态资源服务（用户中心 + 管理后台）

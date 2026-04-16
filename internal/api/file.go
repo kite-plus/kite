@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/amigoer/kite/internal/api/middleware"
 	"github.com/amigoer/kite/internal/model"
@@ -126,8 +127,10 @@ func (h *FileHandler) GuestUpload(c *gin.Context) {
 }
 
 // List 获取当前用户的文件列表。
+// 管理员可以查看全部文件。
 func (h *FileHandler) List(c *gin.Context) {
 	userID := c.GetString(middleware.ContextKeyUserID)
+	role := c.GetString(middleware.ContextKeyRole)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 	if page < 1 {
@@ -138,7 +141,6 @@ func (h *FileHandler) List(c *gin.Context) {
 	}
 
 	params := repo.FileListParams{
-		UserID:   userID,
 		AlbumID:  c.Query("album_id"),
 		FileType: c.Query("file_type"),
 		Keyword:  c.Query("keyword"),
@@ -148,13 +150,18 @@ func (h *FileHandler) List(c *gin.Context) {
 		Order:    c.DefaultQuery("order", "DESC"),
 	}
 
+	// 管理员查看全站文件，普通用户只能查看自己的
+	if role != "admin" {
+		params.UserID = userID
+	}
+
 	files, total, err := h.fileSvc.ListFiles(c.Request.Context(), params)
 	if err != nil {
 		serverError(c, "failed to list files")
 		return
 	}
 
-	paged(c, files, total, page, size)
+	paged(c, h.enrichFiles(files, requestBaseURL(c)), total, page, size)
 }
 
 // AdminList 管理员查看全站文件列表（不限制用户）。
@@ -184,7 +191,34 @@ func (h *FileHandler) AdminList(c *gin.Context) {
 		return
 	}
 
-	paged(c, files, total, page, size)
+	paged(c, h.enrichFiles(files, requestBaseURL(c)), total, page, size)
+}
+
+// enrichedFile 在 model.File 基础上添加源站 URL 和完整链接。
+type enrichedFile struct {
+	model.File
+	URL       string  `json:"url"`
+	ThumbURL  *string `json:"thumb_url,omitempty"`
+	SourceURL string  `json:"source_url,omitempty"`
+}
+
+func (h *FileHandler) enrichFiles(files []model.File, baseURL string) []enrichedFile {
+	base := strings.TrimRight(baseURL, "/")
+	items := make([]enrichedFile, len(files))
+	for i := range files {
+		f := files[i]
+		item := enrichedFile{File: f, URL: f.URL, ThumbURL: f.ThumbURL}
+		if base != "" && !strings.HasPrefix(item.URL, "http") {
+			item.URL = base + item.URL
+		}
+		if item.ThumbURL != nil && !strings.HasPrefix(*item.ThumbURL, "http") {
+			thumbURL := base + *item.ThumbURL
+			item.ThumbURL = &thumbURL
+		}
+		item.SourceURL = h.fileSvc.GetSourceURL(&f, baseURL)
+		items[i] = item
+	}
+	return items
 }
 
 // AdminDelete 管理员删除任意文件（不检查所属用户）。
@@ -318,7 +352,7 @@ func (h *FileHandler) ServeThumbnail(c *gin.Context) {
 	})
 }
 
-func (h *FileHandler) serveFile(c *gin.Context, expectedType string, forceDownload bool) {
+func (h *FileHandler) serveFile(c *gin.Context, _ string, forceDownload bool) {
 	hash := c.Param("hash")
 
 	// 查找匹配 hash 前缀的文件

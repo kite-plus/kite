@@ -109,7 +109,7 @@ type FileListParams struct {
 
 // List 分页查询文件列表。
 func (r *FileRepo) List(ctx context.Context, params FileListParams) ([]model.File, int64, error) {
-	var files []model.File
+	files := make([]model.File, 0)
 	var total int64
 
 	db := r.db.WithContext(ctx).Model(&model.File{}).Where("is_deleted = ?", false)

@@ -53,6 +53,7 @@ interface FileItem {
   mime_type: string;
   size_bytes: number;
   url: string;
+  source_url?: string;
   thumb_url?: string;
   created_at: string;
   width?: number;
@@ -239,8 +240,8 @@ export default function FilesPage() {
                           task.status === "error"
                             ? "bg-destructive"
                             : task.status === "done"
-                            ? "bg-emerald-500"
-                            : undefined
+                              ? "bg-emerald-500"
+                              : undefined
                         }
                       />
                     </div>
@@ -363,7 +364,7 @@ export default function FilesPage() {
               >
                 <ChevronLeft className="size-4" />
               </Button>
-              <span className="min-w-[60px] text-center text-sm text-muted-foreground">
+              <span className="min-w-15 text-center text-sm text-muted-foreground">
                 {page} / {Math.ceil(data.total / 20)}
               </span>
               <Button
@@ -425,6 +426,7 @@ export default function FilesPage() {
                 <span className="text-xs font-medium text-muted-foreground">{t("files.linkFormats")}</span>
                 {[
                   { label: "URL", value: detailFile.url },
+                  ...(detailFile.source_url ? [{ label: t("files.sourceUrl"), value: detailFile.source_url }] : []),
                   { label: "Markdown", value: `![${detailFile.original_name}](${detailFile.url})` },
                   { label: "HTML", value: `<img src="${detailFile.url}" alt="${detailFile.original_name}">` },
                   { label: "BBCode", value: `[img]${detailFile.url}[/img]` },

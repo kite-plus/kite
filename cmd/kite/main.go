@@ -115,6 +115,7 @@ func main() {
 		FileSvc:    fileSvc,
 		AdminFS:    adminFS,
 		TemplateFS: templateFS,
+		DataDir:    dataDir,
 	})
 
 	// 启动 HTTP 服务
