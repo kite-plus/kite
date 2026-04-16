@@ -126,7 +126,7 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 				return
 			}
 			success(c, gin.H{
-				"items": files,
+				"items": fileHandler.enrichFiles(files, requestBaseURL(c)),
 				"total": total,
 				"page":  page,
 				"size":  size,
