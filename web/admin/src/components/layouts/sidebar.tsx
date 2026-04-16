@@ -9,8 +9,6 @@ import {
   Users,
   Settings,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -37,10 +35,9 @@ const adminNavItems = [
 interface SidebarProps {
   onClose?: () => void;
   collapsed?: boolean;
-  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ onClose, collapsed = false }: SidebarProps) {
   const { user, logout } = useAuth();
   const { t } = useI18n();
   const displayName = user?.nickname?.trim() || user?.username;
@@ -50,9 +47,9 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
   const roleExtraNavItems = user?.role === "admin" ? [] : userExtraNavItems;
 
   return (
-    <aside className={cn("flex h-full flex-col bg-background transition-[width] duration-200", collapsed ? "w-17" : "w-55")}>
+    <aside className={cn("flex h-full flex-col bg-background transition-[width] duration-200", collapsed ? "w-16" : "w-55")}>
       {/* Logo — h-14 + border-b aligns with desktop header */}
-      <div className={cn("flex h-14 shrink-0 items-center border-b", collapsed ? "justify-center px-2" : "justify-between px-4")}>
+      <div className={cn("flex h-14 shrink-0 items-center border-b", collapsed ? "justify-center px-0" : "justify-start px-4")}>
         <Link
           to="/dashboard"
           onClick={onClose}
@@ -61,18 +58,6 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
           <KiteLogo className="size-6" />
           {!collapsed && <span className="font-semibold tracking-tight">Kite</span>}
         </Link>
-        {onToggleCollapse && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className={cn("hidden md:inline-flex", collapsed && "absolute")}
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
-          >
-            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </Button>
-        )}
       </div>
 
       {/* Navigation */}

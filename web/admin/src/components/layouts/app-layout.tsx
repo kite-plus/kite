@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, Link, useLocation, useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/page-transition";
-import { Bell, Menu, User as UserIcon, LogOut } from "lucide-react";
+import { Bell, Menu, User as UserIcon, LogOut, ChevronRight, Search, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/i18n";
 import { Sidebar } from "@/components/layouts/sidebar";
@@ -23,8 +23,43 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "@/components/ui/command";
 
 const SIDEBAR_COLLAPSED_KEY = "kite_sidebar_collapsed";
+
+const routeLabelKeys: Record<string, string> = {
+  "/dashboard": "nav.dashboard",
+  "/files": "nav.files",
+  "/albums": "nav.albums",
+  "/tokens": "nav.tokens",
+  "/profile": "profile.title",
+  "/admin": "nav.adminPanel",
+  "/admin/files": "nav.adminFiles",
+  "/admin/storage": "nav.storage",
+  "/admin/users": "nav.users",
+  "/admin/settings": "nav.settings",
+};
+
+type SearchTarget = {
+  to: string;
+  label: string;
+  group: string;
+  keywords: string;
+};
 
 export default function AppLayout() {
   const { user, loading, logout } = useAuth();
@@ -32,11 +67,88 @@ export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [globalQuery, setGlobalQuery] = useState("");
+  const [commandOpen, setCommandOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
   });
   const displayName = user?.nickname?.trim() || user?.username;
+
+  const breadcrumbItems = useMemo(() => {
+    const parts = location.pathname.split("/").filter(Boolean);
+    if (!parts.length) {
+      return [{ to: "/dashboard", label: t("nav.dashboard") }];
+    }
+
+    const items: Array<{ to: string; label: string }> = [];
+    for (let i = 0; i < parts.length; i += 1) {
+      const to = `/${parts.slice(0, i + 1).join("/")}`;
+      const labelKey = routeLabelKeys[to];
+      const label = labelKey ? t(labelKey) : parts[i];
+      items.push({ to, label });
+    }
+    return items;
+  }, [location.pathname, t]);
+
+  const globalSearchTargets = useMemo<SearchTarget[]>(() => {
+    const workspaceGroup = t("nav.general");
+    const adminGroup = t("nav.admin");
+    const base = [
+      { to: "/dashboard", label: t("nav.dashboard"), group: workspaceGroup, keywords: "home stats" },
+      { to: "/files", label: t("nav.files"), group: workspaceGroup, keywords: "upload media" },
+      { to: "/albums", label: t("nav.albums"), group: workspaceGroup, keywords: "gallery collections" },
+      { to: "/tokens", label: t("nav.tokens"), group: workspaceGroup, keywords: "api key" },
+      { to: "/profile", label: t("profile.title"), group: workspaceGroup, keywords: "account user" },
+    ];
+
+    if (user?.role === "admin") {
+      base.push(
+        { to: "/admin/files", label: t("files.adminTitle"), group: adminGroup, keywords: "all files moderation" },
+        { to: "/admin/storage", label: t("nav.storage"), group: adminGroup, keywords: "s3 local driver" },
+        { to: "/admin/users", label: t("nav.users"), group: adminGroup, keywords: "members role" },
+        { to: "/admin/settings", label: t("nav.settings"), group: adminGroup, keywords: "config system" }
+      );
+    }
+
+    return base;
+  }, [t, user?.role]);
+
+  const filteredTargets = useMemo(() => {
+    const query = globalQuery.trim().toLowerCase();
+    if (!query) return globalSearchTargets.slice(0, 8);
+    return globalSearchTargets
+      .filter((item) => {
+        const source = `${item.label} ${item.to} ${item.keywords}`.toLowerCase();
+        return source.includes(query);
+      })
+      .slice(0, 8);
+  }, [globalQuery, globalSearchTargets]);
+
+  const groupedTargets = useMemo(() => {
+    const groups: Record<string, SearchTarget[]> = {};
+    filteredTargets.forEach((target) => {
+      if (!groups[target.group]) groups[target.group] = [];
+      groups[target.group].push(target);
+    });
+    return groups;
+  }, [filteredTargets]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
+      if (!isShortcut) return;
+      event.preventDefault();
+      setCommandOpen((prev) => {
+        const next = !prev;
+        if (!next) setGlobalQuery("");
+        return next;
+      });
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {
@@ -44,6 +156,12 @@ export default function AppLayout() {
       localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
       return next;
     });
+  };
+
+  const goToRoute = (to: string) => {
+    navigate(to);
+    setGlobalQuery("");
+    setCommandOpen(false);
   };
 
   if (loading) {
@@ -68,7 +186,7 @@ export default function AppLayout() {
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar */}
       <div className="hidden shrink-0 border-r md:flex">
-        <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
+        <Sidebar collapsed={sidebarCollapsed} />
       </div>
 
       {/* Right content area */}
@@ -91,6 +209,17 @@ export default function AppLayout() {
               </Link>
             </div>
 
+            <button
+              type="button"
+              className="mx-3 flex h-8 min-w-0 flex-1 items-center justify-between rounded-md border border-input/90 bg-background px-2.5 text-xs text-muted-foreground"
+              onClick={() => setCommandOpen(true)}
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <Search className="size-3.5 shrink-0" />
+                <span className="truncate">{t("common.search")}</span>
+              </span>
+            </button>
+
             <ThemeToggle />
           </header>
           <SheetContent side="left" className="w-55 p-0">
@@ -101,7 +230,52 @@ export default function AppLayout() {
 
         {/* Desktop header */}
         <header className="hidden h-14 shrink-0 border-b md:flex">
-          <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-end px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0"
+                onClick={toggleSidebar}
+                aria-label={sidebarCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
+              >
+                {sidebarCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+              </Button>
+
+              <nav className="hidden min-w-max items-center gap-1 text-xs text-muted-foreground md:flex">
+                {breadcrumbItems.map((item, index) => {
+                  const isLast = index === breadcrumbItems.length - 1;
+                  return (
+                    <div key={item.to} className="flex items-center gap-1">
+                      {index > 0 && <ChevronRight className="size-3 text-muted-foreground/70" />}
+                      {isLast ? (
+                        <span className="rounded bg-muted px-2 py-1 font-medium text-foreground">{item.label}</span>
+                      ) : (
+                        <Link to={item.to} className="rounded px-1.5 py-1 transition-colors hover:bg-muted hover:text-foreground">
+                          {item.label}
+                        </Link>
+                      )}
+                    </div>
+                  );
+                })}
+              </nav>
+
+              <button
+                type="button"
+                className="flex h-9 w-[clamp(300px,34vw,430px)] shrink-0 items-center justify-between rounded-lg border border-input/90 bg-background px-2.5 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent/30"
+                onClick={() => setCommandOpen(true)}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <Search className="size-4" />
+                  <span className="truncate">{t("common.search")}</span>
+                </span>
+                <kbd className="inline-flex h-6 shrink-0 items-center rounded-md border bg-muted px-1.5 text-[11px] font-medium text-foreground/70">
+                  ⌘ K
+                </kbd>
+              </button>
+            </div>
+
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -158,6 +332,53 @@ export default function AppLayout() {
             </div>
           </div>
         </header>
+
+        <Dialog
+          open={commandOpen}
+          onOpenChange={(open) => {
+            setCommandOpen(open);
+            if (!open) setGlobalQuery("");
+          }}
+        >
+          <DialogContent className="max-w-170 gap-0 overflow-hidden border-border/80 p-0 shadow-2xl [&>button]:hidden">
+            <DialogTitle className="sr-only">Search</DialogTitle>
+            <Command shouldFilter={false} className="rounded-none">
+              <CommandInput
+                autoFocus
+                value={globalQuery}
+                onValueChange={setGlobalQuery}
+                placeholder={`${t("common.search")}...`}
+              />
+              <CommandList>
+                <CommandEmpty>{t("common.noData")}</CommandEmpty>
+                {Object.entries(groupedTargets).map(([groupName, items], index) => (
+                  <div key={groupName}>
+                    {index > 0 && <CommandSeparator />}
+                    <CommandGroup
+                      heading={(
+                        <span className="block px-2 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                          {groupName}
+                        </span>
+                      )}
+                    >
+                      {items.map((target) => (
+                        <CommandItem
+                          key={target.to}
+                          value={`${target.label} ${target.to} ${target.keywords}`}
+                          onSelect={() => goToRoute(target.to)}
+                          className="h-10"
+                        >
+                          <span className="truncate font-medium">{target.label}</span>
+                          <CommandShortcut>{target.to}</CommandShortcut>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </div>
+                ))}
+              </CommandList>
+            </Command>
+          </DialogContent>
+        </Dialog>
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto">
