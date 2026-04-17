@@ -96,14 +96,26 @@ export const tokenApi = {
 };
 
 // Storage (admin)
+interface StoragePayload {
+  name: string;
+  driver: string;
+  config: unknown;
+  capacity_limit_bytes?: number;
+  priority?: number;
+  is_default?: boolean;
+  is_active?: boolean;
+}
+
 export const storageApi = {
   list: () => api.get("/storage"),
-  create: (data: { name: string; driver: string; config: unknown }) =>
-    api.post("/storage", data),
-  update: (id: string, data: { name: string; driver: string; config: unknown }) =>
-    api.put(`/storage/${id}`, data),
+  get: (id: string) => api.get(`/storage/${id}`),
+  create: (data: StoragePayload) => api.post("/storage", data),
+  update: (id: string, data: StoragePayload) => api.put(`/storage/${id}`, data),
   delete: (id: string) => api.delete(`/storage/${id}`),
   test: (id: string) => api.post(`/storage/${id}/test`),
+  setDefault: (id: string) => api.post(`/storage/${id}/set-default`),
+  reorder: (orderedIds: string[]) =>
+    api.post("/storage/reorder", { ordered_ids: orderedIds }),
 };
 
 // Settings (admin)

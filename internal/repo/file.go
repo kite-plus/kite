@@ -192,6 +192,21 @@ func (r *FileRepo) SumSizeByUser(ctx context.Context, userID string) (int64, err
 	return *total, nil
 }
 
+// SumSizeByStorageConfig 统计指定存储配置下所有未删除文件的总大小。
+func (r *FileRepo) SumSizeByStorageConfig(ctx context.Context, storageConfigID string) (int64, error) {
+	var total *int64
+	if err := r.db.WithContext(ctx).Model(&model.File{}).
+		Where("storage_config_id = ? AND is_deleted = ?", storageConfigID, false).
+		Select("COALESCE(SUM(size_bytes), 0)").
+		Scan(&total).Error; err != nil {
+		return 0, fmt.Errorf("sum file size by storage: %w", err)
+	}
+	if total == nil {
+		return 0, nil
+	}
+	return *total, nil
+}
+
 // CountByAlbum 统计相册中的文件数量。
 func (r *FileRepo) CountByAlbum(ctx context.Context, albumID string) (int64, error) {
 	var count int64

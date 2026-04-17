@@ -82,20 +82,30 @@ func main() {
 	storageMgr := storage.NewManager()
 	storageRepo := repo.NewStorageConfigRepo(db)
 	seedDefaultStorage(storageRepo, dataDir)
-	loadStorageConfigs(storageRepo, storageMgr)
+	reloadStorage(storageRepo, storageMgr)
 
 	// 初始化服务
 	userRepo := repo.NewUserRepo(db)
 	tokenRepo := repo.NewAPITokenRepo(db)
 	fileRepo := repo.NewFileRepo(db)
+	replicaRepo := repo.NewFileReplicaRepo(db)
 
 	authSvc := service.NewAuthService(userRepo, tokenRepo, cfg.Auth)
 
 	// 首次启动：无用户时自动创建默认管理员
 	seedDefaultAdmin(userRepo, authSvc)
 
+	// 构造 Router：usageFn 从 file 表聚合用量，policyFn 从 settings 表读取策略。
+	usageFn := func(ctx context.Context, configID string) (int64, error) {
+		return fileRepo.SumSizeByStorageConfig(ctx, configID)
+	}
+	policyFn := func(ctx context.Context) (string, error) {
+		return settingRepo.Get(ctx, "storage.upload_policy")
+	}
+	storageRouter := storage.NewRouter(storageMgr, usageFn, policyFn)
+
 	imageSvc := service.NewImageService(cfg.Upload.ThumbWidth, cfg.Upload.ThumbQuality)
-	fileSvc := service.NewFileService(fileRepo, userRepo, storageMgr, imageSvc, cfg.Upload)
+	fileSvc := service.NewFileService(fileRepo, userRepo, storageRepo, replicaRepo, storageMgr, storageRouter, imageSvc, cfg.Upload)
 
 	// 加载内嵌资产
 	var adminFS fs.FS
@@ -116,6 +126,9 @@ func main() {
 		AdminFS:    adminFS,
 		TemplateFS: templateFS,
 		DataDir:    dataDir,
+		ReloadStorage: func() {
+			reloadStorage(storageRepo, storageMgr)
+		},
 	})
 
 	// 启动 HTTP 服务
@@ -156,6 +169,7 @@ func autoMigrate(db *gorm.DB) error {
 		&model.File{},
 		&model.Album{},
 		&model.StorageConfig{},
+		&model.FileReplica{},
 		&model.APIToken{},
 		&model.UploadSession{},
 		&model.Setting{},
@@ -301,46 +315,18 @@ func seedDefaultStorage(storageRepo *repo.StorageConfigRepo, dataDir string) {
 	log.Printf("seeded default local storage at %s", basePath)
 }
 
-// loadStorageConfigs 从数据库加载所有活跃的存储配置到管理器。
-func loadStorageConfigs(storageRepo *repo.StorageConfigRepo, mgr *storage.Manager) {
-	configs, err := storageRepo.ListActive(context.Background())
+// reloadStorage 原子重建存储管理器状态，启动时调用一次，CRUD 后由 handler 再次调用。
+func reloadStorage(storageRepo *repo.StorageConfigRepo, mgr *storage.Manager) {
+	ctx := context.Background()
+	rawConfigs, err := storageRepo.BuildRawConfigs(ctx)
 	if err != nil {
 		log.Printf("warning: failed to load storage configs: %v", err)
 		return
 	}
-
-	for _, cfg := range configs {
-		var scfg storage.StorageConfig
-		scfg.Driver = cfg.Driver
-
-		switch cfg.Driver {
-		case "local":
-			var lc storage.LocalConfig
-			if err := json.Unmarshal([]byte(cfg.Config), &lc); err != nil {
-				log.Printf("warning: failed to parse local config %s: %v", cfg.ID, err)
-				continue
-			}
-			scfg.Local = &lc
-		case "s3":
-			var sc storage.S3Config
-			if err := json.Unmarshal([]byte(cfg.Config), &sc); err != nil {
-				log.Printf("warning: failed to parse s3 config %s: %v", cfg.ID, err)
-				continue
-			}
-			scfg.S3 = &sc
-		}
-
-		if err := mgr.LoadAndRegister(cfg.ID, scfg); err != nil {
-			log.Printf("warning: failed to load storage %s (%s): %v", cfg.Name, cfg.ID, err)
-			continue
-		}
-
-		if cfg.IsDefault {
-			if err := mgr.SetDefault(cfg.ID); err != nil {
-				log.Printf("warning: failed to set default storage: %v", err)
-			}
-		}
-
-		log.Printf("loaded storage: %s (%s, %s)", cfg.Name, cfg.Driver, cfg.ID)
+	if err := mgr.Reload(rawConfigs); err != nil {
+		log.Printf("warning: reload storage with errors: %v", err)
+	}
+	if defID := mgr.DefaultID(); defID != "" {
+		log.Printf("storage manager ready, default=%s, active=%d", defID, len(mgr.ActiveMetas()))
 	}
 }

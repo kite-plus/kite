@@ -20,7 +20,18 @@ import {
   Upload,
   Eye,
   Check,
+  HardDrive,
+  Layers,
+  Repeat,
+  Copy as CopyIcon,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/theme-provider";
 import { localeLabels, type Locale } from "@/i18n";
@@ -235,6 +246,47 @@ export default function SettingsPage() {
               onCheckedChange={() => toggleField("allow_public_gallery")}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Upload routing policy */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("storage.uploadPolicy")}</CardTitle>
+          <CardDescription>{t("storage.uploadPolicyDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select
+            value={form["storage.upload_policy"] || "single"}
+            onValueChange={(v) => updateField("storage.upload_policy", v)}
+          >
+            <SelectTrigger className="h-auto w-full py-2.5 sm:w-[420px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[
+                { value: "single", icon: HardDrive, label: t("storage.policySingle"), desc: t("storage.policySingleDesc") },
+                { value: "primary_fallback", icon: Layers, label: t("storage.policyPrimaryFallback"), desc: t("storage.policyPrimaryFallbackDesc") },
+                { value: "round_robin", icon: Repeat, label: t("storage.policyRoundRobin"), desc: t("storage.policyRoundRobinDesc") },
+                { value: "mirror", icon: CopyIcon, label: t("storage.policyMirror"), desc: t("storage.policyMirrorDesc") },
+              ].map((opt) => {
+                const Icon = opt.icon;
+                return (
+                  <SelectItem key={opt.value} value={opt.value} className="py-2">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                        <Icon className="size-4" />
+                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium">{opt.label}</span>
+                        <span className="text-xs text-muted-foreground">{opt.desc}</span>
+                      </div>
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 

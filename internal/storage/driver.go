@@ -37,11 +37,26 @@ type StorageDriver interface {
 	SignedURL(ctx context.Context, key string, expires time.Duration) (string, error)
 }
 
+// 驱动类型常量。OSS 和 COS 使用 S3 兼容协议，但在数据库中保留独立 driver 值以便前端区分展示。
+const (
+	DriverLocal = "local"
+	DriverS3    = "s3"
+	DriverOSS   = "oss"
+	DriverCOS   = "cos"
+	DriverFTP   = "ftp"
+)
+
+// IsS3Compatible 判断 driver 是否使用 S3 兼容协议（s3 / oss / cos）。
+func IsS3Compatible(driver string) bool {
+	return driver == DriverS3 || driver == DriverOSS || driver == DriverCOS
+}
+
 // StorageConfig 存储配置，从数据库 storage_configs 表的 config 字段反序列化。
 type StorageConfig struct {
-	Driver string       `json:"driver"`          // 存储驱动类型：local / s3
+	Driver string       `json:"driver"`          // 存储驱动类型：local / s3 / oss / cos / ftp
 	Local  *LocalConfig `json:"local,omitempty"` // 本地存储配置，driver 为 local 时必填
-	S3     *S3Config    `json:"s3,omitempty"`    // S3 存储配置，driver 为 s3 时必填
+	S3     *S3Config    `json:"s3,omitempty"`    // S3 兼容配置，driver 为 s3/oss/cos 时必填
+	FTP    *FTPConfig   `json:"ftp,omitempty"`   // FTP 配置，driver 为 ftp 时必填
 }
 
 // LocalConfig 本地文件系统存储的配置。
@@ -62,19 +77,34 @@ type S3Config struct {
 	ForcePathStyle  bool   `json:"force_path_style"`  // 是否使用路径风格访问，MinIO 需设为 true
 }
 
+// FTPConfig FTP 存储的配置。
+type FTPConfig struct {
+	Host     string `json:"host"`      // FTP 服务器主机（不含端口）
+	Port     int    `json:"port"`      // FTP 端口，默认 21
+	Username string `json:"username"`  // 登录用户名
+	Password string `json:"password"`  // 登录密码
+	BasePath string `json:"base_path"` // 远程存储根目录
+	BaseURL  string `json:"base_url"`  // 文件公开访问前缀（FTP 本身无公网 URL，需配合 HTTP 反向代理）
+}
+
 // NewDriver 根据配置创建对应的存储驱动实例。
 func NewDriver(cfg StorageConfig) (StorageDriver, error) {
 	switch cfg.Driver {
-	case "s3":
+	case DriverS3, DriverOSS, DriverCOS:
 		if cfg.S3 == nil {
-			return nil, fmt.Errorf("storage config: driver is s3 but s3 config is nil")
+			return nil, fmt.Errorf("storage config: driver is %s but s3 config is nil", cfg.Driver)
 		}
 		return NewS3Driver(*cfg.S3)
-	case "local":
+	case DriverLocal:
 		if cfg.Local == nil {
 			return nil, fmt.Errorf("storage config: driver is local but local config is nil")
 		}
 		return NewLocalDriver(*cfg.Local)
+	case DriverFTP:
+		if cfg.FTP == nil {
+			return nil, fmt.Errorf("storage config: driver is ftp but ftp config is nil")
+		}
+		return NewFTPDriver(*cfg.FTP)
 	default:
 		return nil, fmt.Errorf("storage config: unknown driver %q", cfg.Driver)
 	}

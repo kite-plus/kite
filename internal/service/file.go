@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,26 +32,35 @@ var (
 
 // FileService 文件处理核心业务逻辑。
 type FileService struct {
-	fileRepo   *repo.FileRepo
-	userRepo   *repo.UserRepo
-	storageMgr *storage.Manager
-	imageSvc   *ImageService
-	cfg        config.UploadConfig
+	fileRepo    *repo.FileRepo
+	userRepo    *repo.UserRepo
+	storageRepo *repo.StorageConfigRepo
+	replicaRepo *repo.FileReplicaRepo
+	storageMgr  *storage.Manager
+	router      *storage.Router
+	imageSvc    *ImageService
+	cfg         config.UploadConfig
 }
 
 func NewFileService(
 	fileRepo *repo.FileRepo,
 	userRepo *repo.UserRepo,
+	storageRepo *repo.StorageConfigRepo,
+	replicaRepo *repo.FileReplicaRepo,
 	storageMgr *storage.Manager,
+	router *storage.Router,
 	imageSvc *ImageService,
 	cfg config.UploadConfig,
 ) *FileService {
 	return &FileService{
-		fileRepo:   fileRepo,
-		userRepo:   userRepo,
-		storageMgr: storageMgr,
-		imageSvc:   imageSvc,
-		cfg:        cfg,
+		fileRepo:    fileRepo,
+		userRepo:    userRepo,
+		storageRepo: storageRepo,
+		replicaRepo: replicaRepo,
+		storageMgr:  storageMgr,
+		router:      router,
+		imageSvc:    imageSvc,
+		cfg:         cfg,
 	}
 }
 
@@ -133,10 +143,10 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		}
 	}
 
-	// 9. 获取默认存储驱动
-	driver, storageConfigID, err := s.storageMgr.Default()
+	// 9. 规划上传目标（根据策略 single / primary_fallback / round_robin / mirror）
+	plan, err := s.router.Plan(ctx, int64(len(data)))
 	if err != nil {
-		return nil, fmt.Errorf("upload get storage: %w", err)
+		return nil, ErrStorageFull
 	}
 
 	// 10. 生成存储 key
@@ -148,12 +158,13 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 	fileID := uuid.New().String()
 	storageKey := s.generateStorageKey(hashMD5, fileID, ext)
 
-	// 11. 上传文件到存储后端
-	if err := driver.Put(ctx, storageKey, bytes.NewReader(data), int64(len(data)), mimeType); err != nil {
+	// 11. 根据策略写入主存储
+	primary, replicaTargets, err := s.writePrimary(ctx, plan, storageKey, data, mimeType)
+	if err != nil {
 		return nil, fmt.Errorf("upload put file: %w", err)
 	}
 
-	// 12. 如果是图片，获取尺寸并生成缩略图
+	// 12. 如果是图片，获取尺寸并生成缩略图（缩略图只写入主存储）
 	var width, height *int
 	var thumbURL *string
 
@@ -167,7 +178,7 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		thumbBuf, err := s.imageSvc.GenerateThumbnail(bytes.NewReader(data))
 		if err == nil {
 			thumbKey := "thumb/" + storageKey
-			if putErr := driver.Put(ctx, thumbKey, thumbBuf, int64(thumbBuf.Len()), "image/jpeg"); putErr == nil {
+			if putErr := primary.Driver.Put(ctx, thumbKey, thumbBuf, int64(thumbBuf.Len()), "image/jpeg"); putErr == nil {
 				u := "/t/" + hashMD5[:8]
 				thumbURL = &u
 			}
@@ -182,7 +193,7 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		ID:              fileID,
 		UserID:          params.UserID,
 		AlbumID:         params.AlbumID,
-		StorageConfigID: storageConfigID,
+		StorageConfigID: primary.Meta.ID,
 		OriginalName:    params.Filename,
 		StorageKey:      storageKey,
 		HashMD5:         hashMD5,
@@ -197,11 +208,16 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 
 	if err := s.fileRepo.Create(ctx, file); err != nil {
 		// 回滚：删除已上传的文件
-		_ = driver.Delete(ctx, storageKey)
+		_ = primary.Driver.Delete(ctx, storageKey)
 		return nil, fmt.Errorf("upload create record: %w", err)
 	}
 
-	// 15. 更新用户已用存储量（游客模式跳过）
+	// 15. 如果是 mirror 模式，预写 replica 记录并启动后台协程并发同步副本
+	if plan.Mode == storage.PolicyMirror && len(replicaTargets) > 0 {
+		s.scheduleReplicas(file, data, mimeType, replicaTargets)
+	}
+
+	// 16. 更新用户已用存储量（游客模式跳过）
 	if !params.IsGuest {
 		if err := s.userRepo.UpdateStorageUsed(ctx, params.UserID, int64(len(data))); err != nil {
 			// 非致命错误，记录日志即可
@@ -213,6 +229,95 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		File:  file,
 		Links: s.generateLinks(file, params.BaseURL),
 	}, nil
+}
+
+// writePrimary 按照策略写入主存储，返回实际写入成功的目标和待异步复制的副本目标。
+// 对 primary_fallback：依次尝试直到某个成功，其余视为未使用的 fallback 不做异步。
+// 对 mirror：Targets[0] 是主，Targets[1:] 需要异步复制。
+// 对 single / round_robin：Targets[0] 是主，无副本。
+func (s *FileService) writePrimary(
+	ctx context.Context,
+	plan *storage.Plan,
+	storageKey string,
+	data []byte,
+	mimeType string,
+) (primary storage.Target, replicas []storage.Target, err error) {
+	if len(plan.Targets) == 0 {
+		return storage.Target{}, nil, fmt.Errorf("empty plan")
+	}
+
+	putOnce := func(t storage.Target) error {
+		return t.Driver.Put(ctx, storageKey, bytes.NewReader(data), int64(len(data)), mimeType)
+	}
+
+	switch plan.Mode {
+	case storage.PolicyPrimaryFallback:
+		var lastErr error
+		for _, t := range plan.Targets {
+			if putErr := putOnce(t); putErr == nil {
+				return t, nil, nil
+			} else {
+				lastErr = putErr
+				log.Printf("storage fallback: %s (%s) failed, trying next: %v", t.Meta.Name, t.Meta.ID, putErr)
+			}
+		}
+		return storage.Target{}, nil, fmt.Errorf("all fallback storages failed: %w", lastErr)
+
+	case storage.PolicyMirror:
+		primary = plan.Targets[0]
+		if putErr := putOnce(primary); putErr != nil {
+			return storage.Target{}, nil, fmt.Errorf("mirror primary %q: %w", primary.Meta.Name, putErr)
+		}
+		return primary, plan.Targets[1:], nil
+
+	default: // single / round_robin
+		primary = plan.Targets[0]
+		if putErr := putOnce(primary); putErr != nil {
+			return storage.Target{}, nil, fmt.Errorf("put %q: %w", primary.Meta.Name, putErr)
+		}
+		return primary, nil, nil
+	}
+}
+
+// scheduleReplicas 为 mirror 模式的每个副本先写入 pending 记录，然后启动后台协程并发同步。
+// 协程使用独立 context（不继承请求 context），并发上限等于副本数；失败只记录 status=failed 与错误，不影响主请求。
+func (s *FileService) scheduleReplicas(file *model.File, data []byte, mimeType string, targets []storage.Target) {
+	ctx := context.Background()
+
+	type job struct {
+		replicaID string
+		target    storage.Target
+	}
+	jobs := make([]job, 0, len(targets))
+	for _, t := range targets {
+		r := &model.FileReplica{
+			ID:              uuid.New().String(),
+			FileID:          file.ID,
+			StorageConfigID: t.Meta.ID,
+			Status:          model.ReplicaStatusPending,
+		}
+		if err := s.replicaRepo.Create(ctx, r); err != nil {
+			log.Printf("mirror: create replica record failed for %s: %v", t.Meta.Name, err)
+			continue
+		}
+		jobs = append(jobs, job{replicaID: r.ID, target: t})
+	}
+
+	for _, j := range jobs {
+		j := j
+		go func() {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+
+			err := j.target.Driver.Put(bgCtx, file.StorageKey, bytes.NewReader(data), int64(len(data)), mimeType)
+			if err != nil {
+				log.Printf("mirror replicate %s (%s) failed: %v", j.target.Meta.Name, j.target.Meta.ID, err)
+				_ = s.replicaRepo.UpdateStatus(bgCtx, j.replicaID, model.ReplicaStatusFailed, err.Error())
+				return
+			}
+			_ = s.replicaRepo.UpdateStatus(bgCtx, j.replicaID, model.ReplicaStatusOK, "")
+		}()
+	}
 }
 
 // GetFile 获取文件详情。

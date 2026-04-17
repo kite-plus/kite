@@ -19,13 +19,14 @@ import (
 
 // RouterConfig 路由配置所需的依赖。
 type RouterConfig struct {
-	DB         *gorm.DB
-	StorageMgr *storage.Manager
-	AuthSvc    *service.AuthService
-	FileSvc    *service.FileService
-	AdminFS    fs.FS  // 内嵌的 SPA 资产（web/admin/dist）
-	TemplateFS fs.FS  // 内嵌的 Go 模板（web/template）
-	DataDir    string // 数据目录（用于本地存储文件的静态服务）
+	DB            *gorm.DB
+	StorageMgr    *storage.Manager
+	AuthSvc       *service.AuthService
+	FileSvc       *service.FileService
+	AdminFS       fs.FS  // 内嵌的 SPA 资产（web/admin/dist）
+	TemplateFS    fs.FS  // 内嵌的 Go 模板（web/template）
+	DataDir       string // 数据目录（用于本地存储文件的静态服务）
+	ReloadStorage func() // 在存储配置 CRUD 后重建 Manager 状态，避免 defaultID 与 DB 不一致
 }
 
 // SetupRouter 注册所有路由并返回 gin.Engine 实例。
@@ -48,10 +49,10 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 	fileHandler := NewFileHandler(cfg.FileSvc, fileRepo)
 	albumHandler := NewAlbumHandler(albumRepo, fileRepo)
 	tokenHandler := NewTokenHandler(cfg.AuthSvc, tokenRepo)
-	storageHandler := NewStorageHandler(storageRepo, cfg.StorageMgr)
+	storageHandler := NewStorageHandler(storageRepo, fileRepo, cfg.StorageMgr, cfg.ReloadStorage)
 	settingsHandler := NewSettingsHandler(settingRepo)
 	userHandler := NewUserHandler(userRepo, fileRepo, cfg.AuthSvc)
-	setupHandler := NewSetupHandler(userRepo, settingRepo, storageRepo, cfg.StorageMgr, cfg.AuthSvc)
+	setupHandler := NewSetupHandler(userRepo, settingRepo, storageRepo, cfg.StorageMgr, cfg.AuthSvc, cfg.ReloadStorage)
 
 	// ========== 公开接口（无需认证）==========
 
@@ -187,10 +188,13 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		{
 			// 存储配置
 			admin.GET("/storage", storageHandler.List)
+			admin.GET("/storage/:id", storageHandler.GetOne)
 			admin.POST("/storage", storageHandler.Create)
 			admin.PUT("/storage/:id", storageHandler.Update)
 			admin.DELETE("/storage/:id", storageHandler.Delete)
 			admin.POST("/storage/:id/test", storageHandler.Test)
+			admin.POST("/storage/:id/set-default", storageHandler.SetDefault)
+			admin.POST("/storage/reorder", storageHandler.Reorder)
 
 			// 系统设置
 			admin.GET("/settings", settingsHandler.Get)

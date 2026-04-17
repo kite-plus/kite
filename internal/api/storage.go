@@ -13,18 +13,37 @@ import (
 
 // StorageHandler 存储配置管理的 HTTP 处理器。
 type StorageHandler struct {
-	storageRepo *repo.StorageConfigRepo
-	storageMgr  *storage.Manager
+	storageRepo   *repo.StorageConfigRepo
+	fileRepo      *repo.FileRepo
+	storageMgr    *storage.Manager
+	reloadStorage func() // 任何变更后调用以刷新 Manager 状态
 }
 
-func NewStorageHandler(storageRepo *repo.StorageConfigRepo, storageMgr *storage.Manager) *StorageHandler {
-	return &StorageHandler{storageRepo: storageRepo, storageMgr: storageMgr}
+func NewStorageHandler(
+	storageRepo *repo.StorageConfigRepo,
+	fileRepo *repo.FileRepo,
+	storageMgr *storage.Manager,
+	reloadStorage func(),
+) *StorageHandler {
+	if reloadStorage == nil {
+		reloadStorage = func() {}
+	}
+	return &StorageHandler{
+		storageRepo:   storageRepo,
+		fileRepo:      fileRepo,
+		storageMgr:    storageMgr,
+		reloadStorage: reloadStorage,
+	}
 }
 
 type createStorageRequest struct {
-	Name   string         `json:"name" binding:"required"`
-	Driver string         `json:"driver" binding:"required,oneof=local s3"`
-	Config json.RawMessage `json:"config" binding:"required"`
+	Name               string          `json:"name" binding:"required"`
+	Driver             string          `json:"driver" binding:"required,oneof=local s3 oss cos ftp"`
+	Config             json.RawMessage `json:"config" binding:"required"`
+	CapacityLimitBytes int64           `json:"capacity_limit_bytes"`
+	Priority           int             `json:"priority"`
+	IsDefault          bool            `json:"is_default"`
+	IsActive           *bool           `json:"is_active"` // 指针以区分未提供与显式 false
 }
 
 // Create 添加存储配置。
@@ -35,24 +54,10 @@ func (h *StorageHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// 验证 config 格式
-	var scfg storage.StorageConfig
-	scfg.Driver = req.Driver
-	switch req.Driver {
-	case "local":
-		var lc storage.LocalConfig
-		if err := json.Unmarshal(req.Config, &lc); err != nil {
-			badRequest(c, "invalid local config: "+err.Error())
-			return
-		}
-		scfg.Local = &lc
-	case "s3":
-		var sc storage.S3Config
-		if err := json.Unmarshal(req.Config, &sc); err != nil {
-			badRequest(c, "invalid s3 config: "+err.Error())
-			return
-		}
-		scfg.S3 = &sc
+	scfg, err := storage.ParseConfig(req.Driver, req.Config)
+	if err != nil {
+		badRequest(c, "invalid "+req.Driver+" config: "+err.Error())
+		return
 	}
 
 	// 验证能否创建驱动
@@ -61,11 +66,29 @@ func (h *StorageHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if req.CapacityLimitBytes < 0 {
+		badRequest(c, "capacity_limit_bytes must not be negative")
+		return
+	}
+
+	priority := req.Priority
+	if priority <= 0 {
+		priority = 100
+	}
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
 	cfg := &model.StorageConfig{
-		ID:     uuid.New().String(),
-		Name:   req.Name,
-		Driver: req.Driver,
-		Config: string(req.Config),
+		ID:                 uuid.New().String(),
+		Name:               req.Name,
+		Driver:             req.Driver,
+		Config:             string(req.Config),
+		CapacityLimitBytes: req.CapacityLimitBytes,
+		Priority:           priority,
+		IsDefault:          req.IsDefault,
+		IsActive:           isActive,
 	}
 
 	if err := h.storageRepo.Create(c.Request.Context(), cfg); err != nil {
@@ -73,8 +96,15 @@ func (h *StorageHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// 加载到管理器
-	_ = h.storageMgr.LoadAndRegister(cfg.ID, scfg)
+	// 如果前端要求将此配置设为默认，先清除其他默认再重载，避免 Manager 读到两个默认。
+	if req.IsDefault {
+		if err := h.storageRepo.SetDefault(c.Request.Context(), cfg.ID); err != nil {
+			serverError(c, "failed to set default storage: "+err.Error())
+			return
+		}
+	}
+
+	h.reloadStorage()
 
 	created(c, gin.H{
 		"id":     cfg.ID,
@@ -93,24 +123,61 @@ func (h *StorageHandler) List(c *gin.Context) {
 
 	// 不返回敏感的 config 字段内容
 	type item struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		Driver    string `json:"driver"`
-		IsDefault bool   `json:"is_default"`
-		IsActive  bool   `json:"is_active"`
+		ID                 string `json:"id"`
+		Name               string `json:"name"`
+		Driver             string `json:"driver"`
+		CapacityLimitBytes int64  `json:"capacity_limit_bytes"`
+		UsedBytes          int64  `json:"used_bytes"`
+		Priority           int    `json:"priority"`
+		IsDefault          bool   `json:"is_default"`
+		IsActive           bool   `json:"is_active"`
 	}
 	items := make([]item, len(configs))
 	for i, cfg := range configs {
+		used, _ := h.fileRepo.SumSizeByStorageConfig(c.Request.Context(), cfg.ID)
 		items[i] = item{
-			ID:        cfg.ID,
-			Name:      cfg.Name,
-			Driver:    cfg.Driver,
-			IsDefault: cfg.IsDefault,
-			IsActive:  cfg.IsActive,
+			ID:                 cfg.ID,
+			Name:               cfg.Name,
+			Driver:             cfg.Driver,
+			CapacityLimitBytes: cfg.CapacityLimitBytes,
+			UsedBytes:          used,
+			Priority:           cfg.Priority,
+			IsDefault:          cfg.IsDefault,
+			IsActive:           cfg.IsActive,
 		}
 	}
 
 	success(c, items)
+}
+
+// GetOne 获取单个存储配置的完整详情（含 config JSON），用于编辑对话框回显。
+func (h *StorageHandler) GetOne(c *gin.Context) {
+	id := c.Param("id")
+
+	cfg, err := h.storageRepo.GetByID(c.Request.Context(), id)
+	if err != nil {
+		notFound(c, "storage config not found")
+		return
+	}
+
+	used, _ := h.fileRepo.SumSizeByStorageConfig(c.Request.Context(), id)
+
+	var configJSON json.RawMessage
+	if cfg.Config != "" {
+		configJSON = json.RawMessage(cfg.Config)
+	}
+
+	success(c, gin.H{
+		"id":                   cfg.ID,
+		"name":                 cfg.Name,
+		"driver":               cfg.Driver,
+		"config":               configJSON,
+		"capacity_limit_bytes": cfg.CapacityLimitBytes,
+		"used_bytes":           used,
+		"priority":             cfg.Priority,
+		"is_default":           cfg.IsDefault,
+		"is_active":            cfg.IsActive,
+	})
 }
 
 // Update 更新存储配置。
@@ -129,21 +196,46 @@ func (h *StorageHandler) Update(c *gin.Context) {
 		return
 	}
 
+	if req.CapacityLimitBytes < 0 {
+		badRequest(c, "capacity_limit_bytes must not be negative")
+		return
+	}
+
+	scfg, err := storage.ParseConfig(req.Driver, req.Config)
+	if err != nil {
+		badRequest(c, "invalid "+req.Driver+" config: "+err.Error())
+		return
+	}
+	if _, err := storage.NewDriver(scfg); err != nil {
+		badRequest(c, "storage config validation failed: "+err.Error())
+		return
+	}
+
 	existing.Name = req.Name
 	existing.Driver = req.Driver
 	existing.Config = string(req.Config)
+	existing.CapacityLimitBytes = req.CapacityLimitBytes
+	if req.Priority > 0 {
+		existing.Priority = req.Priority
+	}
+	// is_default 在这里不直接落库，避免绕过 SetDefault 的互斥语义；由下方 SetDefault 统一处理。
+	if req.IsActive != nil {
+		existing.IsActive = *req.IsActive
+	}
 
 	if err := h.storageRepo.Update(c.Request.Context(), existing); err != nil {
 		serverError(c, "failed to update storage config")
 		return
 	}
 
-	// 重新加载驱动
-	h.storageMgr.Remove(id)
-	var scfg storage.StorageConfig
-	scfg.Driver = req.Driver
-	_ = json.Unmarshal(req.Config, &scfg)
-	_ = h.storageMgr.LoadAndRegister(id, scfg)
+	if req.IsDefault && !existing.IsDefault {
+		if err := h.storageRepo.SetDefault(c.Request.Context(), id); err != nil {
+			serverError(c, "failed to set default storage: "+err.Error())
+			return
+		}
+	}
+
+	h.reloadStorage()
 
 	success(c, gin.H{"id": id, "name": req.Name, "driver": req.Driver})
 }
@@ -157,7 +249,7 @@ func (h *StorageHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	h.storageMgr.Remove(id)
+	h.reloadStorage()
 	success(c, nil)
 }
 
@@ -171,21 +263,10 @@ func (h *StorageHandler) Test(c *gin.Context) {
 		return
 	}
 
-	var scfg storage.StorageConfig
-	scfg.Driver = cfg.Driver
-	if err := json.Unmarshal([]byte(cfg.Config), &scfg); err != nil {
+	scfg, err := storage.ParseConfig(cfg.Driver, json.RawMessage(cfg.Config))
+	if err != nil {
 		serverError(c, "failed to parse storage config")
 		return
-	}
-
-	// 验证存储配置
-	switch scfg.Driver {
-	case "local":
-		scfg.Local = new(storage.LocalConfig)
-		_ = json.Unmarshal([]byte(cfg.Config), scfg.Local)
-	case "s3":
-		scfg.S3 = new(storage.S3Config)
-		_ = json.Unmarshal([]byte(cfg.Config), scfg.S3)
 	}
 
 	driver, err := storage.NewDriver(scfg)
@@ -207,4 +288,42 @@ func (h *StorageHandler) Test(c *gin.Context) {
 	_ = driver.Delete(c.Request.Context(), testKey)
 
 	success(c, gin.H{"ok": true})
+}
+
+// SetDefault 将指定存储设为默认。
+func (h *StorageHandler) SetDefault(c *gin.Context) {
+	id := c.Param("id")
+	if _, err := h.storageRepo.GetByID(c.Request.Context(), id); err != nil {
+		notFound(c, "storage config not found")
+		return
+	}
+	if err := h.storageRepo.SetDefault(c.Request.Context(), id); err != nil {
+		serverError(c, "failed to set default storage: "+err.Error())
+		return
+	}
+	h.reloadStorage()
+	success(c, gin.H{"id": id})
+}
+
+type reorderRequest struct {
+	OrderedIDs []string `json:"ordered_ids" binding:"required"`
+}
+
+// Reorder 按前端给出的 ID 顺序批量重写 priority（拖拽排序）。
+func (h *StorageHandler) Reorder(c *gin.Context) {
+	var req reorderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		badRequest(c, "invalid reorder payload: "+err.Error())
+		return
+	}
+	if len(req.OrderedIDs) == 0 {
+		badRequest(c, "ordered_ids must not be empty")
+		return
+	}
+	if err := h.storageRepo.Reorder(c.Request.Context(), req.OrderedIDs); err != nil {
+		serverError(c, "failed to reorder storages: "+err.Error())
+		return
+	}
+	h.reloadStorage()
+	success(c, nil)
 }

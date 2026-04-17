@@ -13,11 +13,12 @@ import (
 
 // SetupHandler 首次安装向导的 HTTP 处理器。
 type SetupHandler struct {
-	userRepo    *repo.UserRepo
-	settingRepo *repo.SettingRepo
-	storageRepo *repo.StorageConfigRepo
-	storageMgr  *storage.Manager
-	authSvc     *service.AuthService
+	userRepo      *repo.UserRepo
+	settingRepo   *repo.SettingRepo
+	storageRepo   *repo.StorageConfigRepo
+	storageMgr    *storage.Manager
+	authSvc       *service.AuthService
+	reloadStorage func()
 }
 
 func NewSetupHandler(
@@ -26,13 +27,18 @@ func NewSetupHandler(
 	storageRepo *repo.StorageConfigRepo,
 	storageMgr *storage.Manager,
 	authSvc *service.AuthService,
+	reloadStorage func(),
 ) *SetupHandler {
+	if reloadStorage == nil {
+		reloadStorage = func() {}
+	}
 	return &SetupHandler{
-		userRepo:    userRepo,
-		settingRepo: settingRepo,
-		storageRepo: storageRepo,
-		storageMgr:  storageMgr,
-		authSvc:     authSvc,
+		userRepo:      userRepo,
+		settingRepo:   settingRepo,
+		storageRepo:   storageRepo,
+		storageMgr:    storageMgr,
+		authSvc:       authSvc,
+		reloadStorage: reloadStorage,
 	}
 }
 
@@ -87,23 +93,10 @@ func (h *SetupHandler) Setup(c *gin.Context) {
 	}
 
 	// 3. 创建默认存储配置
-	var scfg storage.StorageConfig
-	scfg.Driver = req.StorageDriver
-	switch req.StorageDriver {
-	case "local":
-		var lc storage.LocalConfig
-		if err := json.Unmarshal(req.StorageConfig, &lc); err != nil {
-			badRequest(c, "invalid local storage config: "+err.Error())
-			return
-		}
-		scfg.Local = &lc
-	case "s3":
-		var sc storage.S3Config
-		if err := json.Unmarshal(req.StorageConfig, &sc); err != nil {
-			badRequest(c, "invalid s3 storage config: "+err.Error())
-			return
-		}
-		scfg.S3 = &sc
+	scfg, err := storage.ParseConfig(req.StorageDriver, req.StorageConfig)
+	if err != nil {
+		badRequest(c, "invalid "+req.StorageDriver+" storage config: "+err.Error())
+		return
 	}
 
 	// 验证存储配置
@@ -117,6 +110,7 @@ func (h *SetupHandler) Setup(c *gin.Context) {
 		Name:      "Default Storage",
 		Driver:    req.StorageDriver,
 		Config:    string(req.StorageConfig),
+		Priority:  100,
 		IsDefault: true,
 		IsActive:  true,
 	}
@@ -126,9 +120,8 @@ func (h *SetupHandler) Setup(c *gin.Context) {
 		return
 	}
 
-	// 加载存储驱动
-	_ = h.storageMgr.LoadAndRegister(storageCfg.ID, scfg)
-	_ = h.storageMgr.SetDefault(storageCfg.ID)
+	// 重载存储管理器，读取默认存储 + 所有活跃配置
+	h.reloadStorage()
 
 	success(c, gin.H{
 		"message":  "setup completed successfully",
