@@ -1,15 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { FileText, HardDrive, Image, Video, Upload } from "lucide-react";
+import { Files, HardDrive, Image, Upload, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { statsApi } from "@/lib/api";
 import { useI18n } from "@/i18n";
-import { useAuth } from "@/hooks/use-auth";
-import { formatSize, calcPercent } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { calcPercent, formatSize } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import FileTypeChart from "./FileTypeChart";
-import RecentFiles from "./RecentFiles";
+import UploadTrendChart from "./UploadTrendChart";
 
 interface DashboardStats {
   total_files: number;
@@ -23,7 +29,6 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { t } = useI18n();
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   const { data, isLoading } = useQuery<DashboardStats>({
@@ -43,134 +48,86 @@ export default function DashboardPage() {
     users: 0,
   };
 
+  const summaryItems = [
+    {
+      key: "total",
+      label: t("dashboard.totalFiles"),
+      value: stats.total_files.toLocaleString(),
+      icon: Files,
+      hint: `${t("dashboard.images")} ${calcPercent(stats.images, stats.total_files)}%`,
+    },
+    {
+      key: "storage",
+      label: t("dashboard.storageUsed"),
+      value: formatSize(stats.total_size),
+      icon: HardDrive,
+      hint: `${stats.total_files.toLocaleString()} ${t("dashboard.filesTotal")}`,
+    },
+    {
+      key: "images",
+      label: t("dashboard.images"),
+      value: stats.images.toLocaleString(),
+      icon: Image,
+      hint: `${calcPercent(stats.images, stats.total_files)}% ${t("dashboard.percentOfTotal")}`,
+    },
+    {
+      key: "users",
+      label: t("dashboard.users"),
+      value: stats.users.toLocaleString(),
+      icon: Users,
+      hint: "\u00A0",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Page header */}
+    <div className="space-y-5">
       <div className="flex flex-row items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             {t("dashboard.title")}
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">
+          <p className="line-clamp-1 text-xs text-muted-foreground sm:text-sm">
             {t("dashboard.description")}
           </p>
         </div>
         <Button size="sm" className="shrink-0" onClick={() => navigate("/files")}>
-          <Upload className="mr-2 h-4 w-4 hidden sm:block" />
-          <Upload className="h-4 w-4 sm:hidden" />
-          <span className="hidden sm:inline-block ml-2">{t("common.upload")}</span>
-          <span className="sm:hidden ml-2">{t("common.upload")}</span>
+          <Upload className="h-4 w-4" />
+          <span className="ml-2">{t("common.upload")}</span>
         </Button>
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              {t("dashboard.totalFiles")}
-            </CardTitle>
-            <div className="flex size-9 items-center justify-center rounded-lg border bg-background shadow-xs">
-              <FileText className="h-4 w-4 text-foreground/70" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold tracking-tight">
-                  {stats.total_files.toLocaleString()}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {user?.role === "admin"
-                    ? `${stats.users} ${t("dashboard.users")}`
-                    : `${stats.total_files.toLocaleString()} ${t("dashboard.filesTotal")}`}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {summaryItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Card key={item.key} className="gap-2 py-4 transition-colors hover:border-border">
+              <CardHeader className="px-4 sm:px-6">
+                <CardDescription className="truncate text-xs font-medium">
+                  {item.label}
+                </CardDescription>
+                {isLoading ? (
+                  <Skeleton className="mt-1 h-7 w-20" />
+                ) : (
+                  <CardTitle className="mt-1 truncate text-xl font-semibold tracking-tight tabular-nums sm:text-2xl">
+                    {item.value}
+                  </CardTitle>
+                )}
+                <CardAction>
+                  <span className="inline-flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground sm:size-8">
+                    <Icon className="size-3.5 sm:size-4" />
+                  </span>
+                </CardAction>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6">
+                <p className="truncate text-xs text-muted-foreground tabular-nums">
+                  {item.hint}
                 </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              {t("dashboard.storageUsed")}
-            </CardTitle>
-            <div className="flex size-9 items-center justify-center rounded-lg border bg-background shadow-xs">
-              <HardDrive className="h-4 w-4 text-foreground/70" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold tracking-tight">
-                  {formatSize(stats.total_size)}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {stats.total_files.toLocaleString()} {t("dashboard.filesTotal")}
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              {t("dashboard.images")}
-            </CardTitle>
-            <div className="flex size-9 items-center justify-center rounded-lg border bg-background shadow-xs">
-              <Image className="h-4 w-4 text-foreground/70" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-12" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold tracking-tight">
-                  {stats.images.toLocaleString()}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t("dashboard.percentOfTotal")}{" "}
-                  {calcPercent(stats.images, stats.total_files)}%
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              {t("dashboard.videos")}
-            </CardTitle>
-            <div className="flex size-9 items-center justify-center rounded-lg border bg-background shadow-xs">
-              <Video className="h-4 w-4 text-foreground/70" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-12" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold tracking-tight">
-                  {stats.videos.toLocaleString()}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t("dashboard.percentOfTotal")}{" "}
-                  {calcPercent(stats.videos, stats.total_files)}%
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Bottom grid */}
       <div className="grid gap-4 lg:grid-cols-2">
         <FileTypeChart
           totalFiles={stats.total_files}
@@ -180,7 +137,7 @@ export default function DashboardPage() {
           otherCount={stats.others}
           isLoading={isLoading}
         />
-        <RecentFiles />
+        <UploadTrendChart />
       </div>
     </div>
   );

@@ -99,6 +99,9 @@ const en = {
     latestFiles: "Latest 5 files",
     noFilesYet: "No files uploaded yet",
     used: "Used",
+    trendLast7Days: "Upload trend in last 7 days",
+    totalUploads7d: "7-day total uploads",
+    uploads: "Uploads",
   },
 
   files: {

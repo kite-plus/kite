@@ -101,6 +101,9 @@ const zh: Translations = {
     latestFiles: "最新 5 个文件",
     noFilesYet: "暂无上传文件",
     used: "已用",
+    trendLast7Days: "近 7 天上传趋势",
+    totalUploads7d: "近 7 天总上传",
+    uploads: "上传",
   },
 
   files: {
