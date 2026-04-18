@@ -1,27 +1,32 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/amigoer/kite/internal/api/middleware"
 	"github.com/amigoer/kite/internal/model"
 	"github.com/amigoer/kite/internal/repo"
 	"github.com/amigoer/kite/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // FileHandler 文件上传、查询、删除、访问的 HTTP 处理器。
 type FileHandler struct {
-	fileSvc  *service.FileService
-	fileRepo *repo.FileRepo
+	fileSvc       *service.FileService
+	fileRepo      *repo.FileRepo
+	albumRepo     *repo.AlbumRepo
+	accessLogRepo *repo.FileAccessLogRepo
 }
 
-func NewFileHandler(fileSvc *service.FileService, fileRepo *repo.FileRepo) *FileHandler {
-	return &FileHandler{fileSvc: fileSvc, fileRepo: fileRepo}
+func NewFileHandler(fileSvc *service.FileService, fileRepo *repo.FileRepo, albumRepo *repo.AlbumRepo, accessLogRepo *repo.FileAccessLogRepo) *FileHandler {
+	return &FileHandler{fileSvc: fileSvc, fileRepo: fileRepo, albumRepo: albumRepo, accessLogRepo: accessLogRepo}
 }
 
 // Upload 处理文件上传。
@@ -129,7 +134,6 @@ func (h *FileHandler) GuestUpload(c *gin.Context) {
 // 管理员可以查看全部文件。
 func (h *FileHandler) List(c *gin.Context) {
 	userID := c.GetString(middleware.ContextKeyUserID)
-	role := c.GetString(middleware.ContextKeyRole)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 	if page < 1 {
@@ -140,6 +144,8 @@ func (h *FileHandler) List(c *gin.Context) {
 	}
 
 	params := repo.FileListParams{
+		UserID:   userID,
+		NoAlbum:  c.Query("no_album") == "true",
 		AlbumID:  c.Query("album_id"),
 		FileType: c.Query("file_type"),
 		Keyword:  c.Query("keyword"),
@@ -147,11 +153,6 @@ func (h *FileHandler) List(c *gin.Context) {
 		PageSize: size,
 		OrderBy:  c.DefaultQuery("order_by", "created_at"),
 		Order:    c.DefaultQuery("order", "DESC"),
-	}
-
-	// 管理员查看全站文件，普通用户只能查看自己的
-	if role != "admin" {
-		params.UserID = userID
 	}
 
 	files, total, err := h.fileSvc.ListFiles(c.Request.Context(), params)
@@ -240,8 +241,13 @@ func (h *FileHandler) AdminDelete(c *gin.Context) {
 // Detail 获取文件详情。
 func (h *FileHandler) Detail(c *gin.Context) {
 	id := c.Param("id")
+	userID := c.GetString(middleware.ContextKeyUserID)
 	file, err := h.fileSvc.GetFile(c.Request.Context(), id)
 	if err != nil {
+		notFound(c, "file not found")
+		return
+	}
+	if file.UserID != userID {
 		notFound(c, "file not found")
 		return
 	}
@@ -252,9 +258,8 @@ func (h *FileHandler) Detail(c *gin.Context) {
 func (h *FileHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString(middleware.ContextKeyUserID)
-	role := c.GetString(middleware.ContextKeyRole)
 
-	if err := h.fileSvc.DeleteFile(c.Request.Context(), id, userID, role); err != nil {
+	if err := h.fileSvc.DeleteFile(c.Request.Context(), id, userID, "user"); err != nil {
 		if errors.Is(err, service.ErrFileNotFound) {
 			notFound(c, "file not found")
 			return
@@ -281,11 +286,10 @@ func (h *FileHandler) BatchDelete(c *gin.Context) {
 	}
 
 	userID := c.GetString(middleware.ContextKeyUserID)
-	role := c.GetString(middleware.ContextKeyRole)
 
 	var errs []string
 	for _, id := range req.IDs {
-		if err := h.fileSvc.DeleteFile(c.Request.Context(), id, userID, role); err != nil {
+		if err := h.fileSvc.DeleteFile(c.Request.Context(), id, userID, "user"); err != nil {
 			errs = append(errs, fmt.Sprintf("%s: %s", id, err.Error()))
 		}
 	}
@@ -296,6 +300,45 @@ func (h *FileHandler) BatchDelete(c *gin.Context) {
 	}
 
 	success(c, gin.H{"deleted": len(req.IDs)})
+}
+
+// MoveFile 移动文件到指定文件夹（设置 album_id）。folder_id 为 null 时移出所有文件夹。
+func (h *FileHandler) MoveFile(c *gin.Context) {
+	id := c.Param("id")
+	userID := c.GetString(middleware.ContextKeyUserID)
+
+	var req struct {
+		FolderID *string `json:"folder_id"` // null = 移到根目录
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		badRequest(c, "invalid request")
+		return
+	}
+
+	file, err := h.fileRepo.GetByID(c.Request.Context(), id)
+	if err != nil {
+		notFound(c, "file not found")
+		return
+	}
+	if file.UserID != userID {
+		forbidden(c, "not the owner of this file")
+		return
+	}
+
+	if req.FolderID != nil && *req.FolderID != "" {
+		folder, err := h.albumRepo.GetByID(c.Request.Context(), *req.FolderID)
+		if err != nil || folder.UserID != userID {
+			badRequest(c, "invalid target folder")
+			return
+		}
+	}
+
+	if err := h.fileRepo.SetAlbum(c.Request.Context(), id, req.FolderID); err != nil {
+		serverError(c, "failed to move file")
+		return
+	}
+
+	success(c, nil)
 }
 
 // ServeImage 通过短链提供图片访问（内联预览）。
@@ -344,6 +387,25 @@ func (h *FileHandler) ServeThumbnail(c *gin.Context) {
 	c.Header("Cache-Control", "public, max-age=86400")
 	c.Header("ETag", file.HashMD5+"-thumb")
 	c.DataFromReader(http.StatusOK, size, "image/jpeg", reader, nil)
+	h.logAccess(file.ID, file.UserID, size)
+}
+
+// logAccess 异步记录一次文件访问；失败不影响请求。
+// userID 为文件所有者（游客文件为 "guest" 或空），用于按用户维度统计访问量。
+func (h *FileHandler) logAccess(fileID, userID string, bytes int64) {
+	if h.accessLogRepo == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = h.accessLogRepo.Create(ctx, &model.FileAccessLog{
+			ID:          uuid.New().String(),
+			FileID:      fileID,
+			UserID:      userID,
+			BytesServed: bytes,
+		})
+	}()
 }
 
 func (h *FileHandler) serveFile(c *gin.Context, _ string, forceDownload bool) {
@@ -382,6 +444,7 @@ func (h *FileHandler) serveFile(c *gin.Context, _ string, forceDownload bool) {
 	}
 
 	c.DataFromReader(http.StatusOK, size, contentType, reader, nil)
+	h.logAccess(file.ID, file.UserID, size)
 }
 
 func (h *FileHandler) findFileByHash(c *gin.Context, hash string) (*model.File, error) {

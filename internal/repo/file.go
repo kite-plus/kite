@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/amigoer/kite/internal/model"
 	"gorm.io/gorm"
@@ -99,6 +100,7 @@ func (r *FileRepo) GetByHashPrefix(ctx context.Context, prefix string) (*model.F
 type FileListParams struct {
 	UserID   string
 	AlbumID  string // 为空则不按相册过滤
+	NoAlbum  bool   // 为 true 时查询未归属任何文件夹的文件（album_id IS NULL）
 	FileType string // 为空则不按类型过滤
 	Keyword  string // 搜索原始文件名
 	Page     int
@@ -117,7 +119,9 @@ func (r *FileRepo) List(ctx context.Context, params FileListParams) ([]model.Fil
 	if params.UserID != "" {
 		db = db.Where("user_id = ?", params.UserID)
 	}
-	if params.AlbumID != "" {
+	if params.NoAlbum {
+		db = db.Where("album_id IS NULL")
+	} else if params.AlbumID != "" {
 		db = db.Where("album_id = ?", params.AlbumID)
 	}
 	if params.FileType != "" {
@@ -151,6 +155,16 @@ func (r *FileRepo) SoftDelete(ctx context.Context, id string) error {
 		Where("id = ?", id).
 		Update("is_deleted", true).Error; err != nil {
 		return fmt.Errorf("soft delete file: %w", err)
+	}
+	return nil
+}
+
+// SetAlbum 设置或清除文件的文件夹（album_id）。albumID 为 nil 时清除归属。
+func (r *FileRepo) SetAlbum(ctx context.Context, fileID string, albumID *string) error {
+	if err := r.db.WithContext(ctx).Model(&model.File{}).
+		Where("id = ? AND is_deleted = ?", fileID, false).
+		Update("album_id", albumID).Error; err != nil {
+		return fmt.Errorf("set album: %w", err)
 	}
 	return nil
 }
@@ -303,4 +317,28 @@ func (r *FileRepo) GetUserStats(ctx context.Context, userID string) (*FileStats,
 	}
 
 	return &stats, nil
+}
+
+// DailyUploadStat 每日上传量统计。
+type DailyUploadStat struct {
+	Day         string `json:"day"`          // YYYY-MM-DD
+	UploadCount int64  `json:"upload_count"` // 当日新增文件数
+}
+
+// GetDailyUploadStats 获取指定时间范围内每日上传量。
+// start/end 为 UTC 日期边界（start 含、end 不含）。
+// userID 为空时返回全站聚合（管理员视角）；非空时仅统计该用户的上传。
+func (r *FileRepo) GetDailyUploadStats(ctx context.Context, userID string, start, end time.Time) ([]DailyUploadStat, error) {
+	var rows []DailyUploadStat
+	db := r.db.WithContext(ctx).
+		Model(&model.File{}).
+		Select("strftime('%Y-%m-%d', created_at) as day, COUNT(*) as upload_count").
+		Where("is_deleted = ? AND created_at >= ? AND created_at < ?", false, start, end)
+	if userID != "" {
+		db = db.Where("user_id = ?", userID)
+	}
+	if err := db.Group("day").Order("day ASC").Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("get daily upload stats: %w", err)
+	}
+	return rows, nil
 }

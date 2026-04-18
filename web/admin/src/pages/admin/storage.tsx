@@ -7,6 +7,9 @@ import {
   Plus,
   Pencil,
   AlertCircle,
+  Layers,
+  Repeat,
+  Copy as CopyIcon,
   Infinity as InfinityIcon,
   GripVertical,
   Star,
@@ -31,7 +34,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { storageApi } from "@/lib/api";
+import { settingsApi, storageApi } from "@/lib/api";
 import { useI18n } from "@/i18n";
 import { formatSize } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,6 +43,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -61,6 +65,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PageHeader, Section } from "@/components/page-header";
 import { BrandIcon, getBrandInfo } from "@/components/storage-brand";
 import { toast } from "sonner";
 
@@ -147,7 +152,7 @@ interface DriverOption {
   value: Driver;
   labelKey: string;
   descKey: string;
-  provider: string; // 用于 BrandIcon；s3 表示通用兼容协议
+  provider: string;
 }
 
 const DRIVER_OPTIONS: DriverOption[] = [
@@ -157,6 +162,13 @@ const DRIVER_OPTIONS: DriverOption[] = [
   { value: "cos", labelKey: "storage.driverCos", descKey: "storage.driverCosDesc", provider: "tencent-cos" },
   { value: "ftp", labelKey: "storage.driverFtp", descKey: "storage.driverFtpDesc", provider: "ftp" },
 ];
+
+const UPLOAD_POLICY_OPTIONS = [
+  { value: "single", icon: HardDrive },
+  { value: "primary_fallback", icon: Layers },
+  { value: "round_robin", icon: Repeat },
+  { value: "mirror", icon: CopyIcon },
+] as const;
 
 function mapStorageError(err: unknown, fallback: string): string {
   const status = (err as { response?: { status?: number } })?.response?.status;
@@ -196,13 +208,33 @@ export default function StoragePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<StorageForm>({ ...emptyForm });
   const [testResult, setTestResult] = useState<Record<string, "ok" | "fail" | "testing">>({});
+  const [uploadPolicy, setUploadPolicy] = useState("single");
 
-  const { data, isLoading } = useQuery<StorageListItem[]>({
+  const { data: settings } = useQuery<Record<string, string>>({
+    queryKey: ["settings"],
+    queryFn: () => settingsApi.get().then((r) => r.data.data),
+  });
+
+  useEffect(() => {
+    if (settings?.["storage.upload_policy"]) {
+      setUploadPolicy(settings["storage.upload_policy"]);
+    }
+  }, [settings]);
+
+  const saveUploadPolicyMutation = useMutation({
+    mutationFn: () => settingsApi.update({ "storage.upload_policy": uploadPolicy }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+      toast.success("上传策略已保存");
+    },
+    onError: () => toast.error("上传策略保存失败"),
+  });
+
+  const { data, isLoading: isStorageLoading } = useQuery<StorageListItem[]>({
     queryKey: ["storage"],
     queryFn: () => storageApi.list().then((r) => r.data.data),
   });
 
-  // orderedIds 是乐观的本地顺序，后端异步确认后刷新；这样拖动结束动画流畅。
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   useEffect(() => {
     if (data) setOrderedIds(data.map((c) => c.id));
@@ -253,7 +285,6 @@ export default function StoragePage() {
       toast.success(t("storage.reorderSuccess"));
     },
     onError: (err) => {
-      // 回滚为上一份服务端数据
       if (data) setOrderedIds(data.map((c) => c.id));
       toast.error(mapStorageError(err, "排序保存失败"));
     },
@@ -336,61 +367,120 @@ export default function StoragePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("storage.title")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("storage.description")}</p>
+    <div className="space-y-10">
+      <PageHeader
+        title={t("storage.title")}
+        description={t("storage.description")}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="size-4" />
+            {t("storage.addStorage")}
+          </Button>
+        }
+      />
+
+      <Section
+        title={t("storage.uploadPolicy")}
+        description={t("storage.uploadPolicyDesc")}
+        actions={
+          <Button
+            variant="outline"
+            onClick={() => saveUploadPolicyMutation.mutate()}
+            disabled={saveUploadPolicyMutation.isPending}
+          >
+            {saveUploadPolicyMutation.isPending ? t("settings.saving") : t("settings.saveSettings")}
+          </Button>
+        }
+      >
+        <div className="max-w-xl">
+          <Select value={uploadPolicy} onValueChange={setUploadPolicy}>
+            <SelectTrigger className="h-auto w-full py-2.5">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {UPLOAD_POLICY_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                const labelKey =
+                  opt.value === "single"
+                    ? "storage.policySingle"
+                    : opt.value === "primary_fallback"
+                      ? "storage.policyPrimaryFallback"
+                      : opt.value === "round_robin"
+                        ? "storage.policyRoundRobin"
+                        : "storage.policyMirror";
+                const descKey =
+                  opt.value === "single"
+                    ? "storage.policySingleDesc"
+                    : opt.value === "primary_fallback"
+                      ? "storage.policyPrimaryFallbackDesc"
+                      : opt.value === "round_robin"
+                        ? "storage.policyRoundRobinDesc"
+                        : "storage.policyMirrorDesc";
+                return (
+                  <SelectItem key={opt.value} value={opt.value} className="py-2">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                        <Icon className="size-4" />
+                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium">{t(labelKey)}</span>
+                        <span className="text-xs text-muted-foreground">{t(descKey)}</span>
+                      </div>
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="size-4" />
-          {t("storage.addStorage")}
-        </Button>
-      </div>
+      </Section>
 
-      {!isLoading && orderedItems.length > 0 && (
-        <p className="text-xs text-muted-foreground">{t("storage.priorityHint")}</p>
-      )}
+      <Separator />
 
-      {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
-          ))}
-        </div>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-            <div className="space-y-3">
-              {orderedItems.map((cfg) => (
-                <SortableStorageRow
-                  key={cfg.id}
-                  cfg={cfg}
-                  testResult={testResult[cfg.id]}
-                  onTest={() => handleTest(cfg.id)}
-                  onEdit={() => openEdit(cfg.id)}
-                  onDelete={() => deleteMutation.mutate(cfg.id)}
-                  onSetDefault={() => setDefaultMutation.mutate(cfg.id)}
-                  setDefaultPending={
-                    setDefaultMutation.isPending && setDefaultMutation.variables === cfg.id
-                  }
-                />
-              ))}
+      <Section
+        title={t("storage.title")}
+        description={t("storage.priorityHint")}
+      >
+        {isStorageLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
+              <div className="space-y-3">
+                {orderedItems.map((cfg) => (
+                  <SortableStorageRow
+                    key={cfg.id}
+                    cfg={cfg}
+                    testResult={testResult[cfg.id]}
+                    onTest={() => handleTest(cfg.id)}
+                    onEdit={() => openEdit(cfg.id)}
+                    onDelete={() => deleteMutation.mutate(cfg.id)}
+                    onSetDefault={() => setDefaultMutation.mutate(cfg.id)}
+                    setDefaultPending={
+                      setDefaultMutation.isPending && setDefaultMutation.variables === cfg.id
+                    }
+                  />
+                ))}
 
-              {orderedItems.length === 0 && (
-                <div className="flex flex-col items-center py-16 text-center">
-                  <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-                    <HardDrive className="size-6 text-muted-foreground" />
+                {orderedItems.length === 0 && (
+                  <div className="flex flex-col items-center rounded-xl border border-dashed py-16 text-center">
+                    <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+                      <HardDrive className="size-6 text-muted-foreground" />
+                    </div>
+                    <p className="mt-4 text-sm font-medium text-muted-foreground">
+                      {t("storage.noStorage")}
+                    </p>
                   </div>
-                  <p className="mt-4 text-sm font-medium text-muted-foreground">
-                    {t("storage.noStorage")}
-                  </p>
-                </div>
-              )}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
+                )}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+      </Section>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent className="grid-cols-1 sm:max-w-lg">
@@ -399,8 +489,8 @@ export default function StoragePage() {
               {editingId ? t("storage.editStorage") : t("storage.addStorage")}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-            <div className="space-y-2">
+          <div className="grid max-h-[60vh] gap-4 overflow-y-auto pr-1">
+            <div className="grid gap-2">
               <Label>{t("common.name")}</Label>
               <Input
                 value={form.name}
@@ -409,7 +499,7 @@ export default function StoragePage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="grid gap-2">
               <Label>{t("storage.driver")}</Label>
               <Select value={form.driver} onValueChange={(v) => changeDriver(v as Driver)}>
                 <SelectTrigger className="h-auto py-2">
@@ -448,7 +538,7 @@ export default function StoragePage() {
 
             <DriverFields form={form} updateConfig={updateConfig} />
 
-            <div className="space-y-2">
+            <div className="grid gap-2">
               <Label>{t("storage.capacityLimit")}</Label>
               <div className="flex gap-2">
                 <Input
@@ -527,14 +617,13 @@ function SortableStorageRow(props: StorageListRowProps) {
     zIndex: isDragging ? 10 : undefined,
   };
 
-  // 用品牌色淡化作为图标背景，无品牌时回退中性灰
   const tintBg = brand.isBrand ? `${brand.color}1A` : undefined;
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="group rounded-xl border bg-card p-4 transition-all hover:border-foreground/15 hover:shadow-sm"
+      className="group rounded-xl border bg-card p-4 transition-colors hover:border-foreground/20"
     >
       <div className="flex items-center gap-3">
         <button
@@ -668,7 +757,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
   if (form.driver === "local") {
     return (
       <>
-        <div className="space-y-2">
+        <div className="grid gap-2">
           <Label>{t("storage.rootPath")}</Label>
           <Input
             value={form.config.base_path ?? ""}
@@ -676,7 +765,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
             placeholder="./uploads"
           />
         </div>
-        <div className="space-y-2">
+        <div className="grid gap-2">
           <Label>{t("storage.baseUrl")}</Label>
           <Input
             value={form.config.base_url ?? ""}
@@ -692,7 +781,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
     return (
       <>
         <div className="grid grid-cols-[1fr_100px] gap-3">
-          <div className="space-y-2">
+          <div className="grid gap-2">
             <Label>{t("storage.ftpHost")}</Label>
             <Input
               value={form.config.host ?? ""}
@@ -700,7 +789,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
               placeholder="ftp.example.com"
             />
           </div>
-          <div className="space-y-2">
+          <div className="grid gap-2">
             <Label>{t("storage.ftpPort")}</Label>
             <Input
               type="number"
@@ -710,14 +799,14 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
+          <div className="grid gap-2">
             <Label>{t("storage.ftpUsername")}</Label>
             <Input
               value={form.config.username ?? ""}
               onChange={(e) => updateConfig("username", e.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className="grid gap-2">
             <Label>{t("storage.ftpPassword")}</Label>
             <Input
               type="password"
@@ -726,7 +815,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
             />
           </div>
         </div>
-        <div className="space-y-2">
+        <div className="grid gap-2">
           <Label>{t("storage.ftpBasePath")}</Label>
           <Input
             value={form.config.base_path ?? ""}
@@ -734,7 +823,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
             placeholder="/"
           />
         </div>
-        <div className="space-y-2">
+        <div className="grid gap-2">
           <Label>{t("storage.baseUrl")}</Label>
           <Input
             value={form.config.base_url ?? ""}
@@ -757,7 +846,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
+        <div className="grid gap-2">
           <Label>Endpoint</Label>
           <Input
             value={form.config.endpoint ?? ""}
@@ -765,7 +854,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
             placeholder={endpointHints[form.driver]}
           />
         </div>
-        <div className="space-y-2">
+        <div className="grid gap-2">
           <Label>Region</Label>
           <Input
             value={form.config.region ?? ""}
@@ -774,7 +863,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
           />
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="grid gap-2">
         <Label>Bucket</Label>
         <Input
           value={form.config.bucket ?? ""}
@@ -782,14 +871,14 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
           placeholder="my-bucket"
         />
       </div>
-      <div className="space-y-2">
+      <div className="grid gap-2">
         <Label>Access Key</Label>
         <Input
           value={form.config.access_key_id ?? ""}
           onChange={(e) => updateConfig("access_key_id", e.target.value)}
         />
       </div>
-      <div className="space-y-2">
+      <div className="grid gap-2">
         <Label>Secret Key</Label>
         <Input
           type="password"
@@ -797,7 +886,7 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
           onChange={(e) => updateConfig("secret_access_key", e.target.value)}
         />
       </div>
-      <div className="space-y-2">
+      <div className="grid gap-2">
         <Label>{t("storage.cdnDomain")}</Label>
         <Input
           value={form.config.base_url ?? ""}
@@ -809,7 +898,6 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
   );
 }
 
-// normalizeConfig 根据驱动类型过滤出有效字段，避免把 FTP 的 host 字段发到 S3 接口。
 function normalizeConfig(form: StorageForm): Record<string, unknown> {
   const c = form.config;
   switch (form.driver) {

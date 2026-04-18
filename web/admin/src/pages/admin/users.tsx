@@ -40,6 +40,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 
 interface UserItem {
@@ -188,17 +189,17 @@ export default function UsersPage() {
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("users.title")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("users.description")}</p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="size-4" />
-          {t("users.addUser")}
-        </Button>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title={t("users.title")}
+        description={t("users.description")}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="size-4" />
+            {t("users.addUser")}
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-2">

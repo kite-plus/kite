@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import { getFileIconInfo, getFileTypeLabel } from "@/lib/file-utils";
 import { useAdaptiveGridPageSize } from "@/hooks/use-adaptive-grid-page-size";
+import { PageHeader } from "@/components/page-header";
 
 const LIST_PAGE_SIZE = 20;
 const DEFAULT_GRID_PAGE_SIZE = 20;
@@ -124,20 +125,16 @@ export default function AdminFilesPage() {
   const totalPages = Math.ceil((data?.total ?? 0) / pageSize);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {t("files.adminTitle")}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("files.adminDescription")}
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title={t("files.adminTitle")}
+        description={t("files.adminDescription")}
+      />
 
       {/* Filters */}
-      <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center">
-        <div className="relative w-full sm:flex-1 sm:max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative order-1 flex-1 sm:max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={t("files.searchFiles")}
             value={keyword}
@@ -148,43 +145,38 @@ export default function AdminFilesPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex items-start justify-between gap-3 sm:flex-1 sm:items-center">
-          <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-            {types.map((tp) => (
-              <Button
-                key={tp.value}
-                variant={fileType === tp.value ? "default" : "outline"}
-                size="sm"
-                className="h-10 rounded-xl px-4 text-sm shadow-sm"
-                onClick={() => {
-                  setFileType(tp.value);
-                  setPage(1);
-                }}
-              >
-                {t(tp.labelKey)}
-              </Button>
-            ))}
-          </div>
-          <div className="shrink-0 inline-flex h-10 items-center gap-1 rounded-xl border bg-background p-1 shadow-sm">
+        <div className="order-2 inline-flex shrink-0 items-center gap-1 rounded-md border p-0.5 sm:order-3 sm:ml-auto">
+          <Button
+            size="icon-sm"
+            variant={viewMode === "table" ? "secondary" : "ghost"}
+            onClick={() => setViewMode("table")}
+            title="列表视图"
+          >
+            <List className="size-4" />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
+            onClick={() => setViewMode("grid")}
+            title="网格视图"
+          >
+            <LayoutGrid className="size-4" />
+          </Button>
+        </div>
+        <div className="order-3 flex w-full min-w-0 flex-wrap gap-1.5 sm:order-2 sm:w-auto">
+          {types.map((tp) => (
             <Button
-              size="icon-sm"
-              variant={viewMode === "table" ? "default" : "ghost"}
-              className="rounded-lg"
-              onClick={() => setViewMode("table")}
-              title="列表视图"
+              key={tp.value}
+              variant={fileType === tp.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setFileType(tp.value);
+                setPage(1);
+              }}
             >
-              <List className="size-4" />
+              {t(tp.labelKey)}
             </Button>
-            <Button
-              size="icon-sm"
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              className="rounded-lg"
-              onClick={() => setViewMode("grid")}
-              title="网格视图"
-            >
-              <LayoutGrid className="size-4" />
-            </Button>
-          </div>
+          ))}
         </div>
       </div>
 

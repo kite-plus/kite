@@ -130,6 +130,9 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		"avatar_url":           user.AvatarURL,
 		"role":                 user.Role,
 		"password_must_change": user.PasswordMustChange,
+		"storage_limit":        user.StorageLimit,
+		"storage_used":         user.StorageUsed,
+		"created_at":           user.CreatedAt,
 	})
 }
 

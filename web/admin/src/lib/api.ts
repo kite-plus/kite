@@ -69,11 +69,13 @@ export const fileApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
-  list: (params: Record<string, string | number>) =>
+  list: (params: Record<string, string | number | boolean>) =>
     api.get("/files", { params }),
   detail: (id: string) => api.get(`/files/${id}`),
   delete: (id: string) => api.delete(`/files/${id}`),
   batchDelete: (ids: string[]) => api.post("/files/batch-delete", { ids }),
+  move: (id: string, folderId: string | null) =>
+    api.patch(`/files/${id}/move`, { folder_id: folderId }),
 };
 
 // Albums / Folders
@@ -142,9 +144,17 @@ export const userApi = {
   delete: (id: string) => api.delete(`/admin/users/${id}`),
 };
 
-// Stats
+// Stats — 当前用户维度（仅展示自己的数据）
 export const statsApi = {
   get: () => api.get("/stats"),
+  daily: (days: number = 7) => api.get("/stats/daily", { params: { days } }),
+};
+
+// Admin Stats — 全站维度（仅管理员可调用）
+export const adminStatsApi = {
+  get: () => api.get("/admin/stats"),
+  daily: (days: number = 7) =>
+    api.get("/admin/stats/daily", { params: { days } }),
 };
 
 // Setup

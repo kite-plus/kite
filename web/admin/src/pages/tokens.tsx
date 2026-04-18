@@ -7,7 +7,6 @@ import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 
 export default function TokensPage() {
@@ -60,77 +60,75 @@ export default function TokensPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("tokens.title")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("tokens.description")}
-          </p>
-        </div>
-        <Dialog
-          open={createOpen}
-          onOpenChange={(open) => {
-            setCreateOpen(open);
-            if (!open) setNewToken("");
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="size-4" />
-              {t("tokens.newToken")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {newToken ? t("tokens.tokenCreated") : t("tokens.createToken")}
-              </DialogTitle>
-            </DialogHeader>
-            {newToken ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  {t("tokens.copyWarning")}
-                </p>
-                <div className="flex gap-2">
-                  <Input value={newToken} readOnly className="font-mono" />
-                  <Button variant="outline" onClick={copyToken}>
-                    {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                  </Button>
+    <div className="space-y-8">
+      <PageHeader
+        title={t("tokens.title")}
+        description={t("tokens.description")}
+        actions={
+          <Dialog
+            open={createOpen}
+            onOpenChange={(open) => {
+              setCreateOpen(open);
+              if (!open) setNewToken("");
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="size-4" />
+                {t("tokens.newToken")}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {newToken ? t("tokens.tokenCreated") : t("tokens.createToken")}
+                </DialogTitle>
+              </DialogHeader>
+              {newToken ? (
+                <div className="grid gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    {t("tokens.copyWarning")}
+                  </p>
+                  <div className="flex gap-2">
+                    <Input value={newToken} readOnly className="font-mono" />
+                    <Button variant="outline" onClick={copyToken}>
+                      {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label>{t("tokens.tokenName")}</Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder={t("tokens.tokenNamePlaceholder")}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button
-                    onClick={() => createMutation.mutate()}
-                    disabled={!name || createMutation.isPending}
-                  >
-                    {createMutation.isPending ? t("tokens.creating") : t("common.create")}
-                  </Button>
-                </DialogFooter>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
+              ) : (
+                <>
+                  <div className="grid gap-2">
+                    <Label>{t("tokens.tokenName")}</Label>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={t("tokens.tokenNamePlaceholder")}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={() => createMutation.mutate()}
+                      disabled={!name || createMutation.isPending}
+                    >
+                      {createMutation.isPending ? t("tokens.creating") : t("common.create")}
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {isLoading ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-[72px] rounded-xl" />
+            <Skeleton key={i} className="h-16 rounded-lg" />
           ))}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {data?.map(
             (token: {
               id: string;
@@ -139,35 +137,38 @@ export default function TokensPage() {
               expires_at?: string;
               created_at: string;
             }) => (
-              <Card key={token.id} className="gap-0 py-0">
-                <CardContent className="flex items-center justify-between gap-3 p-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Key className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{token.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {t("tokens.created")}{" "}
-                        {new Date(token.created_at).toLocaleDateString()}
-                        {token.last_used &&
-                          ` · ${t("tokens.lastUsed")} ${new Date(token.last_used).toLocaleDateString()}`}
-                      </p>
-                    </div>
+              <div
+                key={token.id}
+                className="flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:border-foreground/20"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                    <Key className="size-4 text-muted-foreground" />
                   </div>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => deleteMutation.mutate(token.id)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </CardContent>
-              </Card>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{token.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {t("tokens.created")}{" "}
+                      {new Date(token.created_at).toLocaleDateString()}
+                      {token.last_used &&
+                        ` · ${t("tokens.lastUsed")} ${new Date(token.last_used).toLocaleDateString()}`}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => deleteMutation.mutate(token.id)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
             )
           )}
 
           {data?.length === 0 && (
-            <div className="flex flex-col items-center py-16 text-center">
+            <div className="flex flex-col items-center rounded-xl border border-dashed py-16 text-center">
               <div className="flex size-14 items-center justify-center rounded-full bg-muted">
                 <Key className="size-6 text-muted-foreground" />
               </div>

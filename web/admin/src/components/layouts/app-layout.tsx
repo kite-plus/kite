@@ -2,30 +2,32 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate, Link, useLocation, useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/page-transition";
 import {
+  ArrowLeft,
   Bell,
-  Menu,
-  User as UserIcon,
-  LogOut,
   ChevronRight,
-  Search,
+  KeyRound,
+  LogOut,
+  Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  Search,
   ShieldCheck,
+  User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useI18n } from "@/i18n";
+import { useI18n, type Locale } from "@/i18n";
 import { Sidebar } from "@/components/layouts/sidebar";
 import { Button } from "@/components/ui/button";
 import { KiteLogo } from "@/components/kite-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { cn, formatSize } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Sheet,
@@ -77,7 +79,7 @@ type SearchTarget = {
 
 export default function AppLayout() {
   const { user, loading, logout } = useAuth();
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -327,30 +329,126 @@ export default function AppLayout() {
                     <span className="font-medium">{displayName}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium leading-none">
-                        {displayName}
-                      </span>
-                      <span className="mt-1 truncate text-[11px] text-muted-foreground">
-                        @{user.username}
-                      </span>
-                      <span className="mt-1 truncate text-[11px] text-muted-foreground">
-                        {user.email ?? ""}
-                      </span>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate("/user/profile")}>
-                    <UserIcon className="size-4" />
-                    {t("profile.title")}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" onClick={logout}>
-                    <LogOut className="size-4" />
-                    {t("auth.logout")}
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" sideOffset={8} className="w-70 overflow-hidden rounded-xl border-border/80 p-0 shadow-lg">
+                  {(() => {
+                    const storageLimit = user.storage_limit ?? 0;
+                    const storageUsed = user.storage_used ?? 0;
+                    const isUnlimited = storageLimit < 0;
+                    const hasLimit = storageLimit > 0;
+                    const storagePct = hasLimit
+                      ? Math.min(100, (storageUsed / storageLimit) * 100)
+                      : 0;
+                    const isAdmin = user.role === "admin";
+                    return (
+                      <>
+                        <div className="flex items-center gap-3 px-3.5 pt-3.5 pb-3">
+                          <Avatar className="size-9 ring-1 ring-border/60">
+                            <AvatarImage src={user.avatar_url} alt={user.username ?? ""} />
+                            <AvatarFallback className="bg-foreground text-background text-[11px] font-medium">
+                              {displayName?.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="truncate text-[13px] font-semibold leading-tight text-foreground">
+                              {displayName}
+                            </div>
+                            <p className="truncate text-xs leading-tight text-muted-foreground">
+                              {user.email || `@${user.username}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 border-t border-border/60 px-3.5 pt-2.5 pb-3.5">
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                              {t("users.storageCol")}
+                            </span>
+                            <span className="text-[11px] tabular-nums text-foreground">
+                              {formatSize(storageUsed)}
+                              <span className="text-muted-foreground">
+                                {" / "}
+                                {isUnlimited ? t("users.unlimited") : formatSize(storageLimit)}
+                              </span>
+                            </span>
+                          </div>
+                          {isUnlimited || !hasLimit ? (
+                            <div className="h-1 rounded-full bg-muted/70" />
+                          ) : (
+                            <Progress
+                              value={storagePct}
+                              className="h-1 rounded-full bg-muted/70"
+                              indicatorClassName="bg-foreground rounded-full"
+                            />
+                          )}
+                        </div>
+
+                        <div className="border-t border-border/60 p-1.5">
+                          <DropdownMenuItem
+                            onClick={() => navigate("/user/profile")}
+                            className="gap-2.5 rounded-md px-2.5 py-2 text-[13px] focus:bg-accent/80"
+                          >
+                            <UserIcon className="size-3.5 text-muted-foreground" />
+                            {t("profile.title")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => navigate("/user/tokens")}
+                            className="gap-2.5 rounded-md px-2.5 py-2 text-[13px] focus:bg-accent/80"
+                          >
+                            <KeyRound className="size-3.5 text-muted-foreground" />
+                            {t("nav.tokens")}
+                          </DropdownMenuItem>
+                          {isAdmin && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                navigate(isAdminWorkspace ? "/user/dashboard" : "/admin/dashboard")
+                              }
+                              className="gap-2.5 rounded-md px-2.5 py-2 text-[13px] focus:bg-accent/80"
+                            >
+                              {isAdminWorkspace ? (
+                                <ArrowLeft className="size-3.5 text-muted-foreground" />
+                              ) : (
+                                <ShieldCheck className="size-3.5 text-muted-foreground" />
+                              )}
+                              {isAdminWorkspace ? t("nav.backToUser") : t("nav.adminPanel")}
+                            </DropdownMenuItem>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-border/60 px-3.5 py-2.5">
+                          <span className="text-xs text-muted-foreground">
+                            {t("settings.language")}
+                          </span>
+                          <div className="relative flex items-center rounded-md bg-muted/70 p-[3px]">
+                            {(["en", "zh"] as Locale[]).map((code) => (
+                              <button
+                                key={code}
+                                type="button"
+                                onClick={() => setLocale(code)}
+                                className={cn(
+                                  "relative z-10 rounded-[5px] px-2.5 py-0.5 text-[11px] leading-[18px] transition-colors",
+                                  locale === code
+                                    ? "bg-background font-medium text-foreground"
+                                    : "text-muted-foreground hover:text-foreground"
+                                )}
+                              >
+                                {code === "en" ? "EN" : "中"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="border-t border-border/60 p-1.5">
+                          <DropdownMenuItem
+                            onClick={logout}
+                            className="gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-muted-foreground focus:bg-accent/80 focus:text-foreground"
+                          >
+                            <LogOut className="size-3.5" />
+                            {t("auth.logout")}
+                          </DropdownMenuItem>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

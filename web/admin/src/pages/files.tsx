@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { getFileIconInfo, getFileTypeLabel } from "@/lib/file-utils";
 import { useAdaptiveGridPageSize } from "@/hooks/use-adaptive-grid-page-size";
+import { PageHeader } from "@/components/page-header";
 
 const LIST_PAGE_SIZE = 20;
 const DEFAULT_GRID_PAGE_SIZE = 20;
@@ -97,7 +98,7 @@ export default function FilesPage() {
     queryKey: ["files", page, keyword, fileType, pageSize],
     queryFn: () =>
       fileApi
-        .list({ page, size: pageSize, keyword, file_type: fileType })
+        .list({ page, size: pageSize, keyword, file_type: fileType, only_self: true })
         .then((r) => r.data.data),
   });
 
@@ -195,91 +196,90 @@ export default function FilesPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("files.title")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("files.description")}</p>
-        </div>
-        <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Upload className="size-4" />
-              {t("common.upload")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("files.uploadFile")}</DialogTitle>
-            </DialogHeader>
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className="relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-10 text-center cursor-pointer transition-colors hover:border-primary/50 hover:bg-accent/30"
-            >
-              <Upload className="mb-3 size-8 text-muted-foreground" />
-              <p className="text-sm font-medium">{t("files.dragOrClick")}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t("files.supportedTypes")}</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-            </div>
-
-            {/* Upload progress list */}
-            {uploads.length > 0 && (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {uploads.filter((u) => u.status === "done").length}/{uploads.length} {t("files.completed")}
-                  </span>
-                  {uploads.some((u) => u.status !== "uploading") && (
-                    <button onClick={clearDone} className="text-xs text-muted-foreground hover:text-foreground">
-                      {t("files.clearDone")}
-                    </button>
-                  )}
-                </div>
-                {uploads.map((task) => (
-                  <div key={task.id} className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium">{task.file.name}</p>
-                      <Progress
-                        className="mt-1.5 h-1"
-                        value={task.progress}
-                        indicatorClassName={
-                          task.status === "error"
-                            ? "bg-destructive"
-                            : task.status === "done"
-                              ? "bg-emerald-500"
-                              : undefined
-                        }
-                      />
-                    </div>
-                    <span className="shrink-0 text-[10px] text-muted-foreground">
-                      {task.status === "error" ? (
-                        t("files.failed")
-                      ) : task.status === "done" ? (
-                        <Check className="size-3.5 text-emerald-500" />
-                      ) : (
-                        `${task.progress}%`
-                      )}
-                    </span>
-                  </div>
-                ))}
+    <div className="space-y-8">
+      <PageHeader
+        title={t("files.title")}
+        description={t("files.description")}
+        actions={
+          <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Upload className="size-4" />
+                {t("common.upload")}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t("files.uploadFile")}</DialogTitle>
+              </DialogHeader>
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-10 text-center transition-colors hover:border-primary/50 hover:bg-accent/30"
+              >
+                <Upload className="mb-3 size-8 text-muted-foreground" />
+                <p className="text-sm font-medium">{t("files.dragOrClick")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("files.supportedTypes")}</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
+
+              {uploads.length > 0 && (
+                <div className="max-h-48 space-y-2 overflow-y-auto">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      {uploads.filter((u) => u.status === "done").length}/{uploads.length} {t("files.completed")}
+                    </span>
+                    {uploads.some((u) => u.status !== "uploading") && (
+                      <button onClick={clearDone} className="text-xs text-muted-foreground hover:text-foreground">
+                        {t("files.clearDone")}
+                      </button>
+                    )}
+                  </div>
+                  {uploads.map((task) => (
+                    <div key={task.id} className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium">{task.file.name}</p>
+                        <Progress
+                          className="mt-1.5 h-1"
+                          value={task.progress}
+                          indicatorClassName={
+                            task.status === "error"
+                              ? "bg-destructive"
+                              : task.status === "done"
+                                ? "bg-emerald-500"
+                                : undefined
+                          }
+                        />
+                      </div>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {task.status === "error" ? (
+                          t("files.failed")
+                        ) : task.status === "done" ? (
+                          <Check className="size-3.5 text-emerald-500" />
+                        ) : (
+                          `${task.progress}%`
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {/* Filters */}
-      <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center">
-        <div className="relative w-full sm:flex-1 sm:max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative order-1 flex-1 sm:max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={t("files.searchFiles")}
             value={keyword}
@@ -287,47 +287,42 @@ export default function FilesPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex items-start justify-between gap-3 sm:flex-1 sm:items-center">
-          <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-            {types.map((tp) => (
-              <Button
-                key={tp.value}
-                variant={fileType === tp.value ? "default" : "outline"}
-                size="sm"
-                className="h-10 rounded-xl px-4 text-sm shadow-sm"
-                onClick={() => { setFileType(tp.value); setPage(1); }}
-              >
-                {t(tp.labelKey)}
-              </Button>
-            ))}
-          </div>
-          <div className="shrink-0 inline-flex h-10 items-center gap-1 rounded-xl border bg-background p-1 shadow-sm">
+        <div className="order-2 inline-flex shrink-0 items-center gap-1 rounded-md border p-0.5 sm:order-3 sm:ml-auto">
+          <Button
+            size="icon-sm"
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
+            onClick={() => setViewMode("grid")}
+            title="网格视图"
+          >
+            <LayoutGrid className="size-4" />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant={viewMode === "list" ? "secondary" : "ghost"}
+            onClick={() => setViewMode("list")}
+            title="列表视图"
+          >
+            <List className="size-4" />
+          </Button>
+        </div>
+        <div className="order-3 flex w-full min-w-0 flex-wrap gap-1.5 sm:order-2 sm:w-auto">
+          {types.map((tp) => (
             <Button
-              size="icon-sm"
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              className="rounded-lg"
-              onClick={() => setViewMode("grid")}
-              title="网格视图"
+              key={tp.value}
+              variant={fileType === tp.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => { setFileType(tp.value); setPage(1); }}
             >
-              <LayoutGrid className="size-4" />
+              {t(tp.labelKey)}
             </Button>
-            <Button
-              size="icon-sm"
-              variant={viewMode === "list" ? "default" : "ghost"}
-              className="rounded-lg"
-              onClick={() => setViewMode("list")}
-              title="列表视图"
-            >
-              <List className="size-4" />
-            </Button>
-          </div>
+          ))}
         </div>
       </div>
 
       {/* File List/Grid */}
       {isLoading ? (
         viewMode === "grid" ? (
-          <div ref={gridRef} className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div ref={gridRef} className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {Array.from({ length: pageSize }).map((_, i) => (
               <Skeleton key={i} className="h-48 rounded-lg" />
             ))}
@@ -342,7 +337,7 @@ export default function FilesPage() {
       ) : (
         <>
           {viewMode === "grid" ? (
-            <div ref={gridRef} className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div ref={gridRef} className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {data?.items?.map((file: FileItem) => {
                 const fi = getFileIconInfo(file);
                 const Icon = fi.icon;
@@ -350,7 +345,7 @@ export default function FilesPage() {
                 return (
                   <div
                     key={file.id}
-                    className="group relative overflow-hidden rounded-lg border bg-card cursor-pointer"
+                    className="group relative cursor-pointer overflow-hidden rounded-lg border bg-card transition-colors hover:border-foreground/20"
                     onClick={() => setDetailFile(file)}
                   >
                     <div className="flex h-32 items-center justify-center bg-muted/30">
@@ -402,7 +397,7 @@ export default function FilesPage() {
                 return (
                   <div
                     key={file.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border bg-card px-3 py-2.5"
+                    className="flex cursor-pointer items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:border-foreground/20"
                     onClick={() => setDetailFile(file)}
                   >
                     {previewUrl ? (
@@ -446,7 +441,7 @@ export default function FilesPage() {
           )}
 
           {data?.items?.length === 0 && (
-            <div className="flex flex-col items-center py-20 text-center">
+            <div className="flex flex-col items-center rounded-xl border border-dashed py-20 text-center">
               <div className="flex size-14 items-center justify-center rounded-full bg-muted">
                 <FileText className="size-6 text-muted-foreground" />
               </div>
@@ -488,18 +483,16 @@ export default function FilesPage() {
           </DialogHeader>
           {detailFile && (
             <div className="space-y-4">
-              {/* Preview */}
               {detailFile.file_type === "image" && (
-                <div className="rounded-lg border overflow-hidden bg-muted/30">
+                <div className="overflow-hidden rounded-lg border bg-muted/30">
                   <img
                     src={detailFile.url}
                     alt={detailFile.original_name}
-                    className="w-full max-h-64 object-contain"
+                    className="max-h-64 w-full object-contain"
                   />
                 </div>
               )}
 
-              {/* Meta info */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-xs text-muted-foreground">{t("common.type")}</span>
@@ -507,7 +500,7 @@ export default function FilesPage() {
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">MIME</span>
-                  <p className="font-medium text-xs break-all">{detailFile.mime_type}</p>
+                  <p className="text-xs font-medium break-all">{detailFile.mime_type}</p>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">{t("common.size")}</span>
@@ -525,7 +518,6 @@ export default function FilesPage() {
                 </div>
               </div>
 
-              {/* Link formats */}
               <div className="space-y-2">
                 <span className="text-xs font-medium text-muted-foreground">{t("files.linkFormats")}</span>
                 {[
@@ -535,8 +527,8 @@ export default function FilesPage() {
                   { label: "HTML", value: `<img src="${detailFile.url}" alt="${detailFile.original_name}">` },
                   { label: "BBCode", value: `[img]${detailFile.url}[/img]` },
                 ].map((link) => (
-                  <div key={link.label} className="flex items-center gap-2 bg-muted/50 rounded-md px-3 py-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">{link.label}</span>
+                  <div key={link.label} className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
+                    <span className="w-16 shrink-0 text-xs text-muted-foreground">{link.label}</span>
                     <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                       <code className="block w-max min-w-full whitespace-nowrap bg-transparent text-xs text-foreground/90">
                         {link.value}
@@ -553,7 +545,7 @@ export default function FilesPage() {
                 ))}
               </div>
 
-              <div className="flex gap-2 justify-end">
+              <div className="flex justify-end gap-2">
                 <Button size="sm" variant="outline" asChild>
                   <a href={detailFile.url} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="size-3.5" />

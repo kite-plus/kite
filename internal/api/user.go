@@ -3,7 +3,9 @@ package api
 import (
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/amigoer/kite/internal/api/middleware"
 	"github.com/amigoer/kite/internal/model"
 	"github.com/amigoer/kite/internal/repo"
 	"github.com/amigoer/kite/internal/service"
@@ -13,13 +15,14 @@ import (
 
 // UserHandler 用户管理的 HTTP 处理器（管理员专用）。
 type UserHandler struct {
-	userRepo *repo.UserRepo
-	fileRepo *repo.FileRepo
-	authSvc  *service.AuthService
+	userRepo      *repo.UserRepo
+	fileRepo      *repo.FileRepo
+	accessLogRepo *repo.FileAccessLogRepo
+	authSvc       *service.AuthService
 }
 
-func NewUserHandler(userRepo *repo.UserRepo, fileRepo *repo.FileRepo, authSvc *service.AuthService) *UserHandler {
-	return &UserHandler{userRepo: userRepo, fileRepo: fileRepo, authSvc: authSvc}
+func NewUserHandler(userRepo *repo.UserRepo, fileRepo *repo.FileRepo, accessLogRepo *repo.FileAccessLogRepo, authSvc *service.AuthService) *UserHandler {
+	return &UserHandler{userRepo: userRepo, fileRepo: fileRepo, accessLogRepo: accessLogRepo, authSvc: authSvc}
 }
 
 // List 获取所有用户列表。
@@ -170,8 +173,28 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	success(c, nil)
 }
 
-// Stats 获取使用统计。
+// Stats 获取当前登录用户的使用统计（仅自己的数据）。
+// 管理员若需全站数据，应调用 AdminStats。
 func (h *UserHandler) Stats(c *gin.Context) {
+	userID := c.GetString(middleware.ContextKeyUserID)
+	stats, err := h.fileRepo.GetUserStats(c.Request.Context(), userID)
+	if err != nil {
+		serverError(c, "failed to get stats")
+		return
+	}
+
+	success(c, gin.H{
+		"total_files": stats.TotalFiles,
+		"total_size":  stats.TotalSize,
+		"images":      stats.ImageCount,
+		"videos":      stats.VideoCount,
+		"audios":      stats.AudioCount,
+		"others":      stats.OtherCount,
+	})
+}
+
+// AdminStats 获取全站使用统计（仅管理员可调用）。
+func (h *UserHandler) AdminStats(c *gin.Context) {
 	stats, err := h.fileRepo.GetStats(c.Request.Context())
 	if err != nil {
 		serverError(c, "failed to get stats")
@@ -189,4 +212,69 @@ func (h *UserHandler) Stats(c *gin.Context) {
 		"audios":      stats.AudioCount,
 		"others":      stats.OtherCount,
 	})
+}
+
+// DailyStats 获取当前用户按天分组的上传数、访问数、带宽统计。
+// 返回连续 N 天（默认 7）的时间序列，缺失日期补零。
+func (h *UserHandler) DailyStats(c *gin.Context) {
+	h.dailyStats(c, c.GetString(middleware.ContextKeyUserID))
+}
+
+// AdminDailyStats 获取全站按天分组的上传数、访问数、带宽统计（仅管理员可调用）。
+func (h *UserHandler) AdminDailyStats(c *gin.Context) {
+	h.dailyStats(c, "")
+}
+
+func (h *UserHandler) dailyStats(c *gin.Context, userID string) {
+	days, _ := strconv.Atoi(c.DefaultQuery("days", "7"))
+	if days < 1 || days > 90 {
+		days = 7
+	}
+
+	now := time.Now()
+	end := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, 1)
+	start := end.AddDate(0, 0, -days)
+
+	uploads, err := h.fileRepo.GetDailyUploadStats(c.Request.Context(), userID, start, end)
+	if err != nil {
+		serverError(c, "failed to get upload stats")
+		return
+	}
+	accesses, err := h.accessLogRepo.GetDailyAccessStats(c.Request.Context(), userID, start, end)
+	if err != nil {
+		serverError(c, "failed to get access stats")
+		return
+	}
+
+	uploadMap := make(map[string]int64, len(uploads))
+	for _, u := range uploads {
+		uploadMap[u.Day] = u.UploadCount
+	}
+	accessMap := make(map[string]int64, len(accesses))
+	bytesMap := make(map[string]int64, len(accesses))
+	for _, a := range accesses {
+		accessMap[a.Day] = a.AccessCount
+		bytesMap[a.Day] = a.BytesServed
+	}
+
+	type daily struct {
+		Day         string `json:"day"`
+		Uploads     int64  `json:"uploads"`
+		Accesses    int64  `json:"accesses"`
+		BytesServed int64  `json:"bytes_served"`
+	}
+
+	series := make([]daily, 0, days)
+	for i := 0; i < days; i++ {
+		d := start.AddDate(0, 0, i)
+		key := d.Format("2006-01-02")
+		series = append(series, daily{
+			Day:         key,
+			Uploads:     uploadMap[key],
+			Accesses:    accessMap[key],
+			BytesServed: bytesMap[key],
+		})
+	}
+
+	success(c, gin.H{"days": series})
 }

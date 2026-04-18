@@ -16,6 +16,9 @@ export interface User {
   avatar_url?: string;
   role: string;
   password_must_change?: boolean;
+  storage_limit?: number;
+  storage_used?: number;
+  created_at?: string;
 }
 
 export interface AuthContextValue {

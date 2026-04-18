@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, XAxis, YAxis } from "recharts";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -15,153 +16,195 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fileApi } from "@/lib/api";
+import { adminStatsApi, statsApi } from "@/lib/api";
 import { useI18n } from "@/i18n";
+import { formatSize } from "@/lib/utils";
 
-type FileItem = {
-  id: string;
-  created_at: string;
+type DailyPoint = {
+  day: string;
+  uploads: number;
+  accesses: number;
+  bytes_served: number;
 };
 
-type TrendPoint = {
-  dateKey: string;
-  label: string;
-  count: number;
-};
+type SeriesKey = "uploads" | "accesses" | "bytes_served";
 
-function buildTrend(items: FileItem[], locale: string): TrendPoint[] {
-  const now = new Date();
-  const days = 7;
-  const buckets: TrendPoint[] = [];
-
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const d = new Date(now);
-    d.setHours(0, 0, 0, 0);
-    d.setDate(now.getDate() - i);
-    const dateKey = d.toISOString().slice(0, 10);
-    const label =
-      locale === "zh"
-        ? `${d.getMonth() + 1}/${d.getDate()}`
-        : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-    buckets.push({ dateKey, label, count: 0 });
-  }
-
-  const indexByKey = new Map(buckets.map((b, idx) => [b.dateKey, idx]));
-  items.forEach((item) => {
-    const d = new Date(item.created_at);
-    if (Number.isNaN(d.getTime())) return;
-    const key = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-      .toISOString()
-      .slice(0, 10);
-    const idx = indexByKey.get(key);
-    if (idx !== undefined) buckets[idx].count += 1;
-  });
-
-  return buckets;
+function formatDayLabel(day: string, locale: string) {
+  const [, m, d] = day.split("-");
+  if (!m || !d) return day;
+  const mNum = Number(m);
+  const dNum = Number(d);
+  if (locale === "zh") return `${mNum}/${dNum}`;
+  const date = new Date(day);
+  return Number.isNaN(date.getTime())
+    ? day
+    : date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export default function UploadTrendChart() {
+export default function UploadTrendChart({ admin = false }: { admin?: boolean }) {
   const { t, locale } = useI18n();
+  const [active, setActive] = useState<SeriesKey>("uploads");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard", "upload-trend"],
+    queryKey: ["dashboard", "daily-stats", admin ? "admin" : "user"],
     queryFn: () =>
-      fileApi
-        .list({ page: 1, size: 120, sort: "created_at", order: "desc" })
-        .then((r) => r.data.data),
+      (admin ? adminStatsApi.daily(7) : statsApi.daily(7)).then(
+        (r) => r.data.data
+      ),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
 
-  const points = useMemo<TrendPoint[]>(() => {
-    const items: FileItem[] = data?.items ?? [];
-    return buildTrend(items, locale);
-  }, [data?.items, locale]);
+  const points = useMemo<(DailyPoint & { label: string })[]>(() => {
+    const days: DailyPoint[] = data?.days ?? [];
+    return days.map((p) => ({ ...p, label: formatDayLabel(p.day, locale) }));
+  }, [data?.days, locale]);
 
-  const total = useMemo(() => points.reduce((sum, p) => sum + p.count, 0), [points]);
+  const seriesMeta: Record<SeriesKey, { label: string }> = {
+    uploads: { label: t("dashboard.uploads") },
+    accesses: { label: t("dashboard.accesses") },
+    bytes_served: { label: t("dashboard.bandwidth") },
+  };
 
   const chartConfig = {
-    count: {
-      label: t("dashboard.uploads"),
-      color: "var(--color-chart-1)",
+    uploads: { label: t("dashboard.uploads"), color: "hsl(var(--foreground))" },
+    accesses: { label: t("dashboard.accesses"), color: "hsl(var(--foreground))" },
+    bytes_served: {
+      label: t("dashboard.bandwidth"),
+      color: "hsl(var(--foreground))",
     },
   } satisfies ChartConfig;
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-5 w-24" />
-          <Skeleton className="h-4 w-36" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-56 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card className="col-span-1">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">
-          {t("dashboard.recentUploads")}
+    <Card className="gap-0 py-0 shadow-xs">
+      <CardHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-5">
+        <CardTitle className="text-sm">
+          {t("dashboard.activityTrend")}
         </CardTitle>
-        <CardDescription>{t("dashboard.trendLast7Days")}</CardDescription>
+        <CardDescription className="text-xs">
+          {seriesMeta[active].label}
+        </CardDescription>
+        <CardAction>
+          <div className="inline-flex rounded-md bg-muted p-[2px]">
+            {(Object.keys(seriesMeta) as SeriesKey[]).map((key) => {
+              const isActive = key === active;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActive(key)}
+                  className={`rounded-[4px] px-2 py-[2px] text-[10px] transition-colors ${
+                    isActive
+                      ? "bg-card font-medium text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground/80"
+                  }`}
+                >
+                  {seriesMeta[key].label}
+                </button>
+              );
+            })}
+          </div>
+        </CardAction>
       </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="h-56 w-full">
-          <AreaChart
-            accessibilityLayer
-            data={points}
-            margin={{ left: 4, right: 12, top: 8, bottom: 0 }}
-          >
-            <defs>
-              <linearGradient id="uploadTrendFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.35} />
-                <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.4} />
-            <XAxis
-              dataKey="label"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              minTickGap={8}
-            />
-            <YAxis
-              hide
-              allowDecimals={false}
-              domain={[0, (dataMax: number) => Math.max(4, Math.ceil(dataMax * 1.2))]}
-            />
-            <ChartTooltip
-              cursor={{ strokeDasharray: "3 3", opacity: 0.6 }}
-              content={
-                <ChartTooltipContent
-                  indicator="line"
-                  labelFormatter={(label) => label}
+      <CardContent className="px-4 pb-4 sm:px-6 sm:pb-5">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-[110px] w-full sm:h-[120px]" />
+            <Skeleton className="mt-2 h-3 w-full" />
+          </>
+        ) : (
+          <>
+            <ChartContainer
+              config={chartConfig}
+              className="h-[110px] w-full sm:h-[120px]"
+            >
+              <AreaChart
+                accessibilityLayer
+                data={points}
+                margin={{ left: 0, right: 0, top: 4, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient
+                    id="dashboardAreaFill"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor="hsl(var(--foreground))"
+                      stopOpacity={0.12}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor="hsl(var(--foreground))"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="label" hide />
+                <YAxis
+                  hide
+                  domain={[
+                    0,
+                    (dataMax: number) =>
+                      Math.max(
+                        active === "bytes_served" ? 1024 : 4,
+                        Math.ceil(dataMax * 1.2)
+                      ),
+                  ]}
                 />
-              }
-            />
-            <Area
-              dataKey="count"
-              type="monotone"
-              stroke="var(--color-count)"
-              strokeWidth={2}
-              fill="url(#uploadTrendFill)"
-              activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--color-background)" }}
-            />
-          </AreaChart>
-        </ChartContainer>
+                <ChartTooltip
+                  cursor={{ strokeDasharray: "3 3", opacity: 0.4 }}
+                  content={
+                    <ChartTooltipContent
+                      indicator="line"
+                      labelFormatter={(label) => label}
+                      formatter={(value) => {
+                        const displayValue =
+                          active === "bytes_served"
+                            ? formatSize(Number(value))
+                            : Number(value).toLocaleString();
+                        return (
+                          <div className="flex w-full items-center justify-between gap-3">
+                            <span className="text-muted-foreground">
+                              {seriesMeta[active].label}
+                            </span>
+                            <span className="font-mono font-medium tabular-nums text-foreground">
+                              {displayValue}
+                            </span>
+                          </div>
+                        );
+                      }}
+                    />
+                  }
+                />
+                <Area
+                  type="monotone"
+                  dataKey={active}
+                  stroke="hsl(var(--foreground))"
+                  strokeWidth={1.5}
+                  fill="url(#dashboardAreaFill)"
+                  dot={false}
+                  activeDot={{
+                    r: 2.5,
+                    strokeWidth: 1.5,
+                    stroke: "hsl(var(--foreground))",
+                    fill: "hsl(var(--background))",
+                  }}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ChartContainer>
 
-        <div className="mt-3 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
-          <span>{t("dashboard.totalUploads7d")}</span>
-          <span className="font-medium text-foreground tabular-nums">
-            {total.toLocaleString()}
-          </span>
-        </div>
+            <div className="mt-2 flex justify-between text-[9px] tabular-nums text-muted-foreground">
+              {points.map((p) => (
+                <span key={p.day}>{p.label}</span>
+              ))}
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

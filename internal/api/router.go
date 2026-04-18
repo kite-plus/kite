@@ -43,15 +43,16 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 	tokenRepo := repo.NewAPITokenRepo(cfg.DB)
 	storageRepo := repo.NewStorageConfigRepo(cfg.DB)
 	settingRepo := repo.NewSettingRepo(cfg.DB)
+	accessLogRepo := repo.NewFileAccessLogRepo(cfg.DB)
 
 	// 初始化 handlers
 	authHandler := NewAuthHandler(cfg.AuthSvc, userRepo)
-	fileHandler := NewFileHandler(cfg.FileSvc, fileRepo)
+	fileHandler := NewFileHandler(cfg.FileSvc, fileRepo, albumRepo, accessLogRepo)
 	albumHandler := NewAlbumHandler(albumRepo, fileRepo)
 	tokenHandler := NewTokenHandler(cfg.AuthSvc, tokenRepo)
 	storageHandler := NewStorageHandler(storageRepo, fileRepo, cfg.StorageMgr, cfg.ReloadStorage)
 	settingsHandler := NewSettingsHandler(settingRepo)
-	userHandler := NewUserHandler(userRepo, fileRepo, cfg.AuthSvc)
+	userHandler := NewUserHandler(userRepo, fileRepo, accessLogRepo, cfg.AuthSvc)
 	setupHandler := NewSetupHandler(userRepo, settingRepo, storageRepo, cfg.StorageMgr, cfg.AuthSvc, cfg.ReloadStorage)
 
 	// ========== 公开接口（无需认证）==========
@@ -167,6 +168,7 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		authed.GET("/files/:id", fileHandler.Detail)
 		authed.DELETE("/files/:id", fileHandler.Delete)
 		authed.POST("/files/batch-delete", fileHandler.BatchDelete)
+		authed.PATCH("/files/:id/move", fileHandler.MoveFile)
 
 		// 文件夹管理（兼容旧 albums API）
 		authed.GET("/albums", albumHandler.List)
@@ -185,6 +187,7 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 
 		// 使用统计
 		authed.GET("/stats", userHandler.Stats)
+		authed.GET("/stats/daily", userHandler.DailyStats)
 
 		// ========== 管理员接口 ==========
 		admin := authed.Group("")
@@ -203,6 +206,10 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 			// 系统设置
 			admin.GET("/settings", settingsHandler.Get)
 			admin.PUT("/settings", settingsHandler.Update)
+
+			// 全站统计（管理员视角）
+			admin.GET("/admin/stats", userHandler.AdminStats)
+			admin.GET("/admin/stats/daily", userHandler.AdminDailyStats)
 
 			// 文件管理（全站）
 			admin.GET("/admin/files", fileHandler.AdminList)

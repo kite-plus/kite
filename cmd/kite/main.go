@@ -167,6 +167,7 @@ func autoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&model.User{},
 		&model.File{},
+		&model.FileAccessLog{},
 		&model.Album{},
 		&model.StorageConfig{},
 		&model.FileReplica{},
