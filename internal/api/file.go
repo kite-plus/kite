@@ -3,7 +3,6 @@ package api
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -344,12 +343,7 @@ func (h *FileHandler) ServeThumbnail(c *gin.Context) {
 	c.Header("Content-Type", "image/jpeg")
 	c.Header("Cache-Control", "public, max-age=86400")
 	c.Header("ETag", file.HashMD5+"-thumb")
-	c.Header("Content-Length", strconv.FormatInt(size, 10))
-	c.Status(http.StatusOK)
-	c.Stream(func(w io.Writer) bool {
-		_, err := io.Copy(w, reader)
-		return err == nil
-	})
+	c.DataFromReader(http.StatusOK, size, "image/jpeg", reader, nil)
 }
 
 func (h *FileHandler) serveFile(c *gin.Context, _ string, forceDownload bool) {
@@ -370,12 +364,11 @@ func (h *FileHandler) serveFile(c *gin.Context, _ string, forceDownload bool) {
 	}
 	defer reader.Close()
 
-	// 根据文件类型和参数设置响应头
+	contentType := "application/octet-stream"
 	if forceDownload || c.Query("dl") == "1" {
 		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, file.OriginalName))
-		c.Header("Content-Type", "application/octet-stream")
 	} else {
-		c.Header("Content-Type", file.MimeType)
+		contentType = file.MimeType
 		switch file.FileType {
 		case model.FileTypeImage:
 			c.Header("Content-Disposition", "inline")
@@ -388,12 +381,7 @@ func (h *FileHandler) serveFile(c *gin.Context, _ string, forceDownload bool) {
 		}
 	}
 
-	c.Header("Content-Length", strconv.FormatInt(size, 10))
-	c.Status(http.StatusOK)
-	c.Stream(func(w io.Writer) bool {
-		_, err := io.Copy(w, reader)
-		return err == nil
-	})
+	c.DataFromReader(http.StatusOK, size, contentType, reader, nil)
 }
 
 func (h *FileHandler) findFileByHash(c *gin.Context, hash string) (*model.File, error) {

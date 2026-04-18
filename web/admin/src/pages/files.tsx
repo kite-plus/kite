@@ -457,7 +457,7 @@ export default function FilesPage() {
 
       {/* File Detail Dialog */}
       <Dialog open={!!detailFile} onOpenChange={(open) => !open && setDetailFile(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="grid-cols-1 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="truncate pr-8">{detailFile?.original_name}</DialogTitle>
           </DialogHeader>
@@ -516,7 +516,7 @@ export default function FilesPage() {
                       type="text"
                       readOnly
                       value={link.value}
-                      className="flex-1 bg-transparent text-xs outline-none truncate"
+                      className="min-w-0 flex-1 bg-transparent text-xs outline-none truncate"
                       onClick={(e) => (e.target as HTMLInputElement).select()}
                     />
                     <Button

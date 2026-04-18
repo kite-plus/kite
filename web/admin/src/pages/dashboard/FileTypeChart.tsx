@@ -54,6 +54,8 @@ export default function FileTypeChart({
     [imageCount, videoCount, audioCount, otherCount, t],
   );
 
+  const pieData = useMemo(() => data.filter((d) => d.count > 0), [data]);
+
   if (isLoading) {
     return (
       <Card>
@@ -120,12 +122,12 @@ export default function FileTypeChart({
                 }
               />
               <Pie
-                data={data}
+                data={pieData}
                 dataKey="count"
                 nameKey="label"
                 innerRadius={60}
-                strokeWidth={4}
-                paddingAngle={totalFiles > 0 ? 2 : 0}
+                strokeWidth={0}
+                paddingAngle={0}
               >
                 <Label
                   content={({ viewBox }) => {

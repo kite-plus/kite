@@ -7,11 +7,11 @@ import {
   Plus,
   Pencil,
   AlertCircle,
-  Cloud,
-  Server,
   Infinity as InfinityIcon,
   GripVertical,
   Star,
+  MoreHorizontal,
+  Loader2,
 } from "lucide-react";
 import {
   DndContext,
@@ -54,6 +54,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { BrandIcon, getBrandInfo } from "@/components/storage-brand";
 import { toast } from "sonner";
 
 type Driver = "local" | "s3" | "oss" | "cos" | "ftp";
@@ -63,6 +71,7 @@ interface StorageListItem {
   id: string;
   name: string;
   driver: Driver;
+  provider: string;
   capacity_limit_bytes: number;
   used_bytes: number;
   priority: number;
@@ -138,20 +147,16 @@ interface DriverOption {
   value: Driver;
   labelKey: string;
   descKey: string;
-  icon: typeof HardDrive;
+  provider: string; // 用于 BrandIcon；s3 表示通用兼容协议
 }
 
 const DRIVER_OPTIONS: DriverOption[] = [
-  { value: "local", labelKey: "storage.driverLocal", descKey: "storage.driverLocalDesc", icon: HardDrive },
-  { value: "s3", labelKey: "storage.driverS3", descKey: "storage.driverS3Desc", icon: Cloud },
-  { value: "oss", labelKey: "storage.driverOss", descKey: "storage.driverOssDesc", icon: Cloud },
-  { value: "cos", labelKey: "storage.driverCos", descKey: "storage.driverCosDesc", icon: Cloud },
-  { value: "ftp", labelKey: "storage.driverFtp", descKey: "storage.driverFtpDesc", icon: Server },
+  { value: "local", labelKey: "storage.driverLocal", descKey: "storage.driverLocalDesc", provider: "local" },
+  { value: "s3", labelKey: "storage.driverS3", descKey: "storage.driverS3Desc", provider: "s3" },
+  { value: "oss", labelKey: "storage.driverOss", descKey: "storage.driverOssDesc", provider: "aliyun-oss" },
+  { value: "cos", labelKey: "storage.driverCos", descKey: "storage.driverCosDesc", provider: "tencent-cos" },
+  { value: "ftp", labelKey: "storage.driverFtp", descKey: "storage.driverFtpDesc", provider: "ftp" },
 ];
-
-function driverIcon(driver: Driver) {
-  return DRIVER_OPTIONS.find((d) => d.value === driver)?.icon ?? HardDrive;
-}
 
 function mapStorageError(err: unknown, fallback: string): string {
   const status = (err as { response?: { status?: number } })?.response?.status;
@@ -388,7 +393,7 @@ export default function StoragePage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="grid-cols-1 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {editingId ? t("storage.editStorage") : t("storage.addStorage")}
@@ -412,12 +417,20 @@ export default function StoragePage() {
                 </SelectTrigger>
                 <SelectContent>
                   {DRIVER_OPTIONS.map((opt) => {
-                    const Icon = opt.icon;
+                    const optBrand = getBrandInfo(opt.provider, opt.value);
+                    const optTint = optBrand.isBrand ? `${optBrand.color}1A` : undefined;
                     return (
                       <SelectItem key={opt.value} value={opt.value} className="py-2">
                         <div className="flex items-center gap-3">
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                            <Icon className="size-4" />
+                          <span
+                            className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted"
+                            style={optTint ? { backgroundColor: optTint } : undefined}
+                          >
+                            <BrandIcon
+                              provider={opt.provider}
+                              driver={opt.value}
+                              className={optBrand.isBrand ? "size-4" : "size-4 text-muted-foreground"}
+                            />
                           </span>
                           <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium">{t(opt.labelKey)}</span>
@@ -500,7 +513,7 @@ function SortableStorageRow(props: StorageListRowProps) {
     id: props.cfg.id,
   });
   const { t } = useI18n();
-  const Icon = driverIcon(props.cfg.driver);
+  const brand = getBrandInfo(props.cfg.provider, props.cfg.driver);
   const hasLimit = props.cfg.capacity_limit_bytes > 0;
   const percent = hasLimit
     ? Math.min(100, (props.cfg.used_bytes / props.cfg.capacity_limit_bytes) * 100)
@@ -514,100 +527,128 @@ function SortableStorageRow(props: StorageListRowProps) {
     zIndex: isDragging ? 10 : undefined,
   };
 
+  // 用品牌色淡化作为图标背景，无品牌时回退中性灰
+  const tintBg = brand.isBrand ? `${brand.color}1A` : undefined;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="flex flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-border"
+      className="group rounded-xl border bg-card p-4 transition-all hover:border-foreground/15 hover:shadow-sm"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            {...attributes}
-            {...listeners}
-            aria-label={t("storage.dragHandle")}
-            className="flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
-          >
-            <GripVertical className="size-4" />
-          </button>
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-            <Icon className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate text-sm font-medium">{props.cfg.name}</p>
-              <Badge variant="outline" className="text-[10px] uppercase">
-                {props.cfg.driver}
-              </Badge>
-              {props.cfg.is_default && (
-                <Badge variant="secondary" className="text-[10px]">
-                  <Star className="size-3" />
-                  {t("storage.defaultStorage")}
-                </Badge>
-              )}
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {props.cfg.is_active ? t("common.active") : t("common.inactive")}
-              <span className="mx-1.5">·</span>
-              <span className="tabular-nums">P{props.cfg.priority}</span>
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <button
+          {...attributes}
+          {...listeners}
+          aria-label={t("storage.dragHandle")}
+          className="hidden size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground/60 transition-opacity hover:bg-muted hover:text-foreground active:cursor-grabbing sm:flex sm:opacity-0 sm:group-hover:opacity-100"
+        >
+          <GripVertical className="size-4" />
+        </button>
+
+        <div
+          className="flex size-11 shrink-0 items-center justify-center rounded-xl"
+          style={tintBg ? { backgroundColor: tintBg } : undefined}
+        >
+          <BrandIcon
+            provider={props.cfg.provider}
+            driver={props.cfg.driver}
+            className={brand.isBrand ? "size-6" : "size-5 text-muted-foreground"}
+          />
         </div>
-        <div className="flex shrink-0 gap-1">
-          {!props.cfg.is_default && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={props.onSetDefault}
-              disabled={props.setDefaultPending || !props.cfg.is_active}
-            >
-              <Star className="size-3.5" />
-              {t("storage.setAsDefault")}
-            </Button>
-          )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-semibold">{props.cfg.name}</p>
+            {props.cfg.is_default && (
+              <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px]">
+                <Star className="size-2.5 fill-current" />
+                {t("storage.defaultStorage")}
+              </Badge>
+            )}
+            {!props.cfg.is_active && (
+              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                {t("common.inactive")}
+              </Badge>
+            )}
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            <span>{brand.label}</span>
+            <span className="mx-1.5 text-muted-foreground/40">·</span>
+            <span className="tabular-nums">P{props.cfg.priority}</span>
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             size="sm"
             variant="outline"
             onClick={props.onTest}
             disabled={props.testResult === "testing"}
+            className="h-8 px-3"
           >
-            {props.testResult === "ok" ? (
-              <Check className="size-4 text-green-600" />
+            {props.testResult === "testing" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : props.testResult === "ok" ? (
+              <Check className="size-3.5 text-green-600" />
             ) : props.testResult === "fail" ? (
-              <AlertCircle className="size-4 text-destructive" />
+              <AlertCircle className="size-3.5 text-destructive" />
             ) : (
-              t("common.test")
+              <span className="text-xs">{t("common.test")}</span>
             )}
           </Button>
-          <Button size="icon-sm" variant="ghost" onClick={props.onEdit}>
-            <Pencil className="size-3.5" />
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            onClick={props.onDelete}
-            disabled={props.cfg.is_default}
-          >
-            <Trash2 className="size-3.5 text-destructive" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon-sm" variant="ghost" className="size-8">
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              {!props.cfg.is_default && (
+                <>
+                  <DropdownMenuItem
+                    onClick={props.onSetDefault}
+                    disabled={props.setDefaultPending || !props.cfg.is_active}
+                  >
+                    <Star className="size-4" />
+                    {t("storage.setAsDefault")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onClick={props.onEdit}>
+                <Pencil className="size-4" />
+                {t("common.edit")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={props.onDelete}
+                disabled={props.cfg.is_default}
+                variant="destructive"
+              >
+                <Trash2 className="size-4" />
+                {t("common.delete")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="mt-3 flex items-center gap-3 pl-0 sm:pl-[2.875rem]">
         <Progress
           value={hasLimit ? percent : 0}
           indicatorClassName={nearFull ? "bg-destructive" : undefined}
-          className={hasLimit ? "" : "bg-muted"}
+          className="h-1.5"
         />
-        <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
-          <span className="font-medium text-foreground">{formatSize(props.cfg.used_bytes)}</span>
-          <span>/</span>
+        <div className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-muted-foreground">
+          <span className={nearFull ? "font-medium text-destructive" : "font-medium text-foreground"}>
+            {formatSize(props.cfg.used_bytes)}
+          </span>
+          <span className="text-muted-foreground/50">/</span>
           {hasLimit ? (
             <span>{formatSize(props.cfg.capacity_limit_bytes)}</span>
           ) : (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-0.5">
               <InfinityIcon className="size-3" />
-              {t("storage.capacityUnlimited")}
             </span>
           )}
         </div>

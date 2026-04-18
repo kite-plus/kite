@@ -121,11 +121,12 @@ func (h *StorageHandler) List(c *gin.Context) {
 		return
 	}
 
-	// 不返回敏感的 config 字段内容
+	// 不返回敏感的 config 字段内容；provider 由 driver+endpoint 推断，仅用于前端渲染品牌 logo。
 	type item struct {
 		ID                 string `json:"id"`
 		Name               string `json:"name"`
 		Driver             string `json:"driver"`
+		Provider           string `json:"provider"`
 		CapacityLimitBytes int64  `json:"capacity_limit_bytes"`
 		UsedBytes          int64  `json:"used_bytes"`
 		Priority           int    `json:"priority"`
@@ -139,6 +140,7 @@ func (h *StorageHandler) List(c *gin.Context) {
 			ID:                 cfg.ID,
 			Name:               cfg.Name,
 			Driver:             cfg.Driver,
+			Provider:           storage.DetectProvider(cfg.Driver, cfg.Config),
 			CapacityLimitBytes: cfg.CapacityLimitBytes,
 			UsedBytes:          used,
 			Priority:           cfg.Priority,

@@ -420,7 +420,7 @@ export default function AdminFilesPage() {
         open={!!detailFile}
         onOpenChange={(open) => !open && setDetailFile(null)}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="grid-cols-1 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="truncate pr-8">
               {detailFile?.original_name}
@@ -508,7 +508,7 @@ export default function AdminFilesPage() {
                       type="text"
                       readOnly
                       value={link.value}
-                      className="flex-1 truncate bg-transparent text-xs outline-none"
+                      className="min-w-0 flex-1 truncate bg-transparent text-xs outline-none"
                       onClick={(e) => (e.target as HTMLInputElement).select()}
                     />
                     <Button
