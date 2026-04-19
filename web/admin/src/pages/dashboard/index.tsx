@@ -163,93 +163,39 @@ function normalizeHeatmapGrid(input: unknown): number[][] {
   return grid;
 }
 
-type ActivityWho = "system" | "you" | "other";
 interface ActivityItem {
-  who: ActivityWho;
-  actor: string; // display name when who === "other"
-  actionKey:
-    | "uploaded"
-    | "createdAlbum"
-    | "revokedToken"
-    | "downloaded"
-    | "createdToken"
-    | "backupDone";
+  id: string;
+  actor: string;
+  actorType: "you" | "system";
+  actionKey: "uploaded";
   target: string;
-  minutes: number;
+  createdAt: string;
 }
 
-function buildActivity(locale: Locale): ActivityItem[] {
-  // Stable mocked feed — same across renders. Replace when an activity
-  // endpoint exists.
-  const zh = locale === "zh";
-  return [
-    {
-      who: "other",
-      actor: zh ? "苏伟明" : "Suweiming",
-      actionKey: "uploaded",
-      target: "street-food-014.jpg",
-      minutes: 4,
-    },
-    {
-      who: "other",
-      actor: zh ? "Ada Liu" : "Ada Liu",
-      actionKey: "createdAlbum",
-      target: zh ? "Studio · Q2" : "Studio · Q2",
-      minutes: 18,
-    },
-    {
-      who: "you",
-      actor: zh ? "你" : "You",
-      actionKey: "revokedToken",
-      target: zh ? "只读分享" : "read-only share",
-      minutes: 42,
-    },
-    {
-      who: "other",
-      actor: zh ? "于杰" : "Yujie",
-      actionKey: "downloaded",
-      target: "retro-console-007.mp4",
-      minutes: 66,
-    },
-    {
-      who: "system",
-      actor: zh ? "系统" : "System",
-      actionKey: "backupDone",
-      target: zh ? "S3 · 主存储" : "S3 · primary",
-      minutes: 120,
-    },
-    {
-      who: "other",
-      actor: zh ? "刘宇" : "Liuyu",
-      actionKey: "createdToken",
-      target: zh ? "博客自动化" : "blog automation",
-      minutes: 240,
-    },
-  ];
+function buildActivityFromRecent(
+  locale: Locale,
+  recentItems: ThumbFile[],
+  actorName: string
+): ActivityItem[] {
+  const fallbackActor = locale === "zh" ? "你" : "You";
+  return recentItems.slice(0, 6).map((item) => ({
+    id: item.id,
+    actor: actorName || fallbackActor,
+    actorType: "you",
+    actionKey: "uploaded",
+    target: item.original_name,
+    createdAt: item.created_at,
+  }));
 }
 
 function actionLabel(key: ActivityItem["actionKey"], locale: Locale): string {
-  if (locale === "zh") {
-    return {
-      uploaded: "上传了",
-      createdAlbum: "新建了相册",
-      revokedToken: "撤销了 Token",
-      downloaded: "下载了",
-      createdToken: "创建了 Token",
-      backupDone: "完成备份",
-    }[key];
-  }
-  return {
-    uploaded: "uploaded",
-    createdAlbum: "created album",
-    revokedToken: "revoked token",
-    downloaded: "downloaded",
-    createdToken: "created token",
-    backupDone: "finished backup",
-  }[key];
+  if (locale === "zh") return { uploaded: "上传了" }[key];
+  return { uploaded: "uploaded" }[key];
 }
 
-function relativeMinutes(mins: number, locale: Locale): string {
+function formatRelativeTime(timestamp: string, locale: Locale): string {
+  const diffMs = Date.now() - new Date(timestamp).getTime();
+  const mins = Math.max(0, Math.floor(diffMs / 60_000));
   if (locale === "zh") {
     if (mins < 60) return `${mins} 分钟前`;
     const h = Math.floor(mins / 60);
@@ -348,7 +294,10 @@ export default function DashboardPage() {
   /* ── derived values ─────────────────────────────────────── */
   const greeting = useMemo(() => buildGreeting(locale), [locale]);
   const heatmap = useMemo(() => normalizeHeatmapGrid(heatmapData?.grid), [heatmapData?.grid]);
-  const activity = useMemo(() => buildActivity(locale), [locale]);
+  const activity = useMemo(
+    () => buildActivityFromRecent(locale, recent?.items ?? [], displayName),
+    [displayName, locale, recent?.items]
+  );
 
   const days30: TrendPoint[] = useMemo(() => {
     return (daily?.days ?? []).map((d) => ({
@@ -878,21 +827,24 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 px-5">
+              {activity.length === 0 && (
+                <p className="text-xs text-muted-foreground">{t("files.noFilesHint")}</p>
+              )}
               {activity.map((a, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <div
                     className={cn(
                       "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium",
-                      a.who === "system"
+                      a.actorType === "system"
                         ? "bg-muted text-muted-foreground"
-                        : a.who === "you"
+                        : a.actorType === "you"
                           ? "bg-foreground text-background"
                           : "bg-muted",
                     )}
                   >
-                    {a.who === "system" ? (
+                    {a.actorType === "system" ? (
                       <Cpu className="size-4" />
-                    ) : a.who === "you" ? (
+                    ) : a.actorType === "you" ? (
                       <UserIcon className="size-4" />
                     ) : (
                       a.actor.charAt(0).toUpperCase()
@@ -912,7 +864,7 @@ export default function DashboardPage() {
                       </span>
                     </p>
                     <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
-                      {relativeMinutes(a.minutes, locale)}
+                      {formatRelativeTime(a.createdAt, locale)}
                     </p>
                   </div>
                 </div>
