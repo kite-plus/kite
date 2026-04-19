@@ -29,6 +29,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -118,6 +128,7 @@ export default function TokensPage() {
   const [newToken, setNewToken] = useState("");
   const [copied, setCopied] = useState(false);
   const [rowCopiedId, setRowCopiedId] = useState<string | null>(null);
+  const [pendingDeleteToken, setPendingDeleteToken] = useState<TokenItem | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["tokens"],
@@ -184,9 +195,7 @@ export default function TokensPage() {
   };
 
   const requestDelete = (token: TokenItem) => {
-    if (window.confirm(t("tokens.deleteConfirm"))) {
-      deleteMutation.mutate(token.id);
-    }
+    setPendingDeleteToken(token);
   };
 
   const formatRelative = (iso?: string) => {
@@ -542,6 +551,32 @@ export default function TokensPage() {
           </div>
         </>
       )}
+
+      <AlertDialog
+        open={!!pendingDeleteToken}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteToken(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("common.delete")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("tokens.deleteConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingDeleteToken) return;
+                deleteMutation.mutate(pendingDeleteToken.id);
+                setPendingDeleteToken(null);
+              }}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -41,6 +41,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/page-header";
 import { EmptyKite } from "@/components/empty-state";
 import { toast } from "sonner";
@@ -71,6 +81,7 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<UserItem | null>(null);
   const [form, setForm] = useState({
     username: "",
     nickname: "",
@@ -145,9 +156,7 @@ export default function UsersPage() {
   });
 
   const requestDelete = (user: UserItem) => {
-    if (window.confirm(t("users.deleteConfirm"))) {
-      deleteMutation.mutate(user.id);
-    }
+    setPendingDeleteUser(user);
   };
 
   const openCreate = () => {
@@ -612,6 +621,32 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!pendingDeleteUser}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteUser(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("common.delete")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("users.deleteConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingDeleteUser) return;
+                deleteMutation.mutate(pendingDeleteUser.id);
+                setPendingDeleteUser(null);
+              }}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
