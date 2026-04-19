@@ -9,8 +9,6 @@ import {
   Keyboard,
   LogOut,
   Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
   Search,
   ShieldCheck,
   User as UserIcon,
@@ -61,8 +59,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { getPrimaryModifierKeyLabel } from "@/lib/platform";
 
-const SIDEBAR_COLLAPSED_KEY = "kite_sidebar_collapsed";
-
 const routeLabelKeys: Record<string, string> = {
   "/user": "nav.general",
   "/user/dashboard": "nav.dashboard",
@@ -95,10 +91,6 @@ export default function AppLayout() {
   const [globalQuery, setGlobalQuery] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
-  });
   const displayName = user?.nickname?.trim() || user?.username;
   const modifierKeyLabel = getPrimaryModifierKeyLabel();
 
@@ -166,14 +158,6 @@ export default function AppLayout() {
   }, [filteredTargets]);
 
   useEffect(() => {
-    const toggleSidebarKey = () => {
-      setSidebarCollapsed((prev) => {
-        const next = !prev;
-        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
-        return next;
-      });
-    };
-
     const toggleTheme = () => {
       const html = document.documentElement;
       const isDark = html.classList.contains("dark");
@@ -214,13 +198,6 @@ export default function AppLayout() {
       if (event.key === "?") {
         event.preventDefault();
         setShortcutsOpen(true);
-        return;
-      }
-
-      // ⌘B / Ctrl+B — toggle sidebar
-      if (mod && event.key.toLowerCase() === "b") {
-        event.preventDefault();
-        toggleSidebarKey();
         return;
       }
 
@@ -280,14 +257,6 @@ export default function AppLayout() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [commandOpen, shortcutsOpen, navigate, location.pathname]);
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
-      return next;
-    });
-  };
-
   const goToRoute = (to: string) => {
     navigate(to);
     setGlobalQuery("");
@@ -317,7 +286,6 @@ export default function AppLayout() {
       {/* Desktop sidebar */}
       <div className="hidden shrink-0 border-r md:flex">
         <Sidebar
-          collapsed={sidebarCollapsed}
           onOpenShortcuts={() => setShortcutsOpen(true)}
         />
       </div>
@@ -377,17 +345,6 @@ export default function AppLayout() {
         <header className="hidden h-14 shrink-0 border-b md:flex">
           <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="shrink-0"
-                onClick={toggleSidebar}
-                aria-label={sidebarCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
-              >
-                {sidebarCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-              </Button>
-
               <nav className="hidden min-w-max items-center gap-1 text-xs text-muted-foreground md:flex">
                 {breadcrumbItems.map((item, index) => {
                   const isLast = index === breadcrumbItems.length - 1;

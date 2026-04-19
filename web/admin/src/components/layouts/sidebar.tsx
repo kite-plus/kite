@@ -165,7 +165,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
       <aside
         className={cn(
           "flex h-full flex-col bg-background transition-[width] duration-200",
-          collapsed ? "w-16" : "w-60"
+          collapsed ? "w-[4.5rem]" : "w-60"
         )}
       >
         {/* ── Brand ───────────────────────────────────────────── */}
@@ -183,7 +183,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
               collapsed ? "justify-center" : "gap-2.5"
             )}
           >
-            <KiteLogo className="size-6" />
+            <KiteLogo className={cn(collapsed ? "size-6" : "size-6")} />
             {!collapsed && (
               <div className="flex min-w-0 items-baseline gap-1.5">
                 <span className="font-semibold tracking-tight">Kite</span>
@@ -230,7 +230,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
         )}
 
         {/* ── Quick upload (user workspace only) ──────────────── */}
-        {!isAdminWorkspace && (
+        {!isAdminWorkspace && !collapsed && (
           <div
             className={cn(
               "pt-3",
@@ -276,22 +276,20 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
         )}
 
         {/* ── Grouped nav ─────────────────────────────────────── */}
-        <nav className="mt-3 flex-1 overflow-y-auto px-2 pb-3">
+        <nav className={cn("flex-1 overflow-y-auto pb-3", collapsed ? "mt-4 px-2" : "mt-3 px-2")}>
           {groupOrder
             .filter((g) => groups[g] && groups[g].length > 0)
             .map((g, gi) => (
-              <div key={g} className={cn(gi > 0 && (collapsed ? "mt-2" : "mt-4"))}>
-                {!collapsed && (
-                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
+              <div key={g} className={cn(gi > 0 && "mt-4")}>
+                {(collapsed ? gi > 0 : true) && (
+                  <div className={cn(
+                    "py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80",
+                    collapsed ? "flex justify-center px-2" : "px-3"
+                  )}>
                     {t(groupLabelKey[g])}
                   </div>
                 )}
-                {collapsed && gi > 0 && (
-                  <div className="mb-2 flex justify-center">
-                    <div className="h-px w-6 bg-border/70" />
-                  </div>
-                )}
-                <div className={cn(collapsed ? "flex flex-col items-center gap-1" : "space-y-0.5")}>
+                <div className={cn(collapsed ? "flex flex-col gap-0.5" : "space-y-0.5")}>
                   {groups[g].map((it) => {
                     const badge = badgeFor(it);
                     const content = (
@@ -304,10 +302,10 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                             "relative flex items-center text-sm font-medium transition-colors",
                             collapsed
                               ? cn(
-                                  "size-10 shrink-0 justify-center rounded-xl",
+                                  "w-full justify-center rounded-lg px-3 py-2",
                                   isActive
-                                    ? "bg-foreground/10 text-foreground"
-                                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                    ? "bg-foreground/[0.06] text-foreground"
+                                    : "text-muted-foreground/80 hover:bg-accent/60 hover:text-foreground"
                                 )
                               : cn(
                                   "w-full gap-2.5 rounded-lg px-3 py-2",
@@ -320,15 +318,14 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                       >
                         {({ isActive }) => (
                           <>
-                            {/* active indicator rail (expanded only) */}
-                            {isActive && !collapsed && (
+                            {/* active indicator rail */}
+                            {isActive && (
                               <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-foreground" />
                             )}
                             <it.icon
                               className={cn(
-                                "size-4 shrink-0",
-                                isActive && !collapsed && "text-foreground",
-                                isActive && collapsed && "stroke-[2.25]"
+                                "size-4.5 shrink-0",
+                                isActive && "text-foreground"
                               )}
                             />
                             {!collapsed && (
@@ -348,9 +345,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                                 )}
                               </>
                             )}
-                            {collapsed && badge && !isActive && (
-                              <span className="absolute right-1 top-1 size-1.5 rounded-full bg-foreground/70 ring-2 ring-background" />
-                            )}
+                            {collapsed && badge && !isActive && null}
                           </>
                         )}
                       </NavLink>
@@ -411,9 +406,9 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
         </nav>
 
         {/* ── Footer: workspace switch + utility row ─────────── */}
-        <div className={cn("shrink-0 border-t", collapsed ? "px-2 py-2" : "p-3")}>
+        <div className={cn("shrink-0 border-t", collapsed ? "px-2 py-3" : "p-3")}>
           {collapsed ? (
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-1.5">
               {user?.role === "admin" && (
                 <>
                   <Tooltip>
@@ -421,7 +416,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                       <Button
                         variant="outline"
                         size="icon-sm"
-                        className="size-9 rounded-lg"
+                        className="h-11 w-11 rounded-xl border-border/80 bg-background text-muted-foreground hover:text-foreground"
                         onClick={handleWorkspaceSwitch}
                         aria-label={
                           isAdminWorkspace ? t("nav.backToUser") : t("nav.adminPanel")
@@ -438,7 +433,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                       {isAdminWorkspace ? t("nav.backToUser") : t("nav.adminPanel")}
                     </TooltipContent>
                   </Tooltip>
-                  <div className="my-0.5 h-px w-6 bg-border/70" />
+                  <div className="my-1 h-px w-8 bg-border/70" />
                 </>
               )}
               {onOpenShortcuts && (
@@ -447,7 +442,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      className="size-9 rounded-lg text-muted-foreground hover:text-foreground"
+                      className="h-11 w-11 rounded-xl text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                       onClick={onOpenShortcuts}
                       aria-label={t("nav.shortcuts")}
                     >
@@ -464,7 +459,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                     size="icon-sm"
                     onClick={logout}
                     aria-label={t("auth.logout")}
-                    className="size-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    className="h-11 w-11 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                   >
                     <LogOut className="size-3.5" />
                   </Button>
