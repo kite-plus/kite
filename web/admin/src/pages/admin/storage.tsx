@@ -66,6 +66,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PageHeader, Section } from "@/components/page-header";
+import { EmptyKite } from "@/components/empty-state";
 import { BrandIcon, getBrandInfo } from "@/components/storage-brand";
 import { toast } from "sonner";
 
@@ -225,9 +226,9 @@ export default function StoragePage() {
     mutationFn: () => settingsApi.update({ "storage.upload_policy": uploadPolicy }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
-      toast.success("上传策略已保存");
+      toast.success(t("storage.savePolicySuccess"));
     },
-    onError: () => toast.error("上传策略保存失败"),
+    onError: () => toast.error(t("storage.savePolicyFailed")),
   });
 
   const { data, isLoading: isStorageLoading } = useQuery<StorageListItem[]>({
@@ -266,16 +267,16 @@ export default function StoragePage() {
       closeDialog();
       toast.success(t("storage.savedSuccess"));
     },
-    onError: (err) => toast.error(mapStorageError(err, "存储配置保存失败")),
+    onError: (err) => toast.error(mapStorageError(err, t("storage.saveConfigFailed"))),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => storageApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["storage"] });
-      toast.success("存储配置删除成功");
+      toast.success(t("storage.deleteSuccess"));
     },
-    onError: (err) => toast.error(mapStorageError(err, "存储配置删除失败")),
+    onError: (err) => toast.error(mapStorageError(err, t("storage.deleteFailed"))),
   });
 
   const reorderMutation = useMutation({
@@ -286,7 +287,7 @@ export default function StoragePage() {
     },
     onError: (err) => {
       if (data) setOrderedIds(data.map((c) => c.id));
-      toast.error(mapStorageError(err, "排序保存失败"));
+      toast.error(mapStorageError(err, t("storage.reorderFailed")));
     },
   });
 
@@ -296,7 +297,7 @@ export default function StoragePage() {
       queryClient.invalidateQueries({ queryKey: ["storage"] });
       toast.success(t("storage.setDefaultSuccess"));
     },
-    onError: (err) => toast.error(mapStorageError(err, "切换默认失败")),
+    onError: (err) => toast.error(mapStorageError(err, t("storage.setDefaultFailed"))),
   });
 
   const handleTest = async (id: string) => {
@@ -304,11 +305,11 @@ export default function StoragePage() {
     try {
       await storageApi.test(id);
       setTestResult((prev) => ({ ...prev, [id]: "ok" }));
-      toast.success("存储测试成功");
+      toast.success(t("storage.testSuccess"));
       setTimeout(() => setTestResult((prev) => ({ ...prev, [id]: undefined! })), 3000);
     } catch (err) {
       setTestResult((prev) => ({ ...prev, [id]: "fail" }));
-      toast.error(mapStorageError(err, "存储测试失败，请检查配置"));
+      toast.error(mapStorageError(err, t("storage.testFailedGeneric")));
       setTimeout(() => setTestResult((prev) => ({ ...prev, [id]: undefined! })), 3000);
     }
   };
@@ -334,7 +335,7 @@ export default function StoragePage() {
       });
       setDialogOpen(true);
     } catch (err) {
-      toast.error(mapStorageError(err, "无法获取存储详情"));
+      toast.error(mapStorageError(err, t("storage.detailFailed")));
     }
   };
 
@@ -467,14 +468,16 @@ export default function StoragePage() {
                 ))}
 
                 {orderedItems.length === 0 && (
-                  <div className="flex flex-col items-center rounded-xl border border-dashed py-16 text-center">
-                    <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-                      <HardDrive className="size-6 text-muted-foreground" />
-                    </div>
-                    <p className="mt-4 text-sm font-medium text-muted-foreground">
-                      {t("storage.noStorage")}
-                    </p>
-                  </div>
+                  <EmptyKite
+                    title={t("storage.noStorage")}
+                    hint={t("storage.noStorageHint")}
+                    action={
+                      <Button size="sm" onClick={openCreate}>
+                        <Plus className="size-3.5" />
+                        {t("storage.addStorage")}
+                      </Button>
+                    }
+                  />
                 )}
               </div>
             </SortableContext>

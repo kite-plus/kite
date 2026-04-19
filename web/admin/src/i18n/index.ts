@@ -61,3 +61,11 @@ export const localeLabels: Record<Locale, string> = {
   en: "English",
   zh: "中文",
 };
+
+// Standalone translator for contexts that can't use the useI18n hook
+// (e.g. imperative helpers, hooks that run before provider mounts).
+// Reads the active locale from localStorage with the same fallback as the provider.
+export function translate(key: string): string {
+  const locale = getInitialLocale();
+  return resolve(locales[locale] as unknown as Record<string, unknown>, key);
+}

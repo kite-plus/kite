@@ -6,6 +6,7 @@ import {
   Bell,
   ChevronRight,
   KeyRound,
+  Keyboard,
   LogOut,
   Menu,
   PanelLeftClose,
@@ -17,11 +18,18 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n, type Locale } from "@/i18n";
 import { Sidebar } from "@/components/layouts/sidebar";
+import { ShortcutsDialog } from "@/components/shortcuts-dialog";
 import { Button } from "@/components/ui/button";
 import { KiteLogo } from "@/components/kite-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn, formatSize } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -85,6 +93,7 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [globalQuery, setGlobalQuery] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
@@ -155,20 +164,117 @@ export default function AppLayout() {
   }, [filteredTargets]);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const isShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
-      if (!isShortcut) return;
-      event.preventDefault();
-      setCommandOpen((prev) => {
+    const toggleSidebarKey = () => {
+      setSidebarCollapsed((prev) => {
         const next = !prev;
-        if (!next) setGlobalQuery("");
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
         return next;
       });
     };
 
+    const toggleTheme = () => {
+      const html = document.documentElement;
+      const isDark = html.classList.contains("dark");
+      html.classList.toggle("dark", !isDark);
+      localStorage.setItem("theme", isDark ? "light" : "dark");
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName ?? "";
+      const inField =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        target?.isContentEditable === true;
+      const mod = event.metaKey || event.ctrlKey;
+
+      // ⌘K / Ctrl+K — command menu
+      if (mod && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen((prev) => {
+          const next = !prev;
+          if (!next) setGlobalQuery("");
+          return next;
+        });
+        return;
+      }
+
+      // Esc closes dialogs (native behaviour handles it, but guard against stray)
+      if (event.key === "Escape") {
+        if (commandOpen) setCommandOpen(false);
+        if (shortcutsOpen) setShortcutsOpen(false);
+        return;
+      }
+
+      if (inField) return;
+
+      // ? — open keyboard shortcuts
+      if (event.key === "?") {
+        event.preventDefault();
+        setShortcutsOpen(true);
+        return;
+      }
+
+      // ⌘B / Ctrl+B — toggle sidebar
+      if (mod && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        toggleSidebarKey();
+        return;
+      }
+
+      // ⌘U / Ctrl+U — quick upload
+      if (mod && event.key.toLowerCase() === "u") {
+        event.preventDefault();
+        const isAdmin = location.pathname.startsWith("/admin");
+        navigate(isAdmin ? "/admin/files" : "/user/files");
+        return;
+      }
+
+      // ⌘. — toggle theme
+      if (mod && event.key === ".") {
+        event.preventDefault();
+        toggleTheme();
+        return;
+      }
+
+      // Sequential "g X" navigation (Gmail-style)
+      if (event.key === "g" || event.key === "G") {
+        const nextKey = (e2: KeyboardEvent) => {
+          const isAdmin = location.pathname.startsWith("/admin");
+          const userMap: Record<string, string> = {
+            d: "/user/dashboard",
+            f: "/user/files",
+            a: "/user/folders",
+            t: "/user/tokens",
+            p: "/user/profile",
+          };
+          const adminMap: Record<string, string> = {
+            d: "/admin/dashboard",
+            f: "/admin/files",
+            s: "/admin/storage",
+            u: "/admin/users",
+            t: "/admin/settings",
+          };
+          const map = isAdmin ? adminMap : userMap;
+          const key = e2.key.toLowerCase();
+          const to = map[key];
+          if (to) {
+            e2.preventDefault();
+            navigate(to);
+          }
+          window.removeEventListener("keydown", nextKey, true);
+        };
+        window.addEventListener("keydown", nextKey, true);
+        setTimeout(
+          () => window.removeEventListener("keydown", nextKey, true),
+          1200
+        );
+      }
+    };
+
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [commandOpen, shortcutsOpen, navigate, location.pathname]);
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {
@@ -206,7 +312,10 @@ export default function AppLayout() {
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar */}
       <div className="hidden shrink-0 border-r md:flex">
-        <Sidebar collapsed={sidebarCollapsed} />
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onOpenShortcuts={() => setShortcutsOpen(true)}
+        />
       </div>
 
       {/* Right content area */}
@@ -248,9 +357,15 @@ export default function AppLayout() {
 
             <ThemeToggle />
           </header>
-          <SheetContent side="left" className="w-55 p-0">
+          <SheetContent side="left" className="w-60 p-0">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <Sidebar onClose={() => setMobileOpen(false)} />
+            <Sidebar
+              onClose={() => setMobileOpen(false)}
+              onOpenShortcuts={() => {
+                setMobileOpen(false);
+                setShortcutsOpen(true);
+              }}
+            />
           </SheetContent>
         </Sheet>
 
@@ -303,14 +418,44 @@ export default function AppLayout() {
             </div>
 
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-foreground"
-                aria-label="Notifications"
-              >
-                <Bell className="size-4" />
-              </Button>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => setShortcutsOpen(true)}
+                      aria-label={t("nav.shortcuts")}
+                    >
+                      <Keyboard className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <span className="flex items-center gap-1.5">
+                      {t("nav.shortcuts")}
+                      <kbd>?</kbd>
+                    </span>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="relative text-muted-foreground hover:text-foreground"
+                      aria-label="Notifications"
+                    >
+                      <Bell className="size-4" />
+                      <span
+                        className="absolute right-1.5 top-1.5 size-1.5 rounded-full"
+                        style={{ background: "hsl(var(--chart-2))" }}
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Notifications</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <ThemeToggle />
               <div className="mx-1 h-5 w-px bg-border" />
               <DropdownMenu>
@@ -454,6 +599,11 @@ export default function AppLayout() {
             </div>
           </div>
         </header>
+
+        <ShortcutsDialog
+          open={shortcutsOpen}
+          onOpenChange={setShortcutsOpen}
+        />
 
         <Dialog
           open={commandOpen}

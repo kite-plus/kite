@@ -7,6 +7,7 @@ import {
 } from "react";
 import { authApi } from "@/lib/api";
 import { toast } from "sonner";
+import { translate } from "@/i18n";
 
 export interface User {
   user_id: string;
@@ -124,7 +125,7 @@ export function useAuthProvider(): AuthContextValue {
     writeCachedUser(null);
     setUser(null);
     authApi.logout().catch(() => { });
-    toast.success("已安全退出登录");
+    toast.success(translate("auth.loggedOut"));
   }, []);
 
   const applyTokensAndRefresh = useCallback(

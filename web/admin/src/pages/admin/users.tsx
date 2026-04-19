@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Users,
   Trash2,
   Plus,
   Pencil,
@@ -17,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
@@ -41,6 +42,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
+import { EmptyKite } from "@/components/empty-state";
 import { toast } from "sonner";
 
 interface UserItem {
@@ -48,6 +50,7 @@ interface UserItem {
   username: string;
   nickname?: string;
   email: string;
+  avatar_url?: string;
   role: string;
   storage_used: number;
   storage_limit: number;
@@ -97,12 +100,12 @@ export default function UsersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       closeDialog();
-      toast.success("用户创建成功");
+      toast.success(t("toast.createUser"));
     },
     onError: (err: unknown) => {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? "Failed";
+          ?.message ?? t("users.saveFailed");
       setError(msg);
     },
   });
@@ -122,12 +125,12 @@ export default function UsersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       closeDialog();
-      toast.success("用户更新成功");
+      toast.success(t("toast.updateUser"));
     },
     onError: (err: unknown) => {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? "Failed";
+          ?.message ?? t("users.saveFailed");
       setError(msg);
     },
   });
@@ -136,10 +139,16 @@ export default function UsersPage() {
     mutationFn: (id: string) => userApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      toast.success("用户删除成功");
+      toast.success(t("toast.deleteUser"));
     },
-    onError: () => toast.error("用户删除失败"),
+    onError: () => toast.error(t("users.deleteFailed")),
   });
+
+  const requestDelete = (user: UserItem) => {
+    if (window.confirm(t("users.deleteConfirm"))) {
+      deleteMutation.mutate(user.id);
+    }
+  };
 
   const openCreate = () => {
     setEditingUser(null);
@@ -214,131 +223,221 @@ export default function UsersPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableHead>{t("users.username")}</TableHead>
+                  <TableHead>{t("users.account")}</TableHead>
                   <TableHead>{t("users.email")}</TableHead>
                   <TableHead>{t("users.role")}</TableHead>
-                  <TableHead>{t("users.storageCol")}</TableHead>
+                  <TableHead className="min-w-[180px]">
+                    {t("users.storageCol")}
+                  </TableHead>
                   <TableHead className="w-20" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data?.items?.map((user: UserItem) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">
-                            {user.nickname?.trim() || user.username}
-                          </div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            @{user.username}
+                {data?.items?.map((user: UserItem) => {
+                  const pct =
+                    user.storage_limit > 0
+                      ? Math.min(
+                          100,
+                          (user.storage_used / user.storage_limit) * 100,
+                        )
+                      : 0;
+                  const quotaLabel =
+                    user.storage_limit > 0
+                      ? `${formatBytes(user.storage_used)} / ${formatBytes(user.storage_limit)}`
+                      : `${formatBytes(user.storage_used)} · ${t("users.unlimited")}`;
+                  const name = user.nickname?.trim() || user.username;
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="size-9 shrink-0">
+                            <AvatarImage
+                              src={user.avatar_url}
+                              alt={name}
+                              className="object-cover"
+                            />
+                            <AvatarFallback className="text-xs font-semibold">
+                              {name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate font-medium">
+                                {name}
+                              </span>
+                              {!user.is_active && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  {t("common.disabled")}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              @{user.username}
+                            </div>
                           </div>
                         </div>
-                        {!user.is_active && (
-                          <Badge variant="outline" className="text-[10px]">
-                            {t("common.disabled")}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {user.email}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={user.role === "admin" ? "default" : "secondary"}
-                        className="text-[10px]"
-                      >
-                        {user.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatBytes(user.storage_used)}
-                      {user.storage_limit > 0 &&
-                        ` / ${formatBytes(user.storage_limit)}`}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          onClick={() => openEdit(user)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {user.email}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            user.role === "admin" ? "default" : "secondary"
+                          }
+                          className="text-[10px]"
                         >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          onClick={() => deleteMutation.mutate(user.id)}
-                        >
-                          <Trash2 className="size-3.5 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {user.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="min-w-[160px] space-y-1.5">
+                          <div className="flex items-baseline justify-between gap-2 text-xs">
+                            <span className="truncate text-muted-foreground">
+                              {quotaLabel}
+                            </span>
+                            {user.storage_limit > 0 && (
+                              <span className="shrink-0 font-medium tabular-nums">
+                                {pct.toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                          {user.storage_limit > 0 ? (
+                            <Progress value={pct} className="h-1" />
+                          ) : (
+                            <div className="h-1 rounded-full bg-gradient-to-r from-[color:var(--chart-2)]/30 via-[color:var(--chart-1)]/30 to-[color:var(--chart-4)]/30" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            onClick={() => openEdit(user)}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            onClick={() => requestDelete(user)}
+                          >
+                            <Trash2 className="size-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
 
           {/* Mobile cards */}
           <div className="space-y-3 sm:hidden">
-            {data?.items?.map((user: UserItem) => (
-              <div key={user.id} className="rounded-xl border bg-card p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{user.nickname?.trim() || user.username}</span>
-                      <Badge
-                        variant={user.role === "admin" ? "default" : "secondary"}
-                        className="text-[10px]"
-                      >
-                        {user.role}
-                      </Badge>
-                      {!user.is_active && (
-                        <Badge variant="outline" className="text-[10px]">
-                          {t("common.disabled")}
+            {data?.items?.map((user: UserItem) => {
+              const pct =
+                user.storage_limit > 0
+                  ? Math.min(
+                      100,
+                      (user.storage_used / user.storage_limit) * 100,
+                    )
+                  : 0;
+              const name = user.nickname?.trim() || user.username;
+              return (
+                <div key={user.id} className="rounded-xl border bg-card p-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="size-10 shrink-0">
+                      <AvatarImage
+                        src={user.avatar_url}
+                        alt={name}
+                        className="object-cover"
+                      />
+                      <AvatarFallback className="text-sm font-semibold">
+                        {name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium">
+                          {name}
+                        </span>
+                        <Badge
+                          variant={
+                            user.role === "admin" ? "default" : "secondary"
+                          }
+                          className="text-[10px]"
+                        >
+                          {user.role}
                         </Badge>
-                      )}
+                        {!user.is_active && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {t("common.disabled")}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        @{user.username}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {user.email}
+                      </p>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-baseline justify-between gap-2 text-[11px]">
+                          <span className="truncate text-muted-foreground">
+                            {formatBytes(user.storage_used)}
+                            {user.storage_limit > 0
+                              ? ` / ${formatBytes(user.storage_limit)}`
+                              : ` · ${t("users.unlimited")}`}
+                          </span>
+                          {user.storage_limit > 0 && (
+                            <span className="shrink-0 font-medium tabular-nums">
+                              {pct.toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                        {user.storage_limit > 0 && (
+                          <Progress value={pct} className="h-1" />
+                        )}
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">@{user.username}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{user.email}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {formatBytes(user.storage_used)}
-                      {user.storage_limit > 0 &&
-                        ` / ${formatBytes(user.storage_limit)}`}
-                    </p>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      size="icon-xs"
-                      variant="ghost"
-                      onClick={() => openEdit(user)}
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      size="icon-xs"
-                      variant="ghost"
-                      onClick={() => deleteMutation.mutate(user.id)}
-                    >
-                      <Trash2 className="size-3.5 text-destructive" />
-                    </Button>
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        onClick={() => openEdit(user)}
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        onClick={() => requestDelete(user)}
+                      >
+                        <Trash2 className="size-3.5 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {data?.items?.length === 0 && (
-            <div className="flex flex-col items-center py-16 text-center">
-              <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-                <Users className="size-6 text-muted-foreground" />
-              </div>
-              <p className="mt-4 text-sm font-medium text-muted-foreground">
-                {t("users.noUsers")}
-              </p>
-            </div>
+            <EmptyKite
+              title={t("users.noUsers")}
+              hint={t("users.noUsersHint")}
+              action={
+                <Button size="sm" onClick={openCreate}>
+                  <Plus className="size-3.5" />
+                  {t("users.addUser")}
+                </Button>
+              }
+            />
           )}
 
           {data && data.total > 20 && (

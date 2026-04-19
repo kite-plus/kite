@@ -102,14 +102,14 @@ export default function AdminFilesPage() {
     mutationFn: (id: string) => adminFileApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-files"] });
-      toast.success("文件删除成功");
+      toast.success(t("files.deleteSuccess"));
     },
-    onError: () => toast.error("文件删除失败"),
+    onError: () => toast.error(t("files.deleteFailed")),
   });
 
   const copyUrl = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
-    toast.success("链接已复制");
+    toast.success(t("files.linkCopied"));
     setCopied(key);
     setTimeout(() => setCopied(""), 1500);
   };
@@ -150,7 +150,7 @@ export default function AdminFilesPage() {
             size="icon-sm"
             variant={viewMode === "table" ? "secondary" : "ghost"}
             onClick={() => setViewMode("table")}
-            title="列表视图"
+            title={t("files.listView")}
           >
             <List className="size-4" />
           </Button>
@@ -158,7 +158,7 @@ export default function AdminFilesPage() {
             size="icon-sm"
             variant={viewMode === "grid" ? "secondary" : "ghost"}
             onClick={() => setViewMode("grid")}
-            title="网格视图"
+            title={t("files.gridView")}
           >
             <LayoutGrid className="size-4" />
           </Button>

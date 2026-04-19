@@ -6,7 +6,6 @@ import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -14,12 +13,17 @@ import {
   Sun,
   Moon,
   Check,
+  Paintbrush,
+  Globe,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/theme-provider";
 import { localeLabels, type Locale } from "@/i18n";
-import { PageHeader, Section } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
+
+type Tab = "appearance" | "site" | "access";
 
 export default function SettingsPage() {
   const { t, locale, setLocale } = useI18n();
@@ -27,6 +31,7 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("appearance");
 
   const { data, isLoading } = useQuery({
     queryKey: ["settings"],
@@ -52,138 +57,206 @@ export default function SettingsPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const toggleField = (key: string) =>
-    setForm((prev) => ({ ...prev, [key]: prev[key] === "true" ? "false" : "true" }));
+    setForm((prev) => ({
+      ...prev,
+      [key]: prev[key] === "true" ? "false" : "true",
+    }));
 
   if (isLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-40" />
-        <Skeleton className="h-40" />
+        <Skeleton className="h-10 w-96" />
+        <Skeleton className="h-64" />
       </div>
     );
   }
 
+  const tabs: {
+    key: Tab;
+    label: string;
+    icon: React.ElementType;
+    description: string;
+  }[] = [
+    {
+      key: "appearance",
+      label: t("settings.appearance"),
+      icon: Paintbrush,
+      description: t("settings.appearanceDesc"),
+    },
+    {
+      key: "site",
+      label: t("settings.site"),
+      icon: Globe,
+      description: t("settings.siteDesc"),
+    },
+    {
+      key: "access",
+      label: t("settings.accessControl"),
+      icon: ShieldCheck,
+      description: t("settings.accessControlDesc"),
+    },
+  ];
+
+  const current = tabs.find((tab) => tab.key === activeTab)!;
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <PageHeader
         title={t("settings.title")}
         description={t("settings.description")}
       />
 
-      {/* Appearance */}
-      <Section
-        title={t("settings.appearance")}
-        description={t("settings.appearanceDesc")}
-      >
-        <div className="grid gap-5 max-w-2xl">
-          <SettingRow label={t("settings.language")}>
-            <div className="flex rounded-lg bg-muted p-1">
-              {(Object.keys(localeLabels) as Locale[]).map((l) => (
-                <button
-                  key={l}
-                  className={cn(
-                    "rounded-md px-4 py-1.5 text-[13px] font-medium transition-all",
-                    locale === l
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                  onClick={() => setLocale(l)}
-                >
-                  {localeLabels[l]}
-                </button>
-              ))}
-            </div>
-          </SettingRow>
-
-          <SettingRow label={t("settings.theme")}>
-            <div className="flex rounded-lg bg-muted p-1">
-              {([
-                { value: "light", icon: Sun, label: t("settings.themeLight") },
-                { value: "dark", icon: Moon, label: t("settings.themeDark") },
-                { value: "system", icon: Monitor, label: t("settings.themeSystem") },
-              ] as const).map((item) => (
-                <button
-                  key={item.value}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-all",
-                    theme === item.value
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                  onClick={() => setTheme(item.value)}
-                >
-                  <item.icon className="size-3.5" />
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </SettingRow>
+      {/* Tabs rail */}
+      <div className="sticky top-0 z-10 -mx-4 overflow-x-auto border-b bg-background/80 px-4 backdrop-blur-md sm:mx-0 sm:rounded-lg sm:border sm:bg-card sm:px-1">
+        <div role="tablist" className="flex gap-1">
+          {tabs.map((tab) => {
+            const active = tab.key === activeTab;
+            return (
+              <button
+                key={tab.key}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  "group relative flex min-w-fit shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors sm:rounded-md",
+                  active
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <tab.icon className="size-4" />
+                <span>{tab.label}</span>
+                {active && (
+                  <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-foreground sm:inset-x-1 sm:bottom-0.5 sm:h-0.5" />
+                )}
+              </button>
+            );
+          })}
         </div>
-      </Section>
+      </div>
 
-      <Separator />
-
-      {/* Site config */}
-      <Section
-        title={t("settings.site")}
-        description={t("settings.siteDesc")}
+      <section
+        role="tabpanel"
+        aria-labelledby={`tab-${activeTab}`}
+        className="space-y-6"
       >
-        <div className="grid max-w-xl gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="site_name">{t("settings.siteName")}</Label>
-            <Input
-              id="site_name"
-              value={form.site_name ?? ""}
-              onChange={(e) => updateField("site_name", e.target.value)}
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold tracking-tight">
+            {current.label}
+          </h3>
+          <p className="text-sm text-muted-foreground">{current.description}</p>
+        </div>
+
+        {activeTab === "appearance" && (
+          <div className="grid max-w-2xl gap-5">
+            <SettingRow label={t("settings.language")}>
+              <div className="flex rounded-lg bg-muted p-1">
+                {(Object.keys(localeLabels) as Locale[]).map((l) => (
+                  <button
+                    key={l}
+                    className={cn(
+                      "rounded-md px-4 py-1.5 text-[13px] font-medium transition-all",
+                      locale === l
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setLocale(l)}
+                  >
+                    {localeLabels[l]}
+                  </button>
+                ))}
+              </div>
+            </SettingRow>
+
+            <SettingRow label={t("settings.theme")}>
+              <div className="flex rounded-lg bg-muted p-1">
+                {(
+                  [
+                    {
+                      value: "light",
+                      icon: Sun,
+                      label: t("settings.themeLight"),
+                    },
+                    {
+                      value: "dark",
+                      icon: Moon,
+                      label: t("settings.themeDark"),
+                    },
+                    {
+                      value: "system",
+                      icon: Monitor,
+                      label: t("settings.themeSystem"),
+                    },
+                  ] as const
+                ).map((item) => (
+                  <button
+                    key={item.value}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-all",
+                      theme === item.value
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setTheme(item.value)}
+                  >
+                    <item.icon className="size-3.5" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </SettingRow>
+          </div>
+        )}
+
+        {activeTab === "site" && (
+          <div className="grid max-w-xl gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="site_name">{t("settings.siteName")}</Label>
+              <Input
+                id="site_name"
+                value={form.site_name ?? ""}
+                onChange={(e) => updateField("site_name", e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="site_url">{t("settings.siteUrl")}</Label>
+              <Input
+                id="site_url"
+                value={form.site_url ?? ""}
+                onChange={(e) => updateField("site_url", e.target.value)}
+                placeholder={t("settings.siteUrlPlaceholder")}
+              />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "access" && (
+          <div className="grid max-w-2xl gap-5">
+            <SettingToggle
+              label={t("settings.allowRegistration")}
+              description={t("settings.allowRegistrationDesc")}
+              checked={form.allow_registration === "true"}
+              onChange={() => toggleField("allow_registration")}
+            />
+            <SettingToggle
+              label={t("settings.allowGuestUpload")}
+              description={t("settings.allowGuestUploadDesc")}
+              checked={form.allow_guest_upload === "true"}
+              onChange={() => toggleField("allow_guest_upload")}
+            />
+            <SettingToggle
+              label={t("settings.allowPublicGallery")}
+              description={t("settings.allowPublicGalleryDesc")}
+              checked={form.allow_public_gallery === "true"}
+              onChange={() => toggleField("allow_public_gallery")}
             />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="site_url">{t("settings.siteUrl")}</Label>
-            <Input
-              id="site_url"
-              value={form.site_url ?? ""}
-              onChange={(e) => updateField("site_url", e.target.value)}
-              placeholder={t("settings.siteUrlPlaceholder")}
-            />
-          </div>
-        </div>
-      </Section>
-
-      <Separator />
-
-      {/* Access control */}
-      <Section
-        title={t("settings.accessControl")}
-        description={t("settings.accessControlDesc")}
-      >
-        <div className="grid gap-5 max-w-2xl">
-          <SettingToggle
-            label={t("settings.allowRegistration")}
-            description={t("settings.allowRegistrationDesc")}
-            checked={form.allow_registration === "true"}
-            onChange={() => toggleField("allow_registration")}
-          />
-          <SettingToggle
-            label={t("settings.allowGuestUpload")}
-            description={t("settings.allowGuestUploadDesc")}
-            checked={form.allow_guest_upload === "true"}
-            onChange={() => toggleField("allow_guest_upload")}
-          />
-          <SettingToggle
-            label={t("settings.allowPublicGallery")}
-            description={t("settings.allowPublicGalleryDesc")}
-            checked={form.allow_public_gallery === "true"}
-            onChange={() => toggleField("allow_public_gallery")}
-          />
-        </div>
-      </Section>
+        )}
+      </section>
 
       <div className="flex">
-        <Button
-          onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
-        >
+        <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
           {saved ? (
             <>
               <Check className="size-4" />

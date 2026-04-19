@@ -4,7 +4,6 @@ import {
   Upload,
   Trash2,
   Copy,
-  FileText,
   LayoutGrid,
   List,
   Search,
@@ -32,6 +31,7 @@ import { Progress } from "@/components/ui/progress";
 import { getFileIconInfo, getFileTypeLabel } from "@/lib/file-utils";
 import { useAdaptiveGridPageSize } from "@/hooks/use-adaptive-grid-page-size";
 import { PageHeader } from "@/components/page-header";
+import { EmptyKite } from "@/components/empty-state";
 
 const LIST_PAGE_SIZE = 20;
 const DEFAULT_GRID_PAGE_SIZE = 20;
@@ -106,9 +106,9 @@ export default function FilesPage() {
     mutationFn: (id: string) => fileApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["files"] });
-      toast.success("文件删除成功");
+      toast.success(t("files.deleteSuccess"));
     },
-    onError: () => toast.error("文件删除失败"),
+    onError: () => toast.error(t("files.deleteFailed")),
   });
 
   const uploadFiles = useCallback(
@@ -144,12 +144,16 @@ export default function FilesPage() {
               prev.map((u) => (u.id === task.id ? { ...u, status: "done", progress: 100 } : u))
             );
             queryClient.invalidateQueries({ queryKey: ["files"] });
-            toast.success(`${task.file.name} 上传成功`);
+            toast.success(
+              t("files.uploadOneSuccess").replace("{name}", task.file.name),
+            );
           } else {
             setUploads((prev) =>
               prev.map((u) => (u.id === task.id ? { ...u, status: "error" } : u))
             );
-            toast.error(`${task.file.name} 上传失败`);
+            toast.error(
+              t("files.uploadOneFailed").replace("{name}", task.file.name),
+            );
           }
         };
         xhr.onerror = () => {
@@ -160,7 +164,7 @@ export default function FilesPage() {
         xhr.send(formData);
       });
     },
-    [queryClient]
+    [queryClient, t]
   );
 
   const handleDrop = useCallback(
@@ -180,7 +184,7 @@ export default function FilesPage() {
 
   const copyUrl = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
-    toast.success("链接已复制");
+    toast.success(t("files.linkCopied"));
     setCopied(key);
     setTimeout(() => setCopied(""), 1500);
   };
@@ -292,7 +296,7 @@ export default function FilesPage() {
             size="icon-sm"
             variant={viewMode === "grid" ? "secondary" : "ghost"}
             onClick={() => setViewMode("grid")}
-            title="网格视图"
+            title={t("files.gridView")}
           >
             <LayoutGrid className="size-4" />
           </Button>
@@ -300,7 +304,7 @@ export default function FilesPage() {
             size="icon-sm"
             variant={viewMode === "list" ? "secondary" : "ghost"}
             onClick={() => setViewMode("list")}
-            title="列表视图"
+            title={t("files.listView")}
           >
             <List className="size-4" />
           </Button>
@@ -345,7 +349,7 @@ export default function FilesPage() {
                 return (
                   <div
                     key={file.id}
-                    className="group relative cursor-pointer overflow-hidden rounded-lg border bg-card transition-colors hover:border-foreground/20"
+                    className="glow-card group relative cursor-pointer overflow-hidden rounded-lg border bg-card transition-colors hover:border-foreground/20"
                     onClick={() => setDetailFile(file)}
                   >
                     <div className="flex h-32 items-center justify-center bg-muted/30">
@@ -441,12 +445,16 @@ export default function FilesPage() {
           )}
 
           {data?.items?.length === 0 && (
-            <div className="flex flex-col items-center rounded-xl border border-dashed py-20 text-center">
-              <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-                <FileText className="size-6 text-muted-foreground" />
-              </div>
-              <p className="mt-4 text-sm font-medium text-muted-foreground">{t("files.noFiles")}</p>
-            </div>
+            <EmptyKite
+              title={t("files.noFiles")}
+              hint={t("files.noFilesHint")}
+              action={
+                <Button size="sm" onClick={() => setUploadOpen(true)}>
+                  <Upload className="size-3.5" />
+                  {t("common.upload")}
+                </Button>
+              }
+            />
           )}
 
           {data && data.total > pageSize && (
