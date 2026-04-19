@@ -225,14 +225,14 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
         )}
 
         {/* ── Quick upload ────────────────────────────────────── */}
-        <div className={cn("px-3 pt-3", collapsed && "px-2")}>
+        <div className={cn("pt-3", collapsed ? "flex justify-center px-2" : "px-3")}>
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="default"
                   size="icon-sm"
-                  className="w-full"
+                  className="size-10 rounded-xl"
                   onClick={handleQuickUpload}
                   aria-label={t("files.uploadFile")}
                 >
@@ -262,16 +262,18 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
           {groupOrder
             .filter((g) => groups[g] && groups[g].length > 0)
             .map((g, gi) => (
-              <div key={g} className={cn(gi > 0 && "mt-4")}>
+              <div key={g} className={cn(gi > 0 && (collapsed ? "mt-2" : "mt-4"))}>
                 {!collapsed && (
                   <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
                     {t(groupLabelKey[g])}
                   </div>
                 )}
                 {collapsed && gi > 0 && (
-                  <div className="mx-2 my-2 h-px bg-border/80" />
+                  <div className="mb-2 flex justify-center">
+                    <div className="h-px w-6 bg-border/70" />
+                  </div>
                 )}
-                <div className="space-y-0.5">
+                <div className={cn(collapsed ? "flex flex-col items-center gap-1" : "space-y-0.5")}>
                   {groups[g].map((it) => {
                     const badge = badgeFor(it);
                     const content = (
@@ -281,40 +283,55 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                         onClick={onClose}
                         className={({ isActive }) =>
                           cn(
-                            "group relative flex w-full items-center rounded-lg text-sm font-medium transition-colors",
-                            collapsed ? "h-9 justify-center px-0" : "gap-2.5 px-3 py-2",
-                            isActive
-                              ? "bg-foreground/[0.06] text-foreground"
-                              : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                            "relative flex items-center text-sm font-medium transition-colors",
+                            collapsed
+                              ? cn(
+                                  "size-10 shrink-0 justify-center rounded-xl",
+                                  isActive
+                                    ? "bg-foreground/10 text-foreground"
+                                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                )
+                              : cn(
+                                  "w-full gap-2.5 rounded-lg px-3 py-2",
+                                  isActive
+                                    ? "bg-foreground/[0.06] text-foreground"
+                                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                                )
                           )
                         }
                       >
                         {({ isActive }) => (
                           <>
-                            {/* active indicator rail */}
+                            {/* active indicator rail (expanded only) */}
                             {isActive && !collapsed && (
                               <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-foreground" />
                             )}
                             <it.icon
                               className={cn(
                                 "size-4 shrink-0",
-                                isActive && "text-foreground"
+                                isActive && !collapsed && "text-foreground",
+                                isActive && collapsed && "stroke-[2.25]"
                               )}
                             />
                             {!collapsed && (
-                              <span className="flex-1 text-left">{t(it.labelKey)}</span>
-                            )}
-                            {!collapsed && badge && (
-                              <span
-                                className={cn(
-                                  "rounded-md border px-1.5 py-0 text-[10px] tabular-nums leading-[1.4]",
-                                  isActive
-                                    ? "border-foreground/20 bg-background text-foreground/80"
-                                    : "border-border/80 text-muted-foreground"
+                              <>
+                                <span className="flex-1 text-left">{t(it.labelKey)}</span>
+                                {badge && (
+                                  <span
+                                    className={cn(
+                                      "rounded-md border px-1.5 py-0 text-[10px] tabular-nums leading-[1.4]",
+                                      isActive
+                                        ? "border-foreground/20 bg-background text-foreground/80"
+                                        : "border-border/80 text-muted-foreground"
+                                    )}
+                                  >
+                                    {badge}
+                                  </span>
                                 )}
-                              >
-                                {badge}
-                              </span>
+                              </>
+                            )}
+                            {collapsed && badge && !isActive && (
+                              <span className="absolute right-1 top-1 size-1.5 rounded-full bg-foreground/70 ring-2 ring-background" />
                             )}
                           </>
                         )}
@@ -376,31 +393,35 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
         </nav>
 
         {/* ── Footer: workspace switch + utility row ─────────── */}
-        <div className={cn("shrink-0 border-t", collapsed ? "p-2" : "p-3")}>
+        <div className={cn("shrink-0 border-t", collapsed ? "px-2 py-2" : "p-3")}>
           {collapsed ? (
             <div className="flex flex-col items-center gap-1">
               {user?.role === "admin" && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={handleWorkspaceSwitch}
-                      aria-label={
-                        isAdminWorkspace ? t("nav.backToUser") : t("nav.adminPanel")
-                      }
-                    >
-                      {isAdminWorkspace ? (
-                        <UserIcon className="size-3.5" />
-                      ) : (
-                        <ShieldCheck className="size-3.5" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {isAdminWorkspace ? t("nav.backToUser") : t("nav.adminPanel")}
-                  </TooltipContent>
-                </Tooltip>
+                <>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        className="size-9 rounded-lg"
+                        onClick={handleWorkspaceSwitch}
+                        aria-label={
+                          isAdminWorkspace ? t("nav.backToUser") : t("nav.adminPanel")
+                        }
+                      >
+                        {isAdminWorkspace ? (
+                          <UserIcon className="size-3.5" />
+                        ) : (
+                          <ShieldCheck className="size-3.5 text-violet-600 dark:text-violet-400" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      {isAdminWorkspace ? t("nav.backToUser") : t("nav.adminPanel")}
+                    </TooltipContent>
+                  </Tooltip>
+                  <div className="my-0.5 h-px w-6 bg-border/70" />
+                </>
               )}
               {onOpenShortcuts && (
                 <Tooltip>
@@ -408,6 +429,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                     <Button
                       variant="ghost"
                       size="icon-sm"
+                      className="size-9 rounded-lg text-muted-foreground hover:text-foreground"
                       onClick={onOpenShortcuts}
                       aria-label={t("nav.shortcuts")}
                     >
@@ -424,7 +446,7 @@ export function Sidebar({ onClose, collapsed = false, onOpenShortcuts }: Sidebar
                     size="icon-sm"
                     onClick={logout}
                     aria-label={t("auth.logout")}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="size-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                   >
                     <LogOut className="size-3.5" />
                   </Button>

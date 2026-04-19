@@ -5,7 +5,6 @@ import {
   Trash2,
   Check,
   Plus,
-  Pencil,
   AlertCircle,
   Layers,
   Repeat,
@@ -15,6 +14,8 @@ import {
   Star,
   MoreHorizontal,
   Loader2,
+  Settings as SettingsIcon,
+  RefreshCw,
 } from "lucide-react";
 import {
   DndContext,
@@ -28,22 +29,29 @@ import {
 import {
   SortableContext,
   arrayMove,
-  sortableKeyboardCoordinates,
+  rectSortingStrategy,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { settingsApi, storageApi } from "@/lib/api";
+import { adminStatsApi, settingsApi, storageApi } from "@/lib/api";
 import { useI18n } from "@/i18n";
-import { formatSize } from "@/lib/utils";
+import { formatSize, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -68,6 +76,11 @@ import {
 import { PageHeader, Section } from "@/components/page-header";
 import { EmptyKite } from "@/components/empty-state";
 import { BrandIcon, getBrandInfo } from "@/components/storage-brand";
+import { StorageLogo, resolveLogoVendor } from "@/components/storage-logo";
+import {
+  StackedStorageBar,
+  type StorageSegment,
+} from "@/pages/dashboard/components";
 import { toast } from "sonner";
 
 type Driver = "local" | "s3" | "oss" | "cos" | "ftp";
@@ -80,6 +93,7 @@ interface StorageListItem {
   provider: string;
   capacity_limit_bytes: number;
   used_bytes: number;
+  files_count?: number;
   priority: number;
   is_default: boolean;
   is_active: boolean;
@@ -108,6 +122,15 @@ interface StorageForm {
     username?: string;
     password?: string;
   };
+}
+
+interface AdminStats {
+  total_files: number;
+  total_size: number;
+  images: number;
+  videos: number;
+  audios: number;
+  others: number;
 }
 
 const UNIT_BYTES: Record<Unit, number> = {
@@ -223,7 +246,8 @@ export default function StoragePage() {
   }, [settings]);
 
   const saveUploadPolicyMutation = useMutation({
-    mutationFn: () => settingsApi.update({ "storage.upload_policy": uploadPolicy }),
+    mutationFn: (policy: string) =>
+      settingsApi.update({ "storage.upload_policy": policy }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
       toast.success(t("storage.savePolicySuccess"));
@@ -231,9 +255,19 @@ export default function StoragePage() {
     onError: () => toast.error(t("storage.savePolicyFailed")),
   });
 
+  const handlePolicyChange = (value: string) => {
+    setUploadPolicy(value);
+    saveUploadPolicyMutation.mutate(value);
+  };
+
   const { data, isLoading: isStorageLoading } = useQuery<StorageListItem[]>({
     queryKey: ["storage"],
     queryFn: () => storageApi.list().then((r) => r.data.data),
+  });
+
+  const { data: adminStats } = useQuery<AdminStats>({
+    queryKey: ["admin-stats"],
+    queryFn: () => adminStatsApi.get().then((r) => r.data.data),
   });
 
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
@@ -298,6 +332,26 @@ export default function StoragePage() {
       toast.success(t("storage.setDefaultSuccess"));
     },
     onError: (err) => toast.error(mapStorageError(err, t("storage.setDefaultFailed"))),
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const detail = await storageApi.get(id);
+      const cfg = detail.data.data as StorageDetail;
+      return storageApi.update(id, {
+        name: cfg.name,
+        driver: cfg.driver,
+        config: (cfg.config as Record<string, unknown>) ?? {},
+        capacity_limit_bytes: cfg.capacity_limit_bytes,
+        priority: cfg.priority,
+        is_default: cfg.is_default,
+        is_active: active,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["storage"] });
+    },
+    onError: (err) => toast.error(mapStorageError(err, t("storage.toggleActiveFailed"))),
   });
 
   const handleTest = async (id: string) => {
@@ -367,6 +421,29 @@ export default function StoragePage() {
     reorderMutation.mutate(next);
   };
 
+  /* ── Global breakdown (by file type) ─────────────────────── */
+  const breakdownSegs: StorageSegment[] = useMemo(() => {
+    const s = adminStats ?? {
+      total_files: 0,
+      total_size: 0,
+      images: 0,
+      videos: 0,
+      audios: 0,
+      others: 0,
+    };
+    const total = Math.max(1, s.total_files);
+    const byKind = (count: number) =>
+      total > 0 ? Math.round((count / total) * s.total_size) : 0;
+    return [
+      { kind: "image", label: t("storage.fileKindImage"), count: s.images, bytes: byKind(s.images), color: "hsl(var(--chart-3))" },
+      { kind: "video", label: t("storage.fileKindVideo"), count: s.videos, bytes: byKind(s.videos), color: "hsl(var(--chart-2))" },
+      { kind: "audio", label: t("storage.fileKindAudio"), count: s.audios, bytes: byKind(s.audios), color: "hsl(var(--chart-1))" },
+      { kind: "other", label: t("storage.fileKindOther"), count: s.others, bytes: byKind(s.others), color: "hsl(var(--chart-4))" },
+    ];
+  }, [adminStats, t]);
+
+  const hasBreakdown = (adminStats?.total_files ?? 0) > 0;
+
   return (
     <div className="space-y-10">
       <PageHeader
@@ -381,79 +458,94 @@ export default function StoragePage() {
       />
 
       <Section
-        title={t("storage.uploadPolicy")}
-        description={t("storage.uploadPolicyDesc")}
-        actions={
-          <Button
-            variant="outline"
-            onClick={() => saveUploadPolicyMutation.mutate()}
-            disabled={saveUploadPolicyMutation.isPending}
-          >
-            {saveUploadPolicyMutation.isPending ? t("settings.saving") : t("settings.saveSettings")}
-          </Button>
-        }
-      >
-        <div className="max-w-xl">
-          <Select value={uploadPolicy} onValueChange={setUploadPolicy}>
-            <SelectTrigger className="h-auto w-full py-2.5">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {UPLOAD_POLICY_OPTIONS.map((opt) => {
-                const Icon = opt.icon;
-                const labelKey =
-                  opt.value === "single"
-                    ? "storage.policySingle"
-                    : opt.value === "primary_fallback"
-                      ? "storage.policyPrimaryFallback"
-                      : opt.value === "round_robin"
-                        ? "storage.policyRoundRobin"
-                        : "storage.policyMirror";
-                const descKey =
-                  opt.value === "single"
-                    ? "storage.policySingleDesc"
-                    : opt.value === "primary_fallback"
-                      ? "storage.policyPrimaryFallbackDesc"
-                      : opt.value === "round_robin"
-                        ? "storage.policyRoundRobinDesc"
-                        : "storage.policyMirrorDesc";
-                return (
-                  <SelectItem key={opt.value} value={opt.value} className="py-2">
-                    <div className="flex items-center gap-3">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                        <Icon className="size-4" />
-                      </span>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium">{t(labelKey)}</span>
-                        <span className="text-xs text-muted-foreground">{t(descKey)}</span>
-                      </div>
-                    </div>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-      </Section>
-
-      <Separator />
-
-      <Section
         title={t("storage.title")}
         description={t("storage.priorityHint")}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs font-medium text-muted-foreground sm:inline">
+              {t("storage.uploadPolicy")}
+            </span>
+            <Select value={uploadPolicy} onValueChange={handlePolicyChange}>
+              <SelectTrigger
+                aria-label={t("storage.uploadPolicy")}
+                className="h-8 w-[180px] gap-2 text-xs [&_[data-role=policy-desc]]:hidden [&_[data-role=policy-icon]]:hidden [&_[data-role=policy-label]]:text-xs [&_[data-role=policy-label]]:font-medium"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end" className="w-[340px]">
+                {UPLOAD_POLICY_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  const labelKey =
+                    opt.value === "single"
+                      ? "storage.policySingle"
+                      : opt.value === "primary_fallback"
+                        ? "storage.policyPrimaryFallback"
+                        : opt.value === "round_robin"
+                          ? "storage.policyRoundRobin"
+                          : "storage.policyMirror";
+                  const descKey =
+                    opt.value === "single"
+                      ? "storage.policySingleDesc"
+                      : opt.value === "primary_fallback"
+                        ? "storage.policyPrimaryFallbackDesc"
+                        : opt.value === "round_robin"
+                          ? "storage.policyRoundRobinDesc"
+                          : "storage.policyMirrorDesc";
+                  return (
+                    <SelectItem key={opt.value} value={opt.value} className="py-2">
+                      <div className="flex items-center gap-3">
+                        <span
+                          data-role="policy-icon"
+                          className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted"
+                        >
+                          <Icon className="size-4" />
+                        </span>
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <span
+                            data-role="policy-label"
+                            className="text-sm font-medium"
+                          >
+                            {t(labelKey)}
+                          </span>
+                          <span
+                            data-role="policy-desc"
+                            className="text-xs text-muted-foreground"
+                          >
+                            {t(descKey)}
+                          </span>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        }
       >
         {isStorageLoading ? (
-          <div className="space-y-3">
+          <div className="grid gap-4 md:grid-cols-2">
             {Array.from({ length: 2 }).map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-xl" />
+              <Skeleton key={i} className="h-64 rounded-xl" />
             ))}
           </div>
+        ) : orderedItems.length === 0 ? (
+          <EmptyKite
+            title={t("storage.noStorage")}
+            hint={t("storage.noStorageHint")}
+            action={
+              <Button size="sm" onClick={openCreate}>
+                <Plus className="size-3.5" />
+                {t("storage.addStorage")}
+              </Button>
+            }
+          />
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-              <div className="space-y-3">
+            <SortableContext items={orderedIds} strategy={rectSortingStrategy}>
+              <div className="grid gap-4 md:grid-cols-2">
                 {orderedItems.map((cfg) => (
-                  <SortableStorageRow
+                  <SortableStorageCard
                     key={cfg.id}
                     cfg={cfg}
                     testResult={testResult[cfg.id]}
@@ -461,29 +553,33 @@ export default function StoragePage() {
                     onEdit={() => openEdit(cfg.id)}
                     onDelete={() => deleteMutation.mutate(cfg.id)}
                     onSetDefault={() => setDefaultMutation.mutate(cfg.id)}
+                    onToggleActive={(next) => toggleActiveMutation.mutate({ id: cfg.id, active: next })}
+                    togglePending={
+                      toggleActiveMutation.isPending &&
+                      toggleActiveMutation.variables?.id === cfg.id
+                    }
                     setDefaultPending={
                       setDefaultMutation.isPending && setDefaultMutation.variables === cfg.id
                     }
                   />
                 ))}
-
-                {orderedItems.length === 0 && (
-                  <EmptyKite
-                    title={t("storage.noStorage")}
-                    hint={t("storage.noStorageHint")}
-                    action={
-                      <Button size="sm" onClick={openCreate}>
-                        <Plus className="size-3.5" />
-                        {t("storage.addStorage")}
-                      </Button>
-                    }
-                  />
-                )}
               </div>
             </SortableContext>
           </DndContext>
         )}
       </Section>
+
+      {hasBreakdown && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("storage.globalBreakdown")}</CardTitle>
+            <CardDescription>{t("storage.breakdownByType")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <StackedStorageBar data={breakdownSegs} />
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent className="grid-cols-1 sm:max-w-lg">
@@ -591,27 +687,34 @@ export default function StoragePage() {
   );
 }
 
-interface StorageListRowProps {
+/* ═══════════════════════════════════════════════════════════
+ * Storage card (sortable, grid)
+ * ═══════════════════════════════════════════════════════════ */
+interface StorageCardProps {
   cfg: StorageListItem;
   testResult: "ok" | "fail" | "testing" | undefined;
   onTest: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onSetDefault: () => void;
+  onToggleActive: (next: boolean) => void;
+  togglePending: boolean;
   setDefaultPending: boolean;
 }
 
-function SortableStorageRow(props: StorageListRowProps) {
+function SortableStorageCard(props: StorageCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: props.cfg.id,
   });
   const { t } = useI18n();
   const brand = getBrandInfo(props.cfg.provider, props.cfg.driver);
+  const vendor = resolveLogoVendor(props.cfg.provider, props.cfg.driver);
   const hasLimit = props.cfg.capacity_limit_bytes > 0;
   const percent = hasLimit
     ? Math.min(100, (props.cfg.used_bytes / props.cfg.capacity_limit_bytes) * 100)
     : 0;
   const nearFull = hasLimit && percent >= 90;
+  const fileCount = props.cfg.files_count ?? 0;
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -620,78 +723,69 @@ function SortableStorageRow(props: StorageListRowProps) {
     zIndex: isDragging ? 10 : undefined,
   };
 
-  const tintBg = brand.isBrand ? `${brand.color}1A` : undefined;
-
   return (
-    <div
+    <Card
       ref={setNodeRef}
       style={style}
-      className="group rounded-xl border bg-card p-4 transition-colors hover:border-foreground/20"
+      className="group gap-4 py-5 transition-colors hover:border-foreground/20"
     >
-      <div className="flex items-center gap-3">
-        <button
-          {...attributes}
-          {...listeners}
-          aria-label={t("storage.dragHandle")}
-          className="hidden size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground/60 transition-opacity hover:bg-muted hover:text-foreground active:cursor-grabbing sm:flex sm:opacity-0 sm:group-hover:opacity-100"
-        >
-          <GripVertical className="size-4" />
-        </button>
-
-        <div
-          className="flex size-11 shrink-0 items-center justify-center rounded-xl"
-          style={tintBg ? { backgroundColor: tintBg } : undefined}
-        >
-          <BrandIcon
-            provider={props.cfg.provider}
-            driver={props.cfg.driver}
-            className={brand.isBrand ? "size-6" : "size-5 text-muted-foreground"}
-          />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold">{props.cfg.name}</p>
-            {props.cfg.is_default && (
-              <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px]">
-                <Star className="size-2.5 fill-current" />
-                {t("storage.defaultStorage")}
-              </Badge>
-            )}
-            {!props.cfg.is_active && (
-              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                {t("common.inactive")}
-              </Badge>
-            )}
+      <CardHeader className="flex flex-row items-start justify-between gap-3 [&]:grid-cols-none [&]:grid-rows-none">
+        <div className="flex min-w-0 items-start gap-3">
+          <StorageLogo vendor={vendor} size={40} rounded="rounded-lg" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CardTitle className="truncate text-sm">{props.cfg.name}</CardTitle>
+              {props.cfg.is_active ? (
+                <Badge
+                  variant="outline"
+                  className="h-4 gap-1 border-emerald-500/20 bg-emerald-500/10 px-1.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400"
+                >
+                  {t("storage.activeBadge")}
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="h-4 px-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  {t("storage.idleBadge")}
+                </Badge>
+              )}
+              {props.cfg.is_default && (
+                <Badge
+                  variant="secondary"
+                  className="h-4 gap-1 px-1.5 text-[10px] font-medium"
+                >
+                  <Star className="size-2.5 fill-current" />
+                  {t("storage.defaultStorage")}
+                </Badge>
+              )}
+            </div>
+            <CardDescription className="mt-1 flex min-w-0 items-center gap-1.5 font-mono text-xs">
+              <span className="rounded bg-muted px-1 py-[1px] text-[9px] font-semibold uppercase tracking-wider not-italic text-muted-foreground">
+                {brand.label}
+              </span>
+              <span className="truncate">P{props.cfg.priority}</span>
+            </CardDescription>
           </div>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            <span>{brand.label}</span>
-            <span className="mx-1.5 text-muted-foreground/40">·</span>
-            <span className="tabular-nums">P{props.cfg.priority}</span>
-          </p>
         </div>
-
         <div className="flex shrink-0 items-center gap-1">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={props.onTest}
-            disabled={props.testResult === "testing"}
-            className="h-8 px-3"
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            aria-label={t("storage.dragHandle")}
+            className="hidden size-7 cursor-grab items-center justify-center rounded-md text-muted-foreground/60 transition-opacity hover:bg-muted hover:text-foreground active:cursor-grabbing sm:flex sm:opacity-0 sm:group-hover:opacity-100"
           >
-            {props.testResult === "testing" ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : props.testResult === "ok" ? (
-              <Check className="size-3.5 text-green-600" />
-            ) : props.testResult === "fail" ? (
-              <AlertCircle className="size-3.5 text-destructive" />
-            ) : (
-              <span className="text-xs">{t("common.test")}</span>
-            )}
-          </Button>
+            <GripVertical className="size-4" />
+          </button>
+          <Switch
+            checked={props.cfg.is_active}
+            onCheckedChange={props.onToggleActive}
+            disabled={props.togglePending}
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon-sm" variant="ghost" className="size-8">
+              <Button size="icon-sm" variant="ghost" className="size-7">
                 <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -708,10 +802,6 @@ function SortableStorageRow(props: StorageListRowProps) {
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onClick={props.onEdit}>
-                <Pencil className="size-4" />
-                {t("common.edit")}
-              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={props.onDelete}
                 disabled={props.cfg.is_default}
@@ -723,32 +813,99 @@ function SortableStorageRow(props: StorageListRowProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
+      </CardHeader>
 
-      <div className="mt-3 flex items-center gap-3 pl-0 sm:pl-[2.875rem]">
-        <Progress
-          value={hasLimit ? percent : 0}
-          indicatorClassName={nearFull ? "bg-destructive" : undefined}
-          className="h-1.5"
-        />
-        <div className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-muted-foreground">
-          <span className={nearFull ? "font-medium text-destructive" : "font-medium text-foreground"}>
-            {formatSize(props.cfg.used_bytes)}
-          </span>
-          <span className="text-muted-foreground/50">/</span>
-          {hasLimit ? (
-            <span>{formatSize(props.cfg.capacity_limit_bytes)}</span>
-          ) : (
-            <span className="flex items-center gap-0.5">
-              <InfinityIcon className="size-3" />
-            </span>
-          )}
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <MiniStat
+            label={t("storage.capacityUsed")}
+            value={formatSize(props.cfg.used_bytes)}
+          />
+          <MiniStat
+            label={t("storage.capacityTotal")}
+            value={
+              hasLimit ? (
+                formatSize(props.cfg.capacity_limit_bytes)
+              ) : (
+                <span className="inline-flex items-center justify-center">
+                  <InfinityIcon className="size-4" />
+                </span>
+              )
+            }
+          />
+          <MiniStat
+            label={t("storage.filesCount")}
+            value={fileCount.toLocaleString()}
+          />
         </div>
+
+        <div>
+          <div className="flex items-baseline justify-between text-[11px]">
+            <span className="text-muted-foreground">{t("storage.usageRate")}</span>
+            <span
+              className={cn(
+                "font-medium tabular-nums",
+                nearFull && "text-destructive",
+              )}
+            >
+              {hasLimit ? `${Math.round(percent)}%` : "—"}
+            </span>
+          </div>
+          <Progress
+            value={hasLimit ? percent : 0}
+            indicatorClassName={nearFull ? "bg-destructive" : undefined}
+            className="mt-1.5 h-1.5"
+          />
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={props.onEdit}
+          >
+            <SettingsIcon className="size-3.5" />
+            {t("storage.configure")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={props.onTest}
+            disabled={props.testResult === "testing"}
+          >
+            {props.testResult === "testing" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : props.testResult === "ok" ? (
+              <Check className="size-3.5 text-emerald-600" />
+            ) : props.testResult === "fail" ? (
+              <AlertCircle className="size-3.5 text-destructive" />
+            ) : (
+              <RefreshCw className="size-3.5" />
+            )}
+            {t("storage.sync")}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border bg-muted/30 p-2.5">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
       </div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums">{value}</div>
     </div>
   );
 }
 
+/* ═══════════════════════════════════════════════════════════
+ * Driver-specific form fields
+ * ═══════════════════════════════════════════════════════════ */
 interface DriverFieldsProps {
   form: StorageForm;
   updateConfig: (key: string, value: string | number) => void;
