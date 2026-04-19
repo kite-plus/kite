@@ -251,6 +251,10 @@ type FileStats struct {
 	VideoCount int64 `json:"video_count"`
 	AudioCount int64 `json:"audio_count"`
 	OtherCount int64 `json:"other_count"`
+	ImageSize  int64 `json:"image_size"`
+	VideoSize  int64 `json:"video_size"`
+	AudioSize  int64 `json:"audio_size"`
+	OtherSize  int64 `json:"other_size"`
 }
 
 // GetStats 获取全站文件统计数据。
@@ -269,16 +273,22 @@ func (r *FileRepo) GetStats(ctx context.Context) (*FileStats, error) {
 	for _, ft := range []struct {
 		typ   string
 		count *int64
+		size  *int64
 	}{
-		{"image", &stats.ImageCount},
-		{"video", &stats.VideoCount},
-		{"audio", &stats.AudioCount},
-		{"file", &stats.OtherCount},
+		{"image", &stats.ImageCount, &stats.ImageSize},
+		{"video", &stats.VideoCount, &stats.VideoSize},
+		{"audio", &stats.AudioCount, &stats.AudioSize},
+		{"file", &stats.OtherCount, &stats.OtherSize},
 	} {
 		if err := r.db.WithContext(ctx).Model(&model.File{}).
 			Where("is_deleted = ? AND file_type = ?", false, ft.typ).
 			Count(ft.count).Error; err != nil {
 			return nil, fmt.Errorf("count %s files: %w", ft.typ, err)
+		}
+		if err := r.db.WithContext(ctx).Model(&model.File{}).
+			Where("is_deleted = ? AND file_type = ?", false, ft.typ).
+			Select("COALESCE(SUM(size_bytes), 0)").Scan(ft.size).Error; err != nil {
+			return nil, fmt.Errorf("sum %s size: %w", ft.typ, err)
 		}
 	}
 

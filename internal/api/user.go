@@ -211,6 +211,10 @@ func (h *UserHandler) AdminStats(c *gin.Context) {
 		"videos":      stats.VideoCount,
 		"audios":      stats.AudioCount,
 		"others":      stats.OtherCount,
+		"images_size": stats.ImageSize,
+		"videos_size": stats.VideoSize,
+		"audios_size": stats.AudioSize,
+		"others_size": stats.OtherSize,
 	})
 }
 

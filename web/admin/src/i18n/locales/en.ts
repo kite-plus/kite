@@ -30,6 +30,8 @@ const en = {
     default: "Default",
     test: "Test",
     copied: "Copied",
+    clear: "Clear",
+    apply: "Apply",
   },
 
   nav: {
@@ -253,6 +255,12 @@ const en = {
     openOriginal: "Open",
     adminTitle: "All Files",
     adminDescription: "Manage all files across the system",
+    adminSub: "{total} resources · cross-user global view",
+    advancedFilter: "Advanced filter",
+    exportList: "Export list",
+    accessesCol: "Accesses",
+    uploadedAt: "Uploaded",
+    otherDocArchive: "Docs / Archives",
     fileName: "File Name",
     uploader: "Uploader",
     guest: "Guest",
