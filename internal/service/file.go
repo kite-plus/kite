@@ -394,10 +394,15 @@ func (s *FileService) GetThumbContent(ctx context.Context, file *model.File) (io
 
 // GetFileByHash 通过 MD5 哈希前缀查找文件（用于公开访问链接）。
 func (s *FileService) GetFileByHash(ctx context.Context, hashPrefix string) (*model.File, error) {
-	// 通过 hash 前缀查询
-	var file model.File
-	// 这里需要在 repo 层额外添加方法，暂时直接用 Like 查询
-	return &file, fmt.Errorf("get file by hash: not implemented via service, use repo directly")
+	file, err := s.fileRepo.GetByHashPrefix(ctx, hashPrefix)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "record not found") ||
+			strings.Contains(strings.ToLower(err.Error()), "prefix too short") {
+			return nil, ErrFileNotFound
+		}
+		return nil, fmt.Errorf("get file by hash: %w", err)
+	}
+	return file, nil
 }
 
 func (s *FileService) checkFileType(mimeType, filename string) error {
