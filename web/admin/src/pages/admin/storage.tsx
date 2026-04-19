@@ -77,11 +77,15 @@ import { PageHeader, Section } from "@/components/page-header";
 import { EmptyKite } from "@/components/empty-state";
 import { BrandIcon, getBrandInfo } from "@/components/storage-brand";
 import { StorageLogo, resolveLogoVendor } from "@/components/storage-logo";
-import {
-  StackedStorageBar,
-  type StorageSegment,
-} from "@/pages/dashboard/components";
 import { toast } from "sonner";
+
+interface StorageSegment {
+  kind: string;
+  label: string;
+  count: number;
+  bytes: number;
+  color: string;
+}
 
 type Driver = "local" | "s3" | "oss" | "cos" | "ftp";
 type Unit = "MB" | "GB" | "TB";
@@ -570,13 +574,74 @@ export default function StoragePage() {
       </Section>
 
       {hasBreakdown && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("storage.globalBreakdown")}</CardTitle>
-            <CardDescription>{t("storage.breakdownByType")}</CardDescription>
+        <Card className="gap-4 py-5">
+          <CardHeader className="flex flex-row items-start justify-between gap-3 [&]:grid-cols-none [&]:grid-rows-none">
+            <div className="min-w-0">
+              <CardTitle className="text-sm">{t("storage.globalBreakdown")}</CardTitle>
+              <CardDescription className="mt-0.5 text-xs">
+                {t("storage.breakdownByType")}
+              </CardDescription>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 rounded-md border bg-muted/30 px-2.5 py-1 text-xs">
+              <span className="font-semibold tabular-nums">
+                {formatSize(adminStats?.total_size ?? 0)}
+              </span>
+              <span className="size-0.5 rounded-full bg-muted-foreground/40" />
+              <span className="tabular-nums text-muted-foreground">
+                {(adminStats?.total_files ?? 0).toLocaleString()}
+              </span>
+            </div>
           </CardHeader>
-          <CardContent>
-            <StackedStorageBar data={breakdownSegs} />
+          <CardContent className="space-y-3">
+            <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted/70">
+              {breakdownSegs
+                .filter((s) => s.bytes > 0)
+                .map((seg) => {
+                  const total = adminStats?.total_size ?? 1;
+                  return (
+                    <div
+                      key={seg.kind}
+                      style={{
+                        width: `${(seg.bytes / total) * 100}%`,
+                        background: seg.color,
+                      }}
+                      className="transition-all hover:opacity-80"
+                      title={`${seg.label} · ${formatSize(seg.bytes)}`}
+                    />
+                  );
+                })}
+            </div>
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+              {breakdownSegs.map((seg) => {
+                const total = adminStats?.total_size ?? 0;
+                const pct = total > 0 ? Math.round((seg.bytes / total) * 100) : 0;
+                return (
+                  <div
+                    key={seg.kind}
+                    className="flex min-w-0 items-center gap-2 rounded-md border bg-muted/20 px-2.5 py-1.5"
+                  >
+                    <span
+                      className="size-1.5 shrink-0 rounded-full"
+                      style={{ background: seg.color }}
+                    />
+                    <span className="truncate text-xs text-foreground">
+                      {seg.label}
+                    </span>
+                    <span className="ml-auto flex shrink-0 items-baseline gap-1.5 tabular-nums">
+                      <span className="text-sm font-semibold">
+                        {seg.count.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {formatSize(seg.bytes)}
+                      </span>
+                      <span className="text-[10px] font-medium text-muted-foreground/80">
+                        {pct}%
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       )}

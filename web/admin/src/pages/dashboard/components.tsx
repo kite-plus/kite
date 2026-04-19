@@ -470,11 +470,10 @@ export function Heatmap({
   };
 
   return (
-    <div className="overflow-x-auto">
+    <div className="min-w-0">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full"
-        style={{ minWidth: 480 }}
+        className="block h-auto w-full"
       >
         {[0, 6, 12, 18, 23].map((h) => (
           <text

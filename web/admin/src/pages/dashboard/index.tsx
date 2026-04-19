@@ -684,7 +684,7 @@ export default function DashboardPage() {
 
       {/* ═════ ROW 2: Trend + Heatmap ══════════════════════ */}
       <div className="grid gap-4 lg:grid-cols-5">
-        <Card className="gap-3 py-5 shadow-xs lg:col-span-3">
+        <Card className="min-w-0 gap-3 overflow-hidden py-5 shadow-xs lg:col-span-3">
           <CardHeader className="px-5">
             <CardTitle className="text-sm">
               {t("dashboard.trend.title")}
@@ -711,8 +711,8 @@ export default function DashboardPage() {
               </div>
             </CardAction>
           </CardHeader>
-          <CardContent className="px-5">
-            <div className="h-44 sm:h-56">
+          <CardContent className="min-w-0 px-5">
+            <div className="h-44 w-full sm:h-56">
               {!daily ? (
                 <Skeleton className="h-full w-full" />
               ) : (
@@ -727,7 +727,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="gap-3 py-5 shadow-xs lg:col-span-2">
+        <Card className="min-w-0 gap-3 overflow-hidden py-5 shadow-xs lg:col-span-2">
           <CardHeader className="px-5">
             <CardTitle className="text-sm">
               {t("dashboard.heatmap.title")}
@@ -736,7 +736,7 @@ export default function DashboardPage() {
               {t("dashboard.heatmap.sub")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="px-5">
+          <CardContent className="min-w-0 px-5">
             <Heatmap
               grid={heatmap}
               weekdayLabels={[
