@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { fileApi, statsApi } from "@/lib/api";
+import { albumApi, fileApi, statsApi } from "@/lib/api";
 import { useI18n } from "@/i18n";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,10 +37,19 @@ import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -105,6 +114,17 @@ interface PendingDelete {
   ids: string[];
   displayName?: string;
   closeDetail?: boolean;
+}
+
+interface FolderItem {
+  id: string;
+  name: string;
+  parent_id?: string;
+}
+
+interface FolderOption {
+  id: string;
+  label: string;
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -542,6 +562,8 @@ export default function FilesPage() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [detailFile, setDetailFile] = useState<FileItem | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkMoveTarget, setBulkMoveTarget] = useState<string>("__root__");
   const [uploads, setUploads] = useState<UploadTask[]>([]);
   const [copied, setCopied] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -751,6 +773,42 @@ export default function FilesPage() {
     [items, selected]
   );
 
+  const { data: folderOptions = [], isLoading: folderOptionsLoading } = useQuery<FolderOption[]>({
+    queryKey: ["albums", "all-options"],
+    enabled: bulkMoveOpen,
+    queryFn: async () => {
+      const options: FolderOption[] = [];
+
+      const walk = async (parentId: string | null, prefix: string) => {
+        let page = 1;
+        while (true) {
+          const params: Record<string, string | number> = { page, size: 100 };
+          if (parentId) params.parent_id = parentId;
+          const res = await albumApi.list(params);
+          const payload = res.data?.data as { items?: FolderItem[]; total?: number; size?: number };
+          const rows = payload.items ?? [];
+          if (rows.length === 0) break;
+
+          for (const row of rows) {
+            const label = prefix ? `${prefix} / ${row.name}` : row.name;
+            options.push({ id: row.id, label });
+            await walk(row.id, label);
+          }
+
+          const total = Number(payload.total ?? rows.length);
+          const pageSize = Number(payload.size ?? rows.length ?? 1);
+          if (page * pageSize >= total) break;
+          page += 1;
+        }
+      };
+
+      await walk(null, "");
+      options.sort((a, b) => a.label.localeCompare(b.label));
+      return options;
+    },
+    staleTime: 60_000,
+  });
+
   const bulkDownload = () => {
     if (selectedFiles.length === 0) return;
     toast.info(
@@ -818,8 +876,40 @@ export default function FilesPage() {
     });
   }, [clearSelection, deleteMutation, pendingDelete, queryClient, t]);
 
-  const bulkMove = () => toast.message(t("files.comingSoon"));
-  const bulkShare = () => toast.message(t("files.comingSoon"));
+  const bulkMove = () => {
+    if (selectedFiles.length === 0) return;
+    setBulkMoveTarget("__root__");
+    setBulkMoveOpen(true);
+  };
+
+  const confirmBulkMove = () => {
+    if (selectedFiles.length === 0) return;
+    const folderId = bulkMoveTarget === "__root__" ? null : bulkMoveTarget;
+
+    Promise.allSettled(selectedFiles.map((f) => fileApi.move(f.id, folderId))).then((results) => {
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      if (ok > 0) {
+        toast.success(t("files.bulkMoveSuccess").replace("{n}", String(ok)));
+      }
+      if (ok < selectedFiles.length) {
+        toast.error(t("albums.moveFailed"));
+      }
+      setBulkMoveOpen(false);
+      clearSelection();
+    });
+  };
+
+  const bulkShare = async () => {
+    if (selectedFiles.length === 0) return;
+    const text = selectedFiles.map((f) => f.url).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("files.bulkShareCopied").replace("{n}", String(selectedFiles.length)));
+    } catch {
+      toast.error(t("files.bulkShareFailed"));
+    }
+  };
 
   /* ── filter pills ─────────────────────────────────────── */
   // When the sample query covered the full bucket, counts are exact; otherwise
@@ -1440,6 +1530,44 @@ export default function FilesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={bulkMoveOpen} onOpenChange={setBulkMoveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("files.bulkMoveTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("files.bulkMoveDesc").replace("{n}", String(selectedFiles.length))}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">{t("files.targetFolder")}</p>
+            <Select value={bulkMoveTarget} onValueChange={setBulkMoveTarget}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("files.targetFolder")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__root__">{t("albums.moveToRoot")}</SelectItem>
+                {folderOptions.map((folder) => (
+                  <SelectItem key={folder.id} value={folder.id}>
+                    {folder.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {folderOptionsLoading && (
+              <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkMoveOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={confirmBulkMove}>{t("files.move")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

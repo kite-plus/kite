@@ -294,6 +294,12 @@ const zh: Translations = {
     bulkDeleteConfirm: "确定删除已选的 {n} 个文件？此操作无法撤销。",
     bulkDeleteSuccess: "已删除 {n} 个文件",
     downloadStarting: "开始下载 {n} 个文件",
+    bulkMoveTitle: "移动已选文件",
+    bulkMoveDesc: "选择 {n} 个已选文件的目标位置。",
+    targetFolder: "目标文件夹",
+    bulkMoveSuccess: "已移动 {n} 个文件",
+    bulkShareCopied: "已复制 {n} 条链接",
+    bulkShareFailed: "复制链接失败",
   },
 
   albums: {

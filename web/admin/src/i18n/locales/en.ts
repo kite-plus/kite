@@ -292,6 +292,12 @@ const en = {
     bulkDeleteConfirm: "Delete {n} selected files? This can't be undone.",
     bulkDeleteSuccess: "{n} files deleted",
     downloadStarting: "Downloading {n} files",
+    bulkMoveTitle: "Move selected files",
+    bulkMoveDesc: "Choose where to move {n} selected files.",
+    targetFolder: "Target folder",
+    bulkMoveSuccess: "Moved {n} files",
+    bulkShareCopied: "Copied {n} links",
+    bulkShareFailed: "Failed to copy links",
   },
 
   albums: {
