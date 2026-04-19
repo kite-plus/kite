@@ -198,6 +198,7 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		// 使用统计
 		authed.GET("/stats", userHandler.Stats)
 		authed.GET("/stats/daily", userHandler.DailyStats)
+		authed.GET("/stats/heatmap", userHandler.HeatmapStats)
 
 		// ========== 管理员接口 ==========
 		admin := authed.Group("")
@@ -222,6 +223,7 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 			// 全站统计（管理员视角）
 			admin.GET("/admin/stats", userHandler.AdminStats)
 			admin.GET("/admin/stats/daily", userHandler.AdminDailyStats)
+			admin.GET("/admin/stats/heatmap", userHandler.AdminHeatmapStats)
 
 			// 文件管理（全站）
 			admin.GET("/admin/files", fileHandler.AdminList)

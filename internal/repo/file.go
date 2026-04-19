@@ -335,6 +335,15 @@ type DailyUploadStat struct {
 	UploadCount int64  `json:"upload_count"` // 当日新增文件数
 }
 
+// HourlyWeekdayStat 按周几与小时聚合的统计。
+// Weekday: 0=Sunday ... 6=Saturday（SQLite strftime('%w') 约定）
+// Hour: 0..23
+type HourlyWeekdayStat struct {
+	Weekday int   `json:"weekday"`
+	Hour    int   `json:"hour"`
+	Count   int64 `json:"count"`
+}
+
 // GetDailyUploadStats 获取指定时间范围内每日上传量。
 // start/end 为 UTC 日期边界（start 含、end 不含）。
 // userID 为空时返回全站聚合（管理员视角）；非空时仅统计该用户的上传。
@@ -349,6 +358,24 @@ func (r *FileRepo) GetDailyUploadStats(ctx context.Context, userID string, start
 	}
 	if err := db.Group("day").Order("day ASC").Scan(&rows).Error; err != nil {
 		return nil, fmt.Errorf("get daily upload stats: %w", err)
+	}
+	return rows, nil
+}
+
+// GetHourlyUploadHeatmapStats 获取指定时间范围内按周几与小时聚合的上传热力图统计。
+// start/end 为时间边界（start 含、end 不含）。
+// userID 为空时返回全站聚合（管理员视角）；非空时仅统计该用户上传。
+func (r *FileRepo) GetHourlyUploadHeatmapStats(ctx context.Context, userID string, start, end time.Time) ([]HourlyWeekdayStat, error) {
+	var rows []HourlyWeekdayStat
+	db := r.db.WithContext(ctx).
+		Model(&model.File{}).
+		Select("CAST(strftime('%w', created_at) AS INTEGER) as weekday, CAST(strftime('%H', created_at) AS INTEGER) as hour, COUNT(*) as count").
+		Where("is_deleted = ? AND created_at >= ? AND created_at < ?", false, start, end)
+	if userID != "" {
+		db = db.Where("user_id = ?", userID)
+	}
+	if err := db.Group("weekday, hour").Order("weekday ASC, hour ASC").Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("get hourly upload heatmap stats: %w", err)
 	}
 	return rows, nil
 }

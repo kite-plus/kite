@@ -224,9 +224,19 @@ func (h *UserHandler) DailyStats(c *gin.Context) {
 	h.dailyStats(c, c.GetString(middleware.ContextKeyUserID))
 }
 
+// HeatmapStats 获取当前用户热力图统计（近 N 周，周几 × 小时）。
+func (h *UserHandler) HeatmapStats(c *gin.Context) {
+	h.heatmapStats(c, c.GetString(middleware.ContextKeyUserID))
+}
+
 // AdminDailyStats 获取全站按天分组的上传数、访问数、带宽统计（仅管理员可调用）。
 func (h *UserHandler) AdminDailyStats(c *gin.Context) {
 	h.dailyStats(c, "")
+}
+
+// AdminHeatmapStats 获取全站热力图统计（近 N 周，周几 × 小时，仅管理员可调用）。
+func (h *UserHandler) AdminHeatmapStats(c *gin.Context) {
+	h.heatmapStats(c, "")
 }
 
 func (h *UserHandler) dailyStats(c *gin.Context, userID string) {
@@ -281,4 +291,58 @@ func (h *UserHandler) dailyStats(c *gin.Context, userID string) {
 	}
 
 	success(c, gin.H{"days": series})
+}
+
+func (h *UserHandler) heatmapStats(c *gin.Context, userID string) {
+	weeks, _ := strconv.Atoi(c.DefaultQuery("weeks", "12"))
+	if weeks < 1 || weeks > 52 {
+		weeks = 12
+	}
+
+	now := time.Now()
+	end := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location()).Add(time.Hour)
+	start := end.AddDate(0, 0, -weeks*7)
+
+	uploads, err := h.fileRepo.GetHourlyUploadHeatmapStats(c.Request.Context(), userID, start, end)
+	if err != nil {
+		serverError(c, "failed to get upload heatmap stats")
+		return
+	}
+	accesses, err := h.accessLogRepo.GetHourlyAccessHeatmapStats(c.Request.Context(), userID, start, end)
+	if err != nil {
+		serverError(c, "failed to get access heatmap stats")
+		return
+	}
+
+	grid := make([][]int64, 7)
+	for i := range grid {
+		grid[i] = make([]int64, 24)
+	}
+
+	for _, u := range uploads {
+		row, col, ok := normalizeHeatmapCell(u.Weekday, u.Hour)
+		if ok {
+			grid[row][col] += u.Count
+		}
+	}
+	for _, a := range accesses {
+		row, col, ok := normalizeHeatmapCell(a.Weekday, a.Hour)
+		if ok {
+			grid[row][col] += a.Count
+		}
+	}
+
+	success(c, gin.H{
+		"weeks": weeks,
+		"grid":  grid,
+	})
+}
+
+func normalizeHeatmapCell(weekday int, hour int) (row int, col int, ok bool) {
+	if weekday < 0 || weekday > 6 || hour < 0 || hour > 23 {
+		return 0, 0, false
+	}
+	// SQLite weekday: Sunday=0 ... Saturday=6, UI row: Monday=0 ... Sunday=6.
+	row = (weekday + 6) % 7
+	return row, hour, true
 }

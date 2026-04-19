@@ -110,6 +110,11 @@ interface DashboardStorageBackend {
   is_active: boolean;
 }
 
+interface DashboardHeatmap {
+  weeks: number;
+  grid: number[][];
+}
+
 /* ────────────────────────────────────────────────────────────
  * Helpers
  * ──────────────────────────────────────────────────────────── */
@@ -133,35 +138,23 @@ function buildGreeting(locale: Locale): { main: string; sub: string } {
   return { main: "Wind down", sub: "One last look, then rest" };
 }
 
-/** Deterministic PRNG — used for the mocked heatmap & activity feed so the
- *  rendering is stable across renders without calling the backend. */
-function rng(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
+function emptyHeatmapGrid(): number[][] {
+  return Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
 }
 
-/** 7 rows (Mon-Sun) × 24 cols (hours) activity heatmap. Weighted toward work
- *  hours with a weekend damping. Replace with real data when the endpoint
- *  lands. */
-function buildHeatmap(seed = 11): number[][] {
-  const r = rng(seed);
-  const grid: number[][] = [];
+function normalizeHeatmapGrid(input: unknown): number[][] {
+  if (!Array.isArray(input) || input.length !== 7) return emptyHeatmapGrid();
+
+  const grid = emptyHeatmapGrid();
   for (let d = 0; d < 7; d++) {
-    const row: number[] = [];
-    for (let h = 0; h < 24; h++) {
-      const workHours = h >= 9 && h <= 22 ? 1 : 0.2;
-      const weekend = d >= 5 ? 0.7 : 1;
-      const base = workHours * weekend;
-      const val = Math.max(
-        0,
-        Math.round(base * (r() * 16 + 2) + r() * 4 - 2)
-      );
-      row.push(val);
+    const row = input[d];
+    if (!Array.isArray(row) || row.length !== 24) {
+      return emptyHeatmapGrid();
     }
-    grid.push(row);
+    for (let h = 0; h < 24; h++) {
+      const n = Number(row[h]);
+      grid[d][h] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    }
   }
   return grid;
 }
@@ -299,6 +292,16 @@ export default function DashboardPage() {
     refetchInterval: 60_000,
   });
 
+  const { data: heatmapData } = useQuery<DashboardHeatmap>({
+    queryKey: ["dashboard", "heatmap", isAdminWorkspace ? "admin" : "user", 12],
+    queryFn: () =>
+      (isAdminWorkspace ? adminStatsApi.heatmap(12) : statsApi.heatmap(12)).then(
+        (r) => r.data.data
+      ),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
   /* ── recent uploads (user) / top users (admin) ───────────── */
   const { data: recent, isLoading: recentLoading } = useQuery<{
     items: ThumbFile[];
@@ -340,7 +343,7 @@ export default function DashboardPage() {
 
   /* ── derived values ─────────────────────────────────────── */
   const greeting = useMemo(() => buildGreeting(locale), [locale]);
-  const heatmap = useMemo(() => buildHeatmap(), []);
+  const heatmap = useMemo(() => normalizeHeatmapGrid(heatmapData?.grid), [heatmapData?.grid]);
   const activity = useMemo(() => buildActivity(locale), [locale]);
 
   const days30: TrendPoint[] = useMemo(() => {

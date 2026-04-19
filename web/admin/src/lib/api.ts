@@ -148,6 +148,7 @@ export const userApi = {
 export const statsApi = {
   get: () => api.get("/stats"),
   daily: (days: number = 7) => api.get("/stats/daily", { params: { days } }),
+  heatmap: (weeks: number = 12) => api.get("/stats/heatmap", { params: { weeks } }),
 };
 
 // Admin Stats — 全站维度（仅管理员可调用）
@@ -155,6 +156,8 @@ export const adminStatsApi = {
   get: () => api.get("/admin/stats"),
   daily: (days: number = 7) =>
     api.get("/admin/stats/daily", { params: { days } }),
+  heatmap: (weeks: number = 12) =>
+    api.get("/admin/stats/heatmap", { params: { weeks } }),
 };
 
 export const systemStatusApi = {
