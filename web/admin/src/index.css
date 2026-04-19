@@ -189,6 +189,34 @@
   background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
 }
 
+/* Diagonal stripe placeholder — used inside empty/placeholder tiles
+ * (video overlay, document cards). Stripes alternate between --muted and
+ * --background so the pattern adapts automatically to light/dark mode. */
+.striped-placeholder {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    hsl(var(--muted)) 0px,
+    hsl(var(--muted)) 8px,
+    hsl(var(--background)) 8px,
+    hsl(var(--background)) 16px
+  );
+}
+
+/* Transparency checkerboard — used behind image previews so that
+ * transparent PNGs/SVGs show the pattern through them, while opaque
+ * images cover it completely. Mimics Photoshop/Figma transparency grid.
+ * Stays light-on-white in dark mode on purpose (industry convention). */
+.checker-bg {
+  background-color: #ffffff;
+  background-image: conic-gradient(
+    rgba(0, 0, 0, 0.06) 0 25%,
+    transparent 0 50%,
+    rgba(0, 0, 0, 0.06) 0 75%,
+    transparent 0
+  );
+  background-size: 14px 14px;
+}
+
 /* Sidebar identity-card backdrop — softer version of hero */
 .sidebar-card-backdrop {
   position: absolute;

@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   Loader2,
   Camera,
@@ -7,7 +7,6 @@ import {
   Key,
   Mail,
   Activity,
-  HardDrive,
   Sun,
   Moon,
   Monitor,
@@ -15,7 +14,7 @@ import {
   List as ListIcon,
 } from "lucide-react";
 
-import { authApi, fileApi, statsApi } from "@/lib/api";
+import { authApi, fileApi } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n, localeLabels, type Locale } from "@/i18n";
 import { useTheme } from "@/components/theme-provider";
@@ -47,29 +46,7 @@ interface User {
   email?: string;
   avatar_url?: string;
   role: string;
-  storage_used?: number;
-  storage_limit?: number;
   created_at?: string;
-}
-
-interface UserStats {
-  total_files: number;
-  total_size: number;
-  images: number;
-  videos: number;
-  audios: number;
-  others: number;
-}
-
-/* ─────────────────────────────────────────────────────────────
- * Helpers
- * ────────────────────────────────────────────────────────────*/
-function formatBytes(bytes: number) {
-  if (!bytes || bytes <= 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
 const DEFAULT_VIEW_KEY = "kite_files_default_view";
@@ -133,13 +110,6 @@ export default function ProfilePage() {
   useEffect(() => {
     localStorage.setItem(EMAIL_NOTIFY_KEY, String(emailNotify));
   }, [emailNotify]);
-
-  /* ── storage breakdown ───────────────────────────────────── */
-  const { data: stats } = useQuery<UserStats>({
-    queryKey: ["profile", "stats"],
-    queryFn: () => statsApi.get().then((r) => r.data.data),
-    staleTime: 60_000,
-  });
 
   /* ── mutations ───────────────────────────────────────────── */
   const avatarUploadMutation = useMutation({
@@ -280,73 +250,9 @@ export default function ProfilePage() {
   const displayName =
     profileForm.nickname.trim() || user?.nickname?.trim() || user?.username || "";
 
-  const storageUsed = user?.storage_used ?? stats?.total_size ?? 0;
-  const storageLimit = user?.storage_limit ?? 0;
-  const isUnlimited = storageLimit <= 0;
-  const storagePct = isUnlimited
-    ? 0
-    : Math.min(100, (storageUsed / storageLimit) * 100);
-
   const joinedDate = user?.created_at
     ? new Date(user.created_at).toLocaleDateString()
     : t("profile.accountUnknownDate");
-
-  // Approximate per-kind bytes by proportion of count · total_size
-  // (matches dashboard's approximation until backend exposes bytes per kind).
-  const typeSegments = useMemo(() => {
-    const s = stats ?? {
-      total_files: 0,
-      total_size: 0,
-      images: 0,
-      videos: 0,
-      audios: 0,
-      others: 0,
-    };
-    const totalCount = Math.max(1, s.total_files);
-    const bytesFor = (count: number) =>
-      s.total_files > 0 ? Math.round((count / totalCount) * s.total_size) : 0;
-
-    const segs = [
-      {
-        key: "images",
-        label: t("profile.storageTypeImages"),
-        count: s.images,
-        bytes: bytesFor(s.images),
-        color: "var(--chart-1)",
-      },
-      {
-        key: "videos",
-        label: t("profile.storageTypeVideos"),
-        count: s.videos,
-        bytes: bytesFor(s.videos),
-        color: "var(--chart-2)",
-      },
-      {
-        key: "audios",
-        label: t("profile.storageTypeAudios"),
-        count: s.audios,
-        bytes: bytesFor(s.audios),
-        color: "var(--chart-4)",
-      },
-      {
-        key: "others",
-        label: t("profile.storageTypeOthers"),
-        count: s.others,
-        bytes: bytesFor(s.others),
-        color: "var(--chart-5)",
-      },
-    ];
-
-    const total = segs.reduce((acc, x) => acc + x.bytes, 0) || 1;
-    return segs.map((x) => ({
-      ...x,
-      pct: Math.round((x.bytes / total) * 100),
-    }));
-  }, [stats, t]);
-
-  const storageUsagePct = isUnlimited
-    ? 0
-    : Math.round((storageUsed / storageLimit) * 100);
 
   const comingSoon = () => toast.message(t("profile.comingSoon"));
 
@@ -359,10 +265,8 @@ export default function ProfilePage() {
         description={t("profile.description")}
       />
 
-      {/* ═════ Row 1: 基本信息 (left) + 存储配额 (right) ═════ */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        {/* —— 基本信息 Card —— */}
-        <section className="min-w-0 rounded-xl border bg-card p-6 sm:p-7">
+      {/* —— 基本信息 Card —— */}
+      <section className="rounded-xl border bg-card p-6 sm:p-7">
             <header className="mb-6">
               <h3 className="text-base font-semibold tracking-tight">
                 {t("profile.basicInfo")}
@@ -374,17 +278,17 @@ export default function ProfilePage() {
 
             <form
               onSubmit={handleProfileSubmit}
-              className="grid gap-6 sm:grid-cols-[auto_minmax(0,1fr)]"
+              className="grid gap-x-6 gap-y-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center"
             >
-              {/* Avatar */}
-              <div className="group relative shrink-0">
-                <Avatar className="size-20 ring-2 ring-background/80">
+              {/* Avatar — vertically centered with the 2×2 form block */}
+              <div className="group relative shrink-0 self-center">
+                <Avatar className="size-24 ring-2 ring-background/80">
                   <AvatarImage
                     src={profileForm.avatarUrl || user.avatar_url}
                     alt={displayName}
                     className="object-cover"
                   />
-                  <AvatarFallback className="text-xl font-semibold">
+                  <AvatarFallback className="text-2xl font-semibold">
                     {displayName.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -486,94 +390,6 @@ export default function ProfilePage() {
               </div>
             </form>
           </section>
-
-          {/* —— 存储配额 Card (right of Row 1) —— */}
-          <aside className="glow-card relative overflow-hidden rounded-xl border bg-card p-5">
-            <div className="dot-grid pointer-events-none absolute inset-0 opacity-30" />
-            <div className="relative space-y-5">
-              <header className="flex items-center gap-2">
-                <div className="flex size-8 items-center justify-center rounded-md bg-[color:var(--chart-1)]/15 text-[color:var(--chart-1)]">
-                  <HardDrive className="size-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold tracking-tight">
-                    {t("profile.storageQuota")}
-                  </h3>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {isUnlimited
-                      ? t("profile.storageUnlimited")
-                      : t("profile.storageUsagePct").replace(
-                          "{pct}",
-                          String(storageUsagePct),
-                        )}
-                  </p>
-                </div>
-              </header>
-
-              {/* Large used size + limit */}
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-3xl font-semibold tracking-tight tabular-nums">
-                  {formatBytes(storageUsed)}
-                </span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {isUnlimited ? "∞" : `/ ${formatBytes(storageLimit)}`}
-                </span>
-              </div>
-
-              {/* Dark filled progress */}
-              {!isUnlimited && (
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-foreground transition-[width]"
-                    style={{ width: `${storagePct}%` }}
-                  />
-                </div>
-              )}
-
-              {/* Stacked type bar */}
-              <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                {typeSegments.map((seg) =>
-                  seg.pct > 0 ? (
-                    <div
-                      key={seg.key}
-                      className="h-full first:rounded-l-full last:rounded-r-full"
-                      style={{
-                        width: `${seg.pct}%`,
-                        backgroundColor: `hsl(${seg.color})`,
-                      }}
-                      title={`${seg.label} ${seg.pct}%`}
-                    />
-                  ) : null,
-                )}
-              </div>
-
-              {/* Legend 2×2 */}
-              <ul className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
-                {typeSegments.map((seg) => (
-                  <li key={seg.key} className="flex items-start gap-2">
-                    <span
-                      className="mt-1 size-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: `hsl(${seg.color})` }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-1">
-                        <span className="truncate text-muted-foreground">
-                          {seg.label}
-                        </span>
-                        <span className="tabular-nums font-medium">
-                          {seg.pct}%
-                        </span>
-                      </div>
-                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground tabular-nums">
-                        {formatBytes(seg.bytes)}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </aside>
-      </div>
 
       {/* ═════ Full-width rows below ═════ */}
       <div className="space-y-6">

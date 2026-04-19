@@ -37,6 +37,7 @@ import {
 import { getFileIconInfo, getFileTypeLabel } from "@/lib/file-utils";
 import { useAdaptiveGridPageSize } from "@/hooks/use-adaptive-grid-page-size";
 import { PageHeader } from "@/components/page-header";
+import { cn } from "@/lib/utils";
 
 const LIST_PAGE_SIZE = 20;
 const DEFAULT_GRID_PAGE_SIZE = 20;
@@ -226,7 +227,7 @@ export default function AdminFilesPage() {
                               {previewUrl ? (
                                 <img
                                   src={previewUrl}
-                                  className="size-8 shrink-0 rounded-md object-cover"
+                                  className="checker-bg size-8 shrink-0 rounded-md object-cover"
                                   alt=""
                                 />
                               ) : (
@@ -301,7 +302,7 @@ export default function AdminFilesPage() {
                       {previewUrl ? (
                         <img
                           src={previewUrl}
-                          className="size-10 shrink-0 rounded-lg object-cover"
+                          className="checker-bg size-10 shrink-0 rounded-lg object-cover"
                           alt=""
                         />
                       ) : (
@@ -344,7 +345,12 @@ export default function AdminFilesPage() {
                     className="group relative overflow-hidden rounded-lg border bg-card cursor-pointer"
                     onClick={() => setDetailFile(file)}
                   >
-                    <div className="flex h-28 items-center justify-center bg-muted/30">
+                    <div
+                      className={cn(
+                        "flex h-28 items-center justify-center",
+                        previewUrl ? "checker-bg" : "bg-muted/30",
+                      )}
+                    >
                       {previewUrl ? (
                         <img
                           src={previewUrl}
@@ -446,7 +452,7 @@ export default function AdminFilesPage() {
           {detailFile && (
             <div className="space-y-4">
               {detailFile.file_type === "image" && (
-                <div className="overflow-hidden rounded-lg border bg-muted/30">
+                <div className="checker-bg overflow-hidden rounded-lg border">
                   <img
                     src={detailFile.url}
                     alt={detailFile.original_name}

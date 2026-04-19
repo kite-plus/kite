@@ -238,7 +238,12 @@ function FileCard({
       className="group relative flex flex-col items-center gap-1.5 rounded-xl border bg-card p-3 cursor-grab select-none transition-all hover:border-primary/30 hover:shadow-sm active:cursor-grabbing"
     >
       {/* thumbnail or icon */}
-      <div className="flex h-14 w-full items-center justify-center overflow-hidden rounded-lg bg-muted">
+      <div
+        className={cn(
+          "flex h-14 w-full items-center justify-center overflow-hidden rounded-lg",
+          file.thumb_url ? "checker-bg" : "bg-muted",
+        )}
+      >
         {file.thumb_url ? (
           <img
             src={file.thumb_url}

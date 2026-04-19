@@ -602,7 +602,7 @@ export const FileThumb = memo(function FileThumb({
       <div
         className={cn(
           "relative aspect-square w-full overflow-hidden",
-          !hasThumb && tint,
+          hasThumb ? "checker-bg" : tint,
         )}
       >
         {hasThumb ? (

@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
-  ArrowRight,
   ArrowUp,
   CheckCircle2,
   Cpu,
@@ -784,7 +783,6 @@ export default function DashboardPage() {
           <RecentUploadsCard
             items={recent?.items ?? []}
             isLoading={recentLoading}
-            onViewAll={() => navigate("/user/files")}
             locale={locale}
             t={t}
           />
@@ -852,13 +850,11 @@ export default function DashboardPage() {
 function RecentUploadsCard({
   items,
   isLoading,
-  onViewAll,
   locale,
   t,
 }: {
   items: ThumbFile[];
   isLoading: boolean;
-  onViewAll: () => void;
   locale: Locale;
   t: (k: string) => string;
 }) {
@@ -874,16 +870,11 @@ function RecentUploadsCard({
             String(items.length),
           )}
         </CardDescription>
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={onViewAll}
-            className="inline-flex items-center gap-1 rounded-md text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
+        <CardAction>
+          <CardLinkFooter to="/user/files">
             {t("dashboard.viewAll")}
-            <ArrowRight className="size-3" />
-          </button>
-        </div>
+          </CardLinkFooter>
+        </CardAction>
       </CardHeader>
       <CardContent className="px-5">
         {isLoading ? (
