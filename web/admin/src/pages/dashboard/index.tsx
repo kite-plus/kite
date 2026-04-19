@@ -1281,7 +1281,6 @@ function SystemStatusCard({ t }: { t: (k: string) => string }) {
     if (safe < 1) return `${(safe * 1000).toFixed(1)} Kb/s`;
     return `${safe.toFixed(2)} Mb/s`;
   };
-  const fmtPercent = (v: number) => `${v.toFixed(2)}%`;
   const fmtLatency = (ms: number) => {
     const safe = Number.isFinite(ms) && ms > 0 ? ms : 0;
     if (safe < 1) return `${safe.toFixed(2)} ms`;
@@ -1302,9 +1301,7 @@ function SystemStatusCard({ t }: { t: (k: string) => string }) {
   const uploadPct = live?.upload_percent ?? 0;
   const downloadPct = live?.download_percent ?? 0;
   const apiLatencyMS = live?.api_latency_ms ?? 0;
-  const diskIOMBps = live?.disk_io_mbps ?? 0;
   const activeConnections = live?.active_connections ?? 0;
-  const errorRatePercent = live?.error_rate_percent ?? 0;
   const uptimeDays = live?.uptime_days ?? 0;
   const allOperational = live?.all_operational ?? true;
 
@@ -1404,19 +1401,9 @@ function SystemStatusCard({ t }: { t: (k: string) => string }) {
             dot="hsl(var(--chart-5))"
           />
           <MetricTile
-            label={t("dashboard.systemStatus.diskIO")}
-            value={hasLive ? `${diskIOMBps.toFixed(1)} MB/s` : "--"}
-            dot="hsl(var(--chart-3))"
-          />
-          <MetricTile
             label={t("dashboard.systemStatus.activeConnections")}
             value={hasLive ? String(activeConnections) : "--"}
             dot="hsl(var(--chart-2))"
-          />
-          <MetricTile
-            label={t("dashboard.systemStatus.errorRate")}
-            value={hasLive ? fmtPercent(errorRatePercent) : "--"}
-            dot="hsl(var(--chart-1))"
           />
         </div>
         <div className={cn(
