@@ -80,6 +80,10 @@ interface DashboardStats {
   videos: number;
   audios: number;
   others: number;
+  images_size?: number;
+  videos_size?: number;
+  audios_size?: number;
+  others_size?: number;
   users?: number;
 }
 
@@ -368,39 +372,51 @@ export default function DashboardPage() {
       audios: 0,
       others: 0,
     };
+    const hasPerKindSize =
+      typeof s.images_size === "number" &&
+      typeof s.videos_size === "number" &&
+      typeof s.audios_size === "number" &&
+      typeof s.others_size === "number";
+
     const total = Math.max(1, s.total_files);
-    // Approximate per-kind bytes by proportion of count · total_size. Not
-    // exact but avoids a new endpoint. Replace with bytes-per-kind when the
-    // backend exposes it.
-    const byKind = (count: number) =>
+    const byKindApprox = (count: number) =>
       total > 0 ? Math.round((count / total) * s.total_size) : 0;
+
+    const byKind = (kind: "image" | "video" | "audio" | "other", count: number) => {
+      if (!hasPerKindSize) return byKindApprox(count);
+      if (kind === "image") return s.images_size ?? 0;
+      if (kind === "video") return s.videos_size ?? 0;
+      if (kind === "audio") return s.audios_size ?? 0;
+      return s.others_size ?? 0;
+    };
+
     return [
       {
         kind: "image",
         label: t("dashboard.images"),
         count: s.images,
-        bytes: byKind(s.images),
+        bytes: byKind("image", s.images),
         color: "hsl(var(--chart-3))",
       },
       {
         kind: "video",
         label: t("dashboard.videos"),
         count: s.videos,
-        bytes: byKind(s.videos),
+        bytes: byKind("video", s.videos),
         color: "hsl(var(--chart-2))",
       },
       {
         kind: "audio",
         label: t("dashboard.audio"),
         count: s.audios,
-        bytes: byKind(s.audios),
+        bytes: byKind("audio", s.audios),
         color: "hsl(var(--chart-1))",
       },
       {
         kind: "other",
         label: t("dashboard.otherFiles"),
         count: s.others,
-        bytes: byKind(s.others),
+        bytes: byKind("other", s.others),
         color: "hsl(var(--chart-4))",
       },
     ];

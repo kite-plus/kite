@@ -280,15 +280,16 @@ func (r *FileRepo) GetStats(ctx context.Context) (*FileStats, error) {
 		{"audio", &stats.AudioCount, &stats.AudioSize},
 		{"file", &stats.OtherCount, &stats.OtherSize},
 	} {
+	} {
 		if err := r.db.WithContext(ctx).Model(&model.File{}).
 			Where("is_deleted = ? AND file_type = ?", false, ft.typ).
 			Count(ft.count).Error; err != nil {
 			return nil, fmt.Errorf("count %s files: %w", ft.typ, err)
-		}
 		if err := r.db.WithContext(ctx).Model(&model.File{}).
 			Where("is_deleted = ? AND file_type = ?", false, ft.typ).
 			Select("COALESCE(SUM(size_bytes), 0)").Scan(ft.size).Error; err != nil {
 			return nil, fmt.Errorf("sum %s size: %w", ft.typ, err)
+		}
 		}
 	}
 
@@ -313,16 +314,23 @@ func (r *FileRepo) GetUserStats(ctx context.Context, userID string) (*FileStats,
 	for _, ft := range []struct {
 		typ   string
 		count *int64
+		size  *int64
 	}{
-		{"image", &stats.ImageCount},
-		{"video", &stats.VideoCount},
-		{"audio", &stats.AudioCount},
-		{"file", &stats.OtherCount},
+		{"image", &stats.ImageCount, &stats.ImageSize},
+		{"video", &stats.VideoCount, &stats.VideoSize},
+		{"audio", &stats.AudioCount, &stats.AudioSize},
+		{"file", &stats.OtherCount, &stats.OtherSize},
 	} {
 		if err := r.db.WithContext(ctx).Model(&model.File{}).
 			Where("user_id = ? AND is_deleted = ? AND file_type = ?", userID, false, ft.typ).
 			Count(ft.count).Error; err != nil {
 			return nil, fmt.Errorf("count user %s files: %w", ft.typ, err)
+		}
+		if err := r.db.WithContext(ctx).Model(&model.File{}).
+			Where("user_id = ? AND is_deleted = ? AND file_type = ?", userID, false, ft.typ).
+			Select("COALESCE(SUM(size_bytes), 0)").
+			Scan(ft.size).Error; err != nil {
+			return nil, fmt.Errorf("sum user %s size: %w", ft.typ, err)
 		}
 	}
 
