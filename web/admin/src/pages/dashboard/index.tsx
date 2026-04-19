@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
-  ArrowDown,
   ArrowRight,
   ArrowUp,
   Cpu,
@@ -40,12 +39,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   Avatar,
   AvatarFallback,
@@ -804,10 +797,19 @@ export default function DashboardPage() {
 
       {/* ═════ ROW 3 ═════════════════════════════════════════ */}
       {isAdminWorkspace ? (
-        <div className="grid gap-4 lg:grid-cols-5">
+        <>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ServiceHealthCard t={t} />
+            <ResourceUsageCard
+              stats={stats}
+              daily={daily}
+              backends={backendsData}
+              locale={locale}
+              t={t}
+            />
+          </div>
           <TopUsersCard users={topUsers} locale={locale} t={t} />
-          <SystemStatusCard t={t} />
-        </div>
+        </>
       ) : (
         <div className="grid gap-4 lg:grid-cols-5">
           <RecentUploadsCard
@@ -945,7 +947,7 @@ function TopUsersCard({
   t: (k: string) => string;
 }) {
   return (
-    <Card className="gap-3 py-5 shadow-xs lg:col-span-3">
+    <Card className="gap-3 py-5 shadow-xs">
       <CardHeader className="px-5">
         <CardTitle className="text-sm">
           {t("dashboard.topUsers.title")}
@@ -1022,191 +1024,31 @@ function TopUsersCard({
 }
 
 /* ────────────────────────────────────────────────────────────
- * SystemStatusCard — admin dashboard Row 3, right (lg:col-span-2)
- *
- * Matches the target layout 1:1:
- *  • Two semi-circle gauges (CPU / 内存)
- *  • Bandwidth tile (上行 / 下行)
- *  • 4 metric tiles (API 延迟 / 磁盘 I/O / 活跃连接 / 错误率)
- *  • Emerald "all operational" banner
+ * ServiceHealthCard — admin Row 3 left
+ * 2×2 metric grid + bottom status bar (all operational + uptime)
  * ──────────────────────────────────────────────────────────── */
 
-/** Semi-circle gauge. `value` is 0..100, `display` is the string shown inside
- *  the arc (e.g. "12%" or "1.2 / 4 GB"). */
-function Gauge({
-  label,
-  value,
-  display,
-  color,
-  valueTestId,
-}: {
-  label: string;
-  value: number;
-  display: string;
-  color: string;
-  valueTestId?: string;
-}) {
-  const r = 30;
-  const cx = 36;
-  const cy = 36;
-  const circumference = Math.PI * r;
-  const pct = Math.max(0, Math.min(100, value));
-  const dash = (pct / 100) * circumference;
-  const arcPath = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
-  return (
-    <div className="flex flex-col items-center rounded-lg border p-2.5">
-      <div className="relative" style={{ width: 72, height: 42 }}>
-        <svg width="72" height="42" viewBox="0 0 72 42">
-          <path
-            d={arcPath}
-            fill="none"
-            stroke="hsl(var(--muted))"
-            strokeWidth="6"
-            strokeLinecap="round"
-          />
-          <path
-            d={arcPath}
-            fill="none"
-            stroke={color}
-            strokeWidth="6"
-            strokeLinecap="round"
-            strokeDasharray={`${dash} ${circumference}`}
-            style={{ transition: "stroke-dasharray 400ms ease" }}
-          />
-        </svg>
-        <div
-          className="absolute inset-x-0 bottom-0 text-center text-[13px] font-semibold tabular-nums"
-          data-testid={valueTestId}
-        >
-          {display}
-        </div>
-      </div>
-      <div className="mt-1 text-[11px] text-muted-foreground">{label}</div>
-    </div>
-  );
-}
+type LiveSystemStatus = {
+  cpu_percent: number;
+  process_cpu_percent: number;
+  cpu_cores: number;
+  memory_used_bytes: number;
+  memory_total_bytes: number;
+  upload_mbps: number;
+  download_mbps: number;
+  upload_percent: number;
+  download_percent: number;
+  api_latency_ms: number;
+  p95_latency_ms: number;
+  cache_hit_rate_percent: number;
+  disk_io_mbps: number;
+  active_connections: number;
+  error_rate_percent: number;
+  uptime_days: number;
+  all_operational: boolean;
+};
 
-/** Two-column bandwidth tile showing upload and download speed. */
-function BandwidthTile({
-  upLabel,
-  downLabel,
-  up,
-  down,
-  upPct = 0,
-  downPct = 0,
-}: {
-  upLabel: string;
-  downLabel: string;
-  up: string;
-  down: string;
-  upPct?: number;
-  downPct?: number;
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-0 overflow-hidden rounded-lg border">
-      <div className="flex items-center gap-2.5 border-r p-2.5">
-        <div
-          className="flex size-8 shrink-0 items-center justify-center rounded-md"
-          style={{
-            background: "hsl(var(--chart-4) / 0.12)",
-            color: "hsl(var(--chart-4))",
-          }}
-        >
-          <ArrowUp className="size-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            {upLabel}
-          </div>
-          <div className="truncate text-[13px] font-semibold tabular-nums">
-            {up}
-          </div>
-          <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full"
-              style={{
-                width: `${upPct}%`,
-                background: "hsl(var(--chart-4))",
-              }}
-            />
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-2.5 p-2.5">
-        <div
-          className="flex size-8 shrink-0 items-center justify-center rounded-md"
-          style={{
-            background: "hsl(var(--chart-1) / 0.12)",
-            color: "hsl(var(--chart-1))",
-          }}
-        >
-          <ArrowDown className="size-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            {downLabel}
-          </div>
-          <div className="truncate text-[13px] font-semibold tabular-nums">
-            {down}
-          </div>
-          <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full"
-              style={{
-                width: `${downPct}%`,
-                background: "hsl(var(--chart-1))",
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Small metric card: colored dot + label + value. */
-function MetricTile({
-  label,
-  value,
-  dot,
-}: {
-  label: string;
-  value: string;
-  dot: string;
-}) {
-  return (
-    <div className="rounded-lg border p-2.5">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <span
-          className="size-1.5 rounded-full"
-          style={{ background: dot }}
-        />
-        {label}
-      </div>
-      <div className="mt-1 text-[13px] font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-function SystemStatusCard({ t }: { t: (k: string) => string }) {
-  type LiveSystemStatus = {
-    cpu_percent: number;
-    process_cpu_percent: number;
-    cpu_cores: number;
-    memory_used_bytes: number;
-    memory_total_bytes: number;
-    upload_mbps: number;
-    download_mbps: number;
-    upload_percent: number;
-    download_percent: number;
-    api_latency_ms: number;
-    disk_io_mbps: number;
-    active_connections: number;
-    error_rate_percent: number;
-    uptime_days: number;
-    all_operational: boolean;
-  };
-
+function useLiveSystemStatus(): LiveSystemStatus | null {
   const [live, setLive] = useState<LiveSystemStatus | null>(null);
 
   useEffect(() => {
@@ -1260,176 +1102,347 @@ function SystemStatusCard({ t }: { t: (k: string) => string }) {
     const tick = () => {
       void systemStatusApi.ping().catch(() => undefined);
     };
-
     tick();
     const timer = window.setInterval(tick, 10_000);
-
-    return () => {
-      window.clearInterval(timer);
-    };
+    return () => window.clearInterval(timer);
   }, []);
 
-  const formatBytesAdaptive = (bytes: number) => {
-    const safe = Number.isFinite(bytes) && bytes > 0 ? bytes : 0;
-    const mb = safe / (1024 * 1024);
-    if (mb < 1024) return `${mb.toFixed(1)} MB`;
-    return `${(mb / 1024).toFixed(2)} GB`;
-  };
-  const fmtBandwidth = (mbps: number) => {
-    const safe = Number.isFinite(mbps) && mbps > 0 ? mbps : 0;
-    if (safe < 0.001) return `${(safe * 1_000_000).toFixed(0)} b/s`;
-    if (safe < 1) return `${(safe * 1000).toFixed(1)} Kb/s`;
-    return `${safe.toFixed(2)} Mb/s`;
-  };
-  const fmtLatency = (ms: number) => {
-    const safe = Number.isFinite(ms) && ms > 0 ? ms : 0;
-    if (safe < 1) return `${safe.toFixed(2)} ms`;
-    if (safe < 10) return `${safe.toFixed(1)} ms`;
-    return `${safe.toFixed(0)} ms`;
-  };
+  return live;
+}
+
+type MetricTone = "default" | "good" | "warn" | "err";
+
+function HealthMetric({
+  label,
+  value,
+  sub,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tone?: MetricTone;
+}) {
+  const toneClass =
+    tone === "good"
+      ? "text-emerald-700 dark:text-emerald-400"
+      : tone === "warn"
+        ? "text-amber-700 dark:text-amber-400"
+        : tone === "err"
+          ? "text-red-700 dark:text-red-400"
+          : "text-foreground";
+  return (
+    <div className="rounded-md bg-muted/60 px-3 py-2.5">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div
+        className={cn(
+          "mt-1 text-xl font-medium leading-none tabular-nums",
+          toneClass,
+        )}
+      >
+        {value}
+      </div>
+      <div className="mt-1.5 text-[11px] text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
+function ServiceHealthCard({ t }: { t: (k: string) => string }) {
+  const live = useLiveSystemStatus();
   const hasLive = !!live;
 
-  const cpuPercent = live?.cpu_percent ?? 0;
-  const processCpuPercent = live?.process_cpu_percent ?? 0;
-  const cpuCores = live?.cpu_cores ?? 0;
-  const memoryUsedBytes = live?.memory_used_bytes ?? 0;
-  const memoryTotalBytes = live?.memory_total_bytes ?? 0;
-  const memoryPct = memoryTotalBytes > 0 ? (memoryUsedBytes / memoryTotalBytes) * 100 : 0;
-  const memoryFreeBytes = Math.max(0, memoryTotalBytes - memoryUsedBytes);
-  const uploadMbps = live?.upload_mbps ?? 0;
-  const downloadMbps = live?.download_mbps ?? 0;
-  const uploadPct = live?.upload_percent ?? 0;
-  const downloadPct = live?.download_percent ?? 0;
-  const apiLatencyMS = live?.api_latency_ms ?? 0;
-  const activeConnections = live?.active_connections ?? 0;
+  const cacheHitRate = live?.cache_hit_rate_percent ?? 0;
+  const p95 = live?.p95_latency_ms ?? 0;
+  const errRate = live?.error_rate_percent ?? 0;
+  const activeConn = live?.active_connections ?? 0;
   const uptimeDays = live?.uptime_days ?? 0;
   const allOperational = live?.all_operational ?? true;
 
+  const cacheTone: MetricTone = !hasLive
+    ? "default"
+    : cacheHitRate >= 80
+      ? "good"
+      : cacheHitRate >= 50
+        ? "warn"
+        : "err";
+  const p95Tone: MetricTone = !hasLive
+    ? "default"
+    : p95 < 100
+      ? "good"
+      : p95 < 300
+        ? "default"
+        : "warn";
+  const errTone: MetricTone = !hasLive
+    ? "default"
+    : errRate < 1
+      ? "good"
+      : errRate < 5
+        ? "warn"
+        : "err";
+
+  const fmtPct = (n: number) =>
+    hasLive ? `${n.toFixed(n < 10 ? 1 : 0)}%` : "--";
+  const fmtMs = (n: number) =>
+    hasLive ? `${n < 10 ? n.toFixed(1) : n.toFixed(0)}ms` : "--";
+
   return (
-    <Card className="gap-3 py-5 shadow-xs lg:col-span-2">
-      <CardHeader className="px-5">
-        <CardTitle className="text-sm">
-          {t("dashboard.systemStatus.title")}
-        </CardTitle>
-        <CardDescription className="text-xs">
-          {t("dashboard.systemStatus.subRefresh")}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 px-5">
+    <Card className="gap-0 py-4 shadow-xs">
+      <CardContent className="px-[18px]">
+        <div className="mb-3.5 flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
+          <span
+            className={cn(
+              "size-1.5 rounded-full",
+              allOperational ? "bg-emerald-500" : "bg-amber-500",
+            )}
+          />
+          {t("dashboard.systemStatus.serviceHealth")}
+        </div>
+
         <div className="grid grid-cols-2 gap-2.5">
-          <TooltipProvider delayDuration={120}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <Gauge
-                    label={t("dashboard.systemStatus.cpu")}
-                    value={cpuPercent}
-                    display={hasLive ? `${cpuPercent.toFixed(0)}%` : "--"}
-                    color="hsl(var(--chart-3))"
-                    valueTestId="system-status-cpu"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent
-                side="top"
-                sideOffset={8}
-                className="w-52 rounded-lg border bg-card p-3 text-card-foreground shadow-lg"
-              >
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold">
-                    {t("dashboard.systemStatus.cpu")}
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                    <span className="text-muted-foreground">{t("dashboard.systemStatus.cpuSystemUsage")}</span>
-                    <span className="text-right font-medium">{hasLive ? `${cpuPercent.toFixed(1)}%` : "--"}</span>
-                    <span className="text-muted-foreground">{t("dashboard.systemStatus.cpuProcessUsage")}</span>
-                    <span className="text-right font-medium">{hasLive ? `${processCpuPercent.toFixed(1)}%` : "--"}</span>
-                    <span className="text-muted-foreground">{t("dashboard.systemStatus.cpuCores")}</span>
-                    <span className="text-right font-medium">{hasLive ? String(cpuCores) : "--"}</span>
-                  </div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider delayDuration={120}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <Gauge
-                    label={t("dashboard.systemStatus.memory")}
-                    value={memoryPct}
-                    display={hasLive ? `${memoryPct.toFixed(0)}%` : "--"}
-                    color="hsl(var(--chart-2))"
-                    valueTestId="system-status-memory"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent
-                side="top"
-                sideOffset={8}
-                className="w-52 rounded-lg border bg-card p-3 text-card-foreground shadow-lg"
-              >
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold">
-                    {t("dashboard.systemStatus.memory")}
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                    <span className="text-muted-foreground">{t("dashboard.systemStatus.memoryUsed")}</span>
-                    <span className="text-right font-medium">{hasLive ? formatBytesAdaptive(memoryUsedBytes) : "--"}</span>
-                    <span className="text-muted-foreground">{t("dashboard.systemStatus.memoryTotal")}</span>
-                    <span className="text-right font-medium">{hasLive ? formatBytesAdaptive(memoryTotalBytes) : "--"}</span>
-                    <span className="text-muted-foreground">{t("dashboard.systemStatus.memoryFree")}</span>
-                    <span className="text-right font-medium">{hasLive ? formatBytesAdaptive(memoryFreeBytes) : "--"}</span>
-                  </div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-        <BandwidthTile
-          upLabel={t("dashboard.systemStatus.upload")}
-          downLabel={t("dashboard.systemStatus.download")}
-          up={hasLive ? fmtBandwidth(uploadMbps) : "--"}
-          down={hasLive ? fmtBandwidth(downloadMbps) : "--"}
-          upPct={uploadPct}
-          downPct={downloadPct}
-        />
-        <div className="grid grid-cols-2 gap-2">
-          <MetricTile
-            label={t("dashboard.systemStatus.apiLatency")}
-            value={hasLive ? fmtLatency(apiLatencyMS) : "--"}
-            dot="hsl(var(--chart-5))"
+          <HealthMetric
+            label={t("dashboard.systemStatus.cacheHitRate")}
+            value={fmtPct(cacheHitRate)}
+            sub={t("dashboard.systemStatus.hourAvg")}
+            tone={cacheTone}
           />
-          <MetricTile
+          <HealthMetric
+            label={t("dashboard.systemStatus.p95Latency")}
+            value={fmtMs(p95)}
+            sub={t("dashboard.systemStatus.hourAvg")}
+            tone={p95Tone}
+          />
+          <HealthMetric
+            label={t("dashboard.systemStatus.errorRate")}
+            value={fmtPct(errRate)}
+            sub={t("dashboard.systemStatus.errorRateSub")}
+            tone={errTone}
+          />
+          <HealthMetric
             label={t("dashboard.systemStatus.activeConnections")}
-            value={hasLive ? String(activeConnections) : "--"}
-            dot="hsl(var(--chart-2))"
+            value={hasLive ? String(activeConn) : "--"}
+            sub={t("dashboard.systemStatus.current")}
           />
         </div>
-        <div className={cn(
-          "flex items-center gap-2 rounded-lg border p-2.5 text-[11px]",
-          allOperational
-            ? "bg-emerald-500/5"
-            : "bg-amber-500/5"
-        )}>
-          <span className={cn(
-            "size-2 rounded-full",
-            allOperational ? "bg-emerald-500" : "bg-amber-500"
-          )} />
-          <span className={cn(
-            "font-medium",
-            allOperational
-              ? "text-emerald-700 dark:text-emerald-400"
-              : "text-amber-700 dark:text-amber-400"
-          )}>
-            {t("dashboard.systemStatus.allOperational")}
-          </span>
-          <span className="ml-auto text-muted-foreground">
+
+        <div className="mt-3.5 flex items-center justify-between border-t pt-3 text-xs">
+          <div className="flex items-center gap-1.5 font-medium">
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                allOperational ? "bg-emerald-500" : "bg-amber-500",
+              )}
+            />
+            <span
+              className={
+                allOperational
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : "text-amber-700 dark:text-amber-400"
+              }
+            >
+              {t("dashboard.systemStatus.allOperational")}
+            </span>
+          </div>
+          <div className="text-muted-foreground">
             {t("dashboard.systemStatus.uptimeDays").replace(
               "{days}",
               String(uptimeDays),
             )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+ * ResourceUsageCard — admin Row 3 right
+ * Three progress rows (storage / bandwidth / file count) + two mini stats
+ * ──────────────────────────────────────────────────────────── */
+function ResourceBar({
+  name,
+  value,
+  suffix,
+  pct,
+  color,
+}: {
+  name: string;
+  value: string;
+  suffix?: string;
+  pct: number;
+  color: string;
+}) {
+  return (
+    <div className="mb-3 last:mb-0">
+      <div className="mb-1.5 flex items-baseline justify-between">
+        <span className="text-xs text-muted-foreground">{name}</span>
+        <span className="text-xs font-medium tabular-nums">
+          {value}
+          {suffix ? (
+            <span className="ml-0.5 font-normal text-muted-foreground">
+              {suffix}
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <div className="h-[5px] w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full transition-[width] duration-500"
+          style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  badge,
+  sub,
+}: {
+  label: string;
+  value: string;
+  badge?: { text: string; up: boolean } | null;
+  sub: string;
+}) {
+  return (
+    <div className="rounded-md bg-muted/60 px-3 py-2">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="mt-1 flex items-center gap-1.5">
+        <span className="text-[17px] font-medium leading-none tabular-nums">
+          {value}
+        </span>
+        {badge && (
+          <span
+            className={cn(
+              "rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+              badge.up
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                : "bg-red-500/15 text-red-700 dark:text-red-400",
+            )}
+          >
+            {badge.text}
           </span>
+        )}
+      </div>
+      <div className="mt-1.5 text-[11px] text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
+function ResourceUsageCard({
+  stats,
+  daily,
+  backends,
+  locale,
+  t,
+}: {
+  stats?: DashboardStats;
+  daily?: { days: DailyPoint[] };
+  backends?: DashboardStorageBackend[];
+  locale: Locale;
+  t: (k: string) => string;
+}) {
+  const days = daily?.days ?? [];
+
+  const totalCapacity = (backends ?? []).reduce(
+    (a, b) => a + (b.capacity_limit_bytes > 0 ? b.capacity_limit_bytes : 0),
+    0,
+  );
+  const storageUsed = stats?.total_size ?? 0;
+  const hasCapacity = totalCapacity > 0;
+  const storagePct = hasCapacity
+    ? Math.min(100, (storageUsed / totalCapacity) * 100)
+    : 0;
+
+  const monthBandwidthBytes = days
+    .slice(-30)
+    .reduce((a, b) => a + (b.bytes_served ?? 0), 0);
+  // Visual-only scale: 1 GB reference fills ~10% of the bar. Label shows
+  // raw usage without a cap since bandwidth is uncapped by default.
+  const bandwidthPct = Math.min(
+    100,
+    (monthBandwidthBytes / (10 * 1024 * 1024 * 1024)) * 100,
+  );
+
+  const totalFiles = stats?.total_files ?? 0;
+  // Visual-only: 1,000 files = 100%. Pure decoration — no denominator shown.
+  const filesPct = Math.min(100, (totalFiles / 1000) * 100);
+
+  const todayAccesses = days.length ? days[days.length - 1].accesses : 0;
+  const yesterdayAccesses = days.length > 1 ? days[days.length - 2].accesses : 0;
+  const todayUploads = days.length ? days[days.length - 1].uploads : 0;
+  const yesterdayUploads = days.length > 1 ? days[days.length - 2].uploads : 0;
+
+  const reqDelta =
+    yesterdayAccesses > 0
+      ? Math.round(
+          ((todayAccesses - yesterdayAccesses) / yesterdayAccesses) * 100,
+        )
+      : null;
+  const uploadDelta = todayUploads - yesterdayUploads;
+
+  const reqBadge =
+    reqDelta !== null && reqDelta !== 0
+      ? { text: `${reqDelta > 0 ? "↑" : "↓"}${Math.abs(reqDelta)}%`, up: reqDelta > 0 }
+      : null;
+  const uploadBadge =
+    uploadDelta !== 0
+      ? {
+          text: `${uploadDelta > 0 ? "↑" : "↓"}${Math.abs(uploadDelta)}`,
+          up: uploadDelta > 0,
+        }
+      : null;
+
+  const filesUnit = t("dashboard.systemStatus.filesUnit");
+  const vsYesterday = t("dashboard.systemStatus.vsYesterday");
+
+  return (
+    <Card className="gap-0 py-4 shadow-xs">
+      <CardContent className="px-[18px]">
+        <div className="mb-3.5 flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-sky-500" />
+          {t("dashboard.systemStatus.resourceUsage")}
+        </div>
+
+        <ResourceBar
+          name={t("dashboard.systemStatus.storage")}
+          value={formatSize(storageUsed)}
+          suffix={
+            hasCapacity
+              ? ` / ${formatSize(totalCapacity)}`
+              : ` / ${locale === "zh" ? "∞" : "∞"}`
+          }
+          pct={storagePct}
+          color="#7F77DD"
+        />
+        <ResourceBar
+          name={t("dashboard.systemStatus.monthlyBandwidth")}
+          value={formatSize(monthBandwidthBytes)}
+          pct={bandwidthPct}
+          color="#1D9E75"
+        />
+        <ResourceBar
+          name={t("dashboard.systemStatus.totalFiles")}
+          value={totalFiles.toLocaleString()}
+          suffix={` ${filesUnit}`}
+          pct={filesPct}
+          color="#378ADD"
+        />
+
+        <div className="mt-3 grid grid-cols-2 gap-2.5 border-t pt-3">
+          <MiniStat
+            label={t("dashboard.systemStatus.todayRequests")}
+            value={todayAccesses.toLocaleString()}
+            badge={reqBadge}
+            sub={vsYesterday}
+          />
+          <MiniStat
+            label={t("dashboard.systemStatus.todayUploads")}
+            value={todayUploads.toLocaleString()}
+            badge={uploadBadge}
+            sub={vsYesterday}
+          />
         </div>
       </CardContent>
     </Card>

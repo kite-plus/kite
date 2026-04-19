@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,9 +18,13 @@ import (
 	gnet "github.com/shirou/gopsutil/v4/net"
 )
 
+const latencyRingCapacity = 1024
+
 type runtimeTotals struct {
 	reqCount       uint64
 	errCount       uint64
+	cacheableReqs  uint64
+	cacheHits      uint64
 	totalLatencyNS uint64
 	lastLatencyNS  uint64
 	bytesIn        uint64
@@ -28,9 +33,50 @@ type runtimeTotals struct {
 	wsClients      int64
 }
 
+type latencyRing struct {
+	mu     sync.Mutex
+	buf    [latencyRingCapacity]uint64
+	head   int
+	filled int
+}
+
+func (r *latencyRing) push(sample uint64) {
+	r.mu.Lock()
+	r.buf[r.head] = sample
+	r.head = (r.head + 1) % latencyRingCapacity
+	if r.filled < latencyRingCapacity {
+		r.filled++
+	}
+	r.mu.Unlock()
+}
+
+func (r *latencyRing) percentileMS(p float64) float64 {
+	r.mu.Lock()
+	n := r.filled
+	if n == 0 {
+		r.mu.Unlock()
+		return 0
+	}
+	samples := make([]uint64, n)
+	copy(samples, r.buf[:n])
+	r.mu.Unlock()
+
+	sort.Slice(samples, func(i, j int) bool { return samples[i] < samples[j] })
+	idx := int(float64(n-1) * p)
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= n {
+		idx = n - 1
+	}
+	return float64(samples[idx]) / 1_000_000
+}
+
 type systemStatusSnapshot struct {
 	ReqCount       uint64
 	ErrCount       uint64
+	CacheableReqs  uint64
+	CacheHits      uint64
 	TotalLatencyNS uint64
 	BytesIn        uint64
 	BytesOut       uint64
@@ -45,29 +91,32 @@ type systemStatusSnapshot struct {
 type RealtimeSystemStatusCollector struct {
 	start time.Time
 
-	totals runtimeTotals
+	totals  runtimeTotals
+	latency latencyRing
 
 	mu   sync.Mutex
 	last systemStatusSnapshot
 }
 
 type RealtimeSystemStatus struct {
-	CPUPercent         float64 `json:"cpu_percent"`
-	ProcessCPUPercent  float64 `json:"process_cpu_percent"`
-	CPUCores           int     `json:"cpu_cores"`
-	MemoryUsedBytes    uint64  `json:"memory_used_bytes"`
-	MemoryTotalBytes   uint64  `json:"memory_total_bytes"`
-	UploadMbps         float64 `json:"upload_mbps"`
-	DownloadMbps       float64 `json:"download_mbps"`
-	UploadPercent      float64 `json:"upload_percent"`
-	DownloadPercent    float64 `json:"download_percent"`
-	APILatencyMS       float64 `json:"api_latency_ms"`
-	DiskIOMBps         float64 `json:"disk_io_mbps"`
-	ActiveConnections  int64   `json:"active_connections"`
-	ErrorRatePercent   float64 `json:"error_rate_percent"`
-	UptimeDays         int64   `json:"uptime_days"`
-	AllOperational     bool    `json:"all_operational"`
-	GeneratedAtUnixSec int64   `json:"generated_at_unix_sec"`
+	CPUPercent          float64 `json:"cpu_percent"`
+	ProcessCPUPercent   float64 `json:"process_cpu_percent"`
+	CPUCores            int     `json:"cpu_cores"`
+	MemoryUsedBytes     uint64  `json:"memory_used_bytes"`
+	MemoryTotalBytes    uint64  `json:"memory_total_bytes"`
+	UploadMbps          float64 `json:"upload_mbps"`
+	DownloadMbps        float64 `json:"download_mbps"`
+	UploadPercent       float64 `json:"upload_percent"`
+	DownloadPercent     float64 `json:"download_percent"`
+	APILatencyMS        float64 `json:"api_latency_ms"`
+	P95LatencyMS        float64 `json:"p95_latency_ms"`
+	CacheHitRatePercent float64 `json:"cache_hit_rate_percent"`
+	DiskIOMBps          float64 `json:"disk_io_mbps"`
+	ActiveConnections   int64   `json:"active_connections"`
+	ErrorRatePercent    float64 `json:"error_rate_percent"`
+	UptimeDays          int64   `json:"uptime_days"`
+	AllOperational      bool    `json:"all_operational"`
+	GeneratedAtUnixSec  int64   `json:"generated_at_unix_sec"`
 }
 
 func NewRealtimeSystemStatusCollector() *RealtimeSystemStatusCollector {
@@ -93,13 +142,27 @@ func (c *RealtimeSystemStatusCollector) Middleware() gin.HandlerFunc {
 			ctx.Next()
 
 			dur := time.Since(start)
+			latencyNS := uint64(dur.Nanoseconds())
 			atomic.AddInt64(&c.totals.inFlight, -1)
 			atomic.AddUint64(&c.totals.reqCount, 1)
-			atomic.AddUint64(&c.totals.totalLatencyNS, uint64(dur.Nanoseconds()))
-			atomic.StoreUint64(&c.totals.lastLatencyNS, uint64(dur.Nanoseconds()))
+			atomic.AddUint64(&c.totals.totalLatencyNS, latencyNS)
+			atomic.StoreUint64(&c.totals.lastLatencyNS, latencyNS)
+			c.latency.push(latencyNS)
 
-			if ctx.Writer.Status() >= http.StatusInternalServerError {
+			status := ctx.Writer.Status()
+			if status >= http.StatusBadRequest {
 				atomic.AddUint64(&c.totals.errCount, 1)
+			}
+
+			// Cache hit rate tracks conditional-GET effectiveness: a GET
+			// that returned 304 is a hit; a GET that returned 200 is a miss.
+			if ctx.Request.Method == http.MethodGet {
+				if status == http.StatusNotModified {
+					atomic.AddUint64(&c.totals.cacheableReqs, 1)
+					atomic.AddUint64(&c.totals.cacheHits, 1)
+				} else if status == http.StatusOK {
+					atomic.AddUint64(&c.totals.cacheableReqs, 1)
+				}
 			}
 
 			if in := ctx.Request.ContentLength; in > 0 {
@@ -129,6 +192,8 @@ func (c *RealtimeSystemStatusCollector) Snapshot() RealtimeSystemStatus {
 	cur := systemStatusSnapshot{
 		ReqCount:       atomic.LoadUint64(&c.totals.reqCount),
 		ErrCount:       atomic.LoadUint64(&c.totals.errCount),
+		CacheableReqs:  atomic.LoadUint64(&c.totals.cacheableReqs),
+		CacheHits:      atomic.LoadUint64(&c.totals.cacheHits),
 		TotalLatencyNS: atomic.LoadUint64(&c.totals.totalLatencyNS),
 		BytesIn:        atomic.LoadUint64(&c.totals.bytesIn),
 		BytesOut:       atomic.LoadUint64(&c.totals.bytesOut),
@@ -219,25 +284,34 @@ func (c *RealtimeSystemStatusCollector) Snapshot() RealtimeSystemStatus {
 		downloadPct = 0
 	}
 
-	allOperational := errRate < 1.0
+	allOperational := errRate < 5.0
+
+	p95MS := c.latency.percentileMS(0.95)
+
+	var cacheHitRate float64
+	if cur.CacheableReqs > 0 {
+		cacheHitRate = float64(cur.CacheHits) / float64(cur.CacheableReqs) * 100
+	}
 
 	return RealtimeSystemStatus{
-		CPUPercent:         cpuPercent,
-		ProcessCPUPercent:  processCPUPercent,
-		CPUCores:           runtime.NumCPU(),
-		MemoryUsedBytes:    memoryUsed,
-		MemoryTotalBytes:   memoryTotal,
-		UploadMbps:         uploadMbps,
-		DownloadMbps:       downloadMbps,
-		UploadPercent:      uploadPct,
-		DownloadPercent:    downloadPct,
-		APILatencyMS:       apiLatencyMS,
-		DiskIOMBps:         diskIOMBps,
-		ActiveConnections:  atomic.LoadInt64(&c.totals.inFlight) + atomic.LoadInt64(&c.totals.wsClients),
-		ErrorRatePercent:   errRate,
-		UptimeDays:         int64(time.Since(c.start).Hours() / 24),
-		AllOperational:     allOperational,
-		GeneratedAtUnixSec: now.Unix(),
+		CPUPercent:          cpuPercent,
+		ProcessCPUPercent:   processCPUPercent,
+		CPUCores:            runtime.NumCPU(),
+		MemoryUsedBytes:     memoryUsed,
+		MemoryTotalBytes:    memoryTotal,
+		UploadMbps:          uploadMbps,
+		DownloadMbps:        downloadMbps,
+		UploadPercent:       uploadPct,
+		DownloadPercent:     downloadPct,
+		APILatencyMS:        apiLatencyMS,
+		P95LatencyMS:        p95MS,
+		CacheHitRatePercent: cacheHitRate,
+		DiskIOMBps:          diskIOMBps,
+		ActiveConnections:   atomic.LoadInt64(&c.totals.inFlight) + atomic.LoadInt64(&c.totals.wsClients),
+		ErrorRatePercent:    errRate,
+		UptimeDays:          int64(time.Since(c.start).Hours() / 24),
+		AllOperational:      allOperational,
+		GeneratedAtUnixSec:  now.Unix(),
 	}
 }
 
