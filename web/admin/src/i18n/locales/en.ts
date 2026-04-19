@@ -444,6 +444,7 @@ const en = {
     breakdownByType: "Storage by file type",
     activeBadge: "active",
     idleBadge: "idle",
+    defaultShort: "default",
     fileKindImage: "Images",
     fileKindVideo: "Videos",
     fileKindAudio: "Audio",

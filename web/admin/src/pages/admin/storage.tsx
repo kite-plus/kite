@@ -528,8 +528,8 @@ export default function StoragePage() {
         }
       >
         {isStorageLoading ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {Array.from({ length: 2 }).map((_, i) => (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-64 rounded-xl" />
             ))}
           </div>
@@ -547,7 +547,7 @@ export default function StoragePage() {
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={orderedIds} strategy={rectSortingStrategy}>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {orderedItems.map((cfg) => (
                   <SortableStorageCard
                     key={cfg.id}
@@ -797,36 +797,42 @@ function SortableStorageCard(props: StorageCardProps) {
       <CardHeader className="flex flex-row items-start justify-between gap-3 [&]:grid-cols-none [&]:grid-rows-none">
         <div className="flex min-w-0 items-start gap-3">
           <StorageLogo vendor={vendor} size={40} rounded="rounded-lg" />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <CardTitle className="truncate text-sm">{props.cfg.name}</CardTitle>
+          <div className="min-w-0 flex-1">
+            {/* Single-line title row: long storage names truncate instead of
+             * wrapping, so the header keeps a fixed 2-line height across cards
+             * regardless of badge combinations. */}
+            <div className="flex min-w-0 items-center gap-1.5">
+              <CardTitle className="min-w-0 truncate text-sm">
+                {props.cfg.name}
+              </CardTitle>
               {props.cfg.is_active ? (
                 <Badge
                   variant="outline"
-                  className="h-4 gap-1 border-emerald-500/20 bg-emerald-500/10 px-1.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400"
+                  className="h-4 shrink-0 gap-1 border-emerald-500/20 bg-emerald-500/10 px-1.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400"
                 >
                   {t("storage.activeBadge")}
                 </Badge>
               ) : (
                 <Badge
                   variant="outline"
-                  className="h-4 px-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                  className="h-4 shrink-0 px-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
                 >
                   {t("storage.idleBadge")}
                 </Badge>
               )}
               {props.cfg.is_default && (
                 <Badge
-                  variant="secondary"
-                  className="h-4 gap-1 px-1.5 text-[10px] font-medium"
+                  variant="outline"
+                  className="h-4 shrink-0 gap-1 border-amber-500/20 bg-amber-500/10 px-1.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400"
+                  title={t("storage.defaultStorage")}
                 >
                   <Star className="size-2.5 fill-current" />
-                  {t("storage.defaultStorage")}
+                  {t("storage.defaultShort")}
                 </Badge>
               )}
             </div>
             <CardDescription className="mt-1 flex min-w-0 items-center gap-1.5 font-mono text-xs">
-              <span className="rounded bg-muted px-1 py-[1px] text-[9px] font-semibold uppercase tracking-wider not-italic text-muted-foreground">
+              <span className="shrink-0 rounded bg-muted px-1 py-[1px] text-[9px] font-semibold uppercase tracking-wider not-italic text-muted-foreground">
                 {brand.label}
               </span>
               <span className="truncate">P{props.cfg.priority}</span>

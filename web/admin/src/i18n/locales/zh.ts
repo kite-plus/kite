@@ -446,6 +446,7 @@ const zh: Translations = {
     breakdownByType: "按类型的存储占用",
     activeBadge: "active",
     idleBadge: "idle",
+    defaultShort: "默认",
     fileKindImage: "图片",
     fileKindVideo: "视频",
     fileKindAudio: "音频",
