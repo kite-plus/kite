@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
   Loader2,
   Camera,
@@ -59,6 +60,7 @@ export default function ProfilePage() {
   const { user, applyTokensAndRefresh } = useAuth();
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
 
   const [profileForm, setProfileForm] = useState({
     username: user?.username ?? "",
@@ -82,6 +84,7 @@ export default function ProfilePage() {
     });
   }
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -254,7 +257,20 @@ export default function ProfilePage() {
     ? new Date(user.created_at).toLocaleDateString()
     : t("profile.accountUnknownDate");
 
-  const comingSoon = () => toast.message(t("profile.comingSoon"));
+  const openSecuritySettings = () => {
+    if (user?.role === "admin") {
+      navigate("/admin/settings");
+      return;
+    }
+    navigate("/user/tokens");
+  };
+
+  const jumpToEmailField = () => {
+    const el = document.getElementById("email") as HTMLInputElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => el.focus(), 120);
+  };
 
   if (!user) return null;
 
@@ -431,7 +447,7 @@ export default function ProfilePage() {
                 }
                 description={t("profile.twoFactorDesc")}
                 actionLabel={t("profile.enable")}
-                onAction={comingSoon}
+                onAction={openSecuritySettings}
               />
               <SecurityRow
                 icon={Mail}
@@ -453,7 +469,7 @@ export default function ProfilePage() {
                     ? t("profile.backupEmailReplace")
                     : t("profile.backupEmailAdd")
                 }
-                onAction={comingSoon}
+                onAction={jumpToEmailField}
               />
               <SecurityRow
                 icon={Activity}
@@ -462,7 +478,7 @@ export default function ProfilePage() {
                   .replace("{n}", "1")
                   .replace("{devices}", "Web")}
                 actionLabel={t("profile.viewAction")}
-                onAction={comingSoon}
+                onAction={() => setSessionDialogOpen(true)}
                 actionIcon
               />
             </div>
@@ -633,6 +649,46 @@ export default function ProfilePage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={sessionDialogOpen} onOpenChange={setSessionDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("profile.loginActivity")}</DialogTitle>
+            <DialogDescription>
+              {t("profile.loginActivityDesc")
+                .replace("{n}", "1")
+                .replace("{devices}", "Web")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 rounded-lg border bg-muted/30 p-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">{t("auth.username")}</span>
+              <span className="font-medium">{user.username}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">{t("common.type")}</span>
+              <span className="font-medium">Web</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">User Agent</span>
+              <span className="max-w-[220px] truncate text-right font-medium">
+                {navigator.userAgent}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">{t("common.date")}</span>
+              <span className="font-medium">{new Date().toLocaleString()}</span>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setSessionDialogOpen(false)}>
+              {t("files.close")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
