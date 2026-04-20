@@ -254,7 +254,7 @@ export default function SettingsPage() {
   /* ── early loading state ─────────────────────────────── */
   if (isLoading) {
     return (
-      <div className="space-y-5">
+      <div className="mx-auto max-w-3xl space-y-5">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-9 w-80" />
         <Skeleton className="h-64 rounded-xl" />
@@ -328,7 +328,7 @@ export default function SettingsPage() {
 
   /* ── render ──────────────────────────────────────────── */
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-3xl space-y-5">
       <PageHeader
         title={t("settings.title")}
         description={t("settings.description")}
@@ -497,7 +497,7 @@ export default function SettingsPage() {
               <CardDescription>{t("settings.oauthProvidersHint")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-3">
                 {(providerList ?? []).map((provider) => {
                   const draft = getProviderDraft(provider);
                   const isPending =
@@ -507,56 +507,41 @@ export default function SettingsPage() {
                   return (
                     <div
                       key={provider.key}
-                      className="flex h-full flex-col rounded-xl border bg-background/70 p-4"
+                      className="rounded-xl border bg-background/70 p-4"
                     >
-                      <div className="mb-4 flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
                           <SocialProviderLogo
                             provider={provider.icon_key}
-                            size={40}
+                            size={36}
                             rounded="rounded-lg"
                           />
-                          <div>
+                          <div className="min-w-0">
                             <div className="text-sm font-medium">
                               {provider.label}
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              {provider.protocol}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{provider.protocol}</span>
+                              <span aria-hidden>·</span>
+                              <span>{getProviderStatus(provider, draft)}</span>
                             </div>
                           </div>
                         </div>
-                        <Badge
-                          variant={draft.enabled ? "secondary" : "outline"}
-                          className="text-[10px]"
-                        >
-                          {getProviderStatus(provider, draft)}
-                        </Badge>
+                        <Switch
+                          checked={draft.enabled}
+                          onCheckedChange={(checked) =>
+                            updateProviderDraft(provider.key, { enabled: checked })
+                          }
+                        />
                       </div>
 
                       {!provider.site_url_valid && (
-                        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+                        <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
                           {t("settings.oauthSiteUrlInvalid")}
                         </div>
                       )}
 
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2.5">
-                          <div>
-                            <div className="text-sm font-medium">
-                              {t("settings.oauthEnable")}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground">
-                              {t("settings.oauthEnableHint")}
-                            </div>
-                          </div>
-                          <Switch
-                            checked={draft.enabled}
-                            onCheckedChange={(checked) =>
-                              updateProviderDraft(provider.key, { enabled: checked })
-                            }
-                          />
-                        </div>
-
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
                         <div className="grid gap-2">
                           <Label>{clientIdLabel(provider.key)}</Label>
                           <Input
@@ -595,14 +580,9 @@ export default function SettingsPage() {
                                   : "client-secret"
                             }
                           />
-                          <div className="text-[11px] text-muted-foreground">
-                            {provider.has_secret
-                              ? t("settings.oauthSecretKeep")
-                              : t("settings.oauthSecretEmpty")}
-                          </div>
                         </div>
 
-                        <div className="grid gap-2">
+                        <div className="grid gap-2 sm:col-span-2">
                           <Label>{t("settings.oauthCallbackUrl")}</Label>
                           <div className="flex items-center gap-2">
                             <Input value={provider.callback_url} readOnly className="font-mono text-xs" />
@@ -619,16 +599,15 @@ export default function SettingsPage() {
                             </Button>
                           </div>
                         </div>
-
-                        <div className="grid gap-2">
-                          <Label>{t("settings.oauthScopes")}</Label>
-                          <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                            {provider.scopes.join(" ")}
-                          </div>
-                        </div>
                       </div>
 
-                      <div className="mt-5 flex justify-end">
+                      <div className="mt-4 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                        <div className="min-w-0 truncate">
+                          <span className="font-medium">{t("settings.oauthScopes")}</span>
+                          <span className="ml-2 font-mono">
+                            {provider.scopes.join(" ")}
+                          </span>
+                        </div>
                         <Button
                           size="sm"
                           onClick={() => handleSaveProvider(provider)}
@@ -644,7 +623,7 @@ export default function SettingsPage() {
 
                 {providerList == null &&
                   Array.from({ length: 3 }).map((_, index) => (
-                    <Skeleton key={index} className="h-[320px] rounded-xl" />
+                    <Skeleton key={index} className="h-[180px] rounded-xl" />
                   ))}
               </div>
             </CardContent>
