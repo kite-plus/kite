@@ -318,7 +318,7 @@ export function TrendCombo({
         <AreaChart
           accessibilityLayer
           data={data}
-          margin={{ left: 20, right: 8, top: 4, bottom: 0 }}
+          margin={{ left: 0, right: 8, top: 4, bottom: 0 }}
         >
           <CartesianGrid vertical={false} />
           <YAxis
@@ -328,8 +328,8 @@ export function TrendCombo({
               strokeDasharray: "4 4",
             }}
             orientation="left"
-            tickMargin={8}
-            width={44}
+            tickMargin={4}
+            width={28}
             allowDecimals={false}
             tickFormatter={(value) => Number(value).toLocaleString()}
           />
