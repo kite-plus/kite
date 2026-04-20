@@ -1,6 +1,15 @@
 <div align="center">
+  <img src="web/admin/public/favicon.svg" alt="Kite logo" width="88" height="88" />
   <h1>Kite 静态资源托管平台</h1>
   <p>一个轻量、快速、现代化的静态资源托管平台。</p>
+  <p>
+    <img src="https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white" alt="Go 1.25+" />
+    <img src="https://img.shields.io/badge/Gin-1.12-008ECF?logo=gin&logoColor=white" alt="Gin 1.12" />
+    <img src="https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB" alt="React 19" />
+    <img src="https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white" alt="Vite 8" />
+    <img src="https://img.shields.io/badge/License-MIT-16A34A" alt="MIT License" />
+    <img src="https://img.shields.io/badge/Storage-Local%20%7C%20S3%20%7C%20OSS%20%7C%20COS%20%7C%20OBS%20%7C%20BOS%20%7C%20FTP-111827" alt="Storage Drivers" />
+  </p>
   <p>
     简体中文 | <a href="README.md">English</a>
   </p>
@@ -10,6 +19,8 @@
 
 Kite 是一个轻量、快速、现代化的静态资源托管平台。它不仅仅是一个图床，更是一个涵盖了图片、音视频以及各类静态文件托管的综合性解决方案。就像天空中翱翔的风筝一样，Kite 旨在为您提供无缝、轻松的全类型媒体资源管理和分发体验。
 
+Kite 由 Go 后端、内嵌式 React 管理后台和可扩展的存储抽象层组成，支持本地磁盘、FTP 以及主流对象存储服务。它适合自托管图床、静态资源分发、内部媒体库和轻量团队部署等场景。
+
 ## ✨ 特性
 
 - **全格式支持**：轻松托管和分发图片、音频、视频以及其他标准的静态文件格式。
@@ -18,9 +29,47 @@ Kite 是一个轻量、快速、现代化的静态资源托管平台。它不仅
 - **安全可靠**：强大的安全措施确保您的数据和资产安全。
 - **开源免费**：自由使用、修改和分发。
 
+## 🧱 技术栈
+
+- **后端**：Go、Gin、GORM、SQLite / MySQL / PostgreSQL
+- **前端**：React、TypeScript、Vite、TanStack Query、Radix UI
+- **存储**：本地、FTP、S3、MinIO、Cloudflare R2、OSS、COS、OBS、BOS
+- **媒体能力**：缩略图、静态文件分发、公开上传接口
+
 ## 🚀 快速开始
 
-*（项目的安装、部署和配置指南将随着项目的开发在这里添加。）*
+### 开发模式
+
+```bash
+make dev
+```
+
+该命令会同时启动 Go 后端和管理后台前端开发服务。
+
+### 生产构建
+
+```bash
+make build
+./build/kite
+```
+
+生产构建会先编译前端，并将其嵌入到 Go 二进制中。
+
+## 📦 项目结构
+
+```text
+cmd/kite            应用入口
+internal/           后端处理器、服务、仓储与存储驱动
+web/admin/          React 管理后台
+template/           落地页与上传页模板
+deploy/             docker-compose 与 nginx 示例
+```
+
+## 🐳 部署
+
+- 使用 [deploy/docker-compose.yml](deploy/docker-compose.yml) 快速容器化部署。
+- 使用 [Dockerfile](Dockerfile) 构建独立镜像。
+- 使用 [deploy/nginx/conf.d/demo.kite.plus.conf](deploy/nginx/conf.d/demo.kite.plus.conf) 作为反向代理参考。
 
 ## 🤝 参与贡献
 
