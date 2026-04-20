@@ -17,7 +17,7 @@ func ParseConfig(driver string, raw json.RawMessage) (StorageConfig, error) {
 			return scfg, fmt.Errorf("parse local config: %w", err)
 		}
 		scfg.Local = &lc
-	case DriverS3, DriverOSS, DriverCOS:
+	case DriverS3, DriverOSS, DriverCOS, DriverOBS, DriverBOS:
 		var sc S3Config
 		if err := json.Unmarshal(raw, &sc); err != nil {
 			return scfg, fmt.Errorf("parse %s config: %w", driver, err)

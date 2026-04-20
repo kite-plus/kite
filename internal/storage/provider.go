@@ -16,6 +16,10 @@ func DetectProvider(driver string, rawConfig string) string {
 		return "aliyun-oss"
 	case DriverCOS:
 		return "tencent-cos"
+	case DriverOBS:
+		return "huawei-obs"
+	case DriverBOS:
+		return "baidu-bos"
 	case DriverS3:
 		return detectS3Provider(rawConfig)
 	}
@@ -50,6 +54,16 @@ func detectS3Provider(rawConfig string) string {
 		return "aliyun-oss"
 	case strings.Contains(ep, "myqcloud.com"):
 		return "tencent-cos"
+	case strings.Contains(ep, "myhuaweicloud.com"):
+		return "huawei-obs"
+	case strings.Contains(ep, "bcebos.com"):
+		return "baidu-bos"
+	case strings.Contains(ep, "googleapis.com"):
+		return "google-gcs"
+	case strings.Contains(ep, "ufileos.com") || strings.Contains(ep, "us3.ucloud"):
+		return "ucloud-us3"
+	case strings.Contains(ep, "jdcloud-oss.com"):
+		return "jdcloud-oss"
 	case strings.Contains(ep, "min.io") || strings.Contains(ep, "minio"):
 		return "minio"
 	}

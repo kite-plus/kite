@@ -36,27 +36,33 @@ type StorageDriver interface {
 	SignedURL(ctx context.Context, key string, expires time.Duration) (string, error)
 }
 
-// Driver-type constants. OSS and COS speak the S3 protocol, but they keep their own driver
-// values in the database so the frontend can render distinct branding.
+// Driver-type constants. S3-compatible drivers (oss/cos/obs/bos) keep distinct values in the
+// database so the frontend can render distinct branding, while all sharing the S3 wire protocol.
 const (
 	DriverLocal = "local"
 	DriverS3    = "s3"
-	DriverOSS   = "oss"
-	DriverCOS   = "cos"
+	DriverOSS   = "oss" // Alibaba Cloud OSS
+	DriverCOS   = "cos" // Tencent Cloud COS
+	DriverOBS   = "obs" // Huawei Cloud OBS
+	DriverBOS   = "bos" // Baidu Cloud BOS
 	DriverFTP   = "ftp"
 )
 
-// IsS3Compatible reports whether the driver speaks the S3-compatible protocol (s3 / oss / cos).
+// IsS3Compatible reports whether the driver speaks the S3-compatible protocol.
 func IsS3Compatible(driver string) bool {
-	return driver == DriverS3 || driver == DriverOSS || driver == DriverCOS
+	switch driver {
+	case DriverS3, DriverOSS, DriverCOS, DriverOBS, DriverBOS:
+		return true
+	}
+	return false
 }
 
 // StorageConfig is the runtime storage configuration, deserialised from the config column
 // of the storage_configs table.
 type StorageConfig struct {
-	Driver string       `json:"driver"`          // driver type: local / s3 / oss / cos / ftp
+	Driver string       `json:"driver"`          // driver type: local / s3 / oss / cos / obs / bos / ftp
 	Local  *LocalConfig `json:"local,omitempty"` // required when driver is local
-	S3     *S3Config    `json:"s3,omitempty"`    // required when driver is s3/oss/cos
+	S3     *S3Config    `json:"s3,omitempty"`    // required when driver is s3/oss/cos/obs/bos
 	FTP    *FTPConfig   `json:"ftp,omitempty"`   // required when driver is ftp
 }
 
@@ -91,7 +97,7 @@ type FTPConfig struct {
 // NewDriver builds the matching driver instance for the given configuration.
 func NewDriver(cfg StorageConfig) (StorageDriver, error) {
 	switch cfg.Driver {
-	case DriverS3, DriverOSS, DriverCOS:
+	case DriverS3, DriverOSS, DriverCOS, DriverOBS, DriverBOS:
 		if cfg.S3 == nil {
 			return nil, fmt.Errorf("storage config: driver is %s but s3 config is nil", cfg.Driver)
 		}

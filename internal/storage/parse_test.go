@@ -103,6 +103,53 @@ func TestParseConfig_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestParseConfig_OBS(t *testing.T) {
+	raw := json.RawMessage(`{"endpoint":"obs.cn-north-4.myhuaweicloud.com","region":"cn-north-4","bucket":"obs-bucket","access_key_id":"k","secret_access_key":"s","base_url":""}`)
+	cfg, err := ParseConfig(DriverOBS, raw)
+	if err != nil {
+		t.Fatalf("ParseConfig obs: %v", err)
+	}
+	if cfg.Driver != DriverOBS || cfg.S3 == nil {
+		t.Fatalf("OBS should parse as S3-compatible, cfg.S3=%v", cfg.S3)
+	}
+}
+
+func TestParseConfig_BOS(t *testing.T) {
+	raw := json.RawMessage(`{"endpoint":"bj.bcebos.com","region":"bj","bucket":"bos-bucket","access_key_id":"k","secret_access_key":"s","base_url":""}`)
+	cfg, err := ParseConfig(DriverBOS, raw)
+	if err != nil {
+		t.Fatalf("ParseConfig bos: %v", err)
+	}
+	if cfg.Driver != DriverBOS || cfg.S3 == nil {
+		t.Fatalf("BOS should parse as S3-compatible, cfg.S3=%v", cfg.S3)
+	}
+}
+
+func TestDetectProvider(t *testing.T) {
+	cases := []struct {
+		driver string
+		cfg    string
+		want   string
+	}{
+		{DriverLocal, "", "local"},
+		{DriverFTP, "", "ftp"},
+		{DriverOSS, "", "aliyun-oss"},
+		{DriverCOS, "", "tencent-cos"},
+		{DriverOBS, "", "huawei-obs"},
+		{DriverBOS, "", "baidu-bos"},
+		{DriverS3, `{"endpoint":"s3.amazonaws.com"}`, "aws-s3"},
+		{DriverS3, `{"endpoint":"r2.cloudflarestorage.com"}`, "cloudflare-r2"},
+		{DriverS3, `{"endpoint":"obs.cn-north-4.myhuaweicloud.com"}`, "huawei-obs"},
+		{DriverS3, `{"endpoint":"bj.bcebos.com"}`, "baidu-bos"},
+		{DriverS3, `{"endpoint":"s3.custom.example.com"}`, "s3"},
+	}
+	for _, c := range cases {
+		if got := DetectProvider(c.driver, c.cfg); got != c.want {
+			t.Errorf("DetectProvider(%q, %q) = %q, want %q", c.driver, c.cfg, got, c.want)
+		}
+	}
+}
+
 func TestIsS3Compatible(t *testing.T) {
 	cases := []struct {
 		driver string
@@ -111,6 +158,8 @@ func TestIsS3Compatible(t *testing.T) {
 		{DriverS3, true},
 		{DriverOSS, true},
 		{DriverCOS, true},
+		{DriverOBS, true},
+		{DriverBOS, true},
 		{DriverLocal, false},
 		{DriverFTP, false},
 		{"unknown", false},
@@ -123,7 +172,8 @@ func TestIsS3Compatible(t *testing.T) {
 }
 
 func TestDriverConstants(t *testing.T) {
-	if DriverLocal != "local" || DriverS3 != "s3" || DriverOSS != "oss" || DriverCOS != "cos" || DriverFTP != "ftp" {
+	if DriverLocal != "local" || DriverS3 != "s3" || DriverOSS != "oss" || DriverCOS != "cos" ||
+		DriverOBS != "obs" || DriverBOS != "bos" || DriverFTP != "ftp" {
 		t.Fatal("driver constants changed unexpectedly")
 	}
 }

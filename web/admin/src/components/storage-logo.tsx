@@ -8,6 +8,8 @@ type LogoVendor =
   | "cloudflare"
   | "aliyun"
   | "tencent"
+  | "huawei"
+  | "baidu"
   | "gcp"
   | "azure"
   | "backblaze"
@@ -65,6 +67,29 @@ const LogoMarks: Record<LogoVendor, (p: React.SVGProps<SVGSVGElement>) => React.
       />
       <path
         d="M9 19.5a.8.8 0 1 1 1.5-.5l.6 1.7a.2.2 0 0 0 .3.1l8.9-6a.8.8 0 0 1 .9 1.3l-8.9 6c-.7.5-1.6.2-1.9-.5L9 19.5Z"
+        fill="#fff"
+      />
+    </svg>
+  ),
+
+  // Huawei Cloud — red diamond mark
+  huawei: (p) => (
+    <svg viewBox="0 0 32 32" fill="none" {...p}>
+      <rect width="32" height="32" rx="7" fill="#CF0A2C" />
+      <path
+        d="M16 6 8 12v8l8 6 8-6v-8L16 6Zm0 3.2 5.2 3.9v5.8L16 22.8l-5.2-3.9v-5.8L16 9.2Z"
+        fill="#fff"
+      />
+      <path d="M16 13a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" fill="#fff" />
+    </svg>
+  ),
+
+  // Baidu Cloud — blue cloud mark
+  baidu: (p) => (
+    <svg viewBox="0 0 32 32" fill="none" {...p}>
+      <rect width="32" height="32" rx="7" fill="#2932E1" />
+      <path
+        d="M9.5 13a4 4 0 0 0-1.5 7.7V21h16v-.3A4 4 0 0 0 22.5 13a5.5 5.5 0 0 0-10.5-.5A3.5 3.5 0 0 0 9.5 13Z"
         fill="#fff"
       />
     </svg>
@@ -168,6 +193,8 @@ export const STORAGE_VENDOR_LABELS: Record<LogoVendor, string> = {
   cloudflare: "Cloudflare",
   aliyun: "Aliyun",
   tencent: "Tencent",
+  huawei: "Huawei",
+  baidu: "Baidu",
   gcp: "Google Cloud",
   azure: "Azure",
   backblaze: "Backblaze",
@@ -186,8 +213,10 @@ export function resolveLogoVendor(provider: string | undefined, driver: string):
   const p = (provider ?? "").toLowerCase();
   if (p.includes("aws") || p.includes("amazon")) return "aws";
   if (p.includes("cloudflare") || p.includes("r2")) return "cloudflare";
-  if (p.includes("aliyun") || p.includes("alibaba") || p.includes("oss")) return "aliyun";
-  if (p.includes("tencent") || p.includes("cos")) return "tencent";
+  if (p.includes("aliyun") || p.includes("alibaba") || p.includes("aliyuncs")) return "aliyun";
+  if (p.includes("tencent") || p.includes("cos") || p.includes("qcloud")) return "tencent";
+  if (p.includes("huawei") || p.includes("obs") || p.includes("myhuaweicloud")) return "huawei";
+  if (p.includes("baidu") || p.includes("bos") || p.includes("bcebos")) return "baidu";
   if (p.includes("gcp") || p.includes("google") || p.includes("gcs")) return "gcp";
   if (p.includes("azure")) return "azure";
   if (p.includes("backblaze") || p.includes("b2")) return "backblaze";
@@ -201,6 +230,10 @@ export function resolveLogoVendor(provider: string | undefined, driver: string):
       return "aliyun";
     case "cos":
       return "tencent";
+    case "obs":
+      return "huawei";
+    case "bos":
+      return "baidu";
     case "ftp":
       return "ftp";
     case "local":

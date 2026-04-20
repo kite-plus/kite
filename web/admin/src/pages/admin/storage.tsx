@@ -87,7 +87,7 @@ interface StorageSegment {
   color: string;
 }
 
-type Driver = "local" | "s3" | "oss" | "cos" | "ftp";
+type Driver = "local" | "s3" | "oss" | "cos" | "obs" | "bos" | "ftp";
 type Unit = "MB" | "GB" | "TB";
 
 interface StorageListItem {
@@ -188,6 +188,8 @@ const DRIVER_OPTIONS: DriverOption[] = [
   { value: "s3", labelKey: "storage.driverS3", descKey: "storage.driverS3Desc", provider: "s3" },
   { value: "oss", labelKey: "storage.driverOss", descKey: "storage.driverOssDesc", provider: "aliyun-oss" },
   { value: "cos", labelKey: "storage.driverCos", descKey: "storage.driverCosDesc", provider: "tencent-cos" },
+  { value: "obs", labelKey: "storage.driverObs", descKey: "storage.driverObsDesc", provider: "huawei-obs" },
+  { value: "bos", labelKey: "storage.driverBos", descKey: "storage.driverBosDesc", provider: "baidu-bos" },
   { value: "ftp", labelKey: "storage.driverFtp", descKey: "storage.driverFtpDesc", provider: "ftp" },
 ];
 
@@ -1071,6 +1073,8 @@ function DriverFields({ form, updateConfig }: DriverFieldsProps) {
     s3: "s3.amazonaws.com",
     oss: "oss-cn-hangzhou.aliyuncs.com",
     cos: "cos.ap-guangzhou.myqcloud.com",
+    obs: "obs.cn-north-4.myhuaweicloud.com",
+    bos: "s3.bj.bcebos.com",
     ftp: "",
   };
 
