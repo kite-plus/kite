@@ -150,6 +150,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 			return
 		}
 		user.PasswordHash = string(hash)
+		user.HasLocalPassword = true
 	}
 	if req.IsActive != nil {
 		user.IsActive = *req.IsActive

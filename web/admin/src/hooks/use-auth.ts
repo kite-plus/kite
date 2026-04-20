@@ -15,6 +15,7 @@ export interface User {
   nickname?: string;
   email?: string;
   avatar_url?: string;
+  has_local_password?: boolean;
   role: string;
   password_must_change?: boolean;
   storage_limit?: number;

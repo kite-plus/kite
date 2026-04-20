@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/amigoer/kite/internal/config"
 	"github.com/amigoer/kite/internal/handler"
 	"github.com/amigoer/kite/internal/middleware"
 	"github.com/amigoer/kite/internal/repo"
@@ -28,6 +29,7 @@ type Config struct {
 	StorageMgr        *storage.Manager
 	AuthSvc           *service.AuthService
 	FileSvc           *service.FileService
+	AuthConfig        config.AuthConfig
 	SiteName          string
 	SiteURL           string
 	AllowRegistration bool
@@ -53,14 +55,27 @@ func Setup(cfg Config) *gin.Engine {
 	fileRepo := repo.NewFileRepo(cfg.DB)
 	albumRepo := repo.NewAlbumRepo(cfg.DB)
 	tokenRepo := repo.NewAPITokenRepo(cfg.DB)
+	identityRepo := repo.NewUserIdentityRepo(cfg.DB)
 	storageRepo := repo.NewStorageConfigRepo(cfg.DB)
 	settingRepo := repo.NewSettingRepo(cfg.DB)
 	accessLogRepo := repo.NewFileAccessLogRepo(cfg.DB)
 
-	authHandler := handler.NewAuthHandler(cfg.AuthSvc, userRepo, settingRepo, cfg.AllowRegistration)
+	oauthConfigSvc := service.NewOAuthConfigService(settingRepo, cfg.SiteURL)
+	socialAuthSvc := service.NewSocialAuthService(
+		cfg.AuthSvc,
+		userRepo,
+		identityRepo,
+		settingRepo,
+		oauthConfigSvc,
+		cfg.AuthConfig.JWTSecret,
+		cfg.AllowRegistration,
+	)
+
+	authHandler := handler.NewAuthHandler(cfg.AuthSvc, socialAuthSvc, oauthConfigSvc, userRepo, settingRepo, cfg.AllowRegistration)
 	fileHandler := handler.NewFileHandler(cfg.FileSvc, fileRepo, albumRepo, accessLogRepo)
 	albumHandler := handler.NewAlbumHandler(albumRepo, fileRepo)
 	tokenHandler := handler.NewTokenHandler(cfg.AuthSvc, tokenRepo)
+	oauthProviderAdminHandler := handler.NewOAuthProviderAdminHandler(oauthConfigSvc)
 	storageHandler := handler.NewStorageHandler(storageRepo, fileRepo, cfg.StorageMgr, cfg.ReloadStorage)
 	settingsHandler := handler.NewSettingsHandler(settingRepo, map[string]string{
 		"site_name":            cfg.SiteName,
@@ -96,6 +111,7 @@ func Setup(cfg Config) *gin.Engine {
 	registerSystemStatusAdmin(admin, systemStatusHandler)
 	registerStorageAdmin(admin, storageHandler)
 	registerSettingsAdmin(admin, settingsHandler)
+	registerAuthAdmin(admin, oauthProviderAdminHandler)
 	registerUserAdmin(admin, userHandler, fileHandler)
 
 	registerLanding(r, cfg, userRepo)

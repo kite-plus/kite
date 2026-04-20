@@ -52,6 +52,17 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*model.User, e
 	return &user, nil
 }
 
+// ExistsByUsername reports whether any row has the given username.
+func (r *UserRepo) ExistsByUsername(ctx context.Context, username string) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("username = ?", username).
+		Count(&count).Error; err != nil {
+		return false, fmt.Errorf("check username exists: %w", err)
+	}
+	return count > 0, nil
+}
+
 // Update persists changes to a user.
 func (r *UserRepo) Update(ctx context.Context, user *model.User) error {
 	if err := r.db.WithContext(ctx).Save(user).Error; err != nil {

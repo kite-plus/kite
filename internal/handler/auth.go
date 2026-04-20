@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/amigoer/kite/internal/middleware"
 	"github.com/amigoer/kite/internal/repo"
@@ -13,6 +14,8 @@ import (
 // AuthHandler handles authentication HTTP requests.
 type AuthHandler struct {
 	authSvc                  *service.AuthService
+	socialAuthSvc            *service.SocialAuthService
+	oauthConfigSvc           *service.OAuthConfigService
 	userRepo                 *repo.UserRepo
 	settingRepo              *repo.SettingRepo
 	allowRegistrationDefault bool
@@ -20,12 +23,16 @@ type AuthHandler struct {
 
 func NewAuthHandler(
 	authSvc *service.AuthService,
+	socialAuthSvc *service.SocialAuthService,
+	oauthConfigSvc *service.OAuthConfigService,
 	userRepo *repo.UserRepo,
 	settingRepo *repo.SettingRepo,
 	allowRegistrationDefault bool,
 ) *AuthHandler {
 	return &AuthHandler{
 		authSvc:                  authSvc,
+		socialAuthSvc:            socialAuthSvc,
+		oauthConfigSvc:           oauthConfigSvc,
 		userRepo:                 userRepo,
 		settingRepo:              settingRepo,
 		allowRegistrationDefault: allowRegistrationDefault,
@@ -45,8 +52,16 @@ func (h *AuthHandler) allowRegistration(c *gin.Context) bool {
 
 // Options returns the effective public auth settings for anonymous pages.
 func (h *AuthHandler) Options(c *gin.Context) {
+	socialProviders := make([]service.PublicOAuthProvider, 0)
+	if h.oauthConfigSvc != nil {
+		providers, err := h.oauthConfigSvc.ListPublicProviders(c.Request.Context())
+		if err == nil {
+			socialProviders = providers
+		}
+	}
 	Success(c, gin.H{
 		"allow_registration": h.allowRegistration(c),
+		"social_providers":   socialProviders,
 	})
 }
 
@@ -74,7 +89,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Also set a cookie for the web UI.
-	c.SetCookie("access_token", tokenPair.AccessToken, 7200, "/", "", false, true)
+	writeAccessTokenCookie(c, tokenPair.AccessToken, tokenPair.ExpiresAt)
 
 	Success(c, tokenPair)
 }
@@ -138,13 +153,13 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("access_token", tokenPair.AccessToken, 7200, "/", "", false, true)
+	writeAccessTokenCookie(c, tokenPair.AccessToken, tokenPair.ExpiresAt)
 	Success(c, tokenPair)
 }
 
 // Logout clears the access token cookie.
 func (h *AuthHandler) Logout(c *gin.Context) {
-	c.SetCookie("access_token", "", -1, "/", "", false, true)
+	writeAccessTokenCookie(c, "", time.Unix(0, 0))
 	Success(c, nil)
 }
 
@@ -164,6 +179,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		"nickname":             user.Nickname,
 		"email":                user.Email,
 		"avatar_url":           user.AvatarURL,
+		"has_local_password":   user.HasLocalPassword,
 		"role":                 user.Role,
 		"password_must_change": user.PasswordMustChange,
 		"storage_limit":        user.StorageLimit,
@@ -199,12 +215,13 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	Success(c, gin.H{
-		"user_id":    user.ID,
-		"username":   user.Username,
-		"nickname":   user.Nickname,
-		"email":      user.Email,
-		"avatar_url": user.AvatarURL,
-		"role":       user.Role,
+		"user_id":            user.ID,
+		"username":           user.Username,
+		"nickname":           user.Nickname,
+		"email":              user.Email,
+		"avatar_url":         user.AvatarURL,
+		"has_local_password": user.HasLocalPassword,
+		"role":               user.Role,
 	})
 }
 
@@ -223,6 +240,10 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	userID := c.GetString(middleware.ContextKeyUserID)
 	if err := h.authSvc.ChangePassword(c.Request.Context(), userID, req.CurrentPassword, req.NewPassword); err != nil {
+		if errors.Is(err, service.ErrLocalPasswordNotSet) {
+			Fail(c, http.StatusBadRequest, 40011, err.Error())
+			return
+		}
 		if errors.Is(err, service.ErrPasswordMismatch) {
 			Fail(c, http.StatusBadRequest, 40010, err.Error())
 			return
@@ -262,6 +283,6 @@ func (h *AuthHandler) FirstLoginReset(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("access_token", tokenPair.AccessToken, 7200, "/", "", false, true)
+	writeAccessTokenCookie(c, tokenPair.AccessToken, tokenPair.ExpiresAt)
 	Success(c, tokenPair)
 }

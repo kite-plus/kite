@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Loader2,
   Camera,
@@ -13,6 +13,7 @@ import {
   Monitor,
   LayoutGrid,
   List as ListIcon,
+  Link2,
 } from "lucide-react";
 
 import { authApi, fileApi } from "@/lib/api";
@@ -34,6 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
+import { SocialProviderLogo } from "@/components/social-provider-logo";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -46,8 +48,18 @@ interface User {
   nickname?: string;
   email?: string;
   avatar_url?: string;
+  has_local_password?: boolean;
   role: string;
   created_at?: string;
+}
+
+interface IdentityStatus {
+  key: string;
+  label: string;
+  icon_key: string;
+  bound: boolean;
+  display_name?: string;
+  email?: string;
 }
 
 const DEFAULT_VIEW_KEY = "kite_files_default_view";
@@ -61,6 +73,8 @@ export default function ProfilePage() {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
 
   const [profileForm, setProfileForm] = useState({
     username: user?.username ?? "",
@@ -196,6 +210,57 @@ export default function ProfilePage() {
     },
   });
 
+  const setPasswordMutation = useMutation({
+    mutationFn: () =>
+      authApi.setPassword({
+        new_password: passwordForm.newPassword,
+      }),
+    onSuccess: async () => {
+      const tokens = {
+        access_token: localStorage.getItem("access_token") ?? "",
+        refresh_token: localStorage.getItem("refresh_token") ?? "",
+      };
+      if (tokens.access_token) await applyTokensAndRefresh(tokens);
+      queryClient.invalidateQueries({ queryKey: ["auth", "identities"] });
+      toast.success(t("profile.passwordSetSaved"));
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setPasswordDialogOpen(false);
+    },
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? t("profile.passwordFailed");
+      toast.error(msg);
+    },
+  });
+
+  const { data: identityData } = useQuery<{
+    has_local_password: boolean;
+    providers: IdentityStatus[];
+  }>({
+    queryKey: ["auth", "identities"],
+    queryFn: () => authApi.identities().then((r) => r.data.data),
+    enabled: !!user,
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: (provider: string) => authApi.unlinkIdentity(provider),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["auth", "identities"] });
+      toast.success(t("profile.identityUnlinked"));
+    },
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? t("profile.identityUnlinkFailed");
+      toast.error(msg);
+    },
+  });
+
   /* ── handlers ────────────────────────────────────────────── */
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,11 +273,12 @@ export default function ProfilePage() {
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !passwordForm.currentPassword ||
-      !passwordForm.newPassword ||
-      !passwordForm.confirmPassword
-    ) {
+    const hasLocalPassword = user?.has_local_password !== false;
+    if (!passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast.error(t("profile.allFieldsRequired"));
+      return;
+    }
+    if (hasLocalPassword && !passwordForm.currentPassword) {
       toast.error(t("profile.allFieldsRequired"));
       return;
     }
@@ -220,11 +286,18 @@ export default function ProfilePage() {
       toast.error(t("auth.passwordMismatch"));
       return;
     }
-    if (passwordForm.newPassword === passwordForm.currentPassword) {
+    if (
+      hasLocalPassword &&
+      passwordForm.newPassword === passwordForm.currentPassword
+    ) {
       toast.error(t("profile.newPasswordMustDiffer"));
       return;
     }
-    passwordMutation.mutate();
+    if (hasLocalPassword) {
+      passwordMutation.mutate();
+      return;
+    }
+    setPasswordMutation.mutate();
   };
 
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -272,7 +345,38 @@ export default function ProfilePage() {
     window.setTimeout(() => el.focus(), 120);
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const status = params.get("social_status");
+    const provider = params.get("provider");
+    const oauthError = params.get("oauth_error");
+    if (!status && !oauthError) return;
+    if (status === "linked") {
+      toast.success(
+        provider
+          ? t("profile.identityLinked").replace("{provider}", provider)
+          : t("profile.identityLinkedGeneric")
+      );
+      queryClient.invalidateQueries({ queryKey: ["auth", "identities"] });
+    } else if (oauthError) {
+      toast.error(oauthError);
+    }
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.search, navigate, queryClient, t]);
+
   if (!user) return null;
+
+  const hasLocalPassword = identityData?.has_local_password ?? user.has_local_password !== false;
+  const identities = identityData?.providers ?? [];
+  const pendingProvider = unlinkMutation.variables;
+
+  const startBindFlow = (provider: string) => {
+    const params = new URLSearchParams({
+      mode: "bind",
+      return_to: "/user/profile",
+    });
+    window.location.href = `/api/v1/auth/oauth/${provider}/start?${params.toString()}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -432,9 +536,28 @@ export default function ProfilePage() {
             <div className="divide-y">
               <SecurityRow
                 icon={Key}
-                title={t("profile.passwordRow")}
-                description={t("profile.passwordRowHintUnknown")}
-                actionLabel={t("profile.passwordChange")}
+                title={
+                  hasLocalPassword
+                    ? t("profile.passwordRow")
+                    : t("profile.passwordSetup")
+                }
+                badge={
+                  !hasLocalPassword ? (
+                    <Badge variant="outline" className="text-[10px]">
+                      {t("profile.passwordUnset")}
+                    </Badge>
+                  ) : undefined
+                }
+                description={
+                  hasLocalPassword
+                    ? t("profile.passwordRowHintUnknown")
+                    : t("profile.passwordSetupDesc")
+                }
+                actionLabel={
+                  hasLocalPassword
+                    ? t("profile.passwordChange")
+                    : t("profile.passwordSetup")
+                }
                 onAction={() => setPasswordDialogOpen(true)}
               />
               <SecurityRow
@@ -481,6 +604,92 @@ export default function ProfilePage() {
                 onAction={() => setSessionDialogOpen(true)}
                 actionIcon
               />
+            </div>
+
+            <div className="mt-5 rounded-lg border bg-muted/20 p-4">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-medium">
+                    {t("profile.socialAccounts")}
+                  </h4>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("profile.socialAccountsDesc")}
+                  </p>
+                </div>
+                <Badge variant="outline" className="text-[10px]">
+                  {identities.filter((item) => item.bound).length}
+                  {" / "}
+                  {identities.length}
+                </Badge>
+              </div>
+
+              <div className="space-y-3">
+                {identities.map((identity) => (
+                  <div
+                    key={identity.key}
+                    className="flex flex-col gap-3 rounded-lg border bg-background/80 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <SocialProviderLogo
+                        provider={identity.icon_key}
+                        size={36}
+                        rounded="rounded-lg"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {identity.label}
+                          </span>
+                          <Badge
+                            variant={identity.bound ? "secondary" : "outline"}
+                            className="text-[10px]"
+                          >
+                            {identity.bound
+                              ? t("profile.identityBound")
+                              : t("profile.identityUnbound")}
+                          </Badge>
+                        </div>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {identity.bound
+                            ? identity.email ||
+                              identity.display_name ||
+                              t("profile.identityBound")
+                            : t("profile.identityUnboundDesc")}
+                        </p>
+                      </div>
+                    </div>
+
+                    {identity.bound ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          unlinkMutation.isPending &&
+                          pendingProvider === identity.key
+                        }
+                        onClick={() => unlinkMutation.mutate(identity.key)}
+                      >
+                        {unlinkMutation.isPending &&
+                        pendingProvider === identity.key ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Link2 className="size-4" />
+                        )}
+                        {t("profile.identityUnlink")}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startBindFlow(identity.key)}
+                      >
+                        <Link2 className="size-4" />
+                        {t("profile.identityLink")}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
 
@@ -565,31 +774,39 @@ export default function ProfilePage() {
       <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("profile.changePassword")}</DialogTitle>
+            <DialogTitle>
+              {hasLocalPassword
+                ? t("profile.changePassword")
+                : t("profile.passwordSetup")}
+            </DialogTitle>
             <DialogDescription>
-              {t("profile.changePasswordDesc")}
+              {hasLocalPassword
+                ? t("profile.changePasswordDesc")
+                : t("profile.passwordSetupDialogDesc")}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handlePasswordSubmit} className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="currentPassword">
-                {t("profile.currentPassword")}
-              </Label>
-              <Input
-                id="currentPassword"
-                type="password"
-                autoComplete="current-password"
-                value={passwordForm.currentPassword}
-                onChange={(e) =>
-                  setPasswordForm((p) => ({
-                    ...p,
-                    currentPassword: e.target.value,
-                  }))
-                }
-                required
-              />
-            </div>
+            {hasLocalPassword && (
+              <div className="grid gap-2">
+                <Label htmlFor="currentPassword">
+                  {t("profile.currentPassword")}
+                </Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) =>
+                    setPasswordForm((p) => ({
+                      ...p,
+                      currentPassword: e.target.value,
+                    }))
+                  }
+                  required
+                />
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="newPassword">{t("profile.newPassword")}</Label>
               <Input
@@ -630,7 +847,11 @@ export default function ProfilePage() {
             </div>
             <p className="flex items-start gap-2 rounded-md border bg-muted/30 p-2.5 text-[11px] text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-3 shrink-0" />
-              <span>{t("profile.passwordTip")}</span>
+              <span>
+                {hasLocalPassword
+                  ? t("profile.passwordTip")
+                  : t("profile.passwordSetupTip")}
+              </span>
             </p>
 
             <DialogFooter>
@@ -641,11 +862,18 @@ export default function ProfilePage() {
               >
                 {t("profile.cancel")}
               </Button>
-              <Button type="submit" disabled={passwordMutation.isPending}>
-                {passwordMutation.isPending && (
+              <Button
+                type="submit"
+                disabled={
+                  passwordMutation.isPending || setPasswordMutation.isPending
+                }
+              >
+                {(passwordMutation.isPending || setPasswordMutation.isPending) && (
                   <Loader2 className="size-4 animate-spin" />
                 )}
-                {t("profile.savePassword")}
+                {hasLocalPassword
+                  ? t("profile.savePassword")
+                  : t("profile.savePasswordSetup")}
               </Button>
             </DialogFooter>
           </form>

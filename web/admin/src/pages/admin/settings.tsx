@@ -6,14 +6,17 @@ import {
   HardDrive,
   Mail,
   Check,
+  Copy,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { settingsApi, storageApi } from "@/lib/api";
+import { authProviderApi, settingsApi, storageApi } from "@/lib/api";
 import { useI18n } from "@/i18n";
 import { cn, formatSize } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +29,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
+import { SocialProviderLogo } from "@/components/social-provider-logo";
 import { StorageLogo, resolveLogoVendor } from "@/components/storage-logo";
 
 type Tab = "general" | "auth" | "storage" | "email";
@@ -41,6 +45,27 @@ interface StorageListItem {
   priority: number;
   is_default: boolean;
   is_active: boolean;
+}
+
+interface OAuthProviderItem {
+  key: string;
+  label: string;
+  icon_key: string;
+  protocol: string;
+  enabled: boolean;
+  client_id: string;
+  has_secret: boolean;
+  callback_url: string;
+  is_configured: boolean;
+  scopes: string[];
+  site_url: string;
+  site_url_valid: boolean;
+}
+
+interface OAuthProviderDraft {
+  enabled: boolean;
+  client_id: string;
+  client_secret: string;
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -117,6 +142,12 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("general");
   const [form, setForm] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [providerDrafts, setProviderDrafts] = useState<
+    Record<string, OAuthProviderDraft>
+  >({});
+  const [providerTouched, setProviderTouched] = useState<Record<string, boolean>>(
+    {}
+  );
 
   const { data, isLoading } = useQuery({
     queryKey: ["settings"],
@@ -127,10 +158,34 @@ export default function SettingsPage() {
     if (data) setForm(data);
   }, [data]);
 
+  const { data: providerList } = useQuery<OAuthProviderItem[]>({
+    queryKey: ["auth", "providers"],
+    queryFn: () => authProviderApi.list().then((r) => r.data.data),
+    enabled: tab === "auth",
+  });
+
+  useEffect(() => {
+    if (!providerList) return;
+    setProviderDrafts(
+      Object.fromEntries(
+        providerList.map((provider) => [
+          provider.key,
+          {
+            enabled: provider.enabled,
+            client_id: provider.client_id ?? "",
+            client_secret: "",
+          },
+        ])
+      )
+    );
+    setProviderTouched({});
+  }, [providerList]);
+
   const mutation = useMutation({
     mutationFn: () => settingsApi.update(form),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
+      queryClient.invalidateQueries({ queryKey: ["auth", "providers"] });
       setSaved(true);
       toast.success(t("settings.saved"));
       setTimeout(() => setSaved(false), 2000);
@@ -169,6 +224,33 @@ export default function SettingsPage() {
     onError: () => toast.error(t("toast.error")),
   });
 
+  const saveProviderMutation = useMutation({
+    mutationFn: ({
+      provider,
+      payload,
+    }: {
+      provider: string;
+      payload: OAuthProviderDraft;
+    }) =>
+      authProviderApi.update(provider, {
+        enabled: payload.enabled,
+        client_id: payload.client_id,
+        client_secret: payload.client_secret,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["auth", "providers"] });
+      queryClient.invalidateQueries({ queryKey: ["auth", "options"] });
+      toast.success(t("settings.saved"));
+    },
+    onError: (err: unknown) => {
+      const msg =
+        (
+          err as { response?: { data?: { message?: string } } }
+        )?.response?.data?.message ?? t("toast.error");
+      toast.error(msg);
+    },
+  });
+
   /* ── early loading state ─────────────────────────────── */
   if (isLoading) {
     return (
@@ -186,6 +268,63 @@ export default function SettingsPage() {
     { value: "storage", label: t("settings.storageTab"), icon: HardDrive },
     { value: "email", label: t("settings.email"), icon: Mail },
   ];
+
+  const updateProviderDraft = (
+    provider: string,
+    patch: Partial<OAuthProviderDraft>
+  ) =>
+    setProviderDrafts((prev) => ({
+      ...prev,
+      [provider]: {
+        ...prev[provider],
+        ...patch,
+      },
+    }));
+
+  const getProviderDraft = (provider: OAuthProviderItem): OAuthProviderDraft =>
+    providerDrafts[provider.key] ?? {
+      enabled: provider.enabled,
+      client_id: provider.client_id ?? "",
+      client_secret: "",
+    };
+
+  const clientIdLabel = (provider: string) =>
+    provider === "wechat" ? t("settings.oauthAppId") : t("settings.oauthClientId");
+
+  const clientSecretLabel = (provider: string) =>
+    provider === "wechat"
+      ? t("settings.oauthAppSecret")
+      : t("settings.oauthClientSecret");
+
+  const getProviderStatus = (provider: OAuthProviderItem, draft: OAuthProviderDraft) => {
+    if (draft.enabled) return t("settings.oauthStatusEnabled");
+    if (provider.is_configured) return t("settings.oauthStatusConfigured");
+    return t("settings.oauthStatusEmpty");
+  };
+
+  const providerMissingFields = (provider: OAuthProviderItem, draft: OAuthProviderDraft) => {
+    if (!draft.enabled) return false;
+    return !draft.client_id.trim() || (!draft.client_secret.trim() && !provider.has_secret);
+  };
+
+  const handleSaveProvider = (provider: OAuthProviderItem) => {
+    const draft = getProviderDraft(provider);
+    setProviderTouched((prev) => ({ ...prev, [provider.key]: true }));
+
+    if (draft.enabled && !provider.site_url_valid) {
+      toast.error(t("settings.oauthSiteUrlInvalid"));
+      return;
+    }
+    if (providerMissingFields(provider, draft)) {
+      toast.error(t("settings.oauthMissingFields"));
+      return;
+    }
+
+    saveProviderMutation.mutate({
+      provider: provider.key,
+      payload: draft,
+    });
+  };
 
   /* ── render ──────────────────────────────────────────── */
   return (
@@ -272,105 +411,245 @@ export default function SettingsPage() {
 
       {/* ── Auth ─────────────────────────────────────── */}
       {tab === "auth" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("settings.authDesc")}</CardTitle>
-          </CardHeader>
-          <CardContent className="divide-y">
-            <Preference
-              label={t("settings.twoFactor")}
-              hint={t("settings.twoFactorHint")}
-            >
-              <Switch
-                checked={boolOf("two_factor_required")}
-                onCheckedChange={() => toggleField("two_factor_required")}
-              />
-            </Preference>
-            <Preference label={t("settings.passwordMinLength")}>
-              <Input
-                value={form.password_min_length ?? ""}
-                onChange={(e) =>
-                  updateField("password_min_length", e.target.value)
-                }
-                placeholder="10"
-                className="w-20"
-              />
-            </Preference>
-            <Preference
-              label={t("settings.sessionTimeout")}
-              hint={t("settings.sessionTimeoutHint")}
-            >
-              <Input
-                value={form.session_timeout ?? ""}
-                onChange={(e) =>
-                  updateField("session_timeout", e.target.value)
-                }
-                placeholder="7d"
-                className="w-24"
-              />
-            </Preference>
-            <Preference
-              label={t("settings.oauthLogin")}
-              hint={t("settings.oauthLoginHint")}
-            >
-              <div className="flex items-center gap-2">
+        <div className="space-y-5">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("settings.authDesc")}</CardTitle>
+            </CardHeader>
+            <CardContent className="divide-y">
+              <Preference
+                label={t("settings.twoFactor")}
+                hint={t("settings.twoFactorHint")}
+              >
                 <Switch
-                  checked={boolOf("oauth_github_enabled")}
-                  onCheckedChange={() => toggleField("oauth_github_enabled")}
+                  checked={boolOf("two_factor_required")}
+                  onCheckedChange={() => toggleField("two_factor_required")}
                 />
-                <span className="text-[11px] text-muted-foreground">
-                  GitHub
-                </span>
+              </Preference>
+              <Preference label={t("settings.passwordMinLength")}>
+                <Input
+                  value={form.password_min_length ?? ""}
+                  onChange={(e) =>
+                    updateField("password_min_length", e.target.value)
+                  }
+                  placeholder="10"
+                  className="w-20"
+                />
+              </Preference>
+              <Preference
+                label={t("settings.sessionTimeout")}
+                hint={t("settings.sessionTimeoutHint")}
+              >
+                <Input
+                  value={form.session_timeout ?? ""}
+                  onChange={(e) =>
+                    updateField("session_timeout", e.target.value)
+                  }
+                  placeholder="7d"
+                  className="w-24"
+                />
+              </Preference>
+              <Preference
+                label={t("settings.allowGuestUpload")}
+                hint={t("settings.allowGuestUploadHint")}
+              >
                 <Switch
-                  checked={boolOf("oauth_google_enabled")}
-                  onCheckedChange={() => toggleField("oauth_google_enabled")}
+                  checked={boolOf("allow_guest_upload")}
+                  onCheckedChange={() => toggleField("allow_guest_upload")}
                 />
-                <span className="text-[11px] text-muted-foreground">
-                  Google
-                </span>
+              </Preference>
+              <Preference
+                label={t("settings.allowPublicGallery")}
+                hint={t("settings.allowPublicGalleryHint")}
+              >
+                <Switch
+                  checked={boolOf("allow_public_gallery")}
+                  onCheckedChange={() => toggleField("allow_public_gallery")}
+                />
+              </Preference>
+            </CardContent>
+            <CardFooter className="justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={resetForm}>
+                {t("settings.reset")}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => mutation.mutate()}
+                disabled={mutation.isPending}
+              >
+                {saved ? (
+                  <>
+                    <Check className="size-3.5" />
+                    {t("settings.saved")}
+                  </>
+                ) : mutation.isPending ? (
+                  t("settings.saving")
+                ) : (
+                  t("settings.saveSettings")
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("settings.oauthProvidersTitle")}</CardTitle>
+              <CardDescription>{t("settings.oauthProvidersHint")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {(providerList ?? []).map((provider) => {
+                  const draft = getProviderDraft(provider);
+                  const isPending =
+                    saveProviderMutation.isPending &&
+                    saveProviderMutation.variables?.provider === provider.key;
+                  const missing = providerTouched[provider.key] && providerMissingFields(provider, draft);
+                  return (
+                    <div
+                      key={provider.key}
+                      className="flex h-full flex-col rounded-xl border bg-background/70 p-4"
+                    >
+                      <div className="mb-4 flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <SocialProviderLogo
+                            provider={provider.icon_key}
+                            size={40}
+                            rounded="rounded-lg"
+                          />
+                          <div>
+                            <div className="text-sm font-medium">
+                              {provider.label}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {provider.protocol}
+                            </div>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={draft.enabled ? "secondary" : "outline"}
+                          className="text-[10px]"
+                        >
+                          {getProviderStatus(provider, draft)}
+                        </Badge>
+                      </div>
+
+                      {!provider.site_url_valid && (
+                        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+                          {t("settings.oauthSiteUrlInvalid")}
+                        </div>
+                      )}
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2.5">
+                          <div>
+                            <div className="text-sm font-medium">
+                              {t("settings.oauthEnable")}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {t("settings.oauthEnableHint")}
+                            </div>
+                          </div>
+                          <Switch
+                            checked={draft.enabled}
+                            onCheckedChange={(checked) =>
+                              updateProviderDraft(provider.key, { enabled: checked })
+                            }
+                          />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>{clientIdLabel(provider.key)}</Label>
+                          <Input
+                            value={draft.client_id}
+                            onChange={(e) =>
+                              updateProviderDraft(provider.key, {
+                                client_id: e.target.value,
+                              })
+                            }
+                            className={cn(missing && !draft.client_id.trim() && "border-red-500")}
+                            placeholder={provider.key === "wechat" ? "wx123..." : "client-id"}
+                          />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>{clientSecretLabel(provider.key)}</Label>
+                          <Input
+                            type="password"
+                            value={draft.client_secret}
+                            onChange={(e) =>
+                              updateProviderDraft(provider.key, {
+                                client_secret: e.target.value,
+                              })
+                            }
+                            className={cn(
+                              missing &&
+                                !draft.client_secret.trim() &&
+                                !provider.has_secret &&
+                                "border-red-500"
+                            )}
+                            placeholder={
+                              provider.has_secret
+                                ? t("settings.oauthSecretConfigured")
+                                : provider.key === "wechat"
+                                  ? "app-secret"
+                                  : "client-secret"
+                            }
+                          />
+                          <div className="text-[11px] text-muted-foreground">
+                            {provider.has_secret
+                              ? t("settings.oauthSecretKeep")
+                              : t("settings.oauthSecretEmpty")}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>{t("settings.oauthCallbackUrl")}</Label>
+                          <div className="flex items-center gap-2">
+                            <Input value={provider.callback_url} readOnly className="font-mono text-xs" />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => {
+                                navigator.clipboard.writeText(provider.callback_url);
+                                toast.success(t("toast.copied"));
+                              }}
+                            >
+                              <Copy className="size-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>{t("settings.oauthScopes")}</Label>
+                          <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                            {provider.scopes.join(" ")}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex justify-end">
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveProvider(provider)}
+                          disabled={isPending}
+                        >
+                          {isPending && <Loader2 className="size-4 animate-spin" />}
+                          {t("settings.saveProvider")}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {providerList == null &&
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <Skeleton key={index} className="h-[320px] rounded-xl" />
+                  ))}
               </div>
-            </Preference>
-            <Preference
-              label={t("settings.allowGuestUpload")}
-              hint={t("settings.allowGuestUploadHint")}
-            >
-              <Switch
-                checked={boolOf("allow_guest_upload")}
-                onCheckedChange={() => toggleField("allow_guest_upload")}
-              />
-            </Preference>
-            <Preference
-              label={t("settings.allowPublicGallery")}
-              hint={t("settings.allowPublicGalleryHint")}
-            >
-              <Switch
-                checked={boolOf("allow_public_gallery")}
-                onCheckedChange={() => toggleField("allow_public_gallery")}
-              />
-            </Preference>
-          </CardContent>
-          <CardFooter className="justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={resetForm}>
-              {t("settings.reset")}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
-            >
-              {saved ? (
-                <>
-                  <Check className="size-3.5" />
-                  {t("settings.saved")}
-                </>
-              ) : mutation.isPending ? (
-                t("settings.saving")
-              ) : (
-                t("settings.saveSettings")
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* ── Default storage ──────────────────────────── */}

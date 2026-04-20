@@ -19,13 +19,14 @@ import (
 )
 
 var (
-	ErrInvalidCredentials = errors.New("invalid username or password")
-	ErrUserInactive       = errors.New("user account is inactive")
-	ErrUserExists         = errors.New("username or email already exists")
-	ErrRegistrationClosed = errors.New("user registration is not allowed")
-	ErrTokenExpired       = errors.New("token has expired")
-	ErrTokenInvalid       = errors.New("invalid token")
-	ErrPasswordMismatch   = errors.New("current password is incorrect")
+	ErrInvalidCredentials  = errors.New("invalid username or password")
+	ErrUserInactive        = errors.New("user account is inactive")
+	ErrUserExists          = errors.New("username or email already exists")
+	ErrRegistrationClosed  = errors.New("user registration is not allowed")
+	ErrTokenExpired        = errors.New("token has expired")
+	ErrTokenInvalid        = errors.New("invalid token")
+	ErrPasswordMismatch    = errors.New("current password is incorrect")
+	ErrLocalPasswordNotSet = errors.New("local password is not set for this user")
 )
 
 // JWTClaims is the claim set carried inside the signed JWT.
@@ -71,16 +72,37 @@ func (s *AuthService) RegisterWithPolicy(ctx context.Context, username, email, p
 		return nil, ErrRegistrationClosed
 	}
 
-	return s.createUser(ctx, username, email, password, "user", false)
+	return s.createUser(ctx, username, email, password, "user", false, true, nil, nil)
 }
 
 // CreateStandardUser creates a regular active user account without consulting
 // the public self-registration switch. It is intended for administrator flows.
 func (s *AuthService) CreateStandardUser(ctx context.Context, username, email, password string) (*model.User, error) {
-	return s.createUser(ctx, username, email, password, "user", false)
+	return s.createUser(ctx, username, email, password, "user", false, true, nil, nil)
 }
 
-func (s *AuthService) createUser(ctx context.Context, username, email, password, role string, mustChange bool) (*model.User, error) {
+// CreateSocialUser creates a new active user that initially only supports
+// third-party login. The password hash is set to a random unusable value while
+// HasLocalPassword remains false until the user explicitly sets one.
+func (s *AuthService) CreateSocialUser(
+	ctx context.Context,
+	username, email string,
+	nickname, avatarURL *string,
+) (*model.User, error) {
+	randomPassword, err := generateRandomToken(32)
+	if err != nil {
+		return nil, fmt.Errorf("generate placeholder password: %w", err)
+	}
+	return s.createUser(ctx, username, email, randomPassword, "user", false, false, nickname, avatarURL)
+}
+
+func (s *AuthService) createUser(
+	ctx context.Context,
+	username, email, password, role string,
+	mustChange bool,
+	hasLocalPassword bool,
+	nickname, avatarURL *string,
+) (*model.User, error) {
 	exists, err := s.userRepo.ExistsByUsernameOrEmail(ctx, username, email)
 	if err != nil {
 		return nil, fmt.Errorf("register check exists: %w", err)
@@ -97,8 +119,11 @@ func (s *AuthService) createUser(ctx context.Context, username, email, password,
 	user := &model.User{
 		ID:                 uuid.New().String(),
 		Username:           username,
+		Nickname:           nickname,
 		Email:              email,
+		AvatarURL:          avatarURL,
 		PasswordHash:       string(hash),
+		HasLocalPassword:   hasLocalPassword,
 		Role:               role,
 		IsActive:           true,
 		PasswordMustChange: mustChange,
@@ -106,6 +131,12 @@ func (s *AuthService) createUser(ctx context.Context, username, email, password,
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
 		return nil, fmt.Errorf("register create user: %w", err)
+	}
+	if !hasLocalPassword {
+		user.HasLocalPassword = false
+		if err := s.userRepo.Update(ctx, user); err != nil {
+			return nil, fmt.Errorf("persist social password mode: %w", err)
+		}
 	}
 
 	return user, nil
@@ -124,6 +155,10 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*To
 
 	if !user.IsActive {
 		return nil, ErrUserInactive
+	}
+
+	if !user.HasLocalPassword {
+		return nil, ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
@@ -201,7 +236,7 @@ func (s *AuthService) CreateAPIToken(ctx context.Context, userID, name string, e
 // CreateAdminUser creates an administrator account (used by the setup wizard).
 // When mustChange is true the user must reset their credentials at first login before anything else.
 func (s *AuthService) CreateAdminUser(ctx context.Context, username, email, password string, mustChange bool) (*model.User, error) {
-	user, err := s.createUser(ctx, username, email, password, "admin", mustChange)
+	user, err := s.createUser(ctx, username, email, password, "admin", mustChange, true, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create admin user: %w", err)
 	}
@@ -261,6 +296,9 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPasswor
 	if err != nil {
 		return fmt.Errorf("get user: %w", err)
 	}
+	if !user.HasLocalPassword {
+		return ErrLocalPasswordNotSet
+	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
 		return ErrPasswordMismatch
 	}
@@ -269,8 +307,28 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPasswor
 		return fmt.Errorf("hash new password: %w", err)
 	}
 	user.PasswordHash = string(hash)
+	user.HasLocalPassword = true
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return fmt.Errorf("update password: %w", err)
+	}
+	return nil
+}
+
+// SetPassword sets the user's first local password without requiring a current
+// password. Used by accounts created through third-party login.
+func (s *AuthService) SetPassword(ctx context.Context, userID, newPassword string) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("get user: %w", err)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash new password: %w", err)
+	}
+	user.PasswordHash = string(hash)
+	user.HasLocalPassword = true
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return fmt.Errorf("set password: %w", err)
 	}
 	return nil
 }
@@ -306,12 +364,19 @@ func (s *AuthService) ResetFirstLoginCredentials(ctx context.Context, userID, ne
 	user.Username = newUsername
 	user.Email = newEmail
 	user.PasswordHash = string(hash)
+	user.HasLocalPassword = true
 	user.PasswordMustChange = false
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, fmt.Errorf("update user: %w", err)
 	}
 
+	return s.generateTokenPair(user)
+}
+
+// IssueTokenPair issues a fresh token pair for the given user without
+// re-authenticating a password flow. Used after third-party login succeeds.
+func (s *AuthService) IssueTokenPair(user *model.User) (*TokenPair, error) {
 	return s.generateTokenPair(user)
 }
 

@@ -25,6 +25,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 	}
 	if err := db.AutoMigrate(
 		&model.User{},
+		&model.UserIdentity{},
 		&model.Album{},
 		&model.APIToken{},
 		&model.File{},

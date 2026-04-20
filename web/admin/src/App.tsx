@@ -11,6 +11,8 @@ import { AuthLayout } from "@/components/layout";
 
 // Auth pages
 import LoginPage from "@/pages/login";
+import LoginCallbackPage from "@/pages/login-callback";
+import CompleteSocialPage from "@/pages/complete-social";
 import RegisterPage from "@/pages/register";
 import FirstLoginPage from "@/pages/first-login";
 
@@ -75,6 +77,8 @@ function AppRoutes() {
         {/* Auth (centered card) */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/login/callback" element={<LoginCallbackPage />} />
+          <Route path="/login/complete-social" element={<CompleteSocialPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
 

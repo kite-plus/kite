@@ -134,6 +134,7 @@ func main() {
 		StorageMgr:        storageMgr,
 		AuthSvc:           authSvc,
 		FileSvc:           fileSvc,
+		AuthConfig:        cfg.Auth,
 		SiteName:          cfg.Site.Name,
 		SiteURL:           cfg.Site.URL,
 		AllowRegistration: cfg.Auth.AllowRegistration,
@@ -182,6 +183,7 @@ func main() {
 func autoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&model.User{},
+		&model.UserIdentity{},
 		&model.File{},
 		&model.FileAccessLog{},
 		&model.Album{},

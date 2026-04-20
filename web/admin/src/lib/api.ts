@@ -43,16 +43,23 @@ api.interceptors.response.use(
 // Auth
 export const authApi = {
   options: () => api.get("/auth/options"),
+  exchangeOAuth: (ticket: string) => api.post("/auth/oauth/exchange", { ticket }),
+  onboardOAuth: (data: { ticket: string; username: string; email: string }) =>
+    api.post("/auth/oauth/onboard", data),
   login: (username: string, password: string) =>
     api.post("/auth/login", { username, password }),
   register: (username: string, email: string, password: string) =>
     api.post("/auth/register", { username, email, password }),
   logout: () => api.post("/auth/logout"),
   profile: () => api.get("/profile"),
+  identities: () => api.get("/auth/identities"),
+  unlinkIdentity: (provider: string) => api.delete(`/auth/identities/${provider}`),
   updateProfile: (data: { username: string; nickname?: string; email: string; avatar_url?: string }) =>
     api.put("/profile", data),
   changePassword: (data: { current_password: string; new_password: string }) =>
     api.post("/auth/change-password", data),
+  setPassword: (data: { new_password: string }) =>
+    api.post("/auth/set-password", data),
   firstLoginReset: (data: {
     new_username: string;
     new_email: string;
@@ -127,6 +134,14 @@ export const settingsApi = {
   get: () => api.get("/settings"),
   update: (settings: Record<string, string>) =>
     api.put("/settings", { settings }),
+};
+
+export const authProviderApi = {
+  list: () => api.get("/admin/auth/providers"),
+  update: (
+    provider: string,
+    data: { enabled: boolean; client_id: string; client_secret: string }
+  ) => api.put(`/admin/auth/providers/${provider}`, data),
 };
 
 // Admin Files
