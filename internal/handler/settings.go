@@ -78,6 +78,22 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		}
 		req.Settings[service.UploadMaxFileSizeMBSettingKey] = normalized
 	}
+	if raw, ok := req.Settings[service.UploadDangerousExtensionRulesSettingKey]; ok {
+		normalized, err := service.NormalizeDangerousExtensionRules(raw)
+		if err != nil {
+			BadRequest(c, "invalid upload.dangerous_extension_rules: "+err.Error())
+			return
+		}
+		req.Settings[service.UploadDangerousExtensionRulesSettingKey] = normalized
+	}
+	if raw, ok := req.Settings[service.UploadDangerousRenameSuffixSettingKey]; ok {
+		normalized, err := service.NormalizeDangerousRenameSuffix(raw)
+		if err != nil {
+			BadRequest(c, "invalid upload.dangerous_rename_suffix: "+err.Error())
+			return
+		}
+		req.Settings[service.UploadDangerousRenameSuffixSettingKey] = normalized
+	}
 	if raw, ok := req.Settings[service.SMTPPortSettingKey]; ok {
 		normalized, err := service.NormalizeSMTPPort(raw)
 		if err != nil {

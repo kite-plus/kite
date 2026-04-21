@@ -24,20 +24,21 @@ import (
 // Config carries all dependencies required to build the HTTP server. It is
 // populated by the cmd entry point before calling [Setup].
 type Config struct {
-	DB                *gorm.DB
-	StorageMgr        *storage.Manager
-	AuthSvc           *service.AuthService
-	FileSvc           *service.FileService
-	AuthConfig        config.AuthConfig
-	UploadPathPattern string
-	UploadMaxFileSize int64
-	SiteName          string
-	SiteURL           string
-	AllowRegistration bool
-	AdminFS           fs.FS  // Embedded SPA assets (web/admin/dist).
-	TemplateFS        fs.FS  // Embedded Go templates (web/template).
-	DataDir           string // Data directory backing the local storage driver.
-	ReloadStorage     func() // Rebuilds the storage manager after CRUD on storage configs.
+	DB                  *gorm.DB
+	StorageMgr          *storage.Manager
+	AuthSvc             *service.AuthService
+	FileSvc             *service.FileService
+	AuthConfig          config.AuthConfig
+	UploadPathPattern   string
+	UploadMaxFileSize   int64
+	UploadForbiddenExts []string
+	SiteName            string
+	SiteURL             string
+	AllowRegistration   bool
+	AdminFS             fs.FS  // Embedded SPA assets (web/admin/dist).
+	TemplateFS          fs.FS  // Embedded Go templates (web/template).
+	DataDir             string // Data directory backing the local storage driver.
+	ReloadStorage       func() // Rebuilds the storage manager after CRUD on storage configs.
 }
 
 // Setup constructs a fully wired gin.Engine: it creates the realtime metrics
@@ -60,7 +61,14 @@ func Setup(cfg Config) *gin.Engine {
 	storageRepo := repo.NewStorageConfigRepo(cfg.DB)
 	settingRepo := repo.NewSettingRepo(cfg.DB)
 	accessLogRepo := repo.NewFileAccessLogRepo(cfg.DB)
-	settingDefaults := service.DefaultSettings(cfg.SiteName, cfg.SiteURL, cfg.AllowRegistration, cfg.UploadPathPattern, cfg.UploadMaxFileSize)
+	settingDefaults := service.DefaultSettings(
+		cfg.SiteName,
+		cfg.SiteURL,
+		cfg.AllowRegistration,
+		cfg.UploadPathPattern,
+		cfg.UploadMaxFileSize,
+		cfg.UploadForbiddenExts,
+	)
 
 	oauthConfigSvc := service.NewOAuthConfigService(settingRepo, cfg.SiteURL)
 	socialAuthSvc := service.NewSocialAuthService(

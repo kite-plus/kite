@@ -20,6 +20,7 @@ import (
 )
 
 var settingsHandlerTestCounter int64
+var settingsHandlerForbiddenExts = []string{".exe", ".bat", ".cmd", ".sh", ".ps1"}
 
 func TestSettingsHandler_GetIncludesDefaultUploadPathPattern(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -29,7 +30,7 @@ func TestSettingsHandler_GetIncludesDefaultUploadPathPattern(t *testing.T) {
 		repo.NewSettingRepo(db),
 		repo.NewUserRepo(db),
 		nil,
-		service.DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024),
+		service.DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsHandlerForbiddenExts),
 	)
 
 	r := gin.New()
@@ -58,6 +59,12 @@ func TestSettingsHandler_GetIncludesDefaultUploadPathPattern(t *testing.T) {
 	}
 	if got := payload.Data[service.UploadMaxFileSizeMBSettingKey]; got != "100" {
 		t.Fatalf("unexpected default upload max size: %q", got)
+	}
+	if got := payload.Data[service.UploadDangerousExtensionRulesSettingKey]; got != `[{"ext":".exe","action":"block"},{"ext":".bat","action":"block"},{"ext":".cmd","action":"block"},{"ext":".sh","action":"block"},{"ext":".ps1","action":"block"}]` {
+		t.Fatalf("unexpected dangerous extension rules: %q", got)
+	}
+	if got := payload.Data[service.UploadDangerousRenameSuffixSettingKey]; got != service.DefaultDangerousRenameSuffixValue {
+		t.Fatalf("unexpected dangerous rename suffix: %q", got)
 	}
 	if got := payload.Data[service.AuthRateLimitPerMinuteSettingKey]; got != "20" {
 		t.Fatalf("unexpected default auth rate limit: %q", got)
@@ -92,7 +99,7 @@ func TestSettingsHandler_GetHidesSMTPPassword(t *testing.T) {
 		settingRepo,
 		repo.NewUserRepo(db),
 		nil,
-		service.DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024),
+		service.DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsHandlerForbiddenExts),
 	)
 
 	r := gin.New()
@@ -376,7 +383,7 @@ func TestSettingsHandler_TestEmailRejectsMissingSMTPConfig(t *testing.T) {
 		repo.NewSettingRepo(db),
 		repo.NewUserRepo(db),
 		service.NewEmailService(),
-		service.DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024),
+		service.DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsHandlerForbiddenExts),
 	)
 
 	r := gin.New()
@@ -480,6 +487,82 @@ func TestSettingsHandler_UpdateRejectsInvalidUploadPathPattern(t *testing.T) {
 	}
 	if payload.Message == "" {
 		t.Fatal("expected error message for invalid upload.path_pattern")
+	}
+}
+
+func TestSettingsHandler_UpdateAcceptsDangerousExtensionRules(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newSettingsHandlerTestDB(t)
+	settingRepo := repo.NewSettingRepo(db)
+	h := NewSettingsHandler(settingRepo, repo.NewUserRepo(db), nil, nil)
+
+	r := gin.New()
+	r.PUT("/settings", h.Update)
+
+	body := map[string]any{
+		"settings": map[string]string{
+			service.UploadDangerousExtensionRulesSettingKey: `[{"ext":" .EXE ","action":"rename"},{"ext":" .svg ","action":"block"}]`,
+			service.UploadDangerousRenameSuffixSettingKey:   " .SAFE ",
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT /settings status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	savedRules, err := settingRepo.Get(req.Context(), service.UploadDangerousExtensionRulesSettingKey)
+	if err != nil {
+		t.Fatalf("Get upload.dangerous_extension_rules: %v", err)
+	}
+	if savedRules != `[{"ext":".exe","action":"rename"},{"ext":".svg","action":"block"}]` {
+		t.Fatalf("unexpected dangerous rules: %q", savedRules)
+	}
+
+	savedSuffix, err := settingRepo.Get(req.Context(), service.UploadDangerousRenameSuffixSettingKey)
+	if err != nil {
+		t.Fatalf("Get upload.dangerous_rename_suffix: %v", err)
+	}
+	if savedSuffix != "safe" {
+		t.Fatalf("unexpected dangerous rename suffix: %q", savedSuffix)
+	}
+}
+
+func TestSettingsHandler_UpdateRejectsInvalidDangerousExtensionRules(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newSettingsHandlerTestDB(t)
+	h := NewSettingsHandler(repo.NewSettingRepo(db), repo.NewUserRepo(db), nil, nil)
+
+	r := gin.New()
+	r.PUT("/settings", h.Update)
+
+	body := map[string]any{
+		"settings": map[string]string{
+			service.UploadDangerousExtensionRulesSettingKey: `[{"ext":"exe","action":"noop"}]`,
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid dangerous rules, got %d", rec.Code)
 	}
 }
 

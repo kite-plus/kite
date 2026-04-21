@@ -6,8 +6,10 @@ import (
 	"time"
 )
 
+var settingsDefaultForbiddenExts = []string{".exe", ".bat", ".cmd", ".sh", ".ps1"}
+
 func TestResolveSettingsDerivesSiteDisplayDefaults(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsDefaultForbiddenExts)
 	overrides := map[string]string{
 		SiteNameSettingKey: "媒体仓库",
 	}
@@ -30,7 +32,7 @@ func TestResolveSettingsDerivesSiteDisplayDefaults(t *testing.T) {
 }
 
 func TestResolveSettingsKeepsBlankOptionalDisplayFields(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsDefaultForbiddenExts)
 	overrides := map[string]string{
 		SiteHeaderNavGitHubURLSettingKey: "",
 		SiteFooterTextSettingKey:         "",
@@ -47,7 +49,7 @@ func TestResolveSettingsKeepsBlankOptionalDisplayFields(t *testing.T) {
 }
 
 func TestResolveSettingsFallsBackToDefaultFaviconWhenBlank(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsDefaultForbiddenExts)
 	overrides := map[string]string{
 		SiteFaviconURLSettingKey: "   ",
 	}
@@ -60,7 +62,7 @@ func TestResolveSettingsFallsBackToDefaultFaviconWhenBlank(t *testing.T) {
 }
 
 func TestResolveSettingsIncludesUploadMaxFileSize(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsDefaultForbiddenExts)
 
 	got := ResolveSettings(defaults, map[string]string{
 		UploadMaxFileSizeMBSettingKey: "256",
@@ -72,7 +74,7 @@ func TestResolveSettingsIncludesUploadMaxFileSize(t *testing.T) {
 }
 
 func TestResolveSettingsIncludesDefaultQuota(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsDefaultForbiddenExts)
 
 	got := ResolveSettings(defaults, map[string]string{
 		DefaultQuotaSettingKey: "10 GB",
@@ -84,7 +86,7 @@ func TestResolveSettingsIncludesDefaultQuota(t *testing.T) {
 }
 
 func TestResolveSettingsIncludesRateLimitSettings(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsDefaultForbiddenExts)
 
 	got := ResolveSettings(defaults, map[string]string{
 		AuthRateLimitPerMinuteSettingKey:        "30",
@@ -100,7 +102,7 @@ func TestResolveSettingsIncludesRateLimitSettings(t *testing.T) {
 }
 
 func TestResolveSettingsIncludesSMTPDefaults(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsDefaultForbiddenExts)
 
 	got := ResolveSettings(defaults, nil)
 
@@ -109,5 +111,18 @@ func TestResolveSettingsIncludesSMTPDefaults(t *testing.T) {
 	}
 	if got[SMTPTLSSettingKey] != "false" {
 		t.Fatalf("unexpected smtp_tls: %q", got[SMTPTLSSettingKey])
+	}
+}
+
+func TestResolveSettingsIncludesDangerousExtensionDefaults(t *testing.T) {
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024, settingsDefaultForbiddenExts)
+
+	got := ResolveSettings(defaults, nil)
+
+	if got[UploadDangerousExtensionRulesSettingKey] != `[{"ext":".exe","action":"block"},{"ext":".bat","action":"block"},{"ext":".cmd","action":"block"},{"ext":".sh","action":"block"},{"ext":".ps1","action":"block"}]` {
+		t.Fatalf("unexpected upload.dangerous_extension_rules: %q", got[UploadDangerousExtensionRulesSettingKey])
+	}
+	if got[UploadDangerousRenameSuffixSettingKey] != DefaultDangerousRenameSuffixValue {
+		t.Fatalf("unexpected upload.dangerous_rename_suffix: %q", got[UploadDangerousRenameSuffixSettingKey])
 	}
 }

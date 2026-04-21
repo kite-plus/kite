@@ -76,6 +76,18 @@ func (r *FileRepo) GetByHashMD5(ctx context.Context, userID, hashMD5 string) (*m
 	return &file, nil
 }
 
+// ListByHashMD5 fetches all files matching the same owner and MD5 hash.
+func (r *FileRepo) ListByHashMD5(ctx context.Context, userID, hashMD5 string) ([]model.File, error) {
+	files := make([]model.File, 0)
+	if err := r.db.WithContext(ctx).
+		Where("user_id = ? AND hash_md5 = ? AND is_deleted = ?", userID, hashMD5, false).
+		Order("created_at ASC, id ASC").
+		Find(&files).Error; err != nil {
+		return nil, fmt.Errorf("list files by md5: %w", err)
+	}
+	return files, nil
+}
+
 // minHashPrefixLen is the minimum length of the short-link hash prefix.
 // 8 hex characters (32 bits) is enough to avoid enumeration and matches {md5_8} in path_pattern.
 const minHashPrefixLen = 8

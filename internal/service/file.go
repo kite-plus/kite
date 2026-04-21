@@ -126,15 +126,20 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 
 	// 4. Detect the real MIME type.
 	mtype := mimetype.Detect(data)
-	mimeType := mtype.String()
+	detectedMimeType := mtype.String()
 
-	// 5. Reject disallowed file types.
-	if err := s.checkFileType(mimeType, params.Filename); err != nil {
+	// 5. Resolve dangerous-extension policy before dedupe so blocked files are
+	// rejected immediately and renamed files do not accidentally reuse unsafe
+	// historical records.
+	effectiveName, mimeType, fileType, renameSuffix, isDangerousRenamed, err := s.resolveUploadIdentity(ctx, params.Filename, detectedMimeType)
+	if err != nil {
 		return nil, err
 	}
 
-	// 6. Classify the file type.
-	fileType := classifyFileType(mimeType)
+	// 6. Enforce the allow-list of MIME types, if any.
+	if err := s.checkAllowedMimeType(mimeType); err != nil {
+		return nil, err
+	}
 
 	// 7. Compute the MD5 hash.
 	hash := md5.Sum(data)
@@ -142,7 +147,7 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 
 	// 8. Deduplicate against existing uploads.
 	if !s.cfg.AllowDuplicate {
-		existing, err := s.fileRepo.GetByHashMD5(ctx, params.UserID, hashMD5)
+		existing, err := s.findDuplicateFile(ctx, params.UserID, hashMD5, isDangerousRenamed, renameSuffix)
 		if err == nil && existing != nil {
 			return &UploadResult{
 				File:  existing,
@@ -158,7 +163,7 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 	}
 
 	// 10. Build the storage key.
-	ext := strings.TrimPrefix(filepath.Ext(params.Filename), ".")
+	ext := strings.TrimPrefix(filepath.Ext(effectiveName), ".")
 	if ext == "" {
 		ext = mtype.Extension()
 		ext = strings.TrimPrefix(ext, ".")
@@ -212,7 +217,7 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		UserID:          params.UserID,
 		AlbumID:         params.AlbumID,
 		StorageConfigID: primary.Meta.ID,
-		OriginalName:    params.Filename,
+		OriginalName:    effectiveName,
 		StorageKey:      storageKey,
 		HashMD5:         hashMD5,
 		SizeBytes:       int64(len(data)),
@@ -472,16 +477,7 @@ func (s *FileService) GetFileByHash(ctx context.Context, hashPrefix string) (*mo
 	return file, nil
 }
 
-func (s *FileService) checkFileType(mimeType, filename string) error {
-	// Reject forbidden extensions.
-	ext := strings.ToLower(filepath.Ext(filename))
-	for _, forbidden := range s.cfg.ForbiddenExts {
-		if ext == forbidden {
-			return ErrFileTypeDenied
-		}
-	}
-
-	// Enforce the allow-list of MIME types, if any.
+func (s *FileService) checkAllowedMimeType(mimeType string) error {
 	if len(s.cfg.AllowedTypes) > 0 {
 		allowed := false
 		for _, prefix := range s.cfg.AllowedTypes {
@@ -496,6 +492,98 @@ func (s *FileService) checkFileType(mimeType, filename string) error {
 	}
 
 	return nil
+}
+
+func (s *FileService) resolveUploadIdentity(ctx context.Context, filename, detectedMimeType string) (effectiveName, mimeType, fileType, renameSuffix string, renamed bool, err error) {
+	settings := s.dangerousExtensionSettings(ctx)
+	decision, matched, err := DecideDangerousExtension(filename, settings.Rules, settings.RenameSuffix)
+	if err != nil {
+		return "", "", "", "", false, fmt.Errorf("upload resolve dangerous extension: %w", err)
+	}
+	if matched && decision.Action == DangerousExtensionActionBlock {
+		return "", "", "", "", false, ErrFileTypeDenied
+	}
+	if matched && decision.Action == DangerousExtensionActionRename {
+		return decision.SafeName, DangerousRenameMimeType, model.FileTypeFile, settings.RenameSuffix, true, nil
+	}
+	return filename, detectedMimeType, classifyFileType(detectedMimeType), settings.RenameSuffix, false, nil
+}
+
+func (s *FileService) dangerousExtensionSettings(ctx context.Context) dangerousExtensionSettings {
+	defaultRules := DefaultDangerousExtensionRules(s.cfg.ForbiddenExts)
+	defaultSuffix := DefaultDangerousRenameSuffixValue
+
+	if s.settingRepo == nil {
+		return dangerousExtensionSettings{
+			Rules:        ResolveDangerousExtensionRules(defaultRules, s.cfg.ForbiddenExts),
+			RenameSuffix: defaultSuffix,
+		}
+	}
+
+	rulesRaw, err := s.settingRepo.GetOrDefault(ctx, UploadDangerousExtensionRulesSettingKey, defaultRules)
+	if err != nil {
+		rulesRaw = defaultRules
+	}
+	suffixRaw, err := s.settingRepo.GetOrDefault(ctx, UploadDangerousRenameSuffixSettingKey, defaultSuffix)
+	if err != nil {
+		suffixRaw = defaultSuffix
+	}
+
+	return dangerousExtensionSettings{
+		Rules:        ResolveDangerousExtensionRules(rulesRaw, s.cfg.ForbiddenExts),
+		RenameSuffix: ResolveDangerousRenameSuffix(suffixRaw),
+	}
+}
+
+func (s *FileService) findDuplicateFile(ctx context.Context, userID, hashMD5 string, renamed bool, renameSuffix string) (*model.File, error) {
+	if !renamed {
+		return s.fileRepo.GetByHashMD5(ctx, userID, hashMD5)
+	}
+
+	files, err := s.fileRepo.ListByHashMD5(ctx, userID, hashMD5)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range files {
+		if isSafeDangerousDuplicate(&files[i], renameSuffix) {
+			return &files[i], nil
+		}
+	}
+
+	return nil, nil
+}
+
+func isSafeDangerousDuplicate(file *model.File, renameSuffix string) bool {
+	if file == nil {
+		return false
+	}
+
+	safeSuffix := ResolveDangerousRenameSuffix(renameSuffix)
+	if file.MimeType != DangerousRenameMimeType {
+		return false
+	}
+	if file.FileType != model.FileTypeFile {
+		return false
+	}
+	if file.ThumbURL != nil {
+		return false
+	}
+	if !strings.HasPrefix(file.URL, "/f/") {
+		return false
+	}
+	if strings.ToLower(strings.TrimPrefix(filepath.Ext(file.OriginalName), ".")) != safeSuffix {
+		return false
+	}
+	if strings.ToLower(strings.TrimPrefix(filepath.Ext(file.StorageKey), ".")) != safeSuffix {
+		return false
+	}
+	return true
+}
+
+type dangerousExtensionSettings struct {
+	Rules        []DangerousExtensionRule
+	RenameSuffix string
 }
 
 func (s *FileService) generateStorageKey(ctx context.Context, data UploadPathPatternData) (string, error) {

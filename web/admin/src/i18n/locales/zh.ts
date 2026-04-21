@@ -648,6 +648,25 @@ const zh: Translations = {
     uploadVarMd58: '文件 MD5 前 8 位',
     uploadVarUuid: '文件记录 UUID',
     uploadVarExt: '小写扩展名，缺失时回退为 bin',
+    dangerousExtensionsTitle: '危险后缀处理',
+    dangerousExtensionsHint:
+      '为危险扩展名单独指定处理方式。自动改名会同步影响页面展示名、下载名和底层对象扩展名。',
+    dangerousExtensionsRules: '规则列表',
+    dangerousExtensionsRulesHint:
+      '每条规则只匹配最后一段扩展名，例如 .exe 或 .svg。',
+    dangerousExtensionsAdd: '新增规则',
+    dangerousExtensionsExt: '扩展名',
+    dangerousExtensionsAction: '处理动作',
+    dangerousExtensionsActionBlock: '禁止上传',
+    dangerousExtensionsActionRename: '自动改名',
+    dangerousExtensionsDelete: '删除规则',
+    dangerousExtensionsEmpty: '当前没有规则，危险后缀将不再被额外处理。',
+    dangerousExtensionsSuffix: '安全后缀',
+    dangerousExtensionsSuffixHint:
+      '命中“自动改名”时会追加到原文件名末尾，例如 demo.exe.blocked。',
+    dangerousExtensionsPreview: '改名预览',
+    dangerousExtensionsPreviewHint:
+      '最终会同时作为展示名、下载名与对象扩展名使用。',
     rateLimitPerMinuteSuffix: '次/分钟',
     rateLimitAuthTitle: '认证接口限流',
     rateLimitAuthHint:

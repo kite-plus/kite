@@ -130,19 +130,20 @@ func main() {
 	}
 
 	engine := router.Setup(router.Config{
-		DB:                db,
-		StorageMgr:        storageMgr,
-		AuthSvc:           authSvc,
-		FileSvc:           fileSvc,
-		AuthConfig:        cfg.Auth,
-		UploadPathPattern: cfg.Upload.PathPattern,
-		UploadMaxFileSize: cfg.Upload.MaxFileSize,
-		SiteName:          cfg.Site.Name,
-		SiteURL:           cfg.Site.URL,
-		AllowRegistration: cfg.Auth.AllowRegistration,
-		AdminFS:           adminFS,
-		TemplateFS:        templateFS,
-		DataDir:           dataDir,
+		DB:                  db,
+		StorageMgr:          storageMgr,
+		AuthSvc:             authSvc,
+		FileSvc:             fileSvc,
+		AuthConfig:          cfg.Auth,
+		UploadPathPattern:   cfg.Upload.PathPattern,
+		UploadMaxFileSize:   cfg.Upload.MaxFileSize,
+		UploadForbiddenExts: cfg.Upload.ForbiddenExts,
+		SiteName:            cfg.Site.Name,
+		SiteURL:             cfg.Site.URL,
+		AllowRegistration:   cfg.Auth.AllowRegistration,
+		AdminFS:             adminFS,
+		TemplateFS:          templateFS,
+		DataDir:             dataDir,
 		ReloadStorage: func() {
 			reloadStorage(storageRepo, storageMgr)
 		},

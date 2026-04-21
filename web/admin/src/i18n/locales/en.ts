@@ -672,6 +672,26 @@ const en = {
     uploadVarMd58: 'First 8 characters of the MD5 hash',
     uploadVarUuid: 'File record UUID',
     uploadVarExt: 'Lowercase extension, falling back to bin when missing',
+    dangerousExtensionsTitle: 'Dangerous extension handling',
+    dangerousExtensionsHint:
+      'Configure per-extension actions for dangerous suffixes. Auto-rename also updates the displayed name, download name, and underlying object extension.',
+    dangerousExtensionsRules: 'Rules',
+    dangerousExtensionsRulesHint:
+      'Each rule matches only the final extension segment, for example .exe or .svg.',
+    dangerousExtensionsAdd: 'Add rule',
+    dangerousExtensionsExt: 'Extension',
+    dangerousExtensionsAction: 'Action',
+    dangerousExtensionsActionBlock: 'Block upload',
+    dangerousExtensionsActionRename: 'Auto rename',
+    dangerousExtensionsDelete: 'Delete rule',
+    dangerousExtensionsEmpty:
+      'No rules are configured right now, so dangerous suffixes will not receive extra handling.',
+    dangerousExtensionsSuffix: 'Safe suffix',
+    dangerousExtensionsSuffixHint:
+      'When auto rename is matched, this suffix is appended to the original filename, for example demo.exe.blocked.',
+    dangerousExtensionsPreview: 'Rename preview',
+    dangerousExtensionsPreviewHint:
+      'The rendered name is reused for display, downloads, and the object extension.',
     rateLimitPerMinuteSuffix: 'req/min',
     rateLimitAuthTitle: 'Auth endpoint limit',
     rateLimitAuthHint:

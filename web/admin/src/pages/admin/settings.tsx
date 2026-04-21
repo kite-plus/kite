@@ -11,6 +11,8 @@ import {
   Check,
   Copy,
   Loader2,
+  Plus,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -54,6 +56,7 @@ type Tab =
 
 const DEFAULT_UPLOAD_PATH_PATTERN = '{year}/{month}/{md5_8}/{uuid}.{ext}'
 const DEFAULT_UPLOAD_MAX_FILE_SIZE_MB = '100'
+const DEFAULT_DANGEROUS_RENAME_SUFFIX = 'blocked'
 const DEFAULT_AUTH_RATE_LIMIT_PER_MINUTE = '20'
 const DEFAULT_GUEST_UPLOAD_RATE_LIMIT_PER_MINUTE = '60'
 const DEFAULT_SMTP_PORT = '587'
@@ -62,12 +65,24 @@ const UNLIMITED_DEFAULT_QUOTA = '-1'
 const UPLOAD_SIZE_MB_BYTES = 1024 * 1024
 
 type QuotaUnit = 'MB' | 'GB' | 'TB'
+type DangerousExtensionAction = 'block' | 'rename'
 
 const QUOTA_UNIT_BYTES: Record<QuotaUnit, number> = {
   MB: 1024 ** 2,
   GB: 1024 ** 3,
   TB: 1024 ** 4,
 }
+
+const DEFAULT_DANGEROUS_EXTENSION_RULES: {
+  ext: string
+  action: DangerousExtensionAction
+}[] = [
+  { ext: '.exe', action: 'block' },
+  { ext: '.bat', action: 'block' },
+  { ext: '.cmd', action: 'block' },
+  { ext: '.sh', action: 'block' },
+  { ext: '.ps1', action: 'block' },
+]
 
 interface StorageListItem {
   id: string
@@ -101,6 +116,11 @@ interface OAuthProviderDraft {
   enabled: boolean
   client_id: string
   client_secret: string
+}
+
+interface DangerousExtensionRule {
+  ext: string
+  action: DangerousExtensionAction
 }
 
 function previewUploadPathPattern(pattern: string) {
@@ -140,6 +160,55 @@ function parseUploadMaxFileSizeMB(raw?: string) {
   )
   if (Number.isFinite(parsed) && parsed > 0) return parsed
   return Number.parseInt(DEFAULT_UPLOAD_MAX_FILE_SIZE_MB, 10)
+}
+
+function normalizeDangerousRuleExt(raw: string) {
+  const compact = raw.trim().toLowerCase().replace(/\s+/g, '')
+  if (!compact) return ''
+  return `.${compact.replace(/^\.+/, '')}`
+}
+
+function serializeDangerousExtensionRules(rules: DangerousExtensionRule[]) {
+  return JSON.stringify(
+    rules.map((rule) => ({
+      ext: normalizeDangerousRuleExt(rule.ext),
+      action: rule.action,
+    }))
+  )
+}
+
+function parseDangerousExtensionRules(raw?: string): DangerousExtensionRule[] {
+  const source = raw?.trim()
+  if (!source) return DEFAULT_DANGEROUS_EXTENSION_RULES
+
+  try {
+    const parsed = JSON.parse(source)
+    if (!Array.isArray(parsed)) return DEFAULT_DANGEROUS_EXTENSION_RULES
+    return parsed.map((item) => ({
+      ext: normalizeDangerousRuleExt(String(item?.ext ?? '')),
+      action:
+        item?.action === 'rename'
+          ? ('rename' as DangerousExtensionAction)
+          : ('block' as DangerousExtensionAction),
+    }))
+  } catch {
+    return DEFAULT_DANGEROUS_EXTENSION_RULES
+  }
+}
+
+function normalizeDangerousRenameSuffix(raw?: string) {
+  const compact = (raw ?? '').trim().replace(/^\.+/, '').toLowerCase()
+  return compact || DEFAULT_DANGEROUS_RENAME_SUFFIX
+}
+
+function previewDangerousRename(
+  ext: string,
+  suffix: string,
+  baseName: string = 'demo'
+) {
+  const normalizedExt = normalizeDangerousRuleExt(ext) || '.exe'
+  const normalizedSuffix = normalizeDangerousRenameSuffix(suffix)
+  return `${baseName}${normalizedExt}.${normalizedSuffix}`
 }
 
 function trimTrailingZeros(value: string) {
@@ -522,6 +591,16 @@ export default function SettingsPage() {
     form['upload.max_file_size_mb'] ?? DEFAULT_UPLOAD_MAX_FILE_SIZE_MB
   const uploadMaxFileSizeBytes =
     parseUploadMaxFileSizeMB(uploadMaxFileSizeMB) * UPLOAD_SIZE_MB_BYTES
+  const dangerousExtensionRules = parseDangerousExtensionRules(
+    form['upload.dangerous_extension_rules']
+  )
+  const dangerousRenameSuffix = normalizeDangerousRenameSuffix(
+    form['upload.dangerous_rename_suffix']
+  )
+  const dangerousExtensionPreview = previewDangerousRename(
+    dangerousExtensionRules[0]?.ext ?? '.exe',
+    dangerousRenameSuffix
+  )
   const authRateLimitPerMinute =
     form['rate_limit.auth_requests_per_minute'] ??
     DEFAULT_AUTH_RATE_LIMIT_PER_MINUTE
@@ -546,6 +625,39 @@ export default function SettingsPage() {
     { token: '{uuid}', description: t('settings.uploadVarUuid') },
     { token: '{ext}', description: t('settings.uploadVarExt') },
   ]
+
+  const updateDangerousExtensionRules = (rules: DangerousExtensionRule[]) =>
+    updateField(
+      'upload.dangerous_extension_rules',
+      serializeDangerousExtensionRules(rules)
+    )
+
+  const updateDangerousExtensionRule = (
+    index: number,
+    patch: Partial<DangerousExtensionRule>
+  ) => {
+    updateDangerousExtensionRules(
+      dangerousExtensionRules.map((rule, ruleIndex) =>
+        ruleIndex === index
+          ? {
+              ...rule,
+              ...patch,
+            }
+          : rule
+      )
+    )
+  }
+
+  const addDangerousExtensionRule = () =>
+    updateDangerousExtensionRules([
+      ...dangerousExtensionRules,
+      { ext: '.ext', action: 'block' },
+    ])
+
+  const removeDangerousExtensionRule = (index: number) =>
+    updateDangerousExtensionRules(
+      dangerousExtensionRules.filter((_, ruleIndex) => ruleIndex !== index)
+    )
 
   const updateProviderDraft = (
     provider: string,
@@ -1045,112 +1157,254 @@ export default function SettingsPage() {
       )}
 
       {tab === 'upload' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('settings.uploadDesc')}</CardTitle>
-            <CardDescription>{t('settings.uploadHint')}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid gap-2 sm:max-w-xs">
-              <Label htmlFor="upload-max-file-size">
-                {t('settings.uploadMaxFileSize')}
-              </Label>
-              <div className="flex items-center gap-2">
+        <div className="space-y-5">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('settings.uploadDesc')}</CardTitle>
+              <CardDescription>{t('settings.uploadHint')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-2 sm:max-w-xs">
+                <Label htmlFor="upload-max-file-size">
+                  {t('settings.uploadMaxFileSize')}
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="upload-max-file-size"
+                    type="number"
+                    min={1}
+                    step={1}
+                    inputMode="numeric"
+                    value={uploadMaxFileSizeMB}
+                    onChange={(e) =>
+                      updateField('upload.max_file_size_mb', e.target.value)
+                    }
+                    placeholder={t('settings.uploadMaxFileSizePlaceholder')}
+                  />
+                  <span className="text-sm text-muted-foreground">MB</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.uploadMaxFileSizeHint')}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.uploadMaxFileSizePreview').replace(
+                    '{size}',
+                    formatSize(uploadMaxFileSizeBytes)
+                  )}
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="upload-path-pattern">
+                  {t('settings.uploadPathPattern')}
+                </Label>
                 <Input
-                  id="upload-max-file-size"
-                  type="number"
-                  min={1}
-                  step={1}
-                  inputMode="numeric"
-                  value={uploadMaxFileSizeMB}
+                  id="upload-path-pattern"
+                  value={uploadPattern}
                   onChange={(e) =>
-                    updateField('upload.max_file_size_mb', e.target.value)
+                    updateField('upload.path_pattern', e.target.value)
                   }
-                  placeholder={t('settings.uploadMaxFileSizePlaceholder')}
+                  placeholder={t('settings.uploadPathPatternPlaceholder')}
+                  className="font-mono text-xs"
                 />
-                <span className="text-sm text-muted-foreground">MB</span>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.uploadPathPatternHint')}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t('settings.uploadMaxFileSizeHint')}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t('settings.uploadMaxFileSizePreview').replace(
-                  '{size}',
-                  formatSize(uploadMaxFileSizeBytes)
-                )}
-              </p>
-            </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="upload-path-pattern">
-                {t('settings.uploadPathPattern')}
-              </Label>
-              <Input
-                id="upload-path-pattern"
-                value={uploadPattern}
-                onChange={(e) =>
-                  updateField('upload.path_pattern', e.target.value)
-                }
-                placeholder={t('settings.uploadPathPatternPlaceholder')}
-                className="font-mono text-xs"
-              />
-              <p className="text-xs text-muted-foreground">
-                {t('settings.uploadPathPatternHint')}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm font-medium">
-                {t('settings.uploadPathPatternVariables')}
+              <div className="space-y-2">
+                <div className="text-sm font-medium">
+                  {t('settings.uploadPathPatternVariables')}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {uploadPatternVariables.map((item) => (
+                    <div
+                      key={item.token}
+                      className="flex items-start gap-2 rounded-lg border bg-muted/30 px-3 py-2"
+                    >
+                      <Badge variant="secondary" className="font-mono">
+                        {item.token}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {item.description}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {uploadPatternVariables.map((item) => (
-                  <div
-                    key={item.token}
-                    className="flex items-start gap-2 rounded-lg border bg-muted/30 px-3 py-2"
-                  >
-                    <Badge variant="secondary" className="font-mono">
-                      {item.token}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {item.description}
-                    </span>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">
+                  {t('settings.uploadPathPatternPreview')}
+                </div>
+                <code className="block overflow-x-auto rounded-lg border bg-muted/30 px-3 py-2 font-mono text-xs">
+                  {uploadPatternPreview}
+                </code>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('settings.dangerousExtensionsTitle')}</CardTitle>
+              <CardDescription>
+                {t('settings.dangerousExtensionsHint')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium">
+                      {t('settings.dangerousExtensionsRules')}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.dangerousExtensionsRulesHint')}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addDangerousExtensionRule}
+                  >
+                    <Plus className="mr-1 size-3.5" />
+                    {t('settings.dangerousExtensionsAdd')}
+                  </Button>
+                </div>
 
-            <div className="space-y-2">
-              <div className="text-sm font-medium">
-                {t('settings.uploadPathPatternPreview')}
+                <div className="space-y-3">
+                  {dangerousExtensionRules.map((rule, index) => (
+                    <div
+                      key={`${rule.ext}-${index}`}
+                      className="grid gap-3 rounded-xl border bg-muted/20 p-3 sm:grid-cols-[minmax(0,1fr)_180px_auto]"
+                    >
+                      <div className="grid gap-2">
+                        <Label htmlFor={`dangerous-ext-${index}`}>
+                          {t('settings.dangerousExtensionsExt')}
+                        </Label>
+                        <Input
+                          id={`dangerous-ext-${index}`}
+                          value={rule.ext}
+                          onChange={(e) =>
+                            updateDangerousExtensionRule(index, {
+                              ext: normalizeDangerousRuleExt(e.target.value),
+                            })
+                          }
+                          placeholder=".exe"
+                          className="font-mono text-xs"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor={`dangerous-action-${index}`}>
+                          {t('settings.dangerousExtensionsAction')}
+                        </Label>
+                        <Select
+                          value={rule.action}
+                          onValueChange={(value) =>
+                            updateDangerousExtensionRule(index, {
+                              action: value as DangerousExtensionAction,
+                            })
+                          }
+                        >
+                          <SelectTrigger id={`dangerous-action-${index}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="block">
+                              {t('settings.dangerousExtensionsActionBlock')}
+                            </SelectItem>
+                            <SelectItem value="rename">
+                              {t('settings.dangerousExtensionsActionRename')}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-end justify-end sm:justify-start">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeDangerousExtensionRule(index)}
+                          aria-label={t('settings.dangerousExtensionsDelete')}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {dangerousExtensionRules.length === 0 && (
+                    <div className="rounded-xl border border-dashed bg-muted/10 px-4 py-5 text-sm text-muted-foreground">
+                      {t('settings.dangerousExtensionsEmpty')}
+                    </div>
+                  )}
+                </div>
               </div>
-              <code className="block overflow-x-auto rounded-lg border bg-muted/30 px-3 py-2 font-mono text-xs">
-                {uploadPatternPreview}
-              </code>
-            </div>
-          </CardContent>
-          <CardFooter className="justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={resetForm}>
-              {t('settings.reset')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
-            >
-              {saved ? (
-                <>
-                  <Check className="size-3.5" />
-                  {t('settings.saved')}
-                </>
-              ) : mutation.isPending ? (
-                t('settings.saving')
-              ) : (
-                t('settings.saveSettings')
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
+
+              <div className="grid gap-2 sm:max-w-xs">
+                <Label htmlFor="dangerous-rename-suffix">
+                  {t('settings.dangerousExtensionsSuffix')}
+                </Label>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    .
+                  </span>
+                  <Input
+                    id="dangerous-rename-suffix"
+                    value={dangerousRenameSuffix}
+                    onChange={(e) =>
+                      updateField(
+                        'upload.dangerous_rename_suffix',
+                        normalizeDangerousRenameSuffix(e.target.value)
+                      )
+                    }
+                    placeholder={DEFAULT_DANGEROUS_RENAME_SUFFIX}
+                    className="font-mono text-xs"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.dangerousExtensionsSuffixHint')}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">
+                  {t('settings.dangerousExtensionsPreview')}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.dangerousExtensionsPreviewHint')}
+                </p>
+                <code className="block overflow-x-auto rounded-lg border bg-muted/30 px-3 py-2 font-mono text-xs">
+                  {dangerousExtensionPreview}
+                </code>
+              </div>
+            </CardContent>
+            <CardFooter className="justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={resetForm}>
+                {t('settings.reset')}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => mutation.mutate()}
+                disabled={mutation.isPending}
+              >
+                {saved ? (
+                  <>
+                    <Check className="size-3.5" />
+                    {t('settings.saved')}
+                  </>
+                ) : mutation.isPending ? (
+                  t('settings.saving')
+                ) : (
+                  t('settings.saveSettings')
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       )}
 
       {tab === 'rateLimit' && (

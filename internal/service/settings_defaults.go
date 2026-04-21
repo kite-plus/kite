@@ -32,7 +32,7 @@ const (
 
 // DefaultSettings returns the runtime-default settings used when the database
 // has not stored an override yet.
-func DefaultSettings(siteName, siteURL string, allowRegistration bool, uploadPathPattern string, uploadMaxFileSize int64) map[string]string {
+func DefaultSettings(siteName, siteURL string, allowRegistration bool, uploadPathPattern string, uploadMaxFileSize int64, forbiddenExts []string) map[string]string {
 	name := strings.TrimSpace(siteName)
 	if name == "" {
 		name = defaultSiteName
@@ -54,6 +54,8 @@ func DefaultSettings(siteName, siteURL string, allowRegistration bool, uploadPat
 		SMTPUsernameSettingKey:                  "",
 		UploadPathPatternSettingKey:             strings.TrimSpace(uploadPathPattern),
 		UploadMaxFileSizeMBSettingKey:           DefaultUploadMaxFileSizeMB(uploadMaxFileSize),
+		UploadDangerousExtensionRulesSettingKey: DefaultDangerousExtensionRules(forbiddenExts),
+		UploadDangerousRenameSuffixSettingKey:   DefaultDangerousRenameSuffixValue,
 		SiteKeywordsSettingKey:                  defaultSiteKeywords,
 		SiteFaviconURLSettingKey:                defaultSiteFaviconURL,
 		SiteHeaderNavGitHubURLSettingKey:        defaultSiteGitHubURL,
@@ -89,6 +91,8 @@ func ResolveSettings(defaults, overrides map[string]string) map[string]string {
 	merged[SMTPUsernameSettingKey] = resolveSettingValue(defaults, overrides, SMTPUsernameSettingKey, "", true)
 	merged[UploadPathPatternSettingKey] = resolveSettingValue(defaults, overrides, UploadPathPatternSettingKey, strings.TrimSpace(defaults[UploadPathPatternSettingKey]), false)
 	merged[UploadMaxFileSizeMBSettingKey] = resolveSettingValue(defaults, overrides, UploadMaxFileSizeMBSettingKey, strings.TrimSpace(defaults[UploadMaxFileSizeMBSettingKey]), false)
+	merged[UploadDangerousExtensionRulesSettingKey] = resolveDangerousExtensionRulesSetting(defaults, overrides)
+	merged[UploadDangerousRenameSuffixSettingKey] = resolveDangerousRenameSuffixSetting(defaults, overrides)
 
 	merged[SiteTitleSettingKey] = resolveSettingValue(defaults, overrides, SiteTitleSettingKey, fmt.Sprintf("%s - 自部署媒体托管系统", siteName), false)
 	merged[SiteKeywordsSettingKey] = resolveSettingValue(defaults, overrides, SiteKeywordsSettingKey, defaultSiteKeywords, true)
@@ -125,6 +129,64 @@ func resolveDefaultQuotaSetting(defaults, overrides map[string]string) string {
 		return DefaultQuotaSettingValue()
 	}
 	return normalized
+}
+
+func resolveDangerousExtensionRulesSetting(defaults, overrides map[string]string) string {
+	fallback := resolveSettingValue(
+		defaults,
+		nil,
+		UploadDangerousExtensionRulesSettingKey,
+		DefaultDangerousExtensionRules(nil),
+		false,
+	)
+
+	raw := resolveSettingValue(
+		defaults,
+		overrides,
+		UploadDangerousExtensionRulesSettingKey,
+		fallback,
+		false,
+	)
+
+	normalized, err := NormalizeDangerousExtensionRules(raw)
+	if err == nil {
+		return normalized
+	}
+
+	normalized, err = NormalizeDangerousExtensionRules(fallback)
+	if err == nil {
+		return normalized
+	}
+	return DefaultDangerousExtensionRules(nil)
+}
+
+func resolveDangerousRenameSuffixSetting(defaults, overrides map[string]string) string {
+	fallback := resolveSettingValue(
+		defaults,
+		nil,
+		UploadDangerousRenameSuffixSettingKey,
+		DefaultDangerousRenameSuffixValue,
+		false,
+	)
+
+	raw := resolveSettingValue(
+		defaults,
+		overrides,
+		UploadDangerousRenameSuffixSettingKey,
+		fallback,
+		false,
+	)
+
+	normalized, err := NormalizeDangerousRenameSuffix(raw)
+	if err == nil {
+		return normalized
+	}
+
+	normalized, err = NormalizeDangerousRenameSuffix(fallback)
+	if err == nil {
+		return normalized
+	}
+	return DefaultDangerousRenameSuffixValue
 }
 
 func firstNonEmptySetting(values ...string) string {
