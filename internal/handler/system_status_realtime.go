@@ -157,10 +157,11 @@ func (c *RealtimeSystemStatusCollector) Middleware() gin.HandlerFunc {
 			// Cache hit rate tracks conditional-GET effectiveness: a GET
 			// that returned 304 is a hit; a GET that returned 200 is a miss.
 			if ctx.Request.Method == http.MethodGet {
-				if status == http.StatusNotModified {
+				switch status {
+				case http.StatusNotModified:
 					atomic.AddUint64(&c.totals.cacheableReqs, 1)
 					atomic.AddUint64(&c.totals.cacheHits, 1)
-				} else if status == http.StatusOK {
+				case http.StatusOK:
 					atomic.AddUint64(&c.totals.cacheableReqs, 1)
 				}
 			}
