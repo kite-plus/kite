@@ -52,6 +52,9 @@ func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, setting
 		settings := loadResolvedSettings(c.Request.Context(), settingRepo, settingDefaults)
 		data := landingTemplateData(getOptionalUser(c, cfg.AuthSvc, userRepo), settings, "upload", "上传文件")
 		data["GuestUploadEnabled"] = strings.EqualFold(settings[service.AllowGuestUploadSettingKey], "true")
+		uploadMaxFileSizeBytes := resolveUploadMaxFileSizeBytes(settings, cfg.UploadMaxFileSize)
+		data["UploadMaxFileSizeBytes"] = uploadMaxFileSizeBytes
+		data["UploadMaxFileSizeLabel"] = formatUploadMaxFileSizeLabel(uploadMaxFileSizeBytes)
 		c.HTML(http.StatusOK, "upload.html", data)
 	})
 }

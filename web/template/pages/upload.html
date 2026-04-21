@@ -25,7 +25,7 @@
                     </svg>
                 </div>
                 <p class="text-gray-600 font-medium">拖拽文件到此处，或点击选择</p>
-                <p class="mt-1 text-sm text-gray-400">支持图片、视频、音频和文档</p>
+                <p class="mt-1 text-sm text-gray-400">支持图片、视频、音频和文档，单文件最大 {{.UploadMaxFileSizeLabel}}</p>
             </div>
 
             <div id="uploadList" class="mt-6 space-y-3 hidden"></div>
@@ -41,6 +41,7 @@
                 var uploadList = document.getElementById('uploadList');
                 var resultList = document.getElementById('resultList');
                 var toastContainer = document.getElementById('toastContainer');
+                var uploadMaxFileSize = Number({{.UploadMaxFileSizeBytes}});
 
                 window.showToast = function(type, message) {
                     var el = document.createElement('div');
@@ -72,7 +73,12 @@
                 dropZone.addEventListener('drop', function(e) { if(e.dataTransfer.files.length>0) handleFiles(e.dataTransfer.files); });
                 fileInput.addEventListener('change', function() { if(fileInput.files.length>0) handleFiles(fileInput.files); fileInput.value=''; });
 
-                function fmtSize(b) { if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(2)+' MB'; }
+                function fmtSize(b) {
+                    if (b < 1024) return b + ' B';
+                    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+                    if (b < 1073741824) return (b / 1048576).toFixed(2) + ' MB';
+                    return (b / 1073741824).toFixed(2) + ' GB';
+                }
                 function escHtml(s) {
                     var d = document.createElement('div');
                     d.textContent = s == null ? '' : String(s);
@@ -95,7 +101,27 @@
                         .replace(/</g, '\\x3C');
                 }
 
-                function handleFiles(files) { uploadList.classList.remove('hidden'); Array.from(files).forEach(uploadFile); }
+                function handleFiles(files) {
+                    var accepted = false;
+                    Array.from(files).forEach(function(file) {
+                        if (uploadMaxFileSize > 0 && file.size > uploadMaxFileSize) {
+                            showToast('error', file.name + ' 超过单文件大小上限（' + fmtSize(uploadMaxFileSize) + '）');
+                            return;
+                        }
+                        accepted = true;
+                        uploadFile(file);
+                    });
+                    if (accepted) uploadList.classList.remove('hidden');
+                }
+
+                function xhrMessage(xhr) {
+                    try {
+                        var payload = JSON.parse(xhr.responseText || '{}');
+                        return payload.message || (payload.data && payload.data.message) || '';
+                    } catch (_) {
+                        return '';
+                    }
+                }
 
                 function uploadFile(file) {
                     var id = 'f_' + Math.random().toString(36).slice(2,10);
@@ -111,32 +137,57 @@
                     var fd = new FormData(); fd.append('file', file);
                     var xhr = new XMLHttpRequest();
                     xhr.open('POST', '/api/v1/public/upload');
+                    function setUploadState(progress, label, isError) {
+                        var bar = document.getElementById(id + '_bar');
+                        var pct = document.getElementById(id + '_pct');
+                        if (bar) {
+                            bar.style.width = progress + '%';
+                            if (isError) {
+                                bar.classList.remove('bg-gray-900', 'bg-amber-500', 'animate-pulse');
+                                bar.classList.add('bg-red-500');
+                            } else {
+                                bar.classList.remove('bg-red-500');
+                            }
+                        }
+                        if (pct) pct.textContent = label;
+                    }
                     xhr.upload.onprogress = function(e) {
-                        if(e.lengthComputable) { var p=Math.round(e.loaded/e.total*100); document.getElementById(id+'_bar').style.width=p+'%'; document.getElementById(id+'_pct').textContent=p+'%'; }
+                        if (!e.lengthComputable) return;
+                        var p = Math.min(90, Math.round(e.loaded / e.total * 90));
+                        setUploadState(p, p + '%', false);
+                    };
+                    xhr.upload.onload = function() {
+                        var bar = document.getElementById(id + '_bar');
+                        if (bar) {
+                            bar.classList.remove('bg-gray-900');
+                            bar.classList.add('bg-amber-500', 'animate-pulse');
+                        }
+                        setUploadState(95, '处理中', false);
                     };
                     xhr.onload = function() {
+                        var bar = document.getElementById(id + '_bar');
+                        if (bar) bar.classList.remove('animate-pulse');
                         if(xhr.status===200) {
                             var res=JSON.parse(xhr.responseText);
                             if(res.status&&res.data) {
+                                setUploadState(100, '完成', false);
                                 document.getElementById(id).remove();
                                 if(uploadList.children.length===0) uploadList.classList.add('hidden');
                                 showResult(file.name, res.data);
                                 showToast('success', '上传成功：' + file.name);
                             } else {
-                                document.getElementById(id+'_pct').textContent='失败';
-                                document.getElementById(id+'_bar').classList.replace('bg-gray-900','bg-red-500');
-                                document.getElementById(id+'_bar').style.width='100%';
+                                setUploadState(100, '失败', true);
                                 showToast('error', '上传失败：' + (res.message || file.name));
                             }
                         } else {
-                            document.getElementById(id+'_pct').textContent='失败';
-                            document.getElementById(id+'_bar').classList.replace('bg-gray-900','bg-red-500');
-                            document.getElementById(id+'_bar').style.width='100%';
-                            showToast('error', '上传失败：' + file.name);
+                            setUploadState(100, '失败', true);
+                            showToast('error', xhrMessage(xhr) || ('上传失败：' + file.name));
                         }
                     };
                     xhr.onerror = function() {
-                        document.getElementById(id+'_pct').textContent='失败';
+                        var bar = document.getElementById(id + '_bar');
+                        if (bar) bar.classList.remove('animate-pulse');
+                        setUploadState(100, '失败', true);
                         showToast('error', '网络错误：' + file.name);
                     };
                     xhr.send(fd);
@@ -162,15 +213,80 @@
                     if(!val) return '';
                     return '<div class="rounded-lg bg-gray-50 px-3 py-2"><div class="flex items-start gap-2">'
                         + '<span class="w-20 shrink-0 pt-1 text-xs text-gray-400">'+label+'</span>'
-                        + '<div class="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">'
-                        + '<code class="block w-max min-w-full whitespace-nowrap bg-transparent text-sm text-gray-700">'+escHtml(val)+'</code>'
+                        + '<div data-copy="'+escAttr(val)+'" data-copy-label="'+escAttr(label)+'" onclick="copyValueFromElement(this)" title="点击复制" class="min-w-0 flex-1 overflow-x-auto rounded-md cursor-copy transition hover:bg-gray-100 active:bg-gray-200 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">'
+                        + '<code class="block w-max min-w-full whitespace-nowrap bg-transparent px-2 py-1 text-sm text-gray-700 pointer-events-none">'+escHtml(val)+'</code>'
                         + '</div>'
-                        + '<button data-copy="'+escAttr(val)+'" onclick="copyText(this)" class="text-xs text-gray-400 hover:text-gray-900 transition shrink-0 px-2 py-1 rounded hover:bg-gray-200">复制</button></div></div>';
+                        + '<button type="button" data-copy="'+escAttr(val)+'" data-copy-label="'+escAttr(label)+'" onclick="copyText(this, event)" class="text-xs text-gray-400 hover:text-gray-900 transition shrink-0 px-2 py-1 rounded hover:bg-gray-200">复制</button></div></div>';
                 }
 
-                window.copyText = function(btn) {
-                    var text = btn.getAttribute('data-copy') || '';
-                    navigator.clipboard.writeText(text).then(function() { var o=btn.textContent; btn.textContent='已复制'; setTimeout(function(){btn.textContent=o;},1500); });
+                function fallbackCopyText(text) {
+                    var textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.setAttribute('readonly', 'readonly');
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    textarea.style.pointerEvents = 'none';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    textarea.setSelectionRange(0, textarea.value.length);
+                    var copied = false;
+                    try {
+                        copied = document.execCommand('copy');
+                    } catch (_) {}
+                    document.body.removeChild(textarea);
+                    return copied;
+                }
+
+                function flashCopyButton(btn) {
+                    if (!btn) return;
+                    var original = btn.getAttribute('data-original-text') || btn.textContent;
+                    btn.setAttribute('data-original-text', original);
+                    btn.textContent = '已复制';
+                    btn.classList.add('text-green-700', 'bg-green-50');
+                    setTimeout(function() {
+                        btn.textContent = original;
+                        btn.classList.remove('text-green-700', 'bg-green-50');
+                    }, 1500);
+                }
+
+                function copyValue(text, label, btn) {
+                    var content = text || '';
+                    var copyLabel = label || '内容';
+                    if (!content) {
+                        showToast('error', '没有可复制的内容');
+                        return;
+                    }
+
+                    function onSuccess() {
+                        flashCopyButton(btn);
+                        showToast('success', copyLabel + '已复制');
+                    }
+
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(content).then(onSuccess).catch(function() {
+                            if (fallbackCopyText(content)) {
+                                onSuccess();
+                                return;
+                            }
+                            showToast('error', '复制失败，请手动复制');
+                        });
+                        return;
+                    }
+
+                    if (fallbackCopyText(content)) {
+                        onSuccess();
+                        return;
+                    }
+                    showToast('error', '复制失败，请手动复制');
+                }
+
+                window.copyValueFromElement = function(el) {
+                    copyValue(el.getAttribute('data-copy') || '', el.getAttribute('data-copy-label') || '内容');
+                };
+
+                window.copyText = function(btn, ev) {
+                    if (ev) ev.stopPropagation();
+                    copyValue(btn.getAttribute('data-copy') || '', btn.getAttribute('data-copy-label') || '内容', btn);
                 };
             })();
             </script>

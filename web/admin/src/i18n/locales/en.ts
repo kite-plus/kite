@@ -267,7 +267,9 @@ const en = {
     otherFiles: 'Other',
     deleteConfirm: 'Are you sure you want to delete this file?',
     supportedTypes: 'Images, videos, audio, and documents',
+    maxUploadSize: 'Maximum per file: {size}',
     completed: 'completed',
+    processing: 'Processing',
     clearDone: 'Clear done',
     failed: 'Failed',
     dimensions: 'Dimensions',
@@ -291,6 +293,7 @@ const en = {
     deleteFailed: 'Failed to delete file',
     uploadOneSuccess: '{name} uploaded',
     uploadOneFailed: '{name} upload failed',
+    uploadTooLarge: '{name} exceeds the per-file limit ({size})',
     linkCopied: 'Link copied',
     newFolder: 'New folder',
     selectedN: '{n} selected',
@@ -562,7 +565,7 @@ const en = {
     uploadTab: 'Upload',
     uploadDesc: 'Upload rules',
     uploadHint:
-      'Configure the storage path template used for future uploads. Changes apply immediately after saving.',
+      'Configure the per-file upload limit and storage path template used for future uploads. Changes apply immediately after saving.',
     auth: 'Auth',
     authDesc: 'Authentication & security',
     storageTab: 'Default storage',
@@ -624,6 +627,11 @@ const en = {
     allowRegistrationHint: 'Allow anyone to create an account',
     defaultQuota: 'Default quota',
     defaultQuotaHint: 'Initial storage for new users',
+    uploadMaxFileSize: 'Per-file size limit',
+    uploadMaxFileSizeHint:
+      'Applies to public uploads, signed-in uploads, and API uploads. Unit: MB.',
+    uploadMaxFileSizePlaceholder: '100',
+    uploadMaxFileSizePreview: 'Current effective size: {size}',
     uploadPathPattern: 'Path template',
     uploadPathPatternHint:
       'Use fixed variables to shape the storage key. The underlying filename stays decoupled from the original upload name.',

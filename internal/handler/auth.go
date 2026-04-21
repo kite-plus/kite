@@ -19,6 +19,7 @@ type AuthHandler struct {
 	userRepo                 *repo.UserRepo
 	settingRepo              *repo.SettingRepo
 	allowRegistrationDefault bool
+	uploadMaxFileSizeDefault int64
 }
 
 func NewAuthHandler(
@@ -28,6 +29,7 @@ func NewAuthHandler(
 	userRepo *repo.UserRepo,
 	settingRepo *repo.SettingRepo,
 	allowRegistrationDefault bool,
+	uploadMaxFileSizeDefault int64,
 ) *AuthHandler {
 	return &AuthHandler{
 		authSvc:                  authSvc,
@@ -36,6 +38,7 @@ func NewAuthHandler(
 		userRepo:                 userRepo,
 		settingRepo:              settingRepo,
 		allowRegistrationDefault: allowRegistrationDefault,
+		uploadMaxFileSizeDefault: uploadMaxFileSizeDefault,
 	}
 }
 
@@ -59,9 +62,22 @@ func (h *AuthHandler) Options(c *gin.Context) {
 			socialProviders = providers
 		}
 	}
+	uploadMaxFileSizeMB := service.DefaultUploadMaxFileSizeMB(h.uploadMaxFileSizeDefault)
+	uploadMaxFileSizeBytes := h.uploadMaxFileSizeDefault
+	if h.settingRepo != nil {
+		if saved, err := h.settingRepo.GetOrDefault(c.Request.Context(), service.UploadMaxFileSizeMBSettingKey, uploadMaxFileSizeMB); err == nil {
+			uploadMaxFileSizeMB = saved
+			if parsed, parseErr := service.ParseUploadMaxFileSizeBytes(saved); parseErr == nil {
+				uploadMaxFileSizeBytes = parsed
+			}
+		}
+	}
+
 	Success(c, gin.H{
-		"allow_registration": h.allowRegistration(c),
-		"social_providers":   socialProviders,
+		"allow_registration":         h.allowRegistration(c),
+		"social_providers":           socialProviders,
+		"upload_max_file_size_mb":    uploadMaxFileSizeMB,
+		"upload_max_file_size_bytes": uploadMaxFileSizeBytes,
 	})
 }
 

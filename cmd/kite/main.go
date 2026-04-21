@@ -136,6 +136,7 @@ func main() {
 		FileSvc:           fileSvc,
 		AuthConfig:        cfg.Auth,
 		UploadPathPattern: cfg.Upload.PathPattern,
+		UploadMaxFileSize: cfg.Upload.MaxFileSize,
 		SiteName:          cfg.Site.Name,
 		SiteURL:           cfg.Site.URL,
 		AllowRegistration: cfg.Auth.AllowRegistration,

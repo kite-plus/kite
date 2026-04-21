@@ -38,6 +38,8 @@ import { StorageLogo, resolveLogoVendor } from '@/components/storage-logo'
 type Tab = 'general' | 'site' | 'upload' | 'auth' | 'storage' | 'email'
 
 const DEFAULT_UPLOAD_PATH_PATTERN = '{year}/{month}/{md5_8}/{uuid}.{ext}'
+const DEFAULT_UPLOAD_MAX_FILE_SIZE_MB = '100'
+const UPLOAD_SIZE_MB_BYTES = 1024 * 1024
 
 interface StorageListItem {
   id: string
@@ -101,6 +103,15 @@ function previewDocumentTitle(siteTitle: string, pageTitle?: string) {
   const resolvedPageTitle = pageTitle?.trim()
   if (!resolvedPageTitle) return resolvedSiteTitle
   return `${resolvedPageTitle} - ${resolvedSiteTitle}`
+}
+
+function parseUploadMaxFileSizeMB(raw?: string) {
+  const parsed = Number.parseInt(
+    (raw ?? DEFAULT_UPLOAD_MAX_FILE_SIZE_MB).trim(),
+    10
+  )
+  if (Number.isFinite(parsed) && parsed > 0) return parsed
+  return Number.parseInt(DEFAULT_UPLOAD_MAX_FILE_SIZE_MB, 10)
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -223,6 +234,7 @@ export default function SettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] })
       queryClient.invalidateQueries({ queryKey: ['auth', 'providers'] })
+      queryClient.invalidateQueries({ queryKey: ['auth', 'options'] })
       setSaved(true)
       toast.success(t('settings.saved'))
       setTimeout(() => setSaved(false), 2000)
@@ -315,6 +327,10 @@ export default function SettingsPage() {
   const uploadPattern =
     form['upload.path_pattern'] ?? DEFAULT_UPLOAD_PATH_PATTERN
   const uploadPatternPreview = previewUploadPathPattern(uploadPattern)
+  const uploadMaxFileSizeMB =
+    form['upload.max_file_size_mb'] ?? DEFAULT_UPLOAD_MAX_FILE_SIZE_MB
+  const uploadMaxFileSizeBytes =
+    parseUploadMaxFileSizeMB(uploadMaxFileSizeMB) * UPLOAD_SIZE_MB_BYTES
   const siteName = (form.site_name ?? '').trim()
   const siteTitle = (form.site_title ?? '').trim() || siteName || 'Kite'
   const siteFaviconURL = (form.site_favicon_url ?? '').trim() || '/favicon.svg'
@@ -726,6 +742,36 @@ export default function SettingsPage() {
             <CardDescription>{t('settings.uploadHint')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            <div className="grid gap-2 sm:max-w-xs">
+              <Label htmlFor="upload-max-file-size">
+                {t('settings.uploadMaxFileSize')}
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="upload-max-file-size"
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={uploadMaxFileSizeMB}
+                  onChange={(e) =>
+                    updateField('upload.max_file_size_mb', e.target.value)
+                  }
+                  placeholder={t('settings.uploadMaxFileSizePlaceholder')}
+                />
+                <span className="text-sm text-muted-foreground">MB</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t('settings.uploadMaxFileSizeHint')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t('settings.uploadMaxFileSizePreview').replace(
+                  '{size}',
+                  formatSize(uploadMaxFileSizeBytes)
+                )}
+              </p>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="upload-path-pattern">
                 {t('settings.uploadPathPattern')}

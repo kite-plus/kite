@@ -35,7 +35,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		BadRequest(c, "file is required")
+		BadRequest(c, uploadMissingFileMessage)
 		return
 	}
 	defer file.Close()
@@ -54,16 +54,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		BaseURL:  RequestBaseURL(c),
 	})
 	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrFileTooLarge):
-			Fail(c, http.StatusRequestEntityTooLarge, 41300, err.Error())
-		case errors.Is(err, service.ErrFileTypeDenied):
-			Fail(c, http.StatusUnsupportedMediaType, 41500, err.Error())
-		case errors.Is(err, service.ErrStorageFull):
-			Fail(c, http.StatusInsufficientStorage, 50700, err.Error())
-		default:
-			ServerError(c, "upload failed")
-		}
+		respondUploadError(c, err, false)
 		return
 	}
 
@@ -88,7 +79,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 func (h *FileHandler) GuestUpload(c *gin.Context) {
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		BadRequest(c, "file is required")
+		BadRequest(c, uploadMissingFileMessage)
 		return
 	}
 	defer file.Close()
@@ -102,14 +93,7 @@ func (h *FileHandler) GuestUpload(c *gin.Context) {
 		BaseURL:  RequestBaseURL(c),
 	})
 	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrFileTooLarge):
-			Fail(c, http.StatusRequestEntityTooLarge, 41300, err.Error())
-		case errors.Is(err, service.ErrFileTypeDenied):
-			Fail(c, http.StatusUnsupportedMediaType, 41500, err.Error())
-		default:
-			ServerError(c, "upload failed")
-		}
+		respondUploadError(c, err, true)
 		return
 	}
 
@@ -469,6 +453,32 @@ func RequestBaseURL(c *gin.Context) string {
 		scheme = "http"
 	}
 	return scheme + "://" + c.Request.Host
+}
+
+const (
+	uploadMissingFileMessage    = "请选择要上传的文件"
+	uploadFileTooLargeMessage   = "文件超过单文件大小限制，请压缩后重试"
+	uploadFileTypeDeniedMessage = "该文件类型暂不支持上传"
+	uploadStorageFullMessage    = "存储空间不足，暂时无法上传"
+	uploadSaveFailedMessage     = "文件保存失败，请稍后重试"
+	guestUploadFailedMessage    = "上传处理失败，请稍后重试"
+)
+
+func respondUploadError(c *gin.Context, err error, isGuest bool) {
+	switch {
+	case errors.Is(err, service.ErrFileTooLarge):
+		Fail(c, http.StatusRequestEntityTooLarge, 41300, uploadFileTooLargeMessage)
+	case errors.Is(err, service.ErrFileTypeDenied):
+		Fail(c, http.StatusUnsupportedMediaType, 41500, uploadFileTypeDeniedMessage)
+	case errors.Is(err, service.ErrStorageFull):
+		Fail(c, http.StatusInsufficientStorage, 50700, uploadStorageFullMessage)
+	default:
+		if isGuest {
+			ServerError(c, guestUploadFailedMessage)
+			return
+		}
+		ServerError(c, uploadSaveFailedMessage)
+	}
 }
 
 func fileExtension(name string) string {

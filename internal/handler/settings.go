@@ -52,6 +52,14 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		}
 		req.Settings[service.UploadPathPatternSettingKey] = strings.TrimSpace(pattern)
 	}
+	if raw, ok := req.Settings[service.UploadMaxFileSizeMBSettingKey]; ok {
+		normalized, err := service.NormalizeUploadMaxFileSizeMB(raw)
+		if err != nil {
+			BadRequest(c, "invalid upload.max_file_size_mb: "+err.Error())
+			return
+		}
+		req.Settings[service.UploadMaxFileSizeMBSettingKey] = normalized
+	}
 
 	for _, key := range []string{
 		service.SiteNameSettingKey,

@@ -98,7 +98,8 @@ type FileLinks struct {
 // Upload runs the full upload pipeline.
 func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadResult, error) {
 	// 1. Enforce the per-file size limit.
-	if params.Size > s.cfg.MaxFileSize {
+	maxFileSize := s.maxFileSize(ctx)
+	if params.Size > maxFileSize {
 		return nil, ErrFileTooLarge
 	}
 
@@ -117,6 +118,9 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 	data, err := io.ReadAll(params.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("upload read file: %w", err)
+	}
+	if int64(len(data)) > maxFileSize {
+		return nil, ErrFileTooLarge
 	}
 
 	// 4. Detect the real MIME type.
@@ -511,6 +515,23 @@ func (s *FileService) generateStorageKey(ctx context.Context, data UploadPathPat
 	}
 
 	return RenderUploadPathPattern(normalized, data)
+}
+
+func (s *FileService) maxFileSize(ctx context.Context) int64 {
+	if s.settingRepo == nil {
+		return s.cfg.MaxFileSize
+	}
+
+	raw, err := s.settingRepo.GetOrDefault(ctx, UploadMaxFileSizeMBSettingKey, DefaultUploadMaxFileSizeMB(s.cfg.MaxFileSize))
+	if err != nil {
+		return s.cfg.MaxFileSize
+	}
+
+	maxBytes, err := ParseUploadMaxFileSizeBytes(raw)
+	if err != nil {
+		return s.cfg.MaxFileSize
+	}
+	return maxBytes
 }
 
 func (s *FileService) buildAccessURL(fileType, hashShort string) string {

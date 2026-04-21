@@ -7,7 +7,7 @@ import (
 )
 
 func TestResolveSettingsDerivesSiteDisplayDefaults(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}")
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
 	overrides := map[string]string{
 		SiteNameSettingKey: "媒体仓库",
 	}
@@ -30,7 +30,7 @@ func TestResolveSettingsDerivesSiteDisplayDefaults(t *testing.T) {
 }
 
 func TestResolveSettingsKeepsBlankOptionalDisplayFields(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}")
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
 	overrides := map[string]string{
 		SiteHeaderNavGitHubURLSettingKey: "",
 		SiteFooterTextSettingKey:         "",
@@ -47,7 +47,7 @@ func TestResolveSettingsKeepsBlankOptionalDisplayFields(t *testing.T) {
 }
 
 func TestResolveSettingsFallsBackToDefaultFaviconWhenBlank(t *testing.T) {
-	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}")
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
 	overrides := map[string]string{
 		SiteFaviconURLSettingKey: "   ",
 	}
@@ -56,5 +56,17 @@ func TestResolveSettingsFallsBackToDefaultFaviconWhenBlank(t *testing.T) {
 
 	if got[SiteFaviconURLSettingKey] != "/favicon.svg" {
 		t.Fatalf("expected default favicon url, got %q", got[SiteFaviconURLSettingKey])
+	}
+}
+
+func TestResolveSettingsIncludesUploadMaxFileSize(t *testing.T) {
+	defaults := DefaultSettings("Kite", "http://localhost:8080", true, "{year}/{month}/{md5_8}/{uuid}.{ext}", 100*1024*1024)
+
+	got := ResolveSettings(defaults, map[string]string{
+		UploadMaxFileSizeMBSettingKey: "256",
+	})
+
+	if got[UploadMaxFileSizeMBSettingKey] != "256" {
+		t.Fatalf("unexpected upload.max_file_size_mb: %q", got[UploadMaxFileSizeMBSettingKey])
 	}
 }

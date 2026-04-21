@@ -32,7 +32,7 @@ const (
 
 // DefaultSettings returns the runtime-default settings used when the database
 // has not stored an override yet.
-func DefaultSettings(siteName, siteURL string, allowRegistration bool, uploadPathPattern string) map[string]string {
+func DefaultSettings(siteName, siteURL string, allowRegistration bool, uploadPathPattern string, uploadMaxFileSize int64) map[string]string {
 	name := strings.TrimSpace(siteName)
 	if name == "" {
 		name = defaultSiteName
@@ -45,6 +45,7 @@ func DefaultSettings(siteName, siteURL string, allowRegistration bool, uploadPat
 		AllowGuestUploadSettingKey:       "false",
 		AllowPublicGallerySettingKey:     "false",
 		UploadPathPatternSettingKey:      strings.TrimSpace(uploadPathPattern),
+		UploadMaxFileSizeMBSettingKey:    DefaultUploadMaxFileSizeMB(uploadMaxFileSize),
 		SiteKeywordsSettingKey:           defaultSiteKeywords,
 		SiteFaviconURLSettingKey:         defaultSiteFaviconURL,
 		SiteHeaderNavGitHubURLSettingKey: defaultSiteGitHubURL,
@@ -71,6 +72,7 @@ func ResolveSettings(defaults, overrides map[string]string) map[string]string {
 	merged[AllowGuestUploadSettingKey] = resolveSettingValue(defaults, overrides, AllowGuestUploadSettingKey, strings.TrimSpace(defaults[AllowGuestUploadSettingKey]), false)
 	merged[AllowPublicGallerySettingKey] = resolveSettingValue(defaults, overrides, AllowPublicGallerySettingKey, strings.TrimSpace(defaults[AllowPublicGallerySettingKey]), false)
 	merged[UploadPathPatternSettingKey] = resolveSettingValue(defaults, overrides, UploadPathPatternSettingKey, strings.TrimSpace(defaults[UploadPathPatternSettingKey]), false)
+	merged[UploadMaxFileSizeMBSettingKey] = resolveSettingValue(defaults, overrides, UploadMaxFileSizeMBSettingKey, strings.TrimSpace(defaults[UploadMaxFileSizeMBSettingKey]), false)
 
 	merged[SiteTitleSettingKey] = resolveSettingValue(defaults, overrides, SiteTitleSettingKey, fmt.Sprintf("%s - 自部署媒体托管系统", siteName), false)
 	merged[SiteKeywordsSettingKey] = resolveSettingValue(defaults, overrides, SiteKeywordsSettingKey, defaultSiteKeywords, true)

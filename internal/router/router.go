@@ -30,6 +30,7 @@ type Config struct {
 	FileSvc           *service.FileService
 	AuthConfig        config.AuthConfig
 	UploadPathPattern string
+	UploadMaxFileSize int64
 	SiteName          string
 	SiteURL           string
 	AllowRegistration bool
@@ -59,7 +60,7 @@ func Setup(cfg Config) *gin.Engine {
 	storageRepo := repo.NewStorageConfigRepo(cfg.DB)
 	settingRepo := repo.NewSettingRepo(cfg.DB)
 	accessLogRepo := repo.NewFileAccessLogRepo(cfg.DB)
-	settingDefaults := service.DefaultSettings(cfg.SiteName, cfg.SiteURL, cfg.AllowRegistration, cfg.UploadPathPattern)
+	settingDefaults := service.DefaultSettings(cfg.SiteName, cfg.SiteURL, cfg.AllowRegistration, cfg.UploadPathPattern, cfg.UploadMaxFileSize)
 
 	oauthConfigSvc := service.NewOAuthConfigService(settingRepo, cfg.SiteURL)
 	socialAuthSvc := service.NewSocialAuthService(
@@ -72,7 +73,7 @@ func Setup(cfg Config) *gin.Engine {
 		cfg.AllowRegistration,
 	)
 
-	authHandler := handler.NewAuthHandler(cfg.AuthSvc, socialAuthSvc, oauthConfigSvc, userRepo, settingRepo, cfg.AllowRegistration)
+	authHandler := handler.NewAuthHandler(cfg.AuthSvc, socialAuthSvc, oauthConfigSvc, userRepo, settingRepo, cfg.AllowRegistration, cfg.UploadMaxFileSize)
 	fileHandler := handler.NewFileHandler(cfg.FileSvc, fileRepo, albumRepo, accessLogRepo)
 	albumHandler := handler.NewAlbumHandler(albumRepo, fileRepo)
 	tokenHandler := handler.NewTokenHandler(cfg.AuthSvc, tokenRepo)
