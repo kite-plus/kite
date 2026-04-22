@@ -30,10 +30,21 @@ var (
 )
 
 // JWTClaims is the claim set carried inside the signed JWT.
+//
+// PasswordMustChange mirrors the column of the same name on the user row.
+// The middleware reads it to block authenticated endpoints until the user
+// completes first-login reset — without this claim an attacker who guessed
+// the bootstrap admin/admin credentials could skip the reset page and go
+// straight to the API, leaving the account forever stuck with the default
+// password while still reachable from the outside world. We carry it in
+// the claim instead of hitting the DB on every request because the flag
+// only matters in a brief window at first login; ResetFirstLoginCredentials
+// issues a fresh pair the moment it's cleared.
 type JWTClaims struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID             string `json:"user_id"`
+	Username           string `json:"username"`
+	Role               string `json:"role"`
+	PasswordMustChange bool   `json:"password_must_change,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -438,9 +449,10 @@ func (s *AuthService) generateTokenPair(user *model.User) (*TokenPair, error) {
 	refreshExpiry := now.Add(s.cfg.RefreshTokenExpiry)
 
 	accessClaims := &JWTClaims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Role:     user.Role,
+		UserID:             user.ID,
+		Username:           user.Username,
+		Role:               user.Role,
+		PasswordMustChange: user.PasswordMustChange,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(accessExpiry),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -453,9 +465,10 @@ func (s *AuthService) generateTokenPair(user *model.User) (*TokenPair, error) {
 	}
 
 	refreshClaims := &JWTClaims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Role:     user.Role,
+		UserID:             user.ID,
+		Username:           user.Username,
+		Role:               user.Role,
+		PasswordMustChange: user.PasswordMustChange,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(refreshExpiry),
 			IssuedAt:  jwt.NewNumericDate(now),

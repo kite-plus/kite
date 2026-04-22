@@ -17,6 +17,22 @@ const (
 	ContextKeyRole     = "role"
 )
 
+// firstLoginAllowedRoutes enumerates the only endpoints a user with
+// password_must_change=true may reach. The entries match gin's registered
+// route pattern (c.FullPath), not the raw URL, so trailing slashes and
+// path parameters can't be used to sidestep the gate.
+//
+// Intentionally minimal:
+//   - /api/v1/profile        lets the SPA discover who it is logged in as
+//     and render the first-login screen.
+//   - /api/v1/auth/first-login-reset   the actual reset.
+//   - /api/v1/auth/logout    escape hatch; must stay reachable.
+var firstLoginAllowedRoutes = map[string]struct{}{
+	"/api/v1/profile":                {},
+	"/api/v1/auth/first-login-reset": {},
+	"/api/v1/auth/logout":            {},
+}
+
 // Auth returns a Gin middleware that authenticates the request using either a
 // JWT access token or a long-lived API token. JWT is tried first; on failure
 // the token is validated as an API token. On success the user ID, username
@@ -37,6 +53,25 @@ func Auth(authSvc *service.AuthService) gin.HandlerFunc {
 		// Try JWT first.
 		claims, err := authSvc.ValidateToken(token)
 		if err == nil {
+			// First-login gate: users that still carry the default
+			// bootstrap credentials can only reach the reset endpoint,
+			// their own profile (for the SPA to render), and logout.
+			// Without this the frontend router is the only thing stopping
+			// a curl'd request from using admin/admin credentials against
+			// every authenticated route. The claim comes from
+			// generateTokenPair, so a successful reset issues a fresh
+			// pair with the flag cleared.
+			if claims.PasswordMustChange {
+				if _, ok := firstLoginAllowedRoutes[c.FullPath()]; !ok {
+					c.JSON(http.StatusForbidden, gin.H{
+						"code":    40301,
+						"message": "please complete first-login reset before using the API",
+						"data":    nil,
+					})
+					c.Abort()
+					return
+				}
+			}
 			c.Set(ContextKeyUserID, claims.UserID)
 			c.Set(ContextKeyUsername, claims.Username)
 			c.Set(ContextKeyRole, claims.Role)

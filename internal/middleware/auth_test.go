@@ -181,6 +181,110 @@ func TestAdminOnly_RejectsNonAdmin(t *testing.T) {
 	}
 }
 
+// TestAuth_FirstLoginGate_BlocksNonAllowedRoute verifies that a user whose
+// JWT carries PasswordMustChange=true cannot call endpoints outside the
+// whitelist — without this backend gate, anyone holding the default
+// admin/admin bootstrap credentials could skip the reset UI by hitting the
+// API directly and use the account indefinitely.
+func TestAuth_FirstLoginGate_BlocksNonAllowedRoute(t *testing.T) {
+	db := newMiddlewareTestDB(t)
+	svc := newAuthSvc(db)
+	// CreateAdminUser with mustChange=true mirrors the bootstrap seeding
+	// path in cmd/kite/main.go that creates the default admin account.
+	if _, err := svc.CreateAdminUser(context.Background(), "boot", "boot@example.com", "admin", true); err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	pair, err := svc.Login(context.Background(), "boot", "admin")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	r := setupAuthRouter(svc)
+	// /secured is a generic authed route, not on the first-login whitelist.
+	req := httptest.NewRequest(http.MethodGet, "/secured", nil)
+	req.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("code = %d, want 403 (first-login gate)", w.Code)
+	}
+}
+
+// TestAuth_FirstLoginGate_AllowsWhitelistedRoutes verifies that the three
+// endpoints a first-login user must be able to hit — /profile,
+// /auth/first-login-reset, /auth/logout — pass through. The test registers
+// matching stub routes because the middleware keys off the gin route
+// pattern rather than the URL string.
+func TestAuth_FirstLoginGate_AllowsWhitelistedRoutes(t *testing.T) {
+	db := newMiddlewareTestDB(t)
+	svc := newAuthSvc(db)
+	if _, err := svc.CreateAdminUser(context.Background(), "boot2", "boot2@example.com", "admin", true); err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	pair, err := svc.Login(context.Background(), "boot2", "admin")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	ok := func(c *gin.Context) { c.Status(http.StatusOK) }
+	r.GET("/api/v1/profile", Auth(svc), ok)
+	r.POST("/api/v1/auth/first-login-reset", Auth(svc), ok)
+	r.POST("/api/v1/auth/logout", Auth(svc), ok)
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{"profile", http.MethodGet, "/api/v1/profile"},
+		{"first-login-reset", http.MethodPost, "/api/v1/auth/first-login-reset"},
+		{"logout", http.MethodPost, "/api/v1/auth/logout"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			req.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != http.StatusOK {
+				t.Fatalf("%s: code=%d want 200; body=%s", tc.name, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// TestAuth_FirstLoginGate_PassesAfterReset verifies that once
+// ResetFirstLoginCredentials clears the flag, the freshly issued token
+// pair no longer trips the first-login gate.
+func TestAuth_FirstLoginGate_PassesAfterReset(t *testing.T) {
+	db := newMiddlewareTestDB(t)
+	svc := newAuthSvc(db)
+	admin, err := svc.CreateAdminUser(context.Background(), "boot3", "boot3@example.com", "admin", true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	// Reset the credentials, which clears PasswordMustChange and returns a
+	// fresh pair carrying the updated claim.
+	pair, err := svc.ResetFirstLoginCredentials(context.Background(), admin.ID, "postboot", "postboot@example.com", "brand-new-pw")
+	if err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+
+	r := setupAuthRouter(svc)
+	req := httptest.NewRequest(http.MethodGet, "/secured", nil)
+	req.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200 after reset; body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestAdminOnly_AllowsAdmin(t *testing.T) {
 	db := newMiddlewareTestDB(t)
 	svc := newAuthSvc(db)
