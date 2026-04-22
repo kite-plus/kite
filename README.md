@@ -79,7 +79,7 @@ deploy/             docker-compose and nginx examples
 
 - Use [deploy/docker-compose.yml](deploy/docker-compose.yml) for a containerized setup.
 - Use [Dockerfile](Dockerfile) to build a standalone image.
-- Use [deploy/nginx/conf.d/demo.kite.plus.conf](deploy/nginx/conf.d/demo.kite.plus.conf) as a reverse-proxy reference.
+- Use [deploy/nginx/conf.d/www.kite.plus.conf](deploy/nginx/conf.d/www.kite.plus.conf) as a reverse-proxy reference.
 
 ## 🤝 Contributing
 

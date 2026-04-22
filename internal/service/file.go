@@ -76,7 +76,7 @@ type UploadParams struct {
 	Reader   io.Reader
 	Size     int64
 	IsGuest  bool   // when true, skip per-user quota checks (anonymous uploads)
-	BaseURL  string // request origin (e.g. "https://demo.kite.plus") used to build absolute links
+	BaseURL  string // request origin (e.g. "https://www.kite.plus") used to build absolute links
 }
 
 // UploadResult is the outcome of an upload.

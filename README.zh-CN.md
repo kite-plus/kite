@@ -79,7 +79,7 @@ deploy/             docker-compose 与 nginx 示例
 
 - 使用 [deploy/docker-compose.yml](deploy/docker-compose.yml) 快速容器化部署。
 - 使用 [Dockerfile](Dockerfile) 构建独立镜像。
-- 使用 [deploy/nginx/conf.d/demo.kite.plus.conf](deploy/nginx/conf.d/demo.kite.plus.conf) 作为反向代理参考。
+- 使用 [deploy/nginx/conf.d/www.kite.plus.conf](deploy/nginx/conf.d/www.kite.plus.conf) 作为反向代理参考。
 
 ## 🤝 参与贡献
 
