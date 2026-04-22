@@ -9,18 +9,37 @@ const api = axios.create({
   withCredentials: true,
 })
 
-// On 401, try exactly one silent refresh. The refresh endpoint reads the
-// refresh cookie server-side and rotates both cookies on success, so we
-// just need to retry the original request. We use the bare axios import
-// (not `api`) for the refresh call so this interceptor doesn't loop on
-// the refresh POST itself.
+// inflightRefresh serializes concurrent refreshes. When N requests 401 at
+// once (common after a page wakes from sleep with a stale access token),
+// we must NOT fire N parallel /auth/refresh calls — the first rotates the
+// refresh cookie, invalidating the token the others would present. Every
+// concurrent 401 awaits the same in-flight promise and then retries.
+let inflightRefresh: Promise<void> | null = null
+
+function refreshOnce(): Promise<void> {
+  if (!inflightRefresh) {
+    inflightRefresh = axios
+      .post('/api/v1/auth/refresh', {}, { withCredentials: true })
+      .then(() => undefined)
+      .finally(() => {
+        inflightRefresh = null
+      })
+  }
+  return inflightRefresh
+}
+
+// On 401, try exactly one silent refresh per request. The refresh endpoint
+// reads the refresh cookie server-side and rotates both cookies on success,
+// so we just need to retry the original request. We use the bare axios
+// import (not `api`) for the refresh call so this interceptor doesn't loop
+// on the refresh POST itself.
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     if (error.response?.status === 401 && !error.config?._retry) {
       error.config._retry = true
       try {
-        await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true })
+        await refreshOnce()
         return api(error.config)
       } catch {
         // Refresh failed — credentials are fully stale. Bounce to login
