@@ -135,7 +135,12 @@ func main() {
 	// operator would have no signal that the replica never completed.
 	// 30 minutes covers legitimate large-file replication comfortably while
 	// still surfacing true orphans before the next upload wave.
-	reconcileCtx, reconcileCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	//
+	// The scan is a single UPDATE against an indexed WHERE, so two minutes
+	// is plenty even against a cold MySQL/Postgres; use it rather than 30s
+	// so a slow DB round-trip doesn't clip the reconciliation and leave
+	// rows stuck until the next reboot.
+	reconcileCtx, reconcileCancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	if _, err := fileSvc.ReconcileStaleReplicas(reconcileCtx, 30*time.Minute); err != nil {
 		slog.Warn("replica reconciliation on startup failed", "err", err)
 	}
