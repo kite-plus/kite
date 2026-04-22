@@ -279,25 +279,15 @@ func (s *AuthService) CreateAdminUserWithStorageLimit(
 	return user, nil
 }
 
-// UpdateProfile updates the current user's profile fields (username, nickname, email, avatar).
-// Passwords are unchanged; username and email changes are checked for uniqueness.
-func (s *AuthService) UpdateProfile(ctx context.Context, userID, newUsername string, newNickname *string, newEmail string, newAvatarURL *string) (*model.User, error) {
+// UpdateProfile updates the mutable profile fields: nickname and avatar.
+// Username is immutable (identity anchor); email changes flow through
+// EmailChangeService so the user first proves ownership of the new address.
+func (s *AuthService) UpdateProfile(ctx context.Context, userID string, newNickname *string, newAvatarURL *string) (*model.User, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}
 
-	if newUsername != user.Username || newEmail != user.Email {
-		conflict, err := s.userRepo.ExistsByUsernameOrEmailExcept(ctx, newUsername, newEmail, userID)
-		if err != nil {
-			return nil, fmt.Errorf("check conflict: %w", err)
-		}
-		if conflict {
-			return nil, ErrUserExists
-		}
-	}
-
-	user.Username = newUsername
 	if newNickname != nil {
 		nickname := strings.TrimSpace(*newNickname)
 		if nickname == "" {
@@ -306,7 +296,6 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID, newUsername str
 			user.Nickname = &nickname
 		}
 	}
-	user.Email = newEmail
 	if newAvatarURL != nil {
 		avatar := strings.TrimSpace(*newAvatarURL)
 		if avatar == "" {

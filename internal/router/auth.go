@@ -32,6 +32,8 @@ func registerAuthAuthed(authed *gin.RouterGroup, h *handler.AuthHandler) {
 	authed.POST("/auth/change-password", h.ChangePassword)
 	authed.POST("/auth/set-password", h.SetPassword)
 	authed.POST("/auth/first-login-reset", h.FirstLoginReset)
+	authed.POST("/auth/email-change/request", h.RequestEmailChange)
+	authed.POST("/auth/email-change/confirm", h.ConfirmEmailChange)
 	authed.DELETE("/auth/identities/:provider", h.UnlinkIdentity)
 }
 

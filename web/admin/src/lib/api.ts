@@ -56,12 +56,11 @@ export const authApi = {
   identities: () => api.get('/auth/identities'),
   unlinkIdentity: (provider: string) =>
     api.delete(`/auth/identities/${provider}`),
-  updateProfile: (data: {
-    username: string
-    nickname?: string
-    email: string
-    avatar_url?: string
-  }) => api.put('/profile', data),
+  // Only nickname + avatar are mutable on the self-service profile endpoint.
+  // Username is immutable and email rotation goes through the verified flow
+  // exposed at /auth/email-change/*.
+  updateProfile: (data: { nickname?: string; avatar_url?: string }) =>
+    api.put('/profile', data),
   changePassword: (data: { current_password: string; new_password: string }) =>
     api.post('/auth/change-password', data),
   setPassword: (data: { new_password: string }) =>
@@ -71,6 +70,10 @@ export const authApi = {
     new_email: string
     new_password: string
   }) => api.post('/auth/first-login-reset', data),
+  requestEmailChange: (newEmail: string) =>
+    api.post('/auth/email-change/request', { new_email: newEmail }),
+  confirmEmailChange: (newEmail: string, code: string) =>
+    api.post('/auth/email-change/confirm', { new_email: newEmail, code }),
 }
 
 // Files

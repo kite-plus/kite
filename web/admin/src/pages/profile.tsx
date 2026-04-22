@@ -17,7 +17,7 @@ import {
   Link2,
 } from 'lucide-react'
 
-import { authApi, fileApi } from '@/lib/api'
+import { authApi, fileApi, statsApi } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { useI18n, localeLabels, type Locale } from '@/i18n'
 import { useTheme } from '@/components/theme-provider'
@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/dialog'
 import { PageHeader } from '@/components/page-header'
 import { SocialProviderLogo } from '@/components/social-provider-logo'
-import { cn } from '@/lib/utils'
+import { cn, formatSize } from '@/lib/utils'
 import { toast } from 'sonner'
 
 /* ─────────────────────────────────────────────────────────────
@@ -78,10 +78,10 @@ export default function ProfilePage() {
   const location = useLocation()
   const queryClient = useQueryClient()
 
+  // Username is immutable and email rotation goes through the verified
+  // flow in the dialog below; the self-serve form only edits these two.
   const [profileForm, setProfileForm] = useState({
-    username: user?.username ?? '',
     nickname: user?.nickname ?? '',
-    email: user?.email ?? '',
     avatarUrl: user?.avatar_url ?? '',
   })
   // Resync the form when the signed-in identity changes (e.g. after
@@ -93,20 +93,30 @@ export default function ProfilePage() {
   if (user && user.user_id !== syncedUserId) {
     setSyncedUserId(user.user_id)
     setProfileForm({
-      username: user.username ?? '',
       nickname: user.nickname ?? '',
-      email: user.email ?? '',
       avatarUrl: user.avatar_url ?? '',
     })
   }
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false)
+  // Email-change flow is a 2-step dialog: request a code (sent via SMTP to
+  // the target address) and then confirm it. Owning this state at the page
+  // level keeps the resend countdown alive across step transitions.
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false)
+  const [emailStep, setEmailStep] = useState<'request' | 'verify'>('request')
+  const [pendingNewEmail, setPendingNewEmail] = useState('')
+  const [emailCode, setEmailCode] = useState('')
+  const [resendAtMs, setResendAtMs] = useState<number | null>(null)
+  const [resendTickNow, setResendTickNow] = useState<number>(() => Date.now())
   const [tab, setTab] = useState<ProfileTab>('basic')
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   })
+  // Cache "now" at mount time so joined-days math stays idempotent
+  // during render (purity rule); one-day drift on a long session is fine.
+  const [mountedAtMs] = useState<number>(() => Date.now())
 
   // Preferences: locale-stored and read lazily (default on SSR-safe fallback).
   const [defaultView, setDefaultView] = useState<'grid' | 'list'>(() => {
@@ -131,6 +141,20 @@ export default function ProfilePage() {
     localStorage.setItem(EMAIL_NOTIFY_KEY, String(emailNotify))
   }, [emailNotify])
 
+  // Ticker that drives the resend cooldown countdown in the email dialog.
+  // The interval runs only while the dialog is open and a deadline is set,
+  // and it stops as soon as the deadline elapses.
+  useEffect(() => {
+    if (!emailDialogOpen || !resendAtMs) return
+    if (resendAtMs <= Date.now()) return
+    const id = window.setInterval(() => setResendTickNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [emailDialogOpen, resendAtMs])
+
+  const resendSecondsLeft = resendAtMs
+    ? Math.max(0, Math.ceil((resendAtMs - resendTickNow) / 1000))
+    : 0
+
   /* ── mutations ───────────────────────────────────────────── */
   const avatarUploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -139,9 +163,7 @@ export default function ProfilePage() {
       if (!uploaded) throw new Error('avatar upload did not return URL')
 
       await authApi.updateProfile({
-        username: profileForm.username,
         nickname: profileForm.nickname,
-        email: profileForm.email,
         avatar_url: uploaded,
       })
 
@@ -162,9 +184,7 @@ export default function ProfilePage() {
   const profileMutation = useMutation({
     mutationFn: () =>
       authApi.updateProfile({
-        username: profileForm.username,
         nickname: profileForm.nickname,
-        email: profileForm.email,
         avatar_url: profileForm.avatarUrl || undefined,
       }),
     onSuccess: async (res) => {
@@ -176,9 +196,7 @@ export default function ProfilePage() {
       if (tokens.access_token) await applyTokensAndRefresh(tokens)
       toast.success(t('profile.profileSaved'))
       setProfileForm({
-        username: updated.username,
         nickname: updated.nickname ?? '',
-        email: updated.email ?? '',
         avatarUrl: updated.avatar_url ?? '',
       })
     },
@@ -186,6 +204,50 @@ export default function ProfilePage() {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ?? t('profile.profileFailed')
+      toast.error(msg)
+    },
+  })
+
+  // Email-change mutations. RequestEmailChange sends a code via SMTP;
+  // ConfirmEmailChange redeems it and rotates the user's email. On success
+  // we rebuild the auth store so the display email updates without a
+  // second round trip.
+  const emailRequestMutation = useMutation({
+    mutationFn: (newEmail: string) => authApi.requestEmailChange(newEmail),
+    onSuccess: (res) => {
+      const data = res.data?.data as { resend_after_s?: number } | undefined
+      const after = data?.resend_after_s ?? 60
+      const now = Date.now()
+      setResendAtMs(now + after * 1000)
+      setResendTickNow(now)
+      setEmailStep('verify')
+      toast.success(t('profile.emailCodeSentToast'))
+    },
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? t('profile.emailRequestFailed')
+      toast.error(msg)
+    },
+  })
+
+  const emailConfirmMutation = useMutation({
+    mutationFn: (vars: { email: string; code: string }) =>
+      authApi.confirmEmailChange(vars.email, vars.code),
+    onSuccess: async () => {
+      const tokens = {
+        access_token: localStorage.getItem('access_token') ?? '',
+        refresh_token: localStorage.getItem('refresh_token') ?? '',
+      }
+      if (tokens.access_token) await applyTokensAndRefresh(tokens)
+      toast.success(t('profile.emailChangedToast'))
+      setEmailDialogOpen(false)
+      resetEmailDialog()
+    },
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? t('profile.emailConfirmFailed')
       toast.error(msg)
     },
   })
@@ -250,6 +312,24 @@ export default function ProfilePage() {
     enabled: !!user,
   })
 
+  interface StatsPayload {
+    total_files: number
+    total_size: number
+    images: number
+    videos: number
+    audios: number
+    others: number
+    images_size: number
+    videos_size: number
+    audios_size: number
+    others_size: number
+  }
+  const { data: statsData } = useQuery<StatsPayload>({
+    queryKey: ['stats', 'me'],
+    queryFn: () => statsApi.get().then((r) => r.data.data),
+    enabled: !!user && tab === 'basic',
+  })
+
   const unlinkMutation = useMutation({
     mutationFn: (provider: string) => authApi.unlinkIdentity(provider),
     onSuccess: () => {
@@ -267,11 +347,42 @@ export default function ProfilePage() {
   /* ── handlers ────────────────────────────────────────────── */
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!profileForm.username.trim() || !profileForm.email.trim()) {
-      toast.error(t('profile.allFieldsRequired'))
+    profileMutation.mutate()
+  }
+
+  const resetEmailDialog = () => {
+    setEmailStep('request')
+    setPendingNewEmail('')
+    setEmailCode('')
+    setResendAtMs(null)
+  }
+
+  const openEmailDialog = () => {
+    resetEmailDialog()
+    setEmailDialogOpen(true)
+  }
+
+  const handleEmailRequest = (e: React.FormEvent) => {
+    e.preventDefault()
+    const email = pendingNewEmail.trim()
+    if (!email) {
+      toast.error(t('profile.emailNewRequired'))
       return
     }
-    profileMutation.mutate()
+    if (email.toLowerCase() === (user?.email ?? '').toLowerCase()) {
+      toast.error(t('profile.emailSameAsCurrent'))
+      return
+    }
+    emailRequestMutation.mutate(email)
+  }
+
+  const handleEmailConfirm = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (emailCode.length < 4) {
+      toast.error(t('profile.emailCodeInvalid'))
+      return
+    }
+    emailConfirmMutation.mutate({ email: pendingNewEmail, code: emailCode })
   }
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
@@ -318,9 +429,7 @@ export default function ProfilePage() {
   const resetProfile = () => {
     if (!user) return
     setProfileForm({
-      username: user.username ?? '',
       nickname: user.nickname ?? '',
-      email: user.email ?? '',
       avatarUrl: user.avatar_url ?? '',
     })
   }
@@ -342,16 +451,6 @@ export default function ProfilePage() {
       return
     }
     navigate('/user/tokens')
-  }
-
-  const jumpToEmailField = () => {
-    setTab('basic')
-    window.setTimeout(() => {
-      const el = document.getElementById('email') as HTMLInputElement | null
-      if (!el) return
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      window.setTimeout(() => el.focus(), 120)
-    }, 80)
   }
 
   useEffect(() => {
@@ -380,7 +479,65 @@ export default function ProfilePage() {
   const hasLocalPassword =
     identityData?.has_local_password ?? user.has_local_password !== false
   const identities = identityData?.providers ?? []
+  const linkedCount = identities.filter((i) => i.bound).length
   const pendingProvider = unlinkMutation.variables
+
+  const storageLimit = user.storage_limit ?? 0
+  const storageUsed = user.storage_used ?? 0
+  const storageUnlimited = storageLimit <= 0
+
+  const joinedDays = user.created_at
+    ? Math.max(
+        1,
+        Math.floor(
+          (mountedAtMs - new Date(user.created_at).getTime()) /
+            (24 * 60 * 60 * 1000)
+        )
+      )
+    : null
+
+  // Per-type breakdown drives both the stacked bar and the legend list.
+  // `barColor` is a solid Tailwind class applied to the bar segment and the
+  // square swatch; order here controls both the bar order and list order.
+  const usageBreakdown = [
+    {
+      key: 'images',
+      label: t('profile.usageImages'),
+      count: statsData?.images ?? 0,
+      size: statsData?.images_size ?? 0,
+      barColor: 'bg-sky-500',
+    },
+    {
+      key: 'others',
+      label: t('profile.usageOthers'),
+      count: statsData?.others ?? 0,
+      size: statsData?.others_size ?? 0,
+      barColor: 'bg-emerald-500',
+    },
+    {
+      key: 'videos',
+      label: t('profile.usageVideos'),
+      count: statsData?.videos ?? 0,
+      size: statsData?.videos_size ?? 0,
+      barColor: 'bg-violet-500',
+    },
+    {
+      key: 'audios',
+      label: t('profile.usageAudios'),
+      count: statsData?.audios ?? 0,
+      size: statsData?.audios_size ?? 0,
+      barColor: 'bg-amber-500',
+    },
+  ]
+
+  const copyUserId = async () => {
+    try {
+      await navigator.clipboard.writeText(user.user_id)
+      toast.success(t('profile.metaUserIdCopied'))
+    } catch {
+      toast.error(t('profile.avatarUploadFailed'))
+    }
+  }
   const roleLabel =
     user.role === 'admin' ? t('nav.roleAdmin') : t('nav.roleUser')
   const tabs: { value: ProfileTab; label: string; icon: React.ElementType }[] =
@@ -409,29 +566,109 @@ export default function ProfilePage() {
       <ProfileTabPills tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === 'basic' && (
-        <div className="grid items-start gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-          <section className="rounded-xl border bg-gradient-to-br from-sky-500/10 via-background to-background p-6">
-            <div className="flex flex-col gap-6">
-              <div className="group relative w-fit">
-                <Avatar className="size-28 ring-4 ring-background shadow-sm">
-                  <AvatarImage
-                    src={profileForm.avatarUrl || user.avatar_url}
-                    alt={displayName}
-                    className="object-cover"
-                  />
-                  <AvatarFallback className="text-3xl font-semibold">
-                    {displayName.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+        <div className="space-y-3">
+          {/* ── Profile header: larger hero-style row with clickable avatar.
+               Both the avatar and the explicit button target the same hidden
+               file input, so either entry point opens the picker. */}
+          <section className="rounded-xl border bg-card p-5 sm:p-7">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 items-center gap-5">
                 <Label
                   htmlFor="avatar-file"
-                  className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                  aria-label={t('profile.changeAvatar')}
+                  className={cn(
+                    'group/avatar relative shrink-0 cursor-pointer rounded-full ring-2 ring-background transition-[box-shadow] focus-within:ring-ring focus-within:ring-offset-2',
+                    avatarUploadMutation.isPending && 'pointer-events-none'
+                  )}
+                >
+                  <Avatar className="size-20 transition-opacity group-hover/avatar:opacity-80 sm:size-24">
+                    <AvatarImage
+                      src={profileForm.avatarUrl || user.avatar_url}
+                      alt={displayName}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="text-3xl font-semibold">
+                      {displayName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Hover overlay with camera icon — absent at rest so the
+                      avatar reads cleanly, appears on hover/focus for the
+                      upload affordance. */}
+                  <div
+                    className={cn(
+                      'pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/45 text-white transition-opacity',
+                      avatarUploadMutation.isPending
+                        ? 'opacity-100'
+                        : 'opacity-0 group-hover/avatar:opacity-100'
+                    )}
+                  >
+                    {avatarUploadMutation.isPending ? (
+                      <Loader2 className="size-6 animate-spin" />
+                    ) : (
+                      <Camera className="size-6" strokeWidth={1.8} />
+                    )}
+                  </div>
+                </Label>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                    <h2 className="max-w-full truncate text-2xl font-semibold leading-tight tracking-tight">
+                      {displayName}
+                    </h2>
+                    <span className="truncate text-sm text-muted-foreground">
+                      @{user.username}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <Badge
+                      variant="outline"
+                      className="gap-1 rounded-md border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[12px] font-medium text-sky-700 dark:text-sky-300"
+                    >
+                      {roleLabel}
+                    </Badge>
+                    {/* User-ID badge doubles as the copy control — clicking
+                        it hits the clipboard handler with a toast. */}
+                    <button
+                      type="button"
+                      onClick={copyUserId}
+                      title={t('profile.metaUserIdCopy')}
+                      className="inline-flex rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Badge
+                        variant="secondary"
+                        className="rounded-md px-2 py-0.5 font-mono text-[12px] font-medium transition-colors hover:bg-secondary/80"
+                      >
+                        ID {user.user_id.slice(0, 8)}
+                      </Badge>
+                    </button>
+                    {joinedDays !== null && (
+                      <Badge
+                        variant="secondary"
+                        className="rounded-md px-2 py-0.5 text-[12px] font-medium"
+                      >
+                        {t('profile.joinedBadge').replace(
+                          '{n}',
+                          String(joinedDays)
+                        )}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="shrink-0 sm:ml-auto">
+                <Label
+                  htmlFor="avatar-file"
+                  className={cn(
+                    'inline-flex h-9 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border bg-background px-3 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground',
+                    avatarUploadMutation.isPending &&
+                      'pointer-events-none opacity-60'
+                  )}
                 >
                   {avatarUploadMutation.isPending ? (
-                    <Loader2 className="size-5 animate-spin" />
+                    <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    <Camera className="size-5" />
+                    <Camera className="size-4" />
                   )}
+                  {t('profile.changeAvatar')}
                 </Label>
                 <Input
                   id="avatar-file"
@@ -442,44 +679,138 @@ export default function ProfilePage() {
                   disabled={avatarUploadMutation.isPending}
                 />
               </div>
-
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                    {t('profile.displayName')}
-                  </p>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-tight">
-                    {displayName}
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    @{profileForm.username || user.username}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">{roleLabel}</Badge>
-                  <Badge variant={hasLocalPassword ? 'outline' : 'secondary'}>
-                    {hasLocalPassword
-                      ? t('profile.passwordRow')
-                      : t('profile.passwordUnset')}
-                  </Badge>
-                </div>
-              </div>
             </div>
           </section>
 
-          <section className="rounded-xl border bg-card p-6 sm:p-7">
-            <header className="mb-6">
-              <h3 className="text-base font-semibold tracking-tight">
-                {t('profile.basicInfo')}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t('profile.basicInfoCardDesc')}
-              </p>
-            </header>
+          {/* ── Two-col grid: storage/usage (narrow) · personal info form (wide) */}
+          <div className="grid gap-3 lg:grid-cols-[1fr_1.4fr]">
+            {/* Left: Storage & Usage */}
+            <section className="flex flex-col rounded-xl border bg-card p-4">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="text-sm font-semibold tracking-tight">
+                  {t('profile.storageUsageTitle')}
+                </h3>
+                <span className="text-xs text-muted-foreground">
+                  {storageUnlimited
+                    ? t('profile.storageUnlimited')
+                    : t('profile.storageUsedFmt')
+                        .replace('{used}', formatSize(storageUsed))
+                        .replace('{total}', formatSize(storageLimit))}
+                </span>
+              </div>
 
-            <form onSubmit={handleProfileSubmit} className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2">
+              {/* Headline number — the integer value is emphasized; the
+                  unit and file count trail in muted text. */}
+              <div className="mt-3 flex items-baseline gap-1.5">
+                {(() => {
+                  const total = statsData?.total_size ?? 0
+                  const [value, unit] = formatSize(total).split(' ')
+                  return (
+                    <>
+                      <span className="text-[28px] font-bold leading-none tabular-nums">
+                        {value}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {unit ?? ''}
+                        {' · '}
+                        {t('profile.usageFilesUnit').replace(
+                          '{n}',
+                          String(statsData?.total_files ?? 0)
+                        )}
+                      </span>
+                    </>
+                  )
+                })()}
+              </div>
+
+              {/* Stacked bar — renders only non-zero segments so a single
+                  dominant type doesn't pick up a phantom stripe. */}
+              {(() => {
+                const total = statsData?.total_size ?? 0
+                return (
+                  <div className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-muted">
+                    {total > 0 &&
+                      usageBreakdown
+                        .filter((item) => item.size > 0)
+                        .map((item) => (
+                          <div
+                            key={item.key}
+                            className={item.barColor}
+                            style={{
+                              width: `${(item.size / total) * 100}%`,
+                            }}
+                          />
+                        ))}
+                  </div>
+                )
+              })()}
+
+              {/* Legend list — colored square + label on left, size + count
+                  on right. Zero rows are dimmed for visual hierarchy. */}
+              <ul className="mt-4 space-y-2 text-[13px]">
+                {usageBreakdown.map((item) => {
+                  const empty = item.size === 0 && item.count === 0
+                  return (
+                    <li
+                      key={item.key}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={cn(
+                            'size-2.5 shrink-0 rounded-sm',
+                            empty ? 'bg-muted-foreground/30' : item.barColor
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            'truncate',
+                            empty && 'text-muted-foreground'
+                          )}
+                        >
+                          {item.label}
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          'shrink-0 tabular-nums',
+                          empty ? 'text-muted-foreground' : 'text-foreground'
+                        )}
+                      >
+                        {empty
+                          ? '0'
+                          : `${formatSize(item.size)} · ${item.count}`}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+
+              <div className="mt-auto border-t pt-3">
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-muted-foreground">
+                    {t('profile.linkedAccountsRow')}
+                  </span>
+                  <span className="font-medium tabular-nums">
+                    {linkedCount} / {Math.max(identities.length, 3)}
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            {/* Right: Personal info form */}
+            <section className="rounded-xl border bg-card p-4">
+              <header className="mb-4">
+                <h3 className="text-sm font-semibold tracking-tight">
+                  {t('profile.personalInfoTitle')}
+                </h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {t('profile.basicInfoCardDesc')}
+                </p>
+              </header>
+
+              <form onSubmit={handleProfileSubmit} className="space-y-3">
+                {/* Nickname — only truly editable field. */}
                 <div className="grid gap-1.5">
                   <Label
                     htmlFor="nickname"
@@ -500,29 +831,10 @@ export default function ProfilePage() {
                     placeholder={t('profile.nicknamePlaceholder')}
                   />
                 </div>
-                <div className="grid gap-1.5">
-                  <Label
-                    htmlFor="username"
-                    className="text-xs text-muted-foreground"
-                  >
-                    {t('auth.username')}
-                  </Label>
-                  <Input
-                    id="username"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    value={profileForm.username}
-                    onChange={(e) =>
-                      setProfileForm((p) => ({
-                        ...p,
-                        username: e.target.value,
-                      }))
-                    }
-                    minLength={3}
-                    maxLength={32}
-                    required
-                  />
-                </div>
+
+                {/* Email — read-only; change flow lives on the Security tab.
+                    Styled like a normal input (no muted bg) to match the
+                    mockup, with a subtle hint pointing users to security. */}
                 <div className="grid gap-1.5">
                   <Label
                     htmlFor="email"
@@ -532,47 +844,68 @@ export default function ProfilePage() {
                   </Label>
                   <Input
                     id="email"
-                    type="email"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    value={profileForm.email}
-                    onChange={(e) =>
-                      setProfileForm((p) => ({ ...p, email: e.target.value }))
-                    }
-                    placeholder={t('auth.emailPlaceholder')}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label
-                    htmlFor="registered"
-                    className="text-xs text-muted-foreground"
-                  >
-                    {t('profile.registered')}
-                  </Label>
-                  <Input
-                    id="registered"
-                    value={joinedDate}
+                    value={user.email ?? ''}
                     readOnly
-                    disabled
-                    className="bg-muted/40"
+                    aria-readonly="true"
                   />
+                  <p className="text-[11px] text-muted-foreground">
+                    {t('profile.emailChangeHint')}
+                  </p>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={resetProfile}>
-                  {t('profile.cancel')}
-                </Button>
-                <Button type="submit" disabled={profileMutation.isPending}>
-                  {profileMutation.isPending && (
-                    <Loader2 className="size-4 animate-spin" />
-                  )}
-                  {t('profile.save')}
-                </Button>
-              </div>
-            </form>
-          </section>
+                {/* Locked pair: username + registered-at, shown side-by-side
+                    with muted styling so they clearly read as immutable. */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-1.5">
+                    <Label
+                      htmlFor="username"
+                      className="text-xs text-muted-foreground"
+                    >
+                      {t('profile.usernameLockedLabel')}
+                    </Label>
+                    <Input
+                      id="username"
+                      value={user.username}
+                      readOnly
+                      disabled
+                      className="bg-muted/40"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label
+                      htmlFor="registered"
+                      className="text-xs text-muted-foreground"
+                    >
+                      {t('profile.registered')}
+                    </Label>
+                    <Input
+                      id="registered"
+                      value={joinedDate}
+                      readOnly
+                      disabled
+                      className="bg-muted/40"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-2 flex items-center justify-end gap-2 border-t pt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={resetProfile}
+                  >
+                    {t('profile.cancel')}
+                  </Button>
+                  <Button type="submit" disabled={profileMutation.isPending}>
+                    {profileMutation.isPending && (
+                      <Loader2 className="size-4 animate-spin" />
+                    )}
+                    {t('profile.save')}
+                  </Button>
+                </div>
+              </form>
+            </section>
+          </div>
         </div>
       )}
 
@@ -655,7 +988,7 @@ export default function ProfilePage() {
                   ? t('profile.backupEmailReplace')
                   : t('profile.backupEmailAdd')
               }
-              onAction={jumpToEmailField}
+              onAction={openEmailDialog}
             />
             <SecurityRow
               icon={Activity}
@@ -946,6 +1279,180 @@ export default function ProfilePage() {
                 {hasLocalPassword
                   ? t('profile.savePassword')
                   : t('profile.savePasswordSetup')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* —— Email change dialog —— */}
+      <Dialog
+        open={emailDialogOpen}
+        onOpenChange={(open) => {
+          setEmailDialogOpen(open)
+          // When the dialog closes (cancel, backdrop click, Esc) fully
+          // reset state so reopening always starts from the request step.
+          if (!open) resetEmailDialog()
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('profile.emailChangeTitle')}</DialogTitle>
+            <DialogDescription>
+              {emailStep === 'request'
+                ? t('profile.emailChangeDesc')
+                : t('profile.emailCodeDesc').replace(
+                    '{email}',
+                    pendingNewEmail
+                  )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={
+              emailStep === 'request' ? handleEmailRequest : handleEmailConfirm
+            }
+            className="grid gap-4"
+          >
+            {emailStep === 'request' ? (
+              <>
+                <div className="grid gap-1.5">
+                  <Label
+                    htmlFor="currentEmail"
+                    className="text-xs text-muted-foreground"
+                  >
+                    {t('profile.emailCurrent')}
+                  </Label>
+                  <Input
+                    id="currentEmail"
+                    value={user.email ?? ''}
+                    readOnly
+                    disabled
+                    className="bg-muted/40"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label
+                    htmlFor="newEmail"
+                    className="text-xs text-muted-foreground"
+                  >
+                    {t('profile.emailNew')}
+                  </Label>
+                  <Input
+                    id="newEmail"
+                    type="email"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    value={pendingNewEmail}
+                    onChange={(e) => setPendingNewEmail(e.target.value)}
+                    placeholder={t('profile.emailNewPlaceholder')}
+                    required
+                  />
+                </div>
+                <p className="flex items-start gap-2 rounded-md border bg-muted/30 p-2.5 text-[11px] text-muted-foreground">
+                  <ShieldCheck className="mt-0.5 size-3 shrink-0" />
+                  <span>{t('profile.emailChangeTip')}</span>
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="grid gap-1.5">
+                  <Label
+                    htmlFor="emailCode"
+                    className="text-xs text-muted-foreground"
+                  >
+                    {t('profile.emailCode')}
+                  </Label>
+                  <Input
+                    id="emailCode"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="\d*"
+                    maxLength={6}
+                    value={emailCode}
+                    onChange={(e) =>
+                      setEmailCode(
+                        e.target.value.replace(/\D/g, '').slice(0, 6)
+                      )
+                    }
+                    placeholder="——————"
+                    required
+                    className="text-center font-mono text-base tracking-[0.4em]"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                  <span className="truncate">
+                    {t('profile.emailCodeSent').replace(
+                      '{email}',
+                      pendingNewEmail
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={
+                      resendSecondsLeft > 0 || emailRequestMutation.isPending
+                    }
+                    onClick={() => emailRequestMutation.mutate(pendingNewEmail)}
+                    className={cn(
+                      'shrink-0 text-[11px] font-medium underline-offset-2',
+                      resendSecondsLeft > 0 || emailRequestMutation.isPending
+                        ? 'cursor-not-allowed text-muted-foreground'
+                        : 'text-foreground hover:underline'
+                    )}
+                  >
+                    {emailRequestMutation.isPending ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : resendSecondsLeft > 0 ? (
+                      t('profile.emailResendIn').replace(
+                        '{s}',
+                        String(resendSecondsLeft)
+                      )
+                    ) : (
+                      t('profile.emailResend')
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+
+            <DialogFooter>
+              {emailStep === 'verify' ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setEmailStep('request')
+                    setEmailCode('')
+                  }}
+                >
+                  {t('profile.emailBack')}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEmailDialogOpen(false)}
+                >
+                  {t('profile.cancel')}
+                </Button>
+              )}
+              <Button
+                type="submit"
+                disabled={
+                  emailStep === 'request'
+                    ? emailRequestMutation.isPending
+                    : emailConfirmMutation.isPending
+                }
+              >
+                {(emailStep === 'request'
+                  ? emailRequestMutation.isPending
+                  : emailConfirmMutation.isPending) && (
+                  <Loader2 className="size-4 animate-spin" />
+                )}
+                {emailStep === 'request'
+                  ? t('profile.emailSendCode')
+                  : t('profile.emailConfirm')}
               </Button>
             </DialogFooter>
           </form>

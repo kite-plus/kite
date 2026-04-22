@@ -16,6 +16,7 @@ type AuthHandler struct {
 	authSvc                  *service.AuthService
 	socialAuthSvc            *service.SocialAuthService
 	oauthConfigSvc           *service.OAuthConfigService
+	emailChangeSvc           *service.EmailChangeService
 	userRepo                 *repo.UserRepo
 	settingRepo              *repo.SettingRepo
 	allowRegistrationDefault bool
@@ -26,6 +27,7 @@ func NewAuthHandler(
 	authSvc *service.AuthService,
 	socialAuthSvc *service.SocialAuthService,
 	oauthConfigSvc *service.OAuthConfigService,
+	emailChangeSvc *service.EmailChangeService,
 	userRepo *repo.UserRepo,
 	settingRepo *repo.SettingRepo,
 	allowRegistrationDefault bool,
@@ -35,6 +37,7 @@ func NewAuthHandler(
 		authSvc:                  authSvc,
 		socialAuthSvc:            socialAuthSvc,
 		oauthConfigSvc:           oauthConfigSvc,
+		emailChangeSvc:           emailChangeSvc,
 		userRepo:                 userRepo,
 		settingRepo:              settingRepo,
 		allowRegistrationDefault: allowRegistrationDefault,
@@ -205,13 +208,13 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 }
 
 type updateProfileRequest struct {
-	Username  string  `json:"username" binding:"required,min=3,max=32"`
 	Nickname  *string `json:"nickname" binding:"omitempty,max=32"`
-	Email     string  `json:"email" binding:"required,email"`
 	AvatarURL *string `json:"avatar_url" binding:"omitempty,max=512"`
 }
 
-// UpdateProfile lets the current user update their username, nickname, email, and avatar.
+// UpdateProfile lets the current user update their mutable profile fields
+// (nickname and avatar). Username is immutable; email changes go through
+// the verified flow exposed at /auth/email-change/*.
 func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	var req updateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -220,12 +223,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	userID := c.GetString(middleware.ContextKeyUserID)
-	user, err := h.authSvc.UpdateProfile(c.Request.Context(), userID, req.Username, req.Nickname, req.Email, req.AvatarURL)
+	user, err := h.authSvc.UpdateProfile(c.Request.Context(), userID, req.Nickname, req.AvatarURL)
 	if err != nil {
-		if errors.Is(err, service.ErrUserExists) {
-			Fail(c, http.StatusConflict, 40900, err.Error())
-			return
-		}
 		ServerError(c, "update profile failed")
 		return
 	}
@@ -301,4 +300,99 @@ func (h *AuthHandler) FirstLoginReset(c *gin.Context) {
 
 	writeAccessTokenCookie(c, tokenPair.AccessToken, tokenPair.ExpiresAt)
 	Success(c, tokenPair)
+}
+
+type requestEmailChangeRequest struct {
+	NewEmail string `json:"new_email" binding:"required,email,max=254"`
+}
+
+// RequestEmailChange sends a verification code to the requested new email so
+// the caller can prove ownership before the address is rotated on the account.
+func (h *AuthHandler) RequestEmailChange(c *gin.Context) {
+	if h.emailChangeSvc == nil {
+		ServerError(c, "email change service unavailable")
+		return
+	}
+
+	var req requestEmailChangeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid email: "+err.Error())
+		return
+	}
+
+	userID := c.GetString(middleware.ContextKeyUserID)
+	expiresAt, err := h.emailChangeSvc.RequestEmailChange(c.Request.Context(), userID, req.NewEmail)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidEmailFormat):
+			Fail(c, http.StatusBadRequest, 40001, "invalid email address")
+		case errors.Is(err, service.ErrSameAsCurrentEmail):
+			Fail(c, http.StatusBadRequest, 40002, "new email matches current email")
+		case errors.Is(err, service.ErrEmailTaken):
+			Fail(c, http.StatusConflict, 40900, "email is already registered")
+		case errors.Is(err, service.ErrVerificationCooldown):
+			Fail(c, http.StatusTooManyRequests, 42900, "please wait before requesting another code")
+		case errors.Is(err, service.ErrSMTPNotConfigured):
+			Fail(c, http.StatusFailedDependency, 42400, err.Error())
+		default:
+			ServerError(c, "send verification email failed: "+err.Error())
+		}
+		return
+	}
+
+	Success(c, gin.H{
+		"expires_at":     expiresAt,
+		"resend_after_s": 60,
+	})
+}
+
+type confirmEmailChangeRequest struct {
+	NewEmail string `json:"new_email" binding:"required,email,max=254"`
+	Code     string `json:"code" binding:"required,min=4,max=12"`
+}
+
+// ConfirmEmailChange verifies the code and, on success, rotates the user's
+// email address. Returns the refreshed profile so the client can update its
+// cache without a second round trip.
+func (h *AuthHandler) ConfirmEmailChange(c *gin.Context) {
+	if h.emailChangeSvc == nil {
+		ServerError(c, "email change service unavailable")
+		return
+	}
+
+	var req confirmEmailChangeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid payload: "+err.Error())
+		return
+	}
+
+	userID := c.GetString(middleware.ContextKeyUserID)
+	user, err := h.emailChangeSvc.ConfirmEmailChange(c.Request.Context(), userID, req.NewEmail, req.Code)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidEmailFormat):
+			Fail(c, http.StatusBadRequest, 40001, "invalid email address")
+		case errors.Is(err, service.ErrVerificationNotFound):
+			Fail(c, http.StatusNotFound, 40400, "no pending verification for this email")
+		case errors.Is(err, service.ErrVerificationCodeWrong):
+			Fail(c, http.StatusBadRequest, 40003, "verification code is incorrect")
+		case errors.Is(err, service.ErrVerificationExpired):
+			Fail(c, http.StatusGone, 41000, "verification code has expired")
+		case errors.Is(err, service.ErrEmailTaken):
+			Fail(c, http.StatusConflict, 40900, "email is already registered")
+		default:
+			ServerError(c, "confirm email change failed: "+err.Error())
+		}
+		return
+	}
+
+	Success(c, gin.H{
+		"user_id":            user.ID,
+		"username":           user.Username,
+		"nickname":           user.Nickname,
+		"email":              user.Email,
+		"avatar_url":         user.AvatarURL,
+		"has_local_password": user.HasLocalPassword,
+		"role":               user.Role,
+	})
 }

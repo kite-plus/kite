@@ -81,13 +81,15 @@ func Setup(cfg Config) *gin.Engine {
 		cfg.AllowRegistration,
 	)
 
-	authHandler := handler.NewAuthHandler(cfg.AuthSvc, socialAuthSvc, oauthConfigSvc, userRepo, settingRepo, cfg.AllowRegistration, cfg.UploadMaxFileSize)
 	fileHandler := handler.NewFileHandler(cfg.FileSvc, fileRepo, albumRepo, accessLogRepo)
 	albumHandler := handler.NewAlbumHandler(albumRepo, fileRepo)
 	tokenHandler := handler.NewTokenHandler(cfg.AuthSvc, tokenRepo)
 	oauthProviderAdminHandler := handler.NewOAuthProviderAdminHandler(oauthConfigSvc)
 	storageHandler := handler.NewStorageHandler(storageRepo, fileRepo, cfg.StorageMgr, cfg.ReloadStorage)
 	emailSvc := service.NewEmailService()
+	emailVerRepo := repo.NewEmailVerificationRepo(cfg.DB)
+	emailChangeSvc := service.NewEmailChangeService(userRepo, settingRepo, emailVerRepo, emailSvc)
+	authHandler := handler.NewAuthHandler(cfg.AuthSvc, socialAuthSvc, oauthConfigSvc, emailChangeSvc, userRepo, settingRepo, cfg.AllowRegistration, cfg.UploadMaxFileSize)
 	settingsHandler := handler.NewSettingsHandler(settingRepo, userRepo, emailSvc, settingDefaults)
 	userHandler := handler.NewUserHandler(userRepo, fileRepo, accessLogRepo, cfg.AuthSvc)
 	setupHandler := handler.NewSetupHandler(userRepo, settingRepo, storageRepo, cfg.StorageMgr, cfg.AuthSvc, cfg.ReloadStorage)

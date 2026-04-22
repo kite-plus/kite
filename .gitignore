@@ -73,6 +73,7 @@ vendor/
 .air/
 tmp/
 temp/
+.bin/
 
 # ========================
 # Local App Data & Logs

@@ -195,6 +195,7 @@ func autoMigrate(db *gorm.DB) error {
 		&model.APIToken{},
 		&model.UploadSession{},
 		&model.Setting{},
+		&model.EmailVerification{},
 	)
 }
 

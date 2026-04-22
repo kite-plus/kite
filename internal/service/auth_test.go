@@ -376,27 +376,41 @@ func TestAuthService_UpdateProfile(t *testing.T) {
 	svc := newAuthService(db, true)
 
 	u1, _ := svc.Register(context.Background(), "jack", "jack@example.com", "pw")
-	_, _ = svc.Register(context.Background(), "jill", "jill@example.com", "pw")
 
+	// Update nickname + avatar; username/email must stay untouched because
+	// UpdateProfile no longer exposes them (username is immutable, email
+	// goes through the verified EmailChangeService flow).
 	nickname := "Captain"
 	avatar := "https://example.com/a.png"
-	updated, err := svc.UpdateProfile(context.Background(), u1.ID, "jack2", &nickname, "jack2@example.com", &avatar)
+	updated, err := svc.UpdateProfile(context.Background(), u1.ID, &nickname, &avatar)
 	if err != nil {
 		t.Fatalf("update profile: %v", err)
 	}
-	if updated.Username != "jack2" || updated.Email != "jack2@example.com" {
-		t.Fatalf("unexpected update: %+v", updated)
+	if updated.Username != "jack" || updated.Email != "jack@example.com" {
+		t.Fatalf("username/email should be unchanged: %+v", updated)
 	}
 	if updated.Nickname == nil || *updated.Nickname != "Captain" {
 		t.Fatalf("unexpected nickname: %v", updated.Nickname)
 	}
-
-	if _, err := svc.UpdateProfile(context.Background(), u1.ID, "jill", nil, "jack2@example.com", nil); err != ErrUserExists {
-		t.Fatalf("expected ErrUserExists, got %v", err)
+	if updated.AvatarURL == nil || *updated.AvatarURL != avatar {
+		t.Fatalf("unexpected avatar: %v", updated.AvatarURL)
 	}
 
+	// Nil inputs are a no-op and leave existing values in place.
+	same, err := svc.UpdateProfile(context.Background(), u1.ID, nil, nil)
+	if err != nil {
+		t.Fatalf("nil update: %v", err)
+	}
+	if same.Nickname == nil || *same.Nickname != "Captain" {
+		t.Fatalf("nickname should remain after nil update: %+v", same.Nickname)
+	}
+	if same.AvatarURL == nil || *same.AvatarURL != avatar {
+		t.Fatalf("avatar should remain after nil update: %+v", same.AvatarURL)
+	}
+
+	// Empty string clears the field — the handler treats "" as an explicit reset.
 	empty := ""
-	cleared, err := svc.UpdateProfile(context.Background(), u1.ID, "jack2", &empty, "jack2@example.com", &empty)
+	cleared, err := svc.UpdateProfile(context.Background(), u1.ID, &empty, &empty)
 	if err != nil {
 		t.Fatalf("clear profile fields: %v", err)
 	}
