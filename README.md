@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="web/admin/public/favicon.svg" alt="Kite logo" width="88" height="88" />
+  <img src="web/admin/public/logo.png" alt="Kite logo" width="88" height="88" />
   <h1>Kite Static Asset Hosting</h1>
   <p>A lightweight, fast, and modern static asset hosting platform.</p>
   <p>

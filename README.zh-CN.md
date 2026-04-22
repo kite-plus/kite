@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="web/admin/public/favicon.svg" alt="Kite logo" width="88" height="88" />
+  <img src="web/admin/public/logo.png" alt="Kite logo" width="88" height="88" />
   <h1>Kite 静态资源托管平台</h1>
   <p>一个轻量、快速、现代化的静态资源托管平台。</p>
   <p>
