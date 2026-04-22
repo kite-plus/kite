@@ -72,6 +72,11 @@ func (r *UserRepo) Update(ctx context.Context, user *model.User) error {
 }
 
 // UpdateStorageUsed adjusts the user's used storage counter; delta may be negative.
+//
+// This method is NOT suitable for enforcing quota on positive deltas because it
+// does not check the limit — concurrent uploads can race past the quota. Use
+// TryConsumeStorage for uploads, and keep UpdateStorageUsed only for releases
+// (negative delta) and admin/internal adjustments that bypass quota checks.
 func (r *UserRepo) UpdateStorageUsed(ctx context.Context, userID string, delta int64) error {
 	if err := r.db.WithContext(ctx).
 		Model(&model.User{}).
@@ -80,6 +85,43 @@ func (r *UserRepo) UpdateStorageUsed(ctx context.Context, userID string, delta i
 		return fmt.Errorf("update storage used: %w", err)
 	}
 	return nil
+}
+
+// TryConsumeStorage atomically increments a user's storage_used counter iff the
+// resulting value fits within storage_limit (or the user is unlimited, i.e.
+// storage_limit == -1). It is the authoritative quota gate for uploads.
+//
+// Returns (true, nil) when the quota was consumed, (false, nil) when the user
+// has no room left, and (_, err) only on database failure. A non-existent user
+// also returns (false, nil) — the caller is expected to have established the
+// user exists via the auth middleware before calling this.
+//
+// The WHERE clause evaluates storage_used + delta <= storage_limit inside the
+// same statement as the UPDATE, so two concurrent uploads cannot both pass a
+// check-then-update race. delta must be positive; pass a negative delta to
+// UpdateStorageUsed (or call ReleaseStorage) for rollbacks.
+func (r *UserRepo) TryConsumeStorage(ctx context.Context, userID string, delta int64) (bool, error) {
+	if delta <= 0 {
+		return false, fmt.Errorf("consume storage: delta must be positive, got %d", delta)
+	}
+	res := r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Where("id = ? AND (storage_limit = -1 OR storage_used + ? <= storage_limit)", userID, delta).
+		Update("storage_used", gorm.Expr("storage_used + ?", delta))
+	if res.Error != nil {
+		return false, fmt.Errorf("consume storage: %w", res.Error)
+	}
+	return res.RowsAffected == 1, nil
+}
+
+// ReleaseStorage is a convenience wrapper over UpdateStorageUsed that subtracts
+// delta from the user's storage_used counter. It is intended for compensating
+// a prior TryConsumeStorage when a later step in the upload pipeline fails.
+func (r *UserRepo) ReleaseStorage(ctx context.Context, userID string, delta int64) error {
+	if delta <= 0 {
+		return fmt.Errorf("release storage: delta must be positive, got %d", delta)
+	}
+	return r.UpdateStorageUsed(ctx, userID, -delta)
 }
 
 // Delete soft-deletes a user by flipping is_active to false.

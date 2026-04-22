@@ -104,7 +104,10 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		return nil, ErrFileTooLarge
 	}
 
-	// 2. Enforce the per-user storage quota (skipped for guests).
+	// 2. Optimistic preflight against declared size — rejects users already over
+	// quota before we bother reading the body. NOT authoritative (the declared
+	// size can lie, and concurrent uploads race), so step 9 re-checks atomically
+	// against the real byte count.
 	if !params.IsGuest {
 		user, err := s.userRepo.GetByID(ctx, params.UserID)
 		if err != nil {
@@ -156,13 +159,42 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		}
 	}
 
-	// 9. Pick upload targets according to the policy (single / primary_fallback / round_robin / mirror).
-	plan, err := s.router.Plan(ctx, int64(len(data)))
+	// 9. Atomically reserve quota against the REAL byte count. This is the
+	// authoritative gate — the check and the counter increment happen inside a
+	// single conditional UPDATE, so concurrent uploads cannot race past the
+	// limit. Any subsequent failure must release the reservation to keep the
+	// counter honest. Guests (anonymous uploads) bypass per-user quota entirely.
+	uploadSize := int64(len(data))
+	quotaReserved := false
+	if !params.IsGuest {
+		ok, err := s.userRepo.TryConsumeStorage(ctx, params.UserID, uploadSize)
+		if err != nil {
+			return nil, fmt.Errorf("upload reserve quota: %w", err)
+		}
+		if !ok {
+			return nil, ErrStorageFull
+		}
+		quotaReserved = true
+	}
+
+	// releaseQuota undoes the reservation. Deferred so that any early return
+	// after quota was reserved unwinds the counter; on success we clear the
+	// flag so the defer becomes a no-op.
+	defer func() {
+		if quotaReserved {
+			if relErr := s.userRepo.ReleaseStorage(ctx, params.UserID, uploadSize); relErr != nil {
+				log.Printf("upload: release quota after failure for user=%s size=%d: %v", params.UserID, uploadSize, relErr)
+			}
+		}
+	}()
+
+	// 10. Pick upload targets according to the policy (single / primary_fallback / round_robin / mirror).
+	plan, err := s.router.Plan(ctx, uploadSize)
 	if err != nil {
 		return nil, ErrStorageFull
 	}
 
-	// 10. Build the storage key.
+	// 11. Build the storage key.
 	ext := strings.TrimPrefix(filepath.Ext(effectiveName), ".")
 	if ext == "" {
 		ext = mtype.Extension()
@@ -181,13 +213,13 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		return nil, fmt.Errorf("upload generate storage key: %w", err)
 	}
 
-	// 11. Write to the primary storage according to the policy.
+	// 12. Write to the primary storage according to the policy.
 	primary, replicaTargets, err := s.writePrimary(ctx, plan, storageKey, data, mimeType)
 	if err != nil {
 		return nil, fmt.Errorf("upload put file: %w", err)
 	}
 
-	// 12. For images, capture dimensions and generate a thumbnail on the primary storage only.
+	// 13. For images, capture dimensions and generate a thumbnail on the primary storage only.
 	var width, height *int
 	var thumbURL *string
 
@@ -208,10 +240,10 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		}
 	}
 
-	// 13. Build the access URL.
+	// 14. Build the access URL.
 	accessURL := s.buildAccessURL(fileType, hashMD5[:8])
 
-	// 14. Create the file record.
+	// 15. Create the file record.
 	file := &model.File{
 		ID:              fileID,
 		UserID:          params.UserID,
@@ -220,7 +252,7 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 		OriginalName:    effectiveName,
 		StorageKey:      storageKey,
 		HashMD5:         hashMD5,
-		SizeBytes:       int64(len(data)),
+		SizeBytes:       uploadSize,
 		MimeType:        mimeType,
 		FileType:        fileType,
 		Width:           width,
@@ -230,23 +262,20 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 	}
 
 	if err := s.fileRepo.Create(ctx, file); err != nil {
-		// Roll back by deleting the uploaded bytes.
+		// Roll back by deleting the uploaded bytes. Quota is released by the
+		// deferred releaseQuota above because quotaReserved is still true.
 		_ = primary.Driver.Delete(ctx, storageKey)
 		return nil, fmt.Errorf("upload create record: %w", err)
 	}
 
-	// 15. In mirror mode, pre-insert replica records and kick off concurrent background replication.
+	// 16. In mirror mode, pre-insert replica records and kick off concurrent background replication.
 	if plan.Mode == storage.PolicyMirror && len(replicaTargets) > 0 {
 		s.scheduleReplicas(file, data, mimeType, replicaTargets)
 	}
 
-	// 16. Update the user's storage usage (skipped for guests).
-	if !params.IsGuest {
-		if err := s.userRepo.UpdateStorageUsed(ctx, params.UserID, int64(len(data))); err != nil {
-			// Non-fatal; log and continue.
-			_ = err
-		}
-	}
+	// Upload succeeded — the quota reservation in step 9 is now permanent.
+	// Clearing the flag disarms the deferred release so the counter stays bumped.
+	quotaReserved = false
 
 	return &UploadResult{
 		File:  file,

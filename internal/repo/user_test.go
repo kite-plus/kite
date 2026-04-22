@@ -3,6 +3,8 @@ package repo
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/amigoer/kite/internal/model"
@@ -220,6 +222,197 @@ func TestUserRepo_Count(t *testing.T) {
 	n, _ = r.Count(ctx)
 	if n != 1 {
 		t.Fatalf("expected 1, got %d", n)
+	}
+}
+
+func TestUserRepo_TryConsumeStorage_WithinQuota(t *testing.T) {
+	r := NewUserRepo(newTestDB(t))
+	ctx := context.Background()
+
+	u := &model.User{ID: "q1", Username: "q1", Email: "q1@x", PasswordHash: "h", StorageLimit: 1000, StorageUsed: 900}
+	if err := r.Create(ctx, u); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	ok, err := r.TryConsumeStorage(ctx, "q1", 100)
+	if err != nil || !ok {
+		t.Fatalf("consume 100 of 100 free: ok=%v err=%v", ok, err)
+	}
+
+	got, _ := r.GetByID(ctx, "q1")
+	if got.StorageUsed != 1000 {
+		t.Fatalf("expected storage_used=1000, got %d", got.StorageUsed)
+	}
+}
+
+func TestUserRepo_TryConsumeStorage_ExactBoundary(t *testing.T) {
+	r := NewUserRepo(newTestDB(t))
+	ctx := context.Background()
+
+	u := &model.User{ID: "q2", Username: "q2", Email: "q2@x", PasswordHash: "h", StorageLimit: 1000, StorageUsed: 0}
+	r.Create(ctx, u)
+
+	ok, err := r.TryConsumeStorage(ctx, "q2", 1000)
+	if err != nil || !ok {
+		t.Fatalf("exactly filling quota should succeed: ok=%v err=%v", ok, err)
+	}
+
+	ok, err = r.TryConsumeStorage(ctx, "q2", 1)
+	if err != nil || ok {
+		t.Fatalf("one byte past full should fail: ok=%v err=%v", ok, err)
+	}
+
+	got, _ := r.GetByID(ctx, "q2")
+	if got.StorageUsed != 1000 {
+		t.Fatalf("quota should not have advanced past limit: got %d", got.StorageUsed)
+	}
+}
+
+func TestUserRepo_TryConsumeStorage_OverQuota(t *testing.T) {
+	r := NewUserRepo(newTestDB(t))
+	ctx := context.Background()
+
+	u := &model.User{ID: "q3", Username: "q3", Email: "q3@x", PasswordHash: "h", StorageLimit: 1000, StorageUsed: 900}
+	r.Create(ctx, u)
+
+	ok, err := r.TryConsumeStorage(ctx, "q3", 101)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Fatal("consuming 101 when 100 free should fail")
+	}
+
+	got, _ := r.GetByID(ctx, "q3")
+	if got.StorageUsed != 900 {
+		t.Fatalf("failed consume must not mutate counter: got %d", got.StorageUsed)
+	}
+}
+
+func TestUserRepo_TryConsumeStorage_UnlimitedBypassesLimit(t *testing.T) {
+	r := NewUserRepo(newTestDB(t))
+	ctx := context.Background()
+
+	u := &model.User{ID: "q4", Username: "q4", Email: "q4@x", PasswordHash: "h", StorageLimit: -1, StorageUsed: 0}
+	r.Create(ctx, u)
+
+	// A ludicrously large delta that would overflow any normal quota.
+	const huge = int64(1 << 60)
+	ok, err := r.TryConsumeStorage(ctx, "q4", huge)
+	if err != nil || !ok {
+		t.Fatalf("unlimited user should accept any positive delta: ok=%v err=%v", ok, err)
+	}
+
+	got, _ := r.GetByID(ctx, "q4")
+	if got.StorageUsed != huge {
+		t.Fatalf("storage_used should reflect the delta even on unlimited: got %d", got.StorageUsed)
+	}
+}
+
+func TestUserRepo_TryConsumeStorage_MissingUser(t *testing.T) {
+	r := NewUserRepo(newTestDB(t))
+	ctx := context.Background()
+
+	ok, err := r.TryConsumeStorage(ctx, "ghost", 1)
+	if err != nil {
+		t.Fatalf("missing user should not error: %v", err)
+	}
+	if ok {
+		t.Fatal("missing user must not be reported as consumed")
+	}
+}
+
+func TestUserRepo_TryConsumeStorage_RejectsNonPositiveDelta(t *testing.T) {
+	r := NewUserRepo(newTestDB(t))
+	ctx := context.Background()
+
+	u := &model.User{ID: "q5", Username: "q5", Email: "q5@x", PasswordHash: "h", StorageLimit: 1000}
+	r.Create(ctx, u)
+
+	for _, d := range []int64{0, -1, -1024} {
+		if ok, err := r.TryConsumeStorage(ctx, "q5", d); err == nil || ok {
+			t.Fatalf("delta=%d: expected error, got ok=%v err=%v", d, ok, err)
+		}
+	}
+}
+
+// TestUserRepo_TryConsumeStorage_ConcurrentConsume verifies that when N
+// goroutines race to consume storage that only fits M<N of them, exactly M
+// succeed and the counter ends up at exactly the limit. This is the core
+// TOCTOU regression test: the old check-then-update pattern allowed all N to
+// pass the check and bump the counter past the limit.
+func TestUserRepo_TryConsumeStorage_ConcurrentConsume(t *testing.T) {
+	r := NewUserRepo(newTestDB(t))
+	ctx := context.Background()
+
+	const (
+		limit        = int64(10_000)
+		deltaPerCall = int64(1_000)
+		goroutines   = 20 // only 10 should succeed; the other 10 should fail
+		expectedOK   = int32(10)
+	)
+
+	u := &model.User{ID: "qc", Username: "qc", Email: "qc@x", PasswordHash: "h", StorageLimit: limit, StorageUsed: 0}
+	r.Create(ctx, u)
+
+	var successes int32
+	var failures int32
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	start := make(chan struct{})
+
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			<-start // release all goroutines at once
+			ok, err := r.TryConsumeStorage(ctx, "qc", deltaPerCall)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if ok {
+				atomic.AddInt32(&successes, 1)
+			} else {
+				atomic.AddInt32(&failures, 1)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	if successes != expectedOK {
+		t.Fatalf("expected exactly %d successes, got %d (failures=%d)", expectedOK, successes, failures)
+	}
+	if failures != int32(goroutines)-expectedOK {
+		t.Fatalf("expected %d failures, got %d", goroutines-int(expectedOK), failures)
+	}
+
+	got, _ := r.GetByID(ctx, "qc")
+	if got.StorageUsed != limit {
+		t.Fatalf("counter should match limit exactly; got %d want %d", got.StorageUsed, limit)
+	}
+}
+
+func TestUserRepo_ReleaseStorage(t *testing.T) {
+	r := NewUserRepo(newTestDB(t))
+	ctx := context.Background()
+
+	u := &model.User{ID: "r1", Username: "r1", Email: "r1@x", PasswordHash: "h", StorageLimit: 1000, StorageUsed: 500}
+	r.Create(ctx, u)
+
+	if err := r.ReleaseStorage(ctx, "r1", 300); err != nil {
+		t.Fatalf("ReleaseStorage: %v", err)
+	}
+	got, _ := r.GetByID(ctx, "r1")
+	if got.StorageUsed != 200 {
+		t.Fatalf("expected 200, got %d", got.StorageUsed)
+	}
+
+	if err := r.ReleaseStorage(ctx, "r1", 0); err == nil {
+		t.Fatal("release of 0 should error")
+	}
+	if err := r.ReleaseStorage(ctx, "r1", -10); err == nil {
+		t.Fatal("release of negative should error")
 	}
 }
 
