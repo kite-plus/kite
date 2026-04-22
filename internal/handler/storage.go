@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 
 	"github.com/amigoer/kite/internal/model"
 	"github.com/amigoer/kite/internal/repo"
@@ -291,21 +292,38 @@ func (h *StorageHandler) Test(c *gin.Context) {
 
 	driver, err := storage.NewDriver(scfg)
 	if err != nil {
-		Success(c, gin.H{"ok": false, "error": err.Error()})
+		slog.Warn("storage probe: driver construction failed", "storage_id", id, "driver", cfg.Driver, "err", err)
+		Success(c, gin.H{"ok": false, "error": "storage driver initialization failed"})
 		return
 	}
 
-	// Try uploading a probe file.
-	testKey := ".kite-test-connection"
+	// Random suffix on the probe key so concurrent tests (e.g. an admin
+	// clicking Test twice, or two admins in different tabs) don't race on
+	// the same path — a loser whose Put lands after the winner's Delete
+	// could otherwise report a spurious 404 on Delete. A leading dot and
+	// "kite-test-" prefix keep the file recognizable if it ever gets
+	// stranded on the backend.
+	testKey := ".kite-test-" + uuid.New().String()
 	testPayload := []byte("kite storage test")
 	err = driver.Put(c.Request.Context(), testKey, bytes.NewReader(testPayload), int64(len(testPayload)), "text/plain")
 	if err != nil {
-		Success(c, gin.H{"ok": false, "error": err.Error()})
+		// Full error goes to the server log where an operator with shell
+		// access can inspect it. The client gets a sanitized message so we
+		// don't leak bucket names, endpoint hostnames, credentials baked
+		// into an SDK error, or internal IPs on the wire to whoever can
+		// trigger the Test endpoint.
+		slog.Warn("storage probe: write failed", "storage_id", id, "driver", cfg.Driver, "key", testKey, "err", err)
+		Success(c, gin.H{"ok": false, "error": "storage write failed; check server logs for details"})
 		return
 	}
 
-	// Clean up the probe file.
-	_ = driver.Delete(c.Request.Context(), testKey)
+	// Clean up the probe file. Delete failures are non-fatal to the probe
+	// result (the write succeeded, so the storage is functional) but worth
+	// logging since they indicate an asymmetric IAM policy where Put is
+	// permitted but Delete isn't — operators want to know.
+	if delErr := driver.Delete(c.Request.Context(), testKey); delErr != nil {
+		slog.Warn("storage probe: cleanup delete failed", "storage_id", id, "key", testKey, "err", delErr)
+	}
 
 	Success(c, gin.H{"ok": true})
 }
