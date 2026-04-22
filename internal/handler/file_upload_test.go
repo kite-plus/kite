@@ -89,6 +89,14 @@ func TestRespondUploadError(t *testing.T) {
 func TestFileHandler_UploadRequiresFile(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	// Handlers call fileSvc.MaxUploadBodySize before FormFile to wrap the
+	// body in MaxBytesReader. A bare &FileHandler{} with a nil service would
+	// panic on that method call, so hand over a zero-value FileService —
+	// nil settingRepo falls back to cfg.MaxFileSize, and the empty request
+	// body in this test cannot exceed any cap.
+	svc := &service.FileService{}
+	fh := &FileHandler{fileSvc: svc}
+
 	tests := []struct {
 		name string
 		path string
@@ -97,12 +105,12 @@ func TestFileHandler_UploadRequiresFile(t *testing.T) {
 		{
 			name: "登录上传缺少文件",
 			path: "/upload",
-			h:    (&FileHandler{}).Upload,
+			h:    fh.Upload,
 		},
 		{
 			name: "游客上传缺少文件",
 			path: "/guest/upload",
-			h:    (&FileHandler{}).GuestUpload,
+			h:    fh.GuestUpload,
 		},
 	}
 

@@ -33,8 +33,18 @@ func NewFileHandler(fileSvc *service.FileService, fileRepo *repo.FileRepo, album
 func (h *FileHandler) Upload(c *gin.Context) {
 	userID := c.GetString(middleware.ContextKeyUserID)
 
+	// Cap the request body before FormFile reads it. Without this guard Gin
+	// happily streams a 10 GB body onto /tmp and only errors once the file is
+	// already on disk — an easy DoS vector. MaxBytesReader short-circuits the
+	// read as soon as the cap is crossed and surfaces as ErrFileTooLarge below.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, h.fileSvc.MaxUploadBodySize(c.Request.Context()))
+
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
+		if isRequestBodyTooLarge(err) {
+			Fail(c, http.StatusRequestEntityTooLarge, 41300, uploadFileTooLargeMessage)
+			return
+		}
 		BadRequest(c, uploadMissingFileMessage)
 		return
 	}
@@ -77,8 +87,16 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 // GuestUpload handles anonymous uploads that do not require login.
 func (h *FileHandler) GuestUpload(c *gin.Context) {
+	// See Upload — same DoS guard applies to anonymous uploads, arguably more
+	// so since they don't require an account to abuse.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, h.fileSvc.MaxUploadBodySize(c.Request.Context()))
+
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
+		if isRequestBodyTooLarge(err) {
+			Fail(c, http.StatusRequestEntityTooLarge, 41300, uploadFileTooLargeMessage)
+			return
+		}
 		BadRequest(c, uploadMissingFileMessage)
 		return
 	}
@@ -463,6 +481,18 @@ const (
 	uploadSaveFailedMessage     = "文件保存失败，请稍后重试"
 	guestUploadFailedMessage    = "上传处理失败，请稍后重试"
 )
+
+// isRequestBodyTooLarge reports whether FormFile failed because MaxBytesReader
+// tripped the per-request cap. Both the typed error (Go 1.18+) and the legacy
+// "http: request body too large" string are checked so the helper survives
+// wrappers that swallow the concrete type.
+func isRequestBodyTooLarge(err error) bool {
+	var maxErr *http.MaxBytesError
+	if errors.As(err, &maxErr) {
+		return true
+	}
+	return strings.Contains(err.Error(), "http: request body too large")
+}
 
 func respondUploadError(c *gin.Context, err error, isGuest bool) {
 	switch {

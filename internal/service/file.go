@@ -68,6 +68,17 @@ func NewFileService(
 	}
 }
 
+// MaxUploadBodySize returns the HTTP-layer cap on an upload's multipart
+// body. It's the effective per-file max plus a small allowance for
+// multipart headers/boundaries so a file at exactly the limit still fits.
+// Handlers should wrap Request.Body in http.MaxBytesReader(w, body,
+// MaxUploadBodySize()) before calling FormFile, otherwise Gin will happily
+// spill a multi-GB body to /tmp and only complain once the file is on disk.
+func (s *FileService) MaxUploadBodySize(ctx context.Context) int64 {
+	// 1 MiB is plenty for multipart headers even with pathological boundaries.
+	return s.maxFileSize(ctx) + 1<<20
+}
+
 // ReconcileStaleReplicas flips replica rows that are stuck at "pending"
 // past the staleness threshold to "failed" so they are visible to
 // operators. Background replication runs in goroutines that do not
@@ -143,7 +154,13 @@ func (s *FileService) Upload(ctx context.Context, params UploadParams) (*UploadR
 	}
 
 	// 3. Read the entire body into memory for MIME detection and MD5 hashing.
-	data, err := io.ReadAll(params.Reader)
+	// Bound the read at maxFileSize+1 so a client that lies about Size in the
+	// multipart header (or a bug in an earlier step) can't burn arbitrary RAM
+	// — the extra byte is the signal that we hit the cap rather than read a
+	// file exactly at the limit. HTTP-layer MaxBytesReader is the primary
+	// wall; this is defense-in-depth for callers that reach Upload through
+	// other code paths.
+	data, err := io.ReadAll(io.LimitReader(params.Reader, maxFileSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("upload read file: %w", err)
 	}
