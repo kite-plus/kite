@@ -65,6 +65,17 @@ make build
 
 The production build compiles the frontend and embeds it into the Go binary.
 
+### First-boot admin credentials
+
+On the first start (when the user table is empty) Kite seeds a bootstrap administrator account with these temporary credentials:
+
+```
+username: admin
+password: admin
+```
+
+The account is flagged `password_must_change`, so the first login redirects to a mandatory reset page. The password is intentionally not written to the application logs — change it immediately after the first login and keep the new credentials out of version control.
+
 ## 📦 Project Structure
 
 ```text

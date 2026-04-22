@@ -258,9 +258,12 @@ func seedDefaultAdmin(userRepo *repo.UserRepo, authSvc *service.AuthService) {
 		logger.Fatal("create default admin", slog.String("err", err.Error()))
 	}
 
-	logger.Warn("default admin created with weak credentials, change on first login",
+	// Intentionally omit the password from logs: log ingestion pipelines
+	// (ELK, Datadog, CloudWatch) make every log line as readable as code, and
+	// the password-must-change flag already forces the operator to set real
+	// credentials on first login. See README for the initial credentials.
+	logger.Warn("default admin account created; reset required on first login",
 		slog.String("username", "admin"),
-		slog.String("password", "admin"),
 	)
 }
 
