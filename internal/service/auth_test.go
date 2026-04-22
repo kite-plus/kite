@@ -268,7 +268,7 @@ func TestAuthService_RefreshToken(t *testing.T) {
 		t.Fatalf("login: %v", err)
 	}
 
-	next, err := svc.RefreshToken(pair.RefreshToken)
+	next, err := svc.RefreshToken(context.Background(), pair.RefreshToken)
 	if err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestAuthService_RefreshToken(t *testing.T) {
 		t.Fatal("empty access token after refresh")
 	}
 
-	if _, err := svc.RefreshToken("not-a-token"); err != ErrTokenInvalid {
+	if _, err := svc.RefreshToken(context.Background(), "not-a-token"); err != ErrTokenInvalid {
 		t.Fatalf("expected ErrTokenInvalid, got %v", err)
 	}
 }

@@ -72,6 +72,23 @@ func Auth(authSvc *service.AuthService) gin.HandlerFunc {
 					return
 				}
 			}
+			// Token-version freshness check: a password change /
+			// reset bumps users.token_version, which invalidates every
+			// JWT signed against the previous value. Without this any
+			// stolen token remains usable until its natural expiry,
+			// which for refresh tokens is hours or days. A DB error
+			// here is also treated as 401 so we fail closed — an
+			// unreachable database must not let stale sessions through.
+			dbVersion, versionErr := authSvc.CurrentTokenVersion(c.Request.Context(), claims.UserID)
+			if versionErr != nil || claims.TokenVersion < dbVersion {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"code":    40102,
+					"message": "session revoked; please sign in again",
+					"data":    nil,
+				})
+				c.Abort()
+				return
+			}
 			c.Set(ContextKeyUserID, claims.UserID)
 			c.Set(ContextKeyUsername, claims.Username)
 			c.Set(ContextKeyRole, claims.Role)

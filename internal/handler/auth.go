@@ -170,7 +170,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	tokenPair, err := h.authSvc.RefreshToken(token)
+	tokenPair, err := h.authSvc.RefreshToken(c.Request.Context(), token)
 	if err != nil {
 		Unauthorized(c, "invalid refresh token")
 		return

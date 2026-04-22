@@ -40,11 +40,20 @@ var (
 // the claim instead of hitting the DB on every request because the flag
 // only matters in a brief window at first login; ResetFirstLoginCredentials
 // issues a fresh pair the moment it's cleared.
+//
+// TokenVersion mirrors the users.token_version counter. The middleware
+// rejects any token whose claim is older than the user row's current
+// value, which is how credential-changing operations (password change /
+// reset / first-login reset / admin-forced reset) invalidate every
+// outstanding session issued before them. Without it, a stolen JWT keeps
+// working until its natural expiry — the refresh token especially, which
+// can live for hours or days depending on config.
 type JWTClaims struct {
 	UserID             string `json:"user_id"`
 	Username           string `json:"username"`
 	Role               string `json:"role"`
 	PasswordMustChange bool   `json:"password_must_change,omitempty"`
+	TokenVersion       int    `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
@@ -209,24 +218,53 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*To
 }
 
 // RefreshToken exchanges a valid refresh token for a new token pair.
-func (s *AuthService) RefreshToken(refreshToken string) (*TokenPair, error) {
+//
+// The refresh path hits the DB on purpose. Unlike validation on the access
+// path — where parse-only is enough because the access token is short
+// lived — a refresh token may live for hours or days, and minting a fresh
+// pair from a stale one would defeat token_version rotation: a stolen
+// refresh token could mint new access tokens indefinitely after a
+// password reset. We therefore re-load the user, reject inactive
+// accounts, and reject refresh tokens whose TokenVersion claim is older
+// than the user row's current value. The new pair embeds the current
+// user row's TokenVersion so it continues to validate cleanly.
+func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
 	claims, err := s.parseToken(refreshToken)
 	if err != nil {
 		return nil, err
 	}
 
-	user := &model.User{
-		ID:       claims.UserID,
-		Username: claims.Username,
-		Role:     claims.Role,
+	user, err := s.userRepo.GetByID(ctx, claims.UserID)
+	if err != nil {
+		return nil, ErrTokenInvalid
+	}
+	if !user.IsActive {
+		return nil, ErrTokenInvalid
+	}
+	if claims.TokenVersion < user.TokenVersion {
+		return nil, ErrTokenInvalid
 	}
 
 	return s.generateTokenPair(user)
 }
 
 // ValidateToken verifies a JWT token and returns its claims.
+//
+// ValidateToken is parse-only; it does not consult the database, so a
+// successful return does not imply the underlying user still exists or
+// that the claim's TokenVersion is still current. Callers that care
+// about session revocation (password change, account deletion) must
+// additionally call [CurrentTokenVersion] and compare.
 func (s *AuthService) ValidateToken(tokenStr string) (*JWTClaims, error) {
 	return s.parseToken(tokenStr)
+}
+
+// CurrentTokenVersion reads the user's current token_version from the
+// database. The auth middleware calls it on every authenticated request
+// so a credential-changing operation (password change / reset) can
+// revoke every outstanding JWT by bumping the counter.
+func (s *AuthService) CurrentTokenVersion(ctx context.Context, userID string) (int, error) {
+	return s.userRepo.GetTokenVersion(ctx, userID)
 }
 
 // ValidateAPIToken verifies an API token and returns the owning user ID.
@@ -326,6 +364,12 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID string, newNickn
 }
 
 // ChangePassword verifies the current password and writes a new hash.
+//
+// On success we bump token_version so every outstanding JWT signed
+// against the previous value fails the middleware's freshness check.
+// This is what turns "password changed" into "existing sessions are
+// revoked" — otherwise an attacker who captured a refresh token could
+// keep using it after the legitimate user rotated their password.
 func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
@@ -346,11 +390,20 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPasswor
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return fmt.Errorf("update password: %w", err)
 	}
+	if err := s.userRepo.BumpTokenVersion(ctx, userID); err != nil {
+		return fmt.Errorf("revoke sessions: %w", err)
+	}
 	return nil
 }
 
 // SetPassword sets the user's first local password without requiring a current
 // password. Used by accounts created through third-party login.
+//
+// Bumping token_version here is defensive rather than strictly necessary:
+// the user had no local password before this call, so only OAuth-issued
+// tokens can exist — but they still need to be invalidated so the
+// account cannot be trivially hijacked by someone who stole an OAuth
+// session cookie before the password was set.
 func (s *AuthService) SetPassword(ctx context.Context, userID, newPassword string) error {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
@@ -364,6 +417,9 @@ func (s *AuthService) SetPassword(ctx context.Context, userID, newPassword strin
 	user.HasLocalPassword = true
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return fmt.Errorf("set password: %w", err)
+	}
+	if err := s.userRepo.BumpTokenVersion(ctx, userID); err != nil {
+		return fmt.Errorf("revoke sessions: %w", err)
 	}
 	return nil
 }
@@ -405,6 +461,14 @@ func (s *AuthService) ResetFirstLoginCredentials(ctx context.Context, userID, ne
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, fmt.Errorf("update user: %w", err)
 	}
+
+	// Revoke any JWT minted off the bootstrap credentials. The fresh
+	// pair we return below is re-read from the now-bumped row so its
+	// TokenVersion claim still validates.
+	if err := s.userRepo.BumpTokenVersion(ctx, userID); err != nil {
+		return nil, fmt.Errorf("revoke sessions: %w", err)
+	}
+	user.TokenVersion++
 
 	return s.generateTokenPair(user)
 }
@@ -453,6 +517,7 @@ func (s *AuthService) generateTokenPair(user *model.User) (*TokenPair, error) {
 		Username:           user.Username,
 		Role:               user.Role,
 		PasswordMustChange: user.PasswordMustChange,
+		TokenVersion:       user.TokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(accessExpiry),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -469,6 +534,7 @@ func (s *AuthService) generateTokenPair(user *model.User) (*TokenPair, error) {
 		Username:           user.Username,
 		Role:               user.Role,
 		PasswordMustChange: user.PasswordMustChange,
+		TokenVersion:       user.TokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(refreshExpiry),
 			IssuedAt:  jwt.NewNumericDate(now),

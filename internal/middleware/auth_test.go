@@ -285,6 +285,100 @@ func TestAuth_FirstLoginGate_PassesAfterReset(t *testing.T) {
 	}
 }
 
+// TestAuth_RejectsTokenAfterPasswordChange verifies that a JWT issued
+// before ChangePassword loses middleware access immediately after the
+// password is rotated. Without the token_version gate, a stolen token
+// would stay usable until its natural expiry (up to the configured
+// refresh window), which is exactly the window we're trying to close.
+func TestAuth_RejectsTokenAfterPasswordChange(t *testing.T) {
+	db := newMiddlewareTestDB(t)
+	svc := newAuthSvc(db)
+	user, err := svc.Register(context.Background(), "rotuser", "rot@example.com", "old-pw")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	pair, err := svc.Login(context.Background(), "rotuser", "old-pw")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	r := setupAuthRouter(svc)
+
+	// Baseline: the freshly issued token works.
+	req := httptest.NewRequest(http.MethodGet, "/secured", nil)
+	req.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("pre-change code = %d, want 200", w.Code)
+	}
+
+	// Rotate the password through the regular service path — this must
+	// bump token_version on the underlying row.
+	if err := svc.ChangePassword(context.Background(), user.ID, "old-pw", "new-pw"); err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+
+	// The old token now references an outdated token_version claim and
+	// the middleware must reject it. 401 with the session-revoked body
+	// signals the SPA that it should force a fresh login rather than
+	// attempting silent refresh (the refresh token is invalidated too).
+	req = httptest.NewRequest(http.MethodGet, "/secured", nil)
+	req.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("post-change code = %d, want 401 (session revoked); body=%s", w.Code, w.Body.String())
+	}
+
+	// Re-logging-in with the new credentials must issue a token pair
+	// whose TokenVersion claim matches the bumped row, so the fresh
+	// tokens pass the middleware again.
+	freshPair, err := svc.Login(context.Background(), "rotuser", "new-pw")
+	if err != nil {
+		t.Fatalf("re-login: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/secured", nil)
+	req.Header.Set("Authorization", "Bearer "+freshPair.AccessToken)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("fresh-token code = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+}
+
+// TestAuth_RejectsRefreshTokenAfterPasswordChange is the refresh-path
+// analogue of the previous test. Because the refresh token expiry is
+// typically much longer than the access token, a refresh token that
+// kept working after a password change would be a larger window for
+// abuse than a stale access token. The refresh service must re-read
+// the user row and reject any refresh whose TokenVersion is behind.
+func TestAuth_RejectsRefreshTokenAfterPasswordChange(t *testing.T) {
+	db := newMiddlewareTestDB(t)
+	svc := newAuthSvc(db)
+	user, err := svc.Register(context.Background(), "rot2", "rot2@example.com", "old-pw")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	pair, err := svc.Login(context.Background(), "rot2", "old-pw")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	// Baseline — refresh works while token_version matches.
+	if _, err := svc.RefreshToken(context.Background(), pair.RefreshToken); err != nil {
+		t.Fatalf("pre-change refresh: %v", err)
+	}
+
+	if err := svc.ChangePassword(context.Background(), user.ID, "old-pw", "new-pw"); err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+
+	if _, err := svc.RefreshToken(context.Background(), pair.RefreshToken); err == nil {
+		t.Fatal("refresh with stale token succeeded; expected rejection")
+	}
+}
+
 func TestAdminOnly_AllowsAdmin(t *testing.T) {
 	db := newMiddlewareTestDB(t)
 	svc := newAuthSvc(db)

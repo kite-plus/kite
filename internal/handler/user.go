@@ -156,6 +156,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		}
 		user.Email = *req.Email
 	}
+	passwordChanged := false
 	if req.Password != nil && strings.TrimSpace(*req.Password) != "" {
 		hash, hashErr := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
 		if hashErr != nil {
@@ -164,6 +165,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		}
 		user.PasswordHash = string(hash)
 		user.HasLocalPassword = true
+		passwordChanged = true
 	}
 	if req.IsActive != nil {
 		user.IsActive = *req.IsActive
@@ -175,6 +177,19 @@ func (h *UserHandler) Update(c *gin.Context) {
 	if err := h.userRepo.Update(c.Request.Context(), user); err != nil {
 		ServerError(c, "failed to update user")
 		return
+	}
+
+	// An admin-driven password reset has to invalidate the target user's
+	// outstanding JWTs — otherwise a compromised session stays usable
+	// until the access or refresh token's natural expiry, which on this
+	// server can be hours for access and days for refresh. Bumping
+	// token_version forces every currently-held token to fail the
+	// freshness check the middleware runs on the next request.
+	if passwordChanged {
+		if err := h.userRepo.BumpTokenVersion(c.Request.Context(), user.ID); err != nil {
+			ServerError(c, "failed to revoke existing sessions")
+			return
+		}
 	}
 
 	Success(c, user)

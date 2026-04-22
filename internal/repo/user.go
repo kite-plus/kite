@@ -177,6 +177,41 @@ func (r *UserRepo) ExistsByUsernameOrEmailExcept(ctx context.Context, username, 
 	return count > 0, nil
 }
 
+// GetTokenVersion returns the user's current token_version, the revocation
+// counter JWTs are validated against. It is called on every authenticated
+// request, so the query is intentionally narrow — primary-key SELECT of a
+// single integer column. Callers treat "record not found" as an invalid
+// token so a deleted user cannot keep using outstanding JWTs.
+func (r *UserRepo) GetTokenVersion(ctx context.Context, userID string) (int, error) {
+	var version int
+	err := r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Where("id = ?", userID).
+		Select("token_version").
+		Scan(&version).Error
+	if err != nil {
+		return 0, fmt.Errorf("get token version: %w", err)
+	}
+	return version, nil
+}
+
+// BumpTokenVersion atomically increments the user's token_version so every
+// outstanding JWT signed against the previous value fails the middleware
+// check. Called after password changes / resets to revoke stolen sessions.
+func (r *UserRepo) BumpTokenVersion(ctx context.Context, userID string) error {
+	res := r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Where("id = ?", userID).
+		Update("token_version", gorm.Expr("token_version + 1"))
+	if res.Error != nil {
+		return fmt.Errorf("bump token version: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return fmt.Errorf("bump token version: user %q not found", userID)
+	}
+	return nil
+}
+
 // Count returns the total user count; used by the setup flow to detect fresh installs.
 func (r *UserRepo) Count(ctx context.Context) (int64, error) {
 	var count int64
