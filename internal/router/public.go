@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -9,24 +10,60 @@ import (
 	"github.com/kite-plus/kite/internal/handler"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/version"
+	"gorm.io/gorm"
 )
 
-// registerHealth exposes a lightweight liveness probe used by load balancers
-// and uptime monitors. The response also surfaces the build identity so an
-// operator hitting `curl /api/v1/health` can confirm which binary is live
-// without shelling into the container — useful when diagnosing an outage
-// after a rollout.
-func registerHealth(v1 *gin.RouterGroup) {
+// registerHealth wires the three cloud-native probes:
+//
+//   - GET /health  — liveness. Proves the HTTP stack is alive. No dependency
+//     checks, no DB round-trip; safe to poll at high frequency from LBs.
+//   - GET /ready   — readiness. Pings the database with a short timeout;
+//     returns 503 when a dependency is unreachable so orchestrators can pull
+//     the instance out of rotation during a hiccup.
+//   - GET /version — build identity (version/commit/date/go). Separated from
+//     /health so operators can inspect the running build without conflating
+//     it with probe semantics.
+func registerHealth(v1 *gin.RouterGroup, db *gorm.DB) {
 	v1.GET("/health", func(c *gin.Context) {
-		info := version.Get()
 		handler.Success(c, gin.H{
-			"status":  "ok",
-			"ts":      time.Now().Unix(),
-			"version": info.Version,
-			"commit":  info.Commit,
-			"date":    info.Date,
-			"go":      info.Go,
+			"status": "ok",
+			"ts":     time.Now().Unix(),
 		})
+	})
+
+	v1.GET("/ready", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+
+		checks := gin.H{"db": "ok"}
+		ready := true
+		if sqlDB, err := db.DB(); err != nil {
+			checks["db"] = "error: " + err.Error()
+			ready = false
+		} else if err := sqlDB.PingContext(ctx); err != nil {
+			checks["db"] = "error: " + err.Error()
+			ready = false
+		}
+
+		body := gin.H{
+			"ts":     time.Now().Unix(),
+			"checks": checks,
+		}
+		if !ready {
+			body["status"] = "not_ready"
+			c.JSON(http.StatusServiceUnavailable, handler.Response{
+				Code:    50301,
+				Message: "dependency unavailable",
+				Data:    body,
+			})
+			return
+		}
+		body["status"] = "ready"
+		handler.Success(c, body)
+	})
+
+	v1.GET("/version", func(c *gin.Context) {
+		handler.Success(c, version.Get())
 	})
 }
 

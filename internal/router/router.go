@@ -120,7 +120,7 @@ func Setup(cfg Config) *gin.Engine {
 	registerFilePublicServe(r, fileHandler)
 
 	v1 := r.Group("/api/v1")
-	registerHealth(v1)
+	registerHealth(v1, cfg.DB)
 	registerSystemStatusStream(v1, systemStatusHandler)
 	registerAuthPublic(v1, authHandler, settingRepo)
 	registerSetup(v1, setupHandler)
