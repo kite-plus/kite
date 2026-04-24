@@ -36,6 +36,14 @@ const zh: Translations = {
     apply: '应用',
   },
 
+  palette: {
+    placeholder: '输入页面名或路径，快速跳转',
+    empty: '没有匹配的结果',
+    hintNavigate: '选择',
+    hintSelect: '跳转',
+    hintClose: '关闭',
+  },
+
   nav: {
     dashboard: '仪表盘',
     files: '文件管理',

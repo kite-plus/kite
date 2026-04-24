@@ -34,6 +34,14 @@ const en = {
     apply: 'Apply',
   },
 
+  palette: {
+    placeholder: 'Type a page name or path to jump',
+    empty: 'No matching pages',
+    hintNavigate: 'Navigate',
+    hintSelect: 'Select',
+    hintClose: 'Close',
+  },
+
   nav: {
     dashboard: 'Dashboard',
     files: 'Files',

@@ -5,13 +5,22 @@ import {
   ArrowLeft,
   Bell,
   ChevronRight,
+  CornerDownLeft,
+  FileText,
+  FolderOpen,
+  HardDrive,
   KeyRound,
   Keyboard,
+  LayoutDashboard,
   LogOut,
   Menu,
   Search,
+  Settings,
   ShieldCheck,
+  Upload,
   User as UserIcon,
+  Users,
+  type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useI18n, type Locale } from '@/i18n'
@@ -50,7 +59,6 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-  CommandShortcut,
 } from '@/components/ui/command'
 import { Badge } from '@/components/ui/badge'
 import { getPrimaryModifierKeyLabel } from '@/lib/platform'
@@ -71,11 +79,29 @@ const routeLabelKeys: Record<string, string> = {
   '/admin/settings': 'nav.settings',
 }
 
+// Route → icon map for the global command palette.
+// Kept in parallel to the sidebar's own icon choices so a user scanning
+// the palette sees the same glyph they remember from the nav — the
+// palette reads as "nav, but searchable" instead of a separate widget.
+const routeIcons: Record<string, LucideIcon> = {
+  '/user/dashboard': LayoutDashboard,
+  '/user/files': Upload,
+  '/user/folders': FolderOpen,
+  '/user/tokens': KeyRound,
+  '/user/profile': UserIcon,
+  '/admin/dashboard': LayoutDashboard,
+  '/admin/files': FileText,
+  '/admin/storage': HardDrive,
+  '/admin/users': Users,
+  '/admin/settings': Settings,
+}
+
 type SearchTarget = {
   to: string
   label: string
   group: string
   keywords: string
+  icon: LucideIcon
 }
 
 export default function AppLayout() {
@@ -118,30 +144,35 @@ export default function AppLayout() {
         label: t('nav.dashboard'),
         group: workspaceGroup,
         keywords: 'home stats',
+        icon: routeIcons['/user/dashboard'],
       },
       {
         to: '/user/files',
         label: t('nav.files'),
         group: workspaceGroup,
         keywords: 'upload media',
+        icon: routeIcons['/user/files'],
       },
       {
         to: '/user/folders',
         label: t('nav.albums'),
         group: workspaceGroup,
         keywords: 'folder directory hierarchy',
+        icon: routeIcons['/user/folders'],
       },
       {
         to: '/user/tokens',
         label: t('nav.tokens'),
         group: workspaceGroup,
         keywords: 'api key',
+        icon: routeIcons['/user/tokens'],
       },
       {
         to: '/user/profile',
         label: t('profile.title'),
         group: workspaceGroup,
         keywords: 'account user',
+        icon: routeIcons['/user/profile'],
       },
     ]
 
@@ -152,30 +183,35 @@ export default function AppLayout() {
           label: t('nav.dashboard'),
           group: adminGroup,
           keywords: 'admin overview',
+          icon: routeIcons['/admin/dashboard'],
         },
         {
           to: '/admin/files',
           label: t('files.adminTitle'),
           group: adminGroup,
           keywords: 'all files moderation',
+          icon: routeIcons['/admin/files'],
         },
         {
           to: '/admin/storage',
           label: t('nav.storage'),
           group: adminGroup,
           keywords: 's3 local driver',
+          icon: routeIcons['/admin/storage'],
         },
         {
           to: '/admin/users',
           label: t('nav.users'),
           group: adminGroup,
           keywords: 'members role',
+          icon: routeIcons['/admin/users'],
         },
         {
           to: '/admin/settings',
           label: t('nav.settings'),
           group: adminGroup,
           keywords: 'config system',
+          icon: routeIcons['/admin/settings'],
         }
       )
     }
@@ -639,46 +675,121 @@ export default function AppLayout() {
             if (!open) setGlobalQuery('')
           }}
         >
-          <DialogContent className="max-h-[min(85vh,600px)] w-[min(90vw,500px)] gap-0 overflow-hidden border-border/80 p-0 shadow-2xl md:max-h-150 md:w-170 [&>button]:hidden">
-            <DialogTitle className="sr-only">Search</DialogTitle>
-            <Command shouldFilter={false} className="rounded-none">
+          <DialogContent
+            // Slightly rounded, softer shadow (previously shadow-2xl was
+            // too heavy against the dimmed backdrop); kept p-0 + overflow-
+            // hidden so the internal border-b/border-t strips render
+            // flush to the rounded corners.
+            className="max-h-[min(85vh,560px)] w-[min(90vw,560px)] gap-0 overflow-hidden rounded-xl border-border/60 p-0 shadow-xl md:max-h-[560px] md:w-[600px] [&>button]:hidden"
+          >
+            <DialogTitle className="sr-only">{t('common.search')}</DialogTitle>
+            <Command shouldFilter={false} className="rounded-none bg-popover">
               <CommandInput
                 autoFocus
                 value={globalQuery}
                 onValueChange={setGlobalQuery}
-                placeholder={`${t('common.search')}...`}
+                // Friendlier placeholder than "搜索..." — hints at what
+                // the palette can actually do (jump to pages by name or
+                // path) rather than being a generic search box.
+                placeholder={t('palette.placeholder')}
+                className="h-12 text-[13px]"
               />
-              <CommandList className="max-h-[min(70vh,520px)]">
-                <CommandEmpty>{t('common.noData')}</CommandEmpty>
+              <CommandList className="max-h-[min(60vh,420px)] py-1.5">
+                <CommandEmpty className="py-8 text-sm text-muted-foreground">
+                  {t('palette.empty')}
+                </CommandEmpty>
                 {Object.entries(groupedTargets).map(
                   ([groupName, items], index) => (
                     <div key={groupName}>
-                      {index > 0 && <CommandSeparator />}
+                      {/* Thin separator between groups — default
+                          CommandSeparator is full-width; trim to match
+                          the item padding so groups feel related, not
+                          walled off. */}
+                      {index > 0 && <CommandSeparator className="mx-3 my-1" />}
                       <CommandGroup
+                        // Group heading styled as a classic section
+                        // label (Linear / Raycast / Tailwind docs):
+                        // tiny, uppercase, wide tracking, low contrast.
+                        // This visually demotes the heading below item
+                        // labels so scanning reads label → label →
+                        // heading is a section, not another row.
                         heading={
-                          <span className="block px-2 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                          <span className="block px-3 pb-1.5 pt-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
                             {groupName}
                           </span>
                         }
+                        className="p-1.5"
                       >
-                        {items.map((target) => (
-                          <CommandItem
-                            key={target.to}
-                            value={`${target.label} ${target.to} ${target.keywords}`}
-                            onSelect={() => goToRoute(target.to)}
-                            className="h-10"
-                          >
-                            <span className="truncate font-medium">
-                              {target.label}
-                            </span>
-                            <CommandShortcut>{target.to}</CommandShortcut>
-                          </CommandItem>
-                        ))}
+                        {items.map((target) => {
+                          const Icon = target.icon
+                          return (
+                            <CommandItem
+                              key={target.to}
+                              value={`${target.label} ${target.to} ${target.keywords}`}
+                              onSelect={() => goToRoute(target.to)}
+                              // px-2.5 + py-2 gives each row ~36px of
+                              // height — balanced against the 14px icon,
+                              // label and route tag, without the old
+                              // awkward h-10 empty-space.
+                              className="gap-2.5 rounded-md px-2.5 py-2"
+                            >
+                              {/* Icon tile: muted neutral by default,
+                                  inherits the accent color via
+                                  data-[selected=true] bubble-up from
+                                  the parent item so the hover / focus
+                                  state is cohesive. */}
+                              <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-muted-foreground">
+                                <Icon className="size-3.5" />
+                              </span>
+                              <span className="flex-1 truncate text-sm font-medium">
+                                {target.label}
+                              </span>
+                              {/* Route path as a subtle monospace hint.
+                                  Previously rendered as CommandShortcut
+                                  with default body size, which made
+                                  each row look data-heavy. Now it's a
+                                  pill-shaped kbd-style tag hidden on
+                                  narrow viewports where the width cost
+                                  outweighs the information. */}
+                              <span className="ml-auto hidden shrink-0 rounded border border-border/60 bg-muted/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-block">
+                                {target.to}
+                              </span>
+                            </CommandItem>
+                          )
+                        })}
                       </CommandGroup>
                     </div>
                   )
                 )}
               </CommandList>
+              {/* Footer hint strip — every serious command palette
+                  (Linear, Raycast, Notion, Vercel) shows these, and
+                  their absence reads as a half-finished widget. Only
+                  surfaced on sm+ because at mobile width the row gets
+                  cramped and the hints are less useful (touch UI). */}
+              <div className="hidden h-9 items-center gap-4 border-t bg-muted/30 px-3 text-[11px] text-muted-foreground sm:flex">
+                <span className="flex items-center gap-1.5">
+                  <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border/60 bg-background px-1 font-mono text-[10px]">
+                    ↑
+                  </kbd>
+                  <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border/60 bg-background px-1 font-mono text-[10px]">
+                    ↓
+                  </kbd>
+                  {t('palette.hintNavigate')}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border/60 bg-background px-1 font-mono text-[10px]">
+                    <CornerDownLeft className="size-3" />
+                  </kbd>
+                  {t('palette.hintSelect')}
+                </span>
+                <span className="ml-auto flex items-center gap-1.5">
+                  <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border/60 bg-background px-1 font-mono text-[10px]">
+                    esc
+                  </kbd>
+                  {t('palette.hintClose')}
+                </span>
+              </div>
             </Command>
           </DialogContent>
         </Dialog>
