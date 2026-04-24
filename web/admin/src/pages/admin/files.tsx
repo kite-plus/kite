@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Trash2,
   FileText,
@@ -17,30 +17,30 @@ import {
   MoreHorizontal,
   Search,
   X,
-} from "lucide-react";
-import { toast } from "sonner";
+} from 'lucide-react'
+import { toast } from 'sonner'
 
-import { adminFileApi, adminStatsApi } from "@/lib/api";
-import { useI18n } from "@/i18n";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { adminFileApi, adminStatsApi } from '@/lib/api'
+import { useI18n } from '@/i18n'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
+} from '@/components/ui/dropdown-menu'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -48,98 +48,102 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { getFileTypeLabel } from "@/lib/file-utils";
-import { PageHeader } from "@/components/page-header";
-import { cn, formatRelativeTime } from "@/lib/utils";
+} from '@/components/ui/table'
+import {
+  getFileIconInfo,
+  getFileTypeLabel,
+  isImagePreviewable,
+} from '@/lib/file-utils'
+import { PageHeader } from '@/components/page-header'
+import { cn, formatRelativeTime } from '@/lib/utils'
 
-const LIST_PAGE_SIZE = 20;
+const LIST_PAGE_SIZE = 20
 
 /* ────────────────────────────────────────────────────────────
  * Types
  * ──────────────────────────────────────────────────────────── */
 interface FileItem {
-  id: string;
-  user_id: string;
-  original_name: string;
-  file_type: string;
-  mime_type: string;
-  size_bytes: number;
-  url: string;
-  source_url?: string;
-  thumb_url?: string;
-  created_at: string;
-  width?: number;
-  height?: number;
+  id: string
+  user_id: string
+  original_name: string
+  file_type: string
+  mime_type: string
+  size_bytes: number
+  url: string
+  source_url?: string
+  thumb_url?: string
+  created_at: string
+  width?: number
+  height?: number
 }
 
 interface AdminStats {
-  users: number;
-  total_files: number;
-  total_size: number;
-  images: number;
-  videos: number;
-  audios: number;
-  others: number;
-  images_size: number;
-  videos_size: number;
-  audios_size: number;
-  others_size: number;
+  users: number
+  total_files: number
+  total_size: number
+  images: number
+  videos: number
+  audios: number
+  others: number
+  images_size: number
+  videos_size: number
+  audios_size: number
+  others_size: number
 }
 
 /* ────────────────────────────────────────────────────────────
  * Helpers
  * ──────────────────────────────────────────────────────────── */
 function formatBytes(bytes: number) {
-  if (!bytes || bytes <= 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  if (!bytes || bytes <= 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
 function fileExt(name: string): string {
-  const m = name.match(/\.([A-Za-z0-9]{1,5})$/);
-  return m ? m[1].toLowerCase() : "";
+  const m = name.match(/\.([A-Za-z0-9]{1,5})$/)
+  return m ? m[1].toLowerCase() : ''
 }
 
 /** Short uppercase badge label: extension if present, otherwise a type tag. */
 function extLabel(file: FileItem): string {
-  const ext = fileExt(file.original_name);
-  if (ext) return ext.toUpperCase();
+  const ext = fileExt(file.original_name)
+  if (ext) return ext.toUpperCase()
   switch (file.file_type) {
-    case "image":
-      return "IMG";
-    case "video":
-      return "VID";
-    case "audio":
-      return "AUD";
+    case 'image':
+      return 'IMG'
+    case 'video':
+      return 'VID'
+    case 'audio':
+      return 'AUD'
     default:
-      return "FILE";
+      return 'FILE'
   }
 }
 
 /** Stable hue hash for per-tile color tinting. */
 function hashHue(seed: string): number {
-  let h = 0;
+  let h = 0
   for (let i = 0; i < seed.length; i++) {
-    h = (h * 31 + seed.charCodeAt(i)) | 0;
+    h = (h * 31 + seed.charCodeAt(i)) | 0
   }
-  return Math.abs(h) % 360;
+  return Math.abs(h) % 360
 }
 
 /** Initial letter for avatar fallback — first non-space character uppercased,
  *  falling back to "U" for unknown identifiers. */
 function avatarInitial(name: string): string {
-  const ch = name.trim().charAt(0);
-  return ch ? ch.toUpperCase() : "U";
+  const ch = name.trim().charAt(0)
+  return ch ? ch.toUpperCase() : 'U'
 }
 
 /** Short display name for the owner column: guests keep the translated label,
  *  real user IDs are truncated to the first 8 hex chars. */
 function ownerLabel(userId: string, guestLabel: string): string {
-  if (!userId || userId === "guest") return guestLabel;
-  return userId.slice(0, 8);
+  if (!userId || userId === 'guest') return guestLabel
+  return userId.slice(0, 8)
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -148,15 +152,15 @@ function ownerLabel(userId: string, guestLabel: string): string {
  *  from a single HSL hue.
  * ──────────────────────────────────────────────────────────── */
 function FileTypeIcon({ file }: { file: FileItem }) {
-  const hue = hashHue(file.id);
+  const hue = hashHue(file.id)
   const Icon =
-    file.file_type === "image"
+    file.file_type === 'image'
       ? ImageIcon
-      : file.file_type === "video"
+      : file.file_type === 'video'
         ? Video
-        : file.file_type === "audio"
+        : file.file_type === 'audio'
           ? Music
-          : FileText;
+          : FileText
   return (
     <div
       className="flex size-7 shrink-0 items-center justify-center rounded-md border"
@@ -167,7 +171,7 @@ function FileTypeIcon({ file }: { file: FileItem }) {
     >
       <Icon className="size-3.5" style={{ color: `hsl(${hue} 50% 40%)` }} />
     </div>
-  );
+  )
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -179,10 +183,10 @@ function StatTile({
   hint,
   icon: Icon,
 }: {
-  label: string;
-  value: React.ReactNode;
-  hint: string;
-  icon: React.ElementType;
+  label: string
+  value: React.ReactNode
+  hint: string
+  icon: React.ElementType
 }) {
   return (
     <Card className="gap-0 py-0">
@@ -199,31 +203,31 @@ function StatTile({
         <div className="mt-1 text-[11px] text-muted-foreground">{hint}</div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 /* ────────────────────────────────────────────────────────────
  * AdminFilesPage
  * ──────────────────────────────────────────────────────────── */
 export default function AdminFilesPage() {
-  const { t, locale } = useI18n();
-  const queryClient = useQueryClient();
+  const { t, locale } = useI18n()
+  const queryClient = useQueryClient()
 
-  const [page, setPage] = useState(1);
-  const [keyword, setKeyword] = useState("");
-  const [fileType, setFileType] = useState("");
-  const [detailFile, setDetailFile] = useState<FileItem | null>(null);
-  const [copied, setCopied] = useState("");
-  const [filterOpen, setFilterOpen] = useState(false);
+  const [page, setPage] = useState(1)
+  const [keyword, setKeyword] = useState('')
+  const [fileType, setFileType] = useState('')
+  const [detailFile, setDetailFile] = useState<FileItem | null>(null)
+  const [copied, setCopied] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
 
   // Staged filter values inside the 高级筛选 dialog — only applied on Save
   // so cancelling discards the edits.
-  const [draftKeyword, setDraftKeyword] = useState("");
-  const [draftType, setDraftType] = useState("");
+  const [draftKeyword, setDraftKeyword] = useState('')
+  const [draftType, setDraftType] = useState('')
 
   /* ── data ─────────────────────────────────────────────── */
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-files", page, keyword, fileType, LIST_PAGE_SIZE],
+    queryKey: ['admin-files', page, keyword, fileType, LIST_PAGE_SIZE],
     queryFn: () =>
       adminFileApi
         .list({
@@ -233,127 +237,125 @@ export default function AdminFilesPage() {
           file_type: fileType,
         })
         .then((r) => r.data.data),
-  });
+  })
 
   const { data: stats } = useQuery<AdminStats>({
-    queryKey: ["admin-stats"],
+    queryKey: ['admin-stats'],
     queryFn: () => adminStatsApi.get().then((r) => r.data.data),
     staleTime: 30_000,
-  });
+  })
 
   /* ── mutations ────────────────────────────────────────── */
   const deleteMutation = useMutation({
     mutationFn: (id: string) => adminFileApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-files"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
-      toast.success(t("files.deleteSuccess"));
+      queryClient.invalidateQueries({ queryKey: ['admin-files'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] })
+      toast.success(t('files.deleteSuccess'))
     },
-    onError: () => toast.error(t("files.deleteFailed")),
-  });
+    onError: () => toast.error(t('files.deleteFailed')),
+  })
 
   /* ── helpers ─────────────────────────────────────────── */
   const copyUrl = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(t("files.linkCopied"));
-    setCopied(key);
-    setTimeout(() => setCopied(""), 1500);
-  };
+    navigator.clipboard.writeText(text)
+    toast.success(t('files.linkCopied'))
+    setCopied(key)
+    setTimeout(() => setCopied(''), 1500)
+  }
 
   const openFilterDialog = () => {
-    setDraftKeyword(keyword);
-    setDraftType(fileType);
-    setFilterOpen(true);
-  };
+    setDraftKeyword(keyword)
+    setDraftType(fileType)
+    setFilterOpen(true)
+  }
 
   const applyFilter = () => {
-    setKeyword(draftKeyword);
-    setFileType(draftType);
-    setPage(1);
-    setFilterOpen(false);
-  };
+    setKeyword(draftKeyword)
+    setFileType(draftType)
+    setPage(1)
+    setFilterOpen(false)
+  }
 
   const clearFilter = () => {
-    setDraftKeyword("");
-    setDraftType("");
-    setKeyword("");
-    setFileType("");
-    setPage(1);
-    setFilterOpen(false);
-  };
+    setDraftKeyword('')
+    setDraftType('')
+    setKeyword('')
+    setFileType('')
+    setPage(1)
+    setFilterOpen(false)
+  }
 
   /** Minimal CSV export of the visible page — RFC 4180-ish escaping. */
   const exportCsv = () => {
-    const items: FileItem[] = data?.items ?? [];
+    const items: FileItem[] = data?.items ?? []
     if (items.length === 0) {
-      toast.info(t("files.noFiles"));
-      return;
+      toast.info(t('files.noFiles'))
+      return
     }
     const header = [
-      t("files.fileName"),
-      t("files.uploader"),
-      t("common.type"),
-      t("common.size"),
-      t("files.uploadedAt"),
-      "URL",
-    ];
+      t('files.fileName'),
+      t('files.uploader'),
+      t('common.type'),
+      t('common.size'),
+      t('files.uploadedAt'),
+      'URL',
+    ]
     const escape = (v: string) => {
-      const s = String(v ?? "");
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
+      const s = String(v ?? '')
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
     const rows = items.map((f) => [
       f.original_name,
-      ownerLabel(f.user_id, t("files.guest")),
+      ownerLabel(f.user_id, t('files.guest')),
       extLabel(f),
       formatBytes(f.size_bytes),
       new Date(f.created_at).toISOString(),
       f.url,
-    ]);
-    const csv = [header, ...rows]
-      .map((r) => r.map(escape).join(","))
-      .join("\n");
-    const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `admin-files-p${page}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-  };
+    ])
+    const csv = [header, ...rows].map((r) => r.map(escape).join(',')).join('\n')
+    const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `admin-files-p${page}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(link.href)
+  }
 
   const types = useMemo(
     () => [
-      { value: "", labelKey: "common.all" },
-      { value: "image", labelKey: "files.images" },
-      { value: "video", labelKey: "files.videos" },
-      { value: "audio", labelKey: "files.audio" },
-      { value: "file", labelKey: "files.otherFiles" },
+      { value: '', labelKey: 'common.all' },
+      { value: 'image', labelKey: 'files.images' },
+      { value: 'video', labelKey: 'files.videos' },
+      { value: 'audio', labelKey: 'files.audio' },
+      { value: 'file', labelKey: 'files.otherFiles' },
     ],
     []
-  );
+  )
 
-  const totalFiles = data?.total ?? stats?.total_files ?? 0;
-  const totalPages = Math.ceil((data?.total ?? 0) / LIST_PAGE_SIZE);
+  const totalFiles = data?.total ?? stats?.total_files ?? 0
+  const totalPages = Math.ceil((data?.total ?? 0) / LIST_PAGE_SIZE)
 
   return (
     <div className="space-y-5">
       {/* ── Header ─────────────────────────────────────── */}
       <PageHeader
-        title={t("files.adminTitle")}
-        description={t("files.adminSub").replace(
-          "{total}",
+        title={t('files.adminTitle')}
+        description={t('files.adminSub').replace(
+          '{total}',
           totalFiles.toLocaleString()
         )}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={openFilterDialog}>
               <Filter className="size-3.5" strokeWidth={1.8} />
-              {t("files.advancedFilter")}
+              {t('files.advancedFilter')}
             </Button>
             <Button variant="outline" size="sm" onClick={exportCsv}>
               <Download className="size-3.5" strokeWidth={1.8} />
-              {t("files.exportList")}
+              {t('files.exportList')}
             </Button>
           </>
         }
@@ -362,27 +364,27 @@ export default function AdminFilesPage() {
       {/* ── 4 Stat tiles: 图片 / 视频 / 音频 / 其它 ───────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile
-          label={t("files.images")}
+          label={t('files.images')}
           value={(stats?.images ?? 0).toLocaleString()}
           hint={formatBytes(stats?.images_size ?? 0)}
           icon={ImageIcon}
         />
         <StatTile
-          label={t("files.videos")}
+          label={t('files.videos')}
           value={(stats?.videos ?? 0).toLocaleString()}
           hint={formatBytes(stats?.videos_size ?? 0)}
           icon={Video}
         />
         <StatTile
-          label={t("files.audio")}
+          label={t('files.audio')}
           value={(stats?.audios ?? 0).toLocaleString()}
           hint={formatBytes(stats?.audios_size ?? 0)}
           icon={Music}
         />
         <StatTile
-          label={t("files.otherFiles")}
+          label={t('files.otherFiles')}
           value={(stats?.others ?? 0).toLocaleString()}
-          hint={t("files.otherDocArchive")}
+          hint={t('files.otherDocArchive')}
           icon={FileText}
         />
       </div>
@@ -402,7 +404,7 @@ export default function AdminFilesPage() {
                 <FileText className="size-5 text-muted-foreground" />
               </div>
               <p className="mt-3 text-sm text-muted-foreground">
-                {t("files.noFiles")}
+                {t('files.noFiles')}
               </p>
             </div>
           ) : (
@@ -412,13 +414,13 @@ export default function AdminFilesPage() {
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="pl-5">
-                        {t("files.fileName")}
+                        {t('files.fileName')}
                       </TableHead>
-                      <TableHead>{t("files.uploader")}</TableHead>
-                      <TableHead>{t("common.type")}</TableHead>
-                      <TableHead>{t("common.size")}</TableHead>
-                      <TableHead>{t("files.accessesCol")}</TableHead>
-                      <TableHead>{t("files.uploadedAt")}</TableHead>
+                      <TableHead>{t('files.uploader')}</TableHead>
+                      <TableHead>{t('common.type')}</TableHead>
+                      <TableHead>{t('common.size')}</TableHead>
+                      <TableHead>{t('files.accessesCol')}</TableHead>
+                      <TableHead>{t('files.uploadedAt')}</TableHead>
                       <TableHead className="w-10 pr-4" />
                     </TableRow>
                   </TableHeader>
@@ -442,12 +444,12 @@ export default function AdminFilesPage() {
                             <Avatar className="size-[18px]">
                               <AvatarFallback className="text-[9px]">
                                 {avatarInitial(
-                                  ownerLabel(file.user_id, t("files.guest"))
+                                  ownerLabel(file.user_id, t('files.guest'))
                                 )}
                               </AvatarFallback>
                             </Avatar>
                             <span className="text-muted-foreground">
-                              @{ownerLabel(file.user_id, t("files.guest"))}
+                              @{ownerLabel(file.user_id, t('files.guest'))}
                             </span>
                           </div>
                         </TableCell>
@@ -475,7 +477,7 @@ export default function AdminFilesPage() {
                                 <Button
                                   size="icon-xs"
                                   variant="ghost"
-                                  aria-label={t("files.more")}
+                                  aria-label={t('files.more')}
                                 >
                                   <MoreHorizontal className="size-3.5" />
                                 </Button>
@@ -483,8 +485,8 @@ export default function AdminFilesPage() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                   onSelect={(e) => {
-                                    e.preventDefault();
-                                    copyUrl(file.url, file.id);
+                                    e.preventDefault()
+                                    copyUrl(file.url, file.id)
                                   }}
                                 >
                                   {copied === file.id ? (
@@ -492,31 +494,31 @@ export default function AdminFilesPage() {
                                   ) : (
                                     <Copy className="size-3.5" />
                                   )}
-                                  {t("files.copyLink")}
+                                  {t('files.copyLink')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onSelect={(e) => {
-                                    e.preventDefault();
+                                    e.preventDefault()
                                     window.open(
                                       file.url,
-                                      "_blank",
-                                      "noopener,noreferrer"
-                                    );
+                                      '_blank',
+                                      'noopener,noreferrer'
+                                    )
                                   }}
                                 >
                                   <ExternalLink className="size-3.5" />
-                                  {t("files.openOriginal")}
+                                  {t('files.openOriginal')}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   variant="destructive"
                                   onSelect={(e) => {
-                                    e.preventDefault();
-                                    deleteMutation.mutate(file.id);
+                                    e.preventDefault()
+                                    deleteMutation.mutate(file.id)
                                   }}
                                 >
                                   <Trash2 className="size-3.5" />
-                                  {t("common.delete")}
+                                  {t('common.delete')}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -542,8 +544,8 @@ export default function AdminFilesPage() {
                         {file.original_name}
                       </p>
                       <p className="truncate text-[11px] text-muted-foreground">
-                        @{ownerLabel(file.user_id, t("files.guest"))} ·{" "}
-                        {formatBytes(file.size_bytes)} ·{" "}
+                        @{ownerLabel(file.user_id, t('files.guest'))} ·{' '}
+                        {formatBytes(file.size_bytes)} ·{' '}
                         {formatRelativeTime(file.created_at, locale)}
                       </p>
                     </div>
@@ -553,7 +555,7 @@ export default function AdminFilesPage() {
                           <Button
                             size="icon-xs"
                             variant="ghost"
-                            aria-label={t("files.more")}
+                            aria-label={t('files.more')}
                           >
                             <MoreHorizontal className="size-3.5" />
                           </Button>
@@ -561,23 +563,23 @@ export default function AdminFilesPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onSelect={(e) => {
-                              e.preventDefault();
-                              copyUrl(file.url, file.id);
+                              e.preventDefault()
+                              copyUrl(file.url, file.id)
                             }}
                           >
                             <Copy className="size-3.5" />
-                            {t("files.copyLink")}
+                            {t('files.copyLink')}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant="destructive"
                             onSelect={(e) => {
-                              e.preventDefault();
-                              deleteMutation.mutate(file.id);
+                              e.preventDefault()
+                              deleteMutation.mutate(file.id)
                             }}
                           >
                             <Trash2 className="size-3.5" />
-                            {t("common.delete")}
+                            {t('common.delete')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -619,17 +621,17 @@ export default function AdminFilesPage() {
       <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("files.advancedFilter")}</DialogTitle>
+            <DialogTitle>{t('files.advancedFilter')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                {t("files.searchFiles")}
+                {t('files.searchFiles')}
               </label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder={t("files.searchFiles")}
+                  placeholder={t('files.searchFiles')}
                   value={draftKeyword}
                   onChange={(e) => setDraftKeyword(e.target.value)}
                   className="pl-8"
@@ -638,37 +640,37 @@ export default function AdminFilesPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                {t("common.type")}
+                {t('common.type')}
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {types.map((tp) => {
-                  const active = draftType === tp.value;
+                  const active = draftType === tp.value
                   const Icon =
-                    tp.value === "image"
+                    tp.value === 'image'
                       ? ImageIcon
-                      : tp.value === "video"
+                      : tp.value === 'video'
                         ? Video
-                        : tp.value === "audio"
+                        : tp.value === 'audio'
                           ? Music
-                          : tp.value === "file"
+                          : tp.value === 'file'
                             ? FileIcon
-                            : null;
+                            : null
                   return (
                     <button
                       type="button"
                       key={tp.value}
                       onClick={() => setDraftType(tp.value)}
                       className={cn(
-                        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+                        'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors',
                         active
-                          ? "border-foreground/30 bg-foreground text-background"
-                          : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                          ? 'border-foreground/30 bg-foreground text-background'
+                          : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
                       )}
                     >
                       {Icon && <Icon className="size-3.5" strokeWidth={1.8} />}
                       {t(tp.labelKey)}
                     </button>
-                  );
+                  )
                 })}
               </div>
             </div>
@@ -676,11 +678,11 @@ export default function AdminFilesPage() {
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="outline" size="sm" onClick={clearFilter}>
               <X className="size-3.5" />
-              {t("common.clear")}
+              {t('common.clear')}
             </Button>
             <Button size="sm" onClick={applyFilter}>
               <Check className="size-3.5" />
-              {t("common.apply")}
+              {t('common.apply')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -699,7 +701,7 @@ export default function AdminFilesPage() {
           </DialogHeader>
           {detailFile && (
             <div className="space-y-4">
-              {detailFile.file_type === "image" && (
+              {isImagePreviewable(detailFile) ? (
                 <div className="checker-bg overflow-hidden rounded-lg border">
                   <img
                     src={detailFile.url}
@@ -707,11 +709,41 @@ export default function AdminFilesPage() {
                     className="max-h-48 w-full object-contain sm:max-h-64"
                   />
                 </div>
+              ) : (
+                (() => {
+                  const info = getFileIconInfo(detailFile)
+                  const Icon = info.icon
+                  const ext = (() => {
+                    const n = detailFile.original_name ?? ''
+                    const i = n.lastIndexOf('.')
+                    return i > 0 ? n.substring(i + 1).toUpperCase() : ''
+                  })()
+                  return (
+                    <div className="relative flex h-40 items-center justify-center overflow-hidden rounded-lg border bg-muted/30 sm:h-48">
+                      <div className="striped-placeholder absolute inset-0 opacity-20" />
+                      <div className="relative flex flex-col items-center gap-2.5">
+                        <div className="flex size-14 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm">
+                          <Icon className="size-7" strokeWidth={1.5} />
+                        </div>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-sm font-medium">
+                            {info.label}
+                          </span>
+                          {ext && (
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                              .{ext}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()
               )}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-xs text-muted-foreground">
-                    {t("common.type")}
+                    {t('common.type')}
                   </span>
                   <p className="font-medium">{getFileTypeLabel(detailFile)}</p>
                 </div>
@@ -723,7 +755,7 @@ export default function AdminFilesPage() {
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">
-                    {t("common.size")}
+                    {t('common.size')}
                   </span>
                   <p className="font-medium">
                     {formatBytes(detailFile.size_bytes)}
@@ -731,15 +763,15 @@ export default function AdminFilesPage() {
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">
-                    {t("files.uploader")}
+                    {t('files.uploader')}
                   </span>
                   <p className="font-medium">
-                    @{ownerLabel(detailFile.user_id, t("files.guest"))}
+                    @{ownerLabel(detailFile.user_id, t('files.guest'))}
                   </p>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">
-                    {t("common.date")}
+                    {t('common.date')}
                   </span>
                   <p className="font-medium">
                     {new Date(detailFile.created_at).toLocaleString()}
@@ -748,28 +780,28 @@ export default function AdminFilesPage() {
               </div>
               <div className="space-y-2">
                 <span className="text-xs font-medium text-muted-foreground">
-                  {t("files.linkFormats")}
+                  {t('files.linkFormats')}
                 </span>
                 {[
-                  { label: "URL", value: detailFile.url },
+                  { label: 'URL', value: detailFile.url },
                   ...(detailFile.source_url
                     ? [
                         {
-                          label: t("files.sourceUrl"),
+                          label: t('files.sourceUrl'),
                           value: detailFile.source_url,
                         },
                       ]
                     : []),
                   {
-                    label: "Markdown",
+                    label: 'Markdown',
                     value: `![${detailFile.original_name}](${detailFile.url})`,
                   },
                   {
-                    label: "HTML",
+                    label: 'HTML',
                     value: `<img src="${detailFile.url}" alt="${detailFile.original_name}">`,
                   },
                   {
-                    label: "BBCode",
+                    label: 'BBCode',
                     value: `[img]${detailFile.url}[/img]`,
                   },
                 ].map((link) => (
@@ -807,19 +839,19 @@ export default function AdminFilesPage() {
                     rel="noopener noreferrer"
                   >
                     <ExternalLink className="size-3.5" />
-                    {t("files.openOriginal")}
+                    {t('files.openOriginal')}
                   </a>
                 </Button>
                 <Button
                   size="sm"
                   variant="destructive"
                   onClick={() => {
-                    deleteMutation.mutate(detailFile.id);
-                    setDetailFile(null);
+                    deleteMutation.mutate(detailFile.id)
+                    setDetailFile(null)
                   }}
                 >
                   <Trash2 className="size-3.5" />
-                  {t("common.delete")}
+                  {t('common.delete')}
                 </Button>
               </div>
             </div>
@@ -827,5 +859,5 @@ export default function AdminFilesPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

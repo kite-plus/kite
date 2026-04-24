@@ -70,7 +70,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
-import { getFileTypeLabel } from '@/lib/file-utils'
+import {
+  getFileIconInfo,
+  getFileTypeLabel,
+  isImagePreviewable,
+} from '@/lib/file-utils'
 import { useAdaptiveGridPageSize } from '@/hooks/use-adaptive-grid-page-size'
 import { PageHeader } from '@/components/page-header'
 import { EmptyKite } from '@/components/empty-state'
@@ -1505,14 +1509,49 @@ export default function FilesPage() {
           </DialogHeader>
           {detailFile && (
             <div className="space-y-4">
-              {detailFile.file_type === 'image' && (
-                <div className="overflow-hidden rounded-lg border bg-muted/30">
+              {isImagePreviewable(detailFile) ? (
+                <div className="checker-bg overflow-hidden rounded-lg border">
                   <img
                     src={detailFile.url}
                     alt={detailFile.original_name}
                     className="max-h-64 w-full object-contain"
                   />
                 </div>
+              ) : (
+                (() => {
+                  // Fallback tile for non-previewable files (PSD, PDF, zips,
+                  // video/audio — anything the browser won't render in an
+                  // <img>). Reuses the file-type icon + label so the dialog
+                  // stays visually anchored instead of collapsing to a bare
+                  // metadata grid or — worse — showing a broken-image glyph.
+                  const info = getFileIconInfo(detailFile)
+                  const Icon = info.icon
+                  const ext = (() => {
+                    const n = detailFile.original_name ?? ''
+                    const i = n.lastIndexOf('.')
+                    return i > 0 ? n.substring(i + 1).toUpperCase() : ''
+                  })()
+                  return (
+                    <div className="relative flex h-48 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
+                      <div className="striped-placeholder absolute inset-0 opacity-20" />
+                      <div className="relative flex flex-col items-center gap-2.5">
+                        <div className="flex size-14 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm">
+                          <Icon className="size-7" strokeWidth={1.5} />
+                        </div>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-sm font-medium">
+                            {info.label}
+                          </span>
+                          {ext && (
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                              .{ext}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()
               )}
 
               <div className="grid grid-cols-2 gap-3 text-sm">
