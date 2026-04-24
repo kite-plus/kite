@@ -24,6 +24,11 @@ func registerAuthPublic(v1 *gin.RouterGroup, h *handler.AuthHandler, settingRepo
 	// token at this point — they've passed the password step but don't
 	// yet have a session cookie to present to middleware.Auth.
 	g.POST("/2fa/verify", h.VerifyTOTP)
+	// Forgot-password flow — both endpoints are public by design
+	// (anonymous users call them) and inherit the shared auth rate
+	// limit above, so an attacker can't mass-spam the mailer.
+	g.POST("/password-reset/request", h.RequestPasswordReset)
+	g.POST("/password-reset/confirm", h.ConfirmPasswordReset)
 }
 
 // registerAuthAuthed wires authenticated profile and credential endpoints.

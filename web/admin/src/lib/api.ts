@@ -100,6 +100,21 @@ export const authApi = {
     api.post('/auth/2fa/disable', { password, code }),
   verifyTotp: (challengeToken: string, code: string) =>
     api.post('/auth/2fa/verify', { challenge_token: challengeToken, code }),
+  // Forgot-password — request ships a 6-digit code to the account's
+  // registered email; confirm rotates the password. The endpoints are
+  // public, so we intentionally don't rely on `withCredentials`.
+  requestPasswordReset: (identifier: string) =>
+    api.post('/auth/password-reset/request', { identifier }),
+  confirmPasswordReset: (
+    identifier: string,
+    code: string,
+    newPassword: string
+  ) =>
+    api.post('/auth/password-reset/confirm', {
+      identifier,
+      code,
+      new_password: newPassword,
+    }),
 }
 
 // Files

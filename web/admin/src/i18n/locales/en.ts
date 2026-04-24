@@ -1029,6 +1029,36 @@ const en = {
     shortcuts: 'Shortcuts',
   },
 
+  forgotPassword: {
+    title: 'Forgot password',
+    subtitle:
+      'Enter your username or email. If the account exists, we’ll send a 6-digit code to the registered email.',
+    identifier: 'Username or email',
+    identifierPlaceholder: 'name or name@example.com',
+    sendCode: 'Send code',
+    sending: 'Sending...',
+    backToLogin: 'Back to login',
+    verifyTitle: 'Check your email',
+    verifySubtitle:
+      'Enter the 6-digit code from the email, then choose a new password.',
+    code: 'Verification code',
+    codeHint: 'Didn’t get it? Check spam or resend',
+    resend: 'Resend',
+    resendIn: 'Resend in {s}s',
+    resent: 'Code resent if the account exists',
+    newPassword: 'New password',
+    resetPassword: 'Reset password',
+    resetting: 'Resetting...',
+    changeIdentifier: 'Use a different account',
+    sentIfExists: 'Code sent if the account exists',
+    sendFailed: 'Failed to send reset code',
+    smtpUnavailable: 'Email delivery is not configured; contact your admin',
+    resetSuccess: 'Password updated, please log in',
+    resetFailed: 'Failed to reset password',
+    codeNotFound: 'No pending reset found — request a new code',
+    codeExpired: 'This code has expired — request a new one',
+  },
+
   twoFactor: {
     enableTitle: 'Enable two-factor auth',
     enableScanDesc:

@@ -5,7 +5,8 @@ import "time"
 // EmailVerificationPurpose enumerates what a verification code unlocks.
 // Kept as typed constants so callers cannot pass a free-form string.
 const (
-	EmailVerifyPurposeEmailChange = "email_change"
+	EmailVerifyPurposeEmailChange   = "email_change"
+	EmailVerifyPurposePasswordReset = "password_reset"
 )
 
 // EmailVerification stores a short-lived hashed verification code tied to a

@@ -18,6 +18,7 @@ type AuthHandler struct {
 	socialAuthSvc            *service.SocialAuthService
 	oauthConfigSvc           *service.OAuthConfigService
 	emailChangeSvc           *service.EmailChangeService
+	passwordResetSvc         *service.PasswordResetService
 	userRepo                 *repo.UserRepo
 	settingRepo              *repo.SettingRepo
 	allowRegistrationDefault bool
@@ -29,6 +30,7 @@ func NewAuthHandler(
 	socialAuthSvc *service.SocialAuthService,
 	oauthConfigSvc *service.OAuthConfigService,
 	emailChangeSvc *service.EmailChangeService,
+	passwordResetSvc *service.PasswordResetService,
 	userRepo *repo.UserRepo,
 	settingRepo *repo.SettingRepo,
 	allowRegistrationDefault bool,
@@ -39,6 +41,7 @@ func NewAuthHandler(
 		socialAuthSvc:            socialAuthSvc,
 		oauthConfigSvc:           oauthConfigSvc,
 		emailChangeSvc:           emailChangeSvc,
+		passwordResetSvc:         passwordResetSvc,
 		userRepo:                 userRepo,
 		settingRepo:              settingRepo,
 		allowRegistrationDefault: allowRegistrationDefault,
@@ -435,4 +438,88 @@ func (h *AuthHandler) ConfirmEmailChange(c *gin.Context) {
 		"has_local_password": user.HasLocalPassword,
 		"role":               user.Role,
 	})
+}
+
+type requestPasswordResetRequest struct {
+	// Identifier may be either a username or an email address — the
+	// same field the login form accepts. Keeping it loose here means
+	// the UI shows a single input labelled "账号 / 邮箱", which is
+	// simpler than forcing the user to remember which they signed up
+	// with.
+	Identifier string `json:"identifier" binding:"required,max=254"`
+}
+
+// RequestPasswordReset kicks off the forgot-password flow. The
+// response shape is constant regardless of whether the identifier
+// resolved to a real account — that's what keeps this endpoint from
+// doubling as a user-enumeration oracle. Real UX difference only
+// shows up in the user's inbox.
+func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
+	if h.passwordResetSvc == nil {
+		ServerError(c, "password reset service unavailable")
+		return
+	}
+	var req requestPasswordResetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "identifier is required")
+		return
+	}
+	expiresAt, err := h.passwordResetSvc.RequestPasswordReset(c.Request.Context(), req.Identifier)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrPasswordResetIdentifierRequired):
+			BadRequest(c, "identifier is required")
+		case errors.Is(err, service.ErrSMTPNotConfigured):
+			// SMTP misconfig is an admin problem, not an
+			// enumeration vector — surface it clearly so the
+			// deployer can fix it.
+			Fail(c, http.StatusFailedDependency, 42400, err.Error())
+		default:
+			ServerError(c, "send reset email failed: "+err.Error())
+		}
+		return
+	}
+	Success(c, gin.H{
+		"expires_at":     expiresAt,
+		"resend_after_s": 60,
+	})
+}
+
+type confirmPasswordResetRequest struct {
+	Identifier  string `json:"identifier" binding:"required,max=254"`
+	Code        string `json:"code" binding:"required,min=4,max=12"`
+	NewPassword string `json:"new_password" binding:"required,min=6,max=64"`
+}
+
+// ConfirmPasswordReset validates the code + identifier, rotates the
+// password, and revokes every existing session on the account via
+// token_version. We do NOT auto-login: the caller is redirected to
+// /login, where any 2FA still in force on the account will be
+// honoured as usual.
+func (h *AuthHandler) ConfirmPasswordReset(c *gin.Context) {
+	if h.passwordResetSvc == nil {
+		ServerError(c, "password reset service unavailable")
+		return
+	}
+	var req confirmPasswordResetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid payload: "+err.Error())
+		return
+	}
+	if err := h.passwordResetSvc.ConfirmPasswordReset(c.Request.Context(), req.Identifier, req.Code, req.NewPassword); err != nil {
+		switch {
+		case errors.Is(err, service.ErrPasswordResetIdentifierRequired):
+			BadRequest(c, "identifier is required")
+		case errors.Is(err, service.ErrVerificationNotFound):
+			Fail(c, http.StatusNotFound, 40400, "no pending reset for this account")
+		case errors.Is(err, service.ErrVerificationCodeWrong):
+			Fail(c, http.StatusBadRequest, 40003, "verification code is incorrect")
+		case errors.Is(err, service.ErrVerificationExpired):
+			Fail(c, http.StatusGone, 41000, "verification code has expired")
+		default:
+			ServerError(c, "confirm password reset failed: "+err.Error())
+		}
+		return
+	}
+	Success(c, gin.H{"reset": true})
 }

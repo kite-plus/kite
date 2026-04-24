@@ -252,8 +252,7 @@ export default function LoginPage() {
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">密码</Label>
                   <Link
-                    to="#"
-                    tabIndex={-1}
+                    to="/forgot-password"
                     className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                   >
                     忘记密码？
