@@ -1,12 +1,14 @@
 package router
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/model"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/service"
 )
@@ -25,10 +27,10 @@ type publicUser struct {
 }
 
 // registerLanding wires the server-rendered landing pages (/, /explore,
-// /upload) and parses the embedded template set. These pages recognise the
-// access_token cookie so the header reflects login state, but they never
-// require authentication.
-func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, settingRepo *repo.SettingRepo, settingDefaults map[string]string) {
+// /upload, /share/:hash) and parses the embedded template set. These pages
+// recognise the access_token cookie so the header reflects login state, but
+// they never require authentication.
+func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, fileRepo *repo.FileRepo, settingRepo *repo.SettingRepo, settingDefaults map[string]string) {
 	if cfg.TemplateFS != nil {
 		if tmpl, err := template.ParseFS(cfg.TemplateFS, "layouts/*.html", "pages/*.html"); err == nil {
 			r.SetHTMLTemplate(tmpl)
@@ -57,6 +59,124 @@ func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, setting
 		data["UploadMaxFileSizeLabel"] = formatUploadMaxFileSizeLabel(uploadMaxFileSizeBytes)
 		c.HTML(http.StatusOK, "upload.html", data)
 	})
+
+	r.GET("/share/:hash", func(c *gin.Context) {
+		settings := loadResolvedSettings(c.Request.Context(), settingRepo, settingDefaults)
+		user := getOptionalUser(c, cfg.AuthSvc, userRepo)
+
+		hash := c.Param("hash")
+		file, err := fileRepo.GetByHashPrefix(c.Request.Context(), hash)
+		if err != nil {
+			data := landingTemplateData(user, settings, "", "文件不存在")
+			data["NotFound"] = true
+			c.HTML(http.StatusNotFound, "share.html", data)
+			return
+		}
+
+		data := landingTemplateData(user, settings, "", file.OriginalName)
+		data["File"] = buildShareFileView(file)
+		c.HTML(http.StatusOK, "share.html", data)
+	})
+}
+
+// buildShareFileView assembles the per-file fields the share.html template
+// reads. Raw URLs are picked per file_type so the template can drop the URL
+// directly into the right element without re-deriving it. Sizes/dates are
+// pre-formatted server-side to keep the template free of helpers.
+func buildShareFileView(file *model.File) gin.H {
+	var rawPath, thumbPath string
+	switch file.FileType {
+	case model.FileTypeImage:
+		rawPath = "/i/" + file.HashMD5
+		thumbPath = "/t/" + file.HashMD5
+	case model.FileTypeVideo:
+		rawPath = "/v/" + file.HashMD5
+	case model.FileTypeAudio:
+		rawPath = "/a/" + file.HashMD5
+	default:
+		rawPath = "/f/" + file.HashMD5
+	}
+
+	ext := ""
+	if dot := strings.LastIndex(file.OriginalName, "."); dot >= 0 && dot < len(file.OriginalName)-1 {
+		ext = strings.ToLower(file.OriginalName[dot+1:])
+	}
+
+	return gin.H{
+		"Hash":         file.HashMD5,
+		"OriginalName": file.OriginalName,
+		"FileType":     file.FileType,
+		"MimeType":     file.MimeType,
+		"SizeLabel":    formatShareSize(file.SizeBytes),
+		"Width":        file.Width,
+		"Height":       file.Height,
+		"Duration":     file.Duration,
+		"DurationText": formatShareDuration(file.Duration),
+		"CreatedAt":    file.CreatedAt.Format("2006-01-02 15:04"),
+		"RawURL":       rawPath,
+		"DownloadURL":  "/f/" + file.HashMD5 + "?dl=1",
+		"ThumbURL":     thumbPath,
+		"Ext":          ext,
+		"IsImage":      file.FileType == model.FileTypeImage,
+		"IsVideo":      file.FileType == model.FileTypeVideo,
+		"IsAudio":      file.FileType == model.FileTypeAudio,
+		"IsPDF":        strings.EqualFold(file.MimeType, "application/pdf") || ext == "pdf",
+		"IsText":       isShareTextLike(file.MimeType, ext),
+	}
+}
+
+// isShareTextLike mirrors the previous React component's text-detection rules
+// so the same MIME types and extensions get an inline preview.
+func isShareTextLike(mime, ext string) bool {
+	m := strings.ToLower(mime)
+	prefixes := []string{
+		"text/",
+		"application/json",
+		"application/xml",
+		"application/javascript",
+		"application/x-yaml",
+		"application/x-sh",
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(m, p) {
+			return true
+		}
+	}
+	textExts := map[string]bool{
+		"md": true, "markdown": true, "txt": true, "log": true, "csv": true, "tsv": true,
+		"json": true, "yaml": true, "yml": true, "xml": true, "html": true, "htm": true,
+		"css": true, "js": true, "ts": true, "tsx": true, "jsx": true, "go": true, "py": true,
+		"rs": true, "java": true, "c": true, "h": true, "cpp": true, "rb": true, "sh": true,
+		"sql": true, "toml": true, "ini": true, "conf": true,
+	}
+	return textExts[ext]
+}
+
+func formatShareSize(b int64) string {
+	switch {
+	case b >= 1<<30:
+		return fmt.Sprintf("%.2f GB", float64(b)/float64(1<<30))
+	case b >= 1<<20:
+		return fmt.Sprintf("%.2f MB", float64(b)/float64(1<<20))
+	case b >= 1<<10:
+		return fmt.Sprintf("%.1f KB", float64(b)/float64(1<<10))
+	default:
+		return fmt.Sprintf("%d B", b)
+	}
+}
+
+func formatShareDuration(d *int) string {
+	if d == nil || *d <= 0 {
+		return ""
+	}
+	s := *d
+	h := s / 3600
+	m := (s % 3600) / 60
+	sec := s % 60
+	if h > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", h, m, sec)
+	}
+	return fmt.Sprintf("%d:%02d", m, sec)
 }
 
 // getOptionalUser decodes the access_token cookie (if any) into a publicUser

@@ -343,61 +343,6 @@ func (h *FileHandler) MoveFile(c *gin.Context) {
 	Success(c, nil)
 }
 
-// ShareInfo returns public metadata for a file referenced by its hash prefix.
-// Used by the universal share page (/share/:hash) so an unauthenticated visitor
-// can see the file name, size and type, then pick the right embedded preview.
-// The endpoint is intentionally read-only and exposes nothing beyond what the
-// raw serve endpoints (/i, /v, /a, /f) already do — anyone with the hash can
-// already pull the bytes, so a metadata response with the same key is no
-// extra leak.
-func (h *FileHandler) ShareInfo(c *gin.Context) {
-	hash := c.Param("hash")
-	file, err := h.fileRepo.GetByHashPrefix(c.Request.Context(), hash)
-	if err != nil {
-		NotFound(c, "file not found")
-		return
-	}
-
-	// Pick the correct raw-serve route per file type so the frontend can
-	// drop the URL into the right element (img/video/audio) without having
-	// to re-derive it from the file_type. Files without a media-shaped
-	// route fall back to /f which streams with a download disposition by
-	// default — the share page passes them through an iframe (PDFs etc.)
-	// or shows a download-only fallback.
-	var rawPath string
-	switch file.FileType {
-	case model.FileTypeImage:
-		rawPath = "/i/" + file.HashMD5
-	case model.FileTypeVideo:
-		rawPath = "/v/" + file.HashMD5
-	case model.FileTypeAudio:
-		rawPath = "/a/" + file.HashMD5
-	default:
-		rawPath = "/f/" + file.HashMD5
-	}
-	downloadPath := "/f/" + file.HashMD5 + "?dl=1"
-
-	var thumbPath string
-	if file.FileType == model.FileTypeImage {
-		thumbPath = "/t/" + file.HashMD5
-	}
-
-	Success(c, gin.H{
-		"hash":          file.HashMD5,
-		"original_name": file.OriginalName,
-		"file_type":     file.FileType,
-		"mime_type":     file.MimeType,
-		"size_bytes":    file.SizeBytes,
-		"width":         file.Width,
-		"height":        file.Height,
-		"duration":      file.Duration,
-		"created_at":    file.CreatedAt,
-		"raw_url":       rawPath,
-		"download_url":  downloadPath,
-		"thumb_url":     thumbPath,
-	})
-}
-
 // ServeImage serves an image over a short link for inline preview.
 func (h *FileHandler) ServeImage(c *gin.Context) {
 	h.serveFile(c, model.FileTypeImage, false)

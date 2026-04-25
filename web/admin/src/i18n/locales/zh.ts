@@ -998,23 +998,6 @@ const zh: Translations = {
     shortcuts: '快捷键',
   },
 
-  share: {
-    notFoundTitle: '文件不存在',
-    notFoundDesc: '该分享链接已失效，或者文件已被删除。',
-    errorTitle: '加载失败',
-    errorDesc: '无法获取分享信息，请稍后再试。',
-    copyLink: '复制链接',
-    download: '下载',
-    openRaw: '在新标签打开',
-    backHome: '返回首页',
-    linkCopied: '链接已复制到剪贴板',
-    linkCopyFailed: '复制失败，请手动复制地址栏链接',
-    unsupportedTitle: '此文件类型不支持在线预览',
-    unsupportedDesc: '你可以下载文件，或在新标签页打开原始文件。',
-    textPreview: '文本预览',
-    textTruncated: '已截断 · 仅展示前 {kb} KB',
-  },
-
   forgotPassword: {
     title: '找回密码',
     subtitle: '输入账号或邮箱，如账号存在我们会发送 6 位验证码到绑定邮箱。',

@@ -87,12 +87,6 @@ func registerPublic(
 ) {
 	pub := v1.Group("/public")
 
-	// Share-info exposes the public metadata for a file by hash prefix. The
-	// matching binary is already publicly readable via /i, /v, /a, /f, so a
-	// JSON sibling is not a new disclosure surface — it's just a friendlier
-	// shape for the universal share page to render.
-	pub.GET("/share/:hash", fileHandler.ShareInfo)
-
 	pub.GET("/stats", func(c *gin.Context) {
 		stats, err := fileRepo.GetStats(c.Request.Context())
 		if err != nil {

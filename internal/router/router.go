@@ -146,7 +146,7 @@ func Setup(cfg Config) *gin.Engine {
 	registerAuthAdmin(admin, oauthProviderAdminHandler)
 	registerUserAdmin(admin, userHandler, fileHandler)
 
-	registerLanding(r, cfg, userRepo, settingRepo, settingDefaults)
+	registerLanding(r, cfg, userRepo, fileRepo, settingRepo, settingDefaults)
 	registerStatic(r, cfg, settingRepo, settingDefaults)
 
 	return r

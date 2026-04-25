@@ -256,10 +256,4 @@ export const setupApi = {
   setup: (data: Record<string, unknown>) => api.post('/setup', data),
 }
 
-// Share — public, no auth required. The endpoint is mounted under /public/* so
-// the auth interceptor's silent-refresh path stays out of the way.
-export const shareApi = {
-  info: (hash: string) => api.get(`/public/share/${hash}`),
-}
-
 export default api
