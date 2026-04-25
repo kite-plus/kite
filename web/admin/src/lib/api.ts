@@ -243,6 +243,13 @@ export const systemStatusApi = {
   ping: () => api.get('/health'),
 }
 
+export const updateCheckApi = {
+  check: (force = false) =>
+    api.get('/admin/system/update-check', {
+      params: force ? { force: 1 } : undefined,
+    }),
+}
+
 // Setup
 export const setupApi = {
   status: () => api.get('/setup/status'),

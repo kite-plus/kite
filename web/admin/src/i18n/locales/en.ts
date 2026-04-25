@@ -1059,6 +1059,13 @@ const en = {
     codeExpired: 'This code has expired — request a new one',
   },
 
+  updateBanner: {
+    available: 'A new version {version} is available',
+    current: 'Currently running {version}',
+    viewRelease: 'View release notes',
+    dismiss: 'Dismiss this version',
+  },
+
   twoFactor: {
     enableTitle: 'Enable two-factor auth',
     enableScanDesc:

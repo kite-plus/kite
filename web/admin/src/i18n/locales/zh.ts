@@ -1013,6 +1013,13 @@ const zh: Translations = {
     codeExpired: '验证码已过期，请重新获取',
   },
 
+  updateBanner: {
+    available: '检测到新版本 {version}',
+    current: '当前版本 {version}',
+    viewRelease: '查看更新内容',
+    dismiss: '忽略此版本',
+  },
+
   twoFactor: {
     enableTitle: '启用两步验证',
     enableScanDesc: '用身份验证器扫描二维码，或手动输入密钥。',

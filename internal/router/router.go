@@ -116,6 +116,8 @@ func Setup(cfg Config) *gin.Engine {
 	userHandler := handler.NewUserHandler(userRepo, fileRepo, accessLogRepo, cfg.AuthSvc)
 	setupHandler := handler.NewSetupHandler(userRepo, settingRepo, storageRepo, cfg.StorageMgr, cfg.AuthSvc, cfg.ReloadStorage)
 	systemStatusHandler := handler.NewSystemStatusRealtimeHandler(realtimeCollector)
+	updateCheckSvc := service.NewUpdateCheckService()
+	updateCheckHandler := handler.NewUpdateCheckHandler(updateCheckSvc)
 
 	// Public short links and top-level non-API routes.
 	registerFilePublicServe(r, fileHandler)
@@ -138,6 +140,7 @@ func Setup(cfg Config) *gin.Engine {
 	admin := authed.Group("")
 	admin.Use(middleware.AdminOnly())
 	registerSystemStatusAdmin(admin, systemStatusHandler)
+	registerUpdateCheckAdmin(admin, updateCheckHandler)
 	registerStorageAdmin(admin, storageHandler)
 	registerSettingsAdmin(admin, settingsHandler)
 	registerAuthAdmin(admin, oauthProviderAdminHandler)

@@ -42,6 +42,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StorageLogo, resolveLogoVendor } from '@/components/storage-logo'
+import { UpdateBanner } from '@/components/update-banner'
 import {
   CardLinkFooter,
   Donut,
@@ -496,6 +497,7 @@ export default function DashboardPage() {
 
   return (
     <div className="page-enter flex flex-col gap-5 sm:gap-6">
+      {isAdminWorkspace && <UpdateBanner />}
       {/* ═════ HERO ═════════════════════════════════════════ */}
       <PageHero>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
