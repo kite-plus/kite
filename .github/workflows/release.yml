@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   docker:
@@ -46,16 +47,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute image tags
         id: tags
         run: |
-          IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/kite"
+          IMAGE="ghcr.io/${{ github.repository }}"
+          # ghcr requires lowercase image names; the repo slug is already
+          # lowercase but normalise just in case a fork uses a mixed-case org.
+          IMAGE="$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')"
           TAGS="${IMAGE}:${{ steps.meta.outputs.tag }},${IMAGE}:${{ steps.meta.outputs.version }}"
           if [ "${{ steps.meta.outputs.is_latest }}" = "true" ]; then
             TAGS="${TAGS},${IMAGE}:latest"
