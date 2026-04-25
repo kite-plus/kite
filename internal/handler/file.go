@@ -478,7 +478,15 @@ func (h *FileHandler) serveFile(c *gin.Context, _ string, forceDownload bool) {
 		case model.FileTypeVideo, model.FileTypeAudio:
 			c.Header("Accept-Ranges", "bytes")
 		default:
-			c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, file.OriginalName))
+			// `?inline=1` opts the share page's iframe into inline rendering
+			// (e.g. PDF preview). Without it the default disposition is still
+			// attachment so direct /f/<hash> links keep their download
+			// behaviour.
+			if c.Query("inline") == "1" {
+				c.Header("Content-Disposition", "inline")
+			} else {
+				c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, file.OriginalName))
+			}
 		}
 	}
 

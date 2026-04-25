@@ -73,17 +73,35 @@ func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, fileRep
 			return
 		}
 
+		baseURL := requestBaseURL(c)
+		var sourceURL string
+		if cfg.FileSvc != nil {
+			sourceURL = cfg.FileSvc.GetSourceURL(c.Request.Context(), file, baseURL)
+		}
+
 		data := landingTemplateData(user, settings, "", file.OriginalName)
-		data["File"] = buildShareFileView(file)
+		data["File"] = buildShareFileView(file, baseURL, sourceURL)
 		c.HTML(http.StatusOK, "share.html", data)
 	})
+}
+
+// requestBaseURL mirrors handler.RequestBaseURL — duplicated here to avoid the
+// router→handler import cycle that would arise from sharing the helper.
+func requestBaseURL(c *gin.Context) string {
+	scheme := "https"
+	if proto := c.GetHeader("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	} else if c.Request.TLS == nil {
+		scheme = "http"
+	}
+	return scheme + "://" + c.Request.Host
 }
 
 // buildShareFileView assembles the per-file fields the share.html template
 // reads. Raw URLs are picked per file_type so the template can drop the URL
 // directly into the right element without re-deriving it. Sizes/dates are
 // pre-formatted server-side to keep the template free of helpers.
-func buildShareFileView(file *model.File) gin.H {
+func buildShareFileView(file *model.File, baseURL, sourceURL string) gin.H {
 	var rawPath, thumbPath string
 	switch file.FileType {
 	case model.FileTypeImage:
@@ -102,6 +120,29 @@ func buildShareFileView(file *model.File) gin.H {
 		ext = strings.ToLower(file.OriginalName[dot+1:])
 	}
 
+	isPDF := strings.EqualFold(file.MimeType, "application/pdf") || ext == "pdf"
+	previewPath := rawPath
+	if isPDF {
+		// /f/<hash> defaults to attachment disposition. Opt into inline so
+		// the iframe in share.html can render the PDF instead of triggering
+		// a download.
+		previewPath = rawPath + "?inline=1"
+	}
+
+	absoluteURL := baseURL + rawPath
+
+	links := []gin.H{
+		{"Label": "URL", "Value": absoluteURL},
+	}
+	if sourceURL != "" {
+		links = append(links, gin.H{"Label": "源站 URL", "Value": sourceURL})
+	}
+	links = append(links,
+		gin.H{"Label": "Markdown", "Value": "![" + file.OriginalName + "](" + absoluteURL + ")"},
+		gin.H{"Label": "HTML", "Value": `<img src="` + absoluteURL + `" alt="` + file.OriginalName + `">`},
+		gin.H{"Label": "BBCode", "Value": "[img]" + absoluteURL + "[/img]"},
+	)
+
 	return gin.H{
 		"Hash":         file.HashMD5,
 		"OriginalName": file.OriginalName,
@@ -114,13 +155,16 @@ func buildShareFileView(file *model.File) gin.H {
 		"DurationText": formatShareDuration(file.Duration),
 		"CreatedAt":    file.CreatedAt.Format("2006-01-02 15:04"),
 		"RawURL":       rawPath,
+		"PreviewURL":   previewPath,
 		"DownloadURL":  "/f/" + file.HashMD5 + "?dl=1",
 		"ThumbURL":     thumbPath,
+		"AbsoluteURL":  absoluteURL,
+		"Links":        links,
 		"Ext":          ext,
 		"IsImage":      file.FileType == model.FileTypeImage,
 		"IsVideo":      file.FileType == model.FileTypeVideo,
 		"IsAudio":      file.FileType == model.FileTypeAudio,
-		"IsPDF":        strings.EqualFold(file.MimeType, "application/pdf") || ext == "pdf",
+		"IsPDF":        isPDF,
 		"IsText":       isShareTextLike(file.MimeType, ext),
 	}
 }

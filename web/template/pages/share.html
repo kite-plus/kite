@@ -78,7 +78,7 @@
             </div>
             {{else if .IsPDF}}
             <div class="overflow-hidden rounded-xl border bg-gray-50">
-                <iframe src="{{.RawURL}}" title="{{.OriginalName}}" class="block h-[78svh] w-full"></iframe>
+                <iframe src="{{.PreviewURL}}" title="{{.OriginalName}}" class="block h-[78svh] w-full"></iframe>
             </div>
             {{else if .IsText}}
             <div class="rounded-xl border bg-gray-50">
@@ -155,6 +155,24 @@
                 </div>
             </div>
             {{end}}
+
+            <!-- Link formats: URL / Source / Markdown / HTML / BBCode -->
+            <div class="mt-6 space-y-2">
+                <p class="text-xs font-medium text-gray-400">链接格式</p>
+                {{range .Links}}
+                <div class="rounded-lg border bg-gray-50 px-3 py-2">
+                    <div class="flex items-start gap-2">
+                        <span class="w-20 shrink-0 pt-1 text-xs text-gray-500">{{.Label}}</span>
+                        <div class="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&amp;::-webkit-scrollbar]:hidden">
+                            <code class="block w-max min-w-full whitespace-nowrap bg-transparent text-xs text-gray-700">{{.Value}}</code>
+                        </div>
+                        <button type="button" data-copy="{{.Value}}" class="share-copy-btn shrink-0 rounded p-1 text-gray-400 hover:bg-white hover:text-gray-700 transition" title="复制">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        </button>
+                    </div>
+                </div>
+                {{end}}
+            </div>
             {{end}}
             {{end}}
         </div>
@@ -164,32 +182,51 @@
 
     <script>
         (function () {
-            var btn = document.getElementById('copyLinkBtn');
-            if (!btn) return;
-            var defaultLabel = btn.innerHTML;
-            btn.addEventListener('click', function () {
-                var url = window.location.href;
-                var done = function () {
-                    btn.innerHTML = '<svg class="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 已复制';
-                    setTimeout(function () { btn.innerHTML = defaultLabel; }, 1500);
-                };
+            function copyText(text) {
                 if (navigator.clipboard && window.isSecureContext) {
-                    navigator.clipboard.writeText(url).then(done).catch(function () {
-                        fallback();
-                    });
-                } else {
-                    fallback();
+                    return navigator.clipboard.writeText(text);
                 }
-                function fallback() {
+                return new Promise(function (resolve, reject) {
                     var ta = document.createElement('textarea');
-                    ta.value = url;
+                    ta.value = text;
                     ta.style.position = 'fixed';
                     ta.style.opacity = '0';
                     document.body.appendChild(ta);
                     ta.select();
-                    try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ }
-                    document.body.removeChild(ta);
-                }
+                    try {
+                        document.execCommand('copy');
+                        resolve();
+                    } catch (e) {
+                        reject(e);
+                    } finally {
+                        document.body.removeChild(ta);
+                    }
+                });
+            }
+
+            // Top-right "复制链接" button copies the share-page URL.
+            var btn = document.getElementById('copyLinkBtn');
+            if (btn) {
+                var defaultLabel = btn.innerHTML;
+                btn.addEventListener('click', function () {
+                    copyText(window.location.href).then(function () {
+                        btn.innerHTML = '<svg class="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 已复制';
+                        setTimeout(function () { btn.innerHTML = defaultLabel; }, 1500);
+                    }).catch(function () { /* ignore */ });
+                });
+            }
+
+            // Per-row copy buttons in the link-formats list.
+            var copyIcon = '<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
+            var checkIcon = '<svg class="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+            document.querySelectorAll('.share-copy-btn').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var text = b.getAttribute('data-copy') || '';
+                    copyText(text).then(function () {
+                        b.innerHTML = checkIcon;
+                        setTimeout(function () { b.innerHTML = copyIcon; }, 1500);
+                    }).catch(function () { /* ignore */ });
+                });
             });
         })();
     </script>
