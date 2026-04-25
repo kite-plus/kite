@@ -1029,6 +1029,24 @@ const en = {
     shortcuts: 'Shortcuts',
   },
 
+  share: {
+    notFoundTitle: 'File not found',
+    notFoundDesc: 'This share link has expired, or the file has been removed.',
+    errorTitle: 'Could not load',
+    errorDesc: 'Failed to fetch share info — please try again later.',
+    copyLink: 'Copy link',
+    download: 'Download',
+    openRaw: 'Open raw',
+    backHome: 'Back to home',
+    linkCopied: 'Link copied to clipboard',
+    linkCopyFailed: 'Could not copy — please copy the address bar manually',
+    unsupportedTitle: 'No inline preview for this file type',
+    unsupportedDesc:
+      'You can download the file or open the raw bytes in a new tab.',
+    textPreview: 'Text preview',
+    textTruncated: 'Truncated · showing first {kb} KB',
+  },
+
   forgotPassword: {
     title: 'Forgot password',
     subtitle:

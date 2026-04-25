@@ -136,6 +136,7 @@ interface FileItem {
   file_type: string
   mime_type: string
   size_bytes: number
+  hash_md5: string
   url: string
   source_url?: string
   thumb_url?: string
@@ -1002,7 +1003,13 @@ export default function FilesPage() {
 
   const bulkShare = async () => {
     if (selectedFiles.length === 0) return
-    const text = selectedFiles.map((f) => f.url).join('\n')
+    // Universal share page — clicking the link lands on /share/:hash where a
+    // type-aware preview is rendered, regardless of whether the file is an
+    // image, video, audio, PDF or anything else.
+    const origin = window.location.origin
+    const text = selectedFiles
+      .map((f) => `${origin}/share/${f.hash_md5}`)
+      .join('\n')
     try {
       await navigator.clipboard.writeText(text)
       toast.success(

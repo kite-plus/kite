@@ -23,6 +23,9 @@ import RegisterPage from '@/pages/register'
 import FirstLoginPage from '@/pages/first-login'
 import ForgotPasswordPage from '@/pages/forgot-password'
 
+// Public
+import SharePage from '@/pages/share'
+
 // User workspace
 import DashboardPage from '@/pages/dashboard'
 import FilesPage from '@/pages/files'
@@ -79,6 +82,9 @@ function AppRoutes() {
   return (
     <AuthContext.Provider value={auth}>
       <Routes>
+        {/* Public share — no auth, no layout chrome */}
+        <Route path="/share/:hash" element={<SharePage />} />
+
         {/* First-login reset (强制首次配置，独立布局) */}
         <Route path="/first-login" element={<FirstLoginOnlyGate />} />
 
