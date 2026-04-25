@@ -79,8 +79,26 @@ func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, fileRep
 			sourceURL = cfg.FileSvc.GetSourceURL(c.Request.Context(), file, baseURL)
 		}
 
+		fileView := buildShareFileView(file, baseURL, sourceURL)
+
+		// Server-side syntax highlighting: when the file is text-shaped, read
+		// up to shareTextPreviewCap bytes and run them through chroma so the
+		// template gets a fully-rendered <pre><code>...</code></pre> block.
+		// Avoids the previous client-side fetch + flash-of-unstyled-content.
+		if cfg.FileSvc != nil && fileView["IsText"] == true {
+			if reader, _, fcErr := cfg.FileSvc.GetFileContent(c.Request.Context(), file); fcErr == nil {
+				html, truncated, hlErr := highlightShareText(reader, file.OriginalName, file.MimeType)
+				reader.Close()
+				if hlErr == nil {
+					fileView["HighlightedHTML"] = template.HTML(html)
+					fileView["HighlightTruncated"] = truncated
+				}
+			}
+		}
+
 		data := landingTemplateData(user, settings, "", file.OriginalName)
-		data["File"] = buildShareFileView(file, baseURL, sourceURL)
+		data["File"] = fileView
+		data["HighlightCSS"] = template.CSS(shareHighlightCSS)
 		c.HTML(http.StatusOK, "share.html", data)
 	})
 }

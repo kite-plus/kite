@@ -4,6 +4,21 @@
 
 <head>
     {{template "head_common" .}}
+    {{if .HighlightCSS}}
+    <style>
+        {{.HighlightCSS}}
+        pre.chroma {
+            margin: 0;
+            padding: 1rem;
+            font-size: 0.75rem;
+            line-height: 1.55;
+            background: transparent !important;
+            overflow: auto;
+            max-height: 78svh;
+        }
+        pre.chroma code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    </style>
+    {{end}}
 </head>
 
 <body hx-boost="true" class="font-sans antialiased bg-white text-gray-900 min-h-screen flex flex-col">
@@ -81,59 +96,20 @@
                 <iframe src="{{.PreviewURL}}" title="{{.OriginalName}}" class="block h-[78svh] w-full"></iframe>
             </div>
             {{else if .IsText}}
-            <div class="rounded-xl border bg-gray-50">
-                <div class="flex items-center justify-between border-b px-4 py-2 text-xs text-gray-500">
+            <div class="overflow-hidden rounded-xl border bg-white">
+                <div class="flex items-center justify-between border-b bg-gray-50 px-4 py-2 text-xs text-gray-500">
                     <span class="inline-flex items-center gap-1.5">
                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        <span id="textMime">{{.MimeType}}</span>
+                        <span>{{.MimeType}}</span>
                     </span>
-                    <span id="textTruncated" class="hidden">超过 256KB 仅显示前 256KB</span>
+                    {{if .HighlightTruncated}}<span>已截断 · 仅展示前 256 KB</span>{{end}}
                 </div>
-                <pre id="textContent" class="max-h-[78svh] overflow-auto p-4 text-xs leading-relaxed text-gray-800">加载中...</pre>
+                {{if .HighlightedHTML}}
+                {{.HighlightedHTML}}
+                {{else}}
+                <pre class="max-h-[78svh] overflow-auto p-4 text-xs leading-relaxed text-gray-800">预览加载失败，请下载文件查看。</pre>
+                {{end}}
             </div>
-            <script>
-                (function () {
-                    var url = '{{.RawURL}}';
-                    var cap = 256 * 1024;
-                    var pre = document.getElementById('textContent');
-                    var truncFlag = document.getElementById('textTruncated');
-                    fetch(url).then(function (r) {
-                        if (!r.ok) throw new Error('status ' + r.status);
-                        var reader = r.body && r.body.getReader();
-                        if (!reader) {
-                            return r.text().then(function (text) {
-                                if (text.length > cap) {
-                                    pre.textContent = text.slice(0, cap);
-                                    truncFlag.classList.remove('hidden');
-                                } else {
-                                    pre.textContent = text;
-                                }
-                            });
-                        }
-                        var decoder = new TextDecoder();
-                        var acc = '';
-                        function step() {
-                            return reader.read().then(function (res) {
-                                if (res.done) {
-                                    pre.textContent = acc;
-                                    return;
-                                }
-                                acc += decoder.decode(res.value, { stream: true });
-                                if (acc.length >= cap) {
-                                    pre.textContent = acc.slice(0, cap);
-                                    truncFlag.classList.remove('hidden');
-                                    try { reader.cancel(); } catch (e) { /* ignore */ }
-                                    return;
-                                }
-                                return step();
-                            });
-                        }
-                        return step();
-                    }).catch(function () {
-                        pre.textContent = '预览加载失败，请下载文件查看。';
-                    });
-                })();
-            </script>
             {{else}}
             <div class="flex flex-col items-center gap-4 rounded-xl border bg-gray-50 px-6 py-16 text-center">
                 <div class="inline-flex h-14 w-14 items-center justify-center rounded-full border bg-white text-gray-500">
