@@ -21,6 +21,13 @@ const (
 	unknownDate    = "unknown"
 )
 
+// APIVersion is the wire-format version of the public HTTP API. Bumped when
+// existing endpoints change shape in a breaking way; new endpoints alone do
+// NOT cause a bump (clients can feature-detect from the OpenAPI spec). The
+// number is stamped on every response via the X-Kite-API-Version header so
+// clients can refuse to talk to an incompatible server early.
+const APIVersion = "1"
+
 // The following vars are overwritten at link time:
 //
 //	go build -ldflags "-X github.com/kite-plus/kite/internal/version.Version=v1.0.0 \

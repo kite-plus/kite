@@ -8,6 +8,10 @@ import (
 
 // registerAuthPublic wires unauthenticated authentication endpoints under
 // /api/v1/auth with a per-IP rate limit to slow credential stuffing.
+//
+// /auth/login and /auth/refresh moved to internal/api (typed/OpenAPI). The
+// gin entries are intentionally absent here — re-adding them would clash
+// with the huma registrations made by api.Register.
 func registerAuthPublic(v1 *gin.RouterGroup, h *handler.AuthHandler, settingRepo *repo.SettingRepo) {
 	g := v1.Group("/auth")
 	g.Use(authRateLimit(settingRepo))
@@ -15,9 +19,7 @@ func registerAuthPublic(v1 *gin.RouterGroup, h *handler.AuthHandler, settingRepo
 	g.GET("/options", h.Options)
 	g.GET("/oauth/:provider/start", h.StartOAuth)
 	g.GET("/oauth/:provider/callback", h.OAuthCallback)
-	g.POST("/login", h.Login)
 	g.POST("/register", h.Register)
-	g.POST("/refresh", h.RefreshToken)
 	g.POST("/oauth/exchange", h.ExchangeOAuth)
 	g.POST("/oauth/onboard", h.OnboardOAuth)
 	// /2fa/verify is public because the caller only holds a challenge
@@ -33,11 +35,13 @@ func registerAuthPublic(v1 *gin.RouterGroup, h *handler.AuthHandler, settingRepo
 
 // registerAuthAuthed wires authenticated profile and credential endpoints.
 // The parent group is expected to already carry middleware.Auth.
+//
+// GET /profile and POST /auth/logout moved to internal/api (typed/OpenAPI).
+// The gin entries are intentionally absent here — duplicates would crash
+// gin at boot.
 func registerAuthAuthed(authed *gin.RouterGroup, h *handler.AuthHandler) {
-	authed.GET("/profile", h.GetProfile)
 	authed.PUT("/profile", h.UpdateProfile)
 	authed.GET("/auth/identities", h.ListIdentities)
-	authed.POST("/auth/logout", h.Logout)
 	authed.POST("/auth/change-password", h.ChangePassword)
 	authed.POST("/auth/set-password", h.SetPassword)
 	authed.POST("/auth/first-login-reset", h.FirstLoginReset)

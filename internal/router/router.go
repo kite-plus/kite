@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/handler"
 	"github.com/kite-plus/kite/internal/middleware"
@@ -58,7 +59,6 @@ func Setup(cfg Config) *gin.Engine {
 	userRepo := repo.NewUserRepo(cfg.DB)
 	fileRepo := repo.NewFileRepo(cfg.DB)
 	albumRepo := repo.NewAlbumRepo(cfg.DB)
-	tokenRepo := repo.NewAPITokenRepo(cfg.DB)
 	identityRepo := repo.NewUserIdentityRepo(cfg.DB)
 	storageRepo := repo.NewStorageConfigRepo(cfg.DB)
 	settingRepo := repo.NewSettingRepo(cfg.DB)
@@ -71,6 +71,11 @@ func Setup(cfg Config) *gin.Engine {
 	// without a redeploy.
 	r.Use(middleware.Recovery())
 	r.Use(middleware.AccessLog())
+	r.Use(middleware.APIVersion())
+	// Stamps *gin.Context onto the request's context.Context so the typed
+	// huma handlers in internal/api can reach gin-only state (cookies, the
+	// auth-middleware context keys, X-Forwarded-Proto, etc.).
+	r.Use(api.GinContextInjector())
 	r.Use(middleware.CORS(middleware.CORSConfig{
 		AllowedOrigins: buildStaticCORSOrigins(cfg),
 		DynamicAllowedOrigins: func() []string {
@@ -104,7 +109,6 @@ func Setup(cfg Config) *gin.Engine {
 
 	fileHandler := handler.NewFileHandler(cfg.FileSvc, fileRepo, albumRepo, accessLogRepo)
 	albumHandler := handler.NewAlbumHandler(albumRepo, fileRepo)
-	tokenHandler := handler.NewTokenHandler(cfg.AuthSvc, tokenRepo)
 	oauthProviderAdminHandler := handler.NewOAuthProviderAdminHandler(oauthConfigSvc)
 	storageHandler := handler.NewStorageHandler(storageRepo, fileRepo, cfg.StorageMgr, cfg.ReloadStorage)
 	emailSvc := service.NewEmailService()
@@ -134,7 +138,6 @@ func Setup(cfg Config) *gin.Engine {
 	registerAuthAuthed(authed, authHandler)
 	registerFileAuthed(authed, fileHandler)
 	registerAlbumRoutes(authed, albumHandler)
-	registerTokenRoutes(authed, tokenHandler)
 	registerUserStatsRoutes(authed, userHandler)
 
 	admin := authed.Group("")
@@ -145,6 +148,16 @@ func Setup(cfg Config) *gin.Engine {
 	registerSettingsAdmin(admin, settingsHandler)
 	registerAuthAdmin(admin, oauthProviderAdminHandler)
 	registerUserAdmin(admin, userHandler, fileHandler)
+
+	// Typed, OpenAPI-described operations. Mounted last so the gin route
+	// table is fully built first — humagin registers each operation against
+	// the same gin.Engine, and gin panics on duplicate method+path pairs.
+	api.Register(r, api.Deps{
+		AuthSvc:         cfg.AuthSvc,
+		AuthMW:          middleware.Auth(cfg.AuthSvc),
+		AdminMW:         middleware.AdminOnly(),
+		AuthRateLimitMW: authRateLimit(settingRepo),
+	})
 
 	registerLanding(r, cfg, userRepo, fileRepo, settingRepo, settingDefaults)
 	registerStatic(r, cfg, settingRepo, settingDefaults)

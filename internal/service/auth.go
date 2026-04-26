@@ -85,6 +85,14 @@ func NewAuthService(userRepo *repo.UserRepo, tokenRepo *repo.APITokenRepo, setti
 	}
 }
 
+// UserRepo exposes the user repository for callers (notably the typed API
+// layer in internal/api) that need to read user records without re-deriving
+// auth-context plumbing. Returns the same instance NewAuthService received.
+func (s *AuthService) UserRepo() *repo.UserRepo { return s.userRepo }
+
+// TokenRepo exposes the API-token repository for the typed API layer.
+func (s *AuthService) TokenRepo() *repo.APITokenRepo { return s.tokenRepo }
+
 // Register performs self-service user registration.
 func (s *AuthService) Register(ctx context.Context, username, email, password string) (*model.User, error) {
 	return s.RegisterWithPolicy(ctx, username, email, password, s.cfg.AllowRegistration)

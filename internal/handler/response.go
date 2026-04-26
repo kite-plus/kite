@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/errcodes"
 )
 
 // Response is the unified JSON envelope returned by every API endpoint.
@@ -24,7 +25,7 @@ type PagedData struct {
 // Success writes a 200 OK response with code 0.
 func Success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Response{
-		Code:    0,
+		Code:    int(errcodes.Success),
 		Message: "success",
 		Data:    data,
 	})
@@ -33,14 +34,15 @@ func Success(c *gin.Context, data interface{}) {
 // Created writes a 201 Created response with code 0.
 func Created(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusCreated, Response{
-		Code:    0,
+		Code:    int(errcodes.Success),
 		Message: "success",
 		Data:    data,
 	})
 }
 
-// Fail writes a non-successful response with the given HTTP status code and
-// business error code.
+// Fail writes a non-successful response. errCode is the business code from
+// the [errcodes] package (httpCode is taken as-is — it must agree with the
+// canonical mapping in [errcodes.Catalog]).
 func Fail(c *gin.Context, httpCode int, errCode int, message string) {
 	c.JSON(httpCode, Response{
 		Code:    errCode,
@@ -49,29 +51,29 @@ func Fail(c *gin.Context, httpCode int, errCode int, message string) {
 	})
 }
 
-// BadRequest writes a 400 response with code 40000.
+// BadRequest writes a 400 response with the generic bad-request code.
 func BadRequest(c *gin.Context, message string) {
-	Fail(c, http.StatusBadRequest, 40000, message)
+	Fail(c, http.StatusBadRequest, int(errcodes.BadRequest), message)
 }
 
-// Unauthorized writes a 401 response with code 40100.
+// Unauthorized writes a 401 response with the generic unauthorized code.
 func Unauthorized(c *gin.Context, message string) {
-	Fail(c, http.StatusUnauthorized, 40100, message)
+	Fail(c, http.StatusUnauthorized, int(errcodes.Unauthorized), message)
 }
 
-// Forbidden writes a 403 response with code 40300.
+// Forbidden writes a 403 response with the generic forbidden code.
 func Forbidden(c *gin.Context, message string) {
-	Fail(c, http.StatusForbidden, 40300, message)
+	Fail(c, http.StatusForbidden, int(errcodes.Forbidden), message)
 }
 
-// NotFound writes a 404 response with code 40400.
+// NotFound writes a 404 response with the generic not-found code.
 func NotFound(c *gin.Context, message string) {
-	Fail(c, http.StatusNotFound, 40400, message)
+	Fail(c, http.StatusNotFound, int(errcodes.NotFound), message)
 }
 
-// ServerError writes a 500 response with code 50000.
+// ServerError writes a 500 response with the generic internal-error code.
 func ServerError(c *gin.Context, message string) {
-	Fail(c, http.StatusInternalServerError, 50000, message)
+	Fail(c, http.StatusInternalServerError, int(errcodes.InternalError), message)
 }
 
 // Paged writes a 200 response wrapping a page of items and pagination metadata.
