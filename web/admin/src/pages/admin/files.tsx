@@ -727,7 +727,7 @@ export default function AdminFilesPage() {
                         </div>
                         <div className="flex flex-col items-center gap-0.5">
                           <span className="text-sm font-medium">
-                            {info.label}
+                            {t(info.labelKey)}
                           </span>
                           {ext && (
                             <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -745,7 +745,9 @@ export default function AdminFilesPage() {
                   <span className="text-xs text-muted-foreground">
                     {t('common.type')}
                   </span>
-                  <p className="font-medium">{getFileTypeLabel(detailFile)}</p>
+                  <p className="font-medium">
+                    {getFileTypeLabel(detailFile, t)}
+                  </p>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">MIME</span>

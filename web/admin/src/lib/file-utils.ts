@@ -20,735 +20,776 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { translate } from '@/i18n'
+
 interface FileIconInfo {
   icon: LucideIcon
   color: string // Tailwind text color class
   bg: string // Tailwind bg color class
-  label: string // Friendly type name in Chinese
+  // i18n key (e.g. "fileType.pdf"). Resolve via the t() returned from
+  // useI18n() so the label re-renders when the user switches locale.
+  // Components without a React context can still resolve it via the
+  // standalone translate() helper.
+  labelKey: string
 }
 
-// Extension → icon/color/label mapping
+// Extension → icon/color/labelKey mapping
 const extMap: Record<string, FileIconInfo> = {
   // PDF
   pdf: {
     icon: FileText,
     color: 'text-red-600',
     bg: 'bg-red-50',
-    label: 'PDF 文档',
+    labelKey: 'fileType.pdf',
   },
   // Word
   doc: {
     icon: FileText,
     color: 'text-blue-700',
     bg: 'bg-blue-50',
-    label: 'Word 文档',
+    labelKey: 'fileType.word',
   },
   docx: {
     icon: FileText,
     color: 'text-blue-700',
     bg: 'bg-blue-50',
-    label: 'Word 文档',
+    labelKey: 'fileType.word',
   },
   odt: {
     icon: FileText,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'ODT 文档',
+    labelKey: 'fileType.odt',
   },
   rtf: {
     icon: FileText,
     color: 'text-blue-500',
     bg: 'bg-blue-50',
-    label: 'RTF 文档',
+    labelKey: 'fileType.rtf',
   },
   pages: {
     icon: FileText,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'Pages 文档',
+    labelKey: 'fileType.pages',
   },
   // Excel / Spreadsheet
   xls: {
     icon: FileSpreadsheet,
     color: 'text-green-700',
     bg: 'bg-green-50',
-    label: 'Excel 表格',
+    labelKey: 'fileType.excel',
   },
   xlsx: {
     icon: FileSpreadsheet,
     color: 'text-green-700',
     bg: 'bg-green-50',
-    label: 'Excel 表格',
+    labelKey: 'fileType.excel',
   },
   ods: {
     icon: FileSpreadsheet,
     color: 'text-green-600',
     bg: 'bg-green-50',
-    label: 'ODS 表格',
+    labelKey: 'fileType.ods',
   },
   numbers: {
     icon: FileSpreadsheet,
     color: 'text-green-600',
     bg: 'bg-green-50',
-    label: 'Numbers 表格',
+    labelKey: 'fileType.numbers',
   },
   csv: {
     icon: FileSpreadsheet,
     color: 'text-green-600',
     bg: 'bg-green-50',
-    label: 'CSV 表格',
+    labelKey: 'fileType.csv',
   },
   // PPT / Presentation
   ppt: {
     icon: FileImage,
     color: 'text-orange-600',
     bg: 'bg-orange-50',
-    label: 'PPT 演示',
+    labelKey: 'fileType.ppt',
   },
   pptx: {
     icon: FileImage,
     color: 'text-orange-600',
     bg: 'bg-orange-50',
-    label: 'PPT 演示',
+    labelKey: 'fileType.ppt',
   },
   odp: {
     icon: FileImage,
     color: 'text-orange-500',
     bg: 'bg-orange-50',
-    label: 'ODP 演示',
+    labelKey: 'fileType.odp',
   },
   key: {
     icon: FileImage,
     color: 'text-orange-600',
     bg: 'bg-orange-50',
-    label: 'Keynote 演示',
+    labelKey: 'fileType.keynote',
   },
   // Plain text & config
   txt: {
     icon: FileText,
     color: 'text-gray-600',
     bg: 'bg-gray-100',
-    label: '纯文本',
+    labelKey: 'fileType.plainText',
   },
   log: {
     icon: FileText,
     color: 'text-gray-500',
     bg: 'bg-gray-100',
-    label: '日志文件',
+    labelKey: 'fileType.log',
   },
   ini: {
     icon: FileText,
     color: 'text-slate-600',
     bg: 'bg-slate-100',
-    label: 'INI 配置',
+    labelKey: 'fileType.iniConfig',
   },
   cfg: {
     icon: FileText,
     color: 'text-slate-600',
     bg: 'bg-slate-100',
-    label: '配置文件',
+    labelKey: 'fileType.config',
   },
   conf: {
     icon: FileText,
     color: 'text-slate-600',
     bg: 'bg-slate-100',
-    label: '配置文件',
+    labelKey: 'fileType.config',
   },
   env: {
     icon: FileText,
     color: 'text-slate-700',
     bg: 'bg-slate-100',
-    label: '环境变量',
+    labelKey: 'fileType.envFile',
   },
   properties: {
     icon: FileText,
     color: 'text-slate-600',
     bg: 'bg-slate-100',
-    label: '属性文件',
+    labelKey: 'fileType.propertiesFile',
   },
   // Markdown & data formats
   md: {
     icon: FileText,
     color: 'text-gray-700',
     bg: 'bg-gray-100',
-    label: 'Markdown',
+    labelKey: 'fileType.markdown',
   },
   mdx: {
     icon: FileText,
     color: 'text-gray-700',
     bg: 'bg-gray-100',
-    label: 'MDX',
+    labelKey: 'fileType.mdx',
   },
   yaml: {
     icon: FileCode,
     color: 'text-purple-600',
     bg: 'bg-purple-50',
-    label: 'YAML',
+    labelKey: 'fileType.yaml',
   },
   yml: {
     icon: FileCode,
     color: 'text-purple-600',
     bg: 'bg-purple-50',
-    label: 'YAML',
+    labelKey: 'fileType.yaml',
   },
   json: {
     icon: FileJson,
     color: 'text-amber-700',
     bg: 'bg-amber-50',
-    label: 'JSON',
+    labelKey: 'fileType.json',
   },
   jsonc: {
     icon: FileJson,
     color: 'text-amber-700',
     bg: 'bg-amber-50',
-    label: 'JSONC',
+    labelKey: 'fileType.jsonc',
   },
   json5: {
     icon: FileJson,
     color: 'text-amber-600',
     bg: 'bg-amber-50',
-    label: 'JSON5',
+    labelKey: 'fileType.json5',
   },
   xml: {
     icon: FileCode,
     color: 'text-orange-600',
     bg: 'bg-orange-50',
-    label: 'XML',
+    labelKey: 'fileType.xml',
   },
   xsl: {
     icon: FileCode,
     color: 'text-orange-500',
     bg: 'bg-orange-50',
-    label: 'XSL',
+    labelKey: 'fileType.xsl',
   },
   toml: {
     icon: FileCode,
     color: 'text-violet-600',
     bg: 'bg-violet-50',
-    label: 'TOML',
+    labelKey: 'fileType.toml',
   },
   svg: {
     icon: FileImage,
     color: 'text-pink-600',
     bg: 'bg-pink-50',
-    label: 'SVG',
+    labelKey: 'fileType.svg',
   },
   graphql: {
     icon: FileCode,
     color: 'text-pink-700',
     bg: 'bg-pink-50',
-    label: 'GraphQL',
+    labelKey: 'fileType.graphql',
   },
   proto: {
     icon: FileCode,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'Protobuf',
+    labelKey: 'fileType.protobuf',
   },
   // Web frontend
   html: {
     icon: Globe,
     color: 'text-orange-700',
     bg: 'bg-orange-50',
-    label: 'HTML',
+    labelKey: 'fileType.html',
   },
   htm: {
     icon: Globe,
     color: 'text-orange-700',
     bg: 'bg-orange-50',
-    label: 'HTML',
+    labelKey: 'fileType.html',
   },
-  css: { icon: FileCode, color: 'text-sky-600', bg: 'bg-sky-50', label: 'CSS' },
+  css: {
+    icon: FileCode,
+    color: 'text-sky-600',
+    bg: 'bg-sky-50',
+    labelKey: 'fileType.css',
+  },
   scss: {
     icon: FileCode,
     color: 'text-pink-600',
     bg: 'bg-pink-50',
-    label: 'SCSS',
+    labelKey: 'fileType.scss',
   },
   sass: {
     icon: FileCode,
     color: 'text-pink-600',
     bg: 'bg-pink-50',
-    label: 'Sass',
+    labelKey: 'fileType.sass',
   },
   less: {
     icon: FileCode,
     color: 'text-indigo-500',
     bg: 'bg-indigo-50',
-    label: 'Less',
+    labelKey: 'fileType.less',
   },
   // JavaScript family
   js: {
     icon: FileCode,
     color: 'text-yellow-700',
     bg: 'bg-yellow-50',
-    label: 'JavaScript',
+    labelKey: 'fileType.javascript',
   },
   jsx: {
     icon: FileCode,
     color: 'text-yellow-700',
     bg: 'bg-yellow-50',
-    label: 'JSX',
+    labelKey: 'fileType.jsx',
   },
   mjs: {
     icon: FileCode,
     color: 'text-yellow-600',
     bg: 'bg-yellow-50',
-    label: 'JavaScript',
+    labelKey: 'fileType.javascript',
   },
   cjs: {
     icon: FileCode,
     color: 'text-yellow-600',
     bg: 'bg-yellow-50',
-    label: 'JavaScript',
+    labelKey: 'fileType.javascript',
   },
   ts: {
     icon: FileCode,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'TypeScript',
+    labelKey: 'fileType.typescript',
   },
   tsx: {
     icon: FileCode,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'TSX',
+    labelKey: 'fileType.tsx',
   },
   vue: {
     icon: FileCode,
     color: 'text-emerald-600',
     bg: 'bg-emerald-50',
-    label: 'Vue',
+    labelKey: 'fileType.vue',
   },
   svelte: {
     icon: FileCode,
     color: 'text-orange-600',
     bg: 'bg-orange-50',
-    label: 'Svelte',
+    labelKey: 'fileType.svelte',
   },
   // Backend languages
   py: {
     icon: FileCode,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'Python',
+    labelKey: 'fileType.python',
   },
-  go: { icon: FileCode, color: 'text-cyan-700', bg: 'bg-cyan-50', label: 'Go' },
+  go: {
+    icon: FileCode,
+    color: 'text-cyan-700',
+    bg: 'bg-cyan-50',
+    labelKey: 'fileType.go',
+  },
   rs: {
     icon: FileCode,
     color: 'text-orange-700',
     bg: 'bg-orange-50',
-    label: 'Rust',
+    labelKey: 'fileType.rust',
   },
   java: {
     icon: FileCode,
     color: 'text-red-600',
     bg: 'bg-red-50',
-    label: 'Java',
+    labelKey: 'fileType.java',
   },
   kt: {
     icon: FileCode,
     color: 'text-purple-600',
     bg: 'bg-purple-50',
-    label: 'Kotlin',
+    labelKey: 'fileType.kotlin',
   },
   scala: {
     icon: FileCode,
     color: 'text-red-500',
     bg: 'bg-red-50',
-    label: 'Scala',
+    labelKey: 'fileType.scala',
   },
-  c: { icon: FileCode, color: 'text-blue-700', bg: 'bg-blue-50', label: 'C' },
+  c: {
+    icon: FileCode,
+    color: 'text-blue-700',
+    bg: 'bg-blue-50',
+    labelKey: 'fileType.cLang',
+  },
   cpp: {
     icon: FileCode,
     color: 'text-blue-700',
     bg: 'bg-blue-50',
-    label: 'C++',
+    labelKey: 'fileType.cpp',
   },
   cc: {
     icon: FileCode,
     color: 'text-blue-700',
     bg: 'bg-blue-50',
-    label: 'C++',
+    labelKey: 'fileType.cpp',
   },
   h: {
     icon: FileCode,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'C 头文件',
+    labelKey: 'fileType.cHeader',
   },
   hpp: {
     icon: FileCode,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'C++ 头文件',
+    labelKey: 'fileType.cppHeader',
   },
   cs: {
     icon: FileCode,
     color: 'text-purple-700',
     bg: 'bg-purple-50',
-    label: 'C#',
+    labelKey: 'fileType.csharp',
   },
-  rb: { icon: FileCode, color: 'text-red-500', bg: 'bg-red-50', label: 'Ruby' },
+  rb: {
+    icon: FileCode,
+    color: 'text-red-500',
+    bg: 'bg-red-50',
+    labelKey: 'fileType.ruby',
+  },
   php: {
     icon: FileCode,
     color: 'text-violet-600',
     bg: 'bg-violet-50',
-    label: 'PHP',
+    labelKey: 'fileType.php',
   },
   swift: {
     icon: FileCode,
     color: 'text-orange-600',
     bg: 'bg-orange-50',
-    label: 'Swift',
+    labelKey: 'fileType.swift',
   },
   dart: {
     icon: FileCode,
     color: 'text-cyan-600',
     bg: 'bg-cyan-50',
-    label: 'Dart',
+    labelKey: 'fileType.dart',
   },
   lua: {
     icon: FileCode,
     color: 'text-blue-700',
     bg: 'bg-blue-50',
-    label: 'Lua',
+    labelKey: 'fileType.lua',
   },
-  r: { icon: FileCode, color: 'text-blue-600', bg: 'bg-blue-50', label: 'R' },
+  r: {
+    icon: FileCode,
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
+    labelKey: 'fileType.rLang',
+  },
   zig: {
     icon: FileCode,
     color: 'text-amber-600',
     bg: 'bg-amber-50',
-    label: 'Zig',
+    labelKey: 'fileType.zig',
   },
   nim: {
     icon: FileCode,
     color: 'text-yellow-700',
     bg: 'bg-yellow-50',
-    label: 'Nim',
+    labelKey: 'fileType.nim',
   },
   hs: {
     icon: FileCode,
     color: 'text-purple-700',
     bg: 'bg-purple-50',
-    label: 'Haskell',
+    labelKey: 'fileType.haskell',
   },
   ml: {
     icon: FileCode,
     color: 'text-orange-600',
     bg: 'bg-orange-50',
-    label: 'OCaml',
+    labelKey: 'fileType.ocaml',
   },
   clj: {
     icon: FileCode,
     color: 'text-green-700',
     bg: 'bg-green-50',
-    label: 'Clojure',
+    labelKey: 'fileType.clojure',
   },
   wasm: {
     icon: FileCode,
     color: 'text-violet-700',
     bg: 'bg-violet-50',
-    label: 'WebAssembly',
+    labelKey: 'fileType.webassembly',
   },
   // Shell & script
   sh: {
     icon: Terminal,
     color: 'text-emerald-700',
     bg: 'bg-emerald-50',
-    label: 'Shell',
+    labelKey: 'fileType.shell',
   },
   bash: {
     icon: Terminal,
     color: 'text-emerald-700',
     bg: 'bg-emerald-50',
-    label: 'Bash',
+    labelKey: 'fileType.bash',
   },
   zsh: {
     icon: Terminal,
     color: 'text-emerald-700',
     bg: 'bg-emerald-50',
-    label: 'Zsh',
+    labelKey: 'fileType.zsh',
   },
   fish: {
     icon: Terminal,
     color: 'text-emerald-600',
     bg: 'bg-emerald-50',
-    label: 'Fish',
+    labelKey: 'fileType.fish',
   },
   ps1: {
     icon: Terminal,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'PowerShell',
+    labelKey: 'fileType.powershell',
   },
   bat: {
     icon: Terminal,
     color: 'text-gray-700',
     bg: 'bg-gray-100',
-    label: '批处理',
+    labelKey: 'fileType.batch',
   },
   cmd: {
     icon: Terminal,
     color: 'text-gray-700',
     bg: 'bg-gray-100',
-    label: '批处理',
+    labelKey: 'fileType.batch',
   },
   // Database & SQL
   sql: {
     icon: Database,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'SQL',
+    labelKey: 'fileType.sql',
   },
   db: {
     icon: Database,
     color: 'text-blue-700',
     bg: 'bg-blue-50',
-    label: '数据库',
+    labelKey: 'fileType.database',
   },
   sqlite: {
     icon: Database,
     color: 'text-blue-700',
     bg: 'bg-blue-50',
-    label: 'SQLite',
+    labelKey: 'fileType.sqlite',
   },
   sqlite3: {
     icon: Database,
     color: 'text-blue-700',
     bg: 'bg-blue-50',
-    label: 'SQLite',
+    labelKey: 'fileType.sqlite',
   },
   // Archives
   zip: {
     icon: FileArchive,
     color: 'text-amber-600',
     bg: 'bg-amber-50',
-    label: 'ZIP 压缩包',
+    labelKey: 'fileType.zipArchive',
   },
   rar: {
     icon: FileArchive,
     color: 'text-amber-600',
     bg: 'bg-amber-50',
-    label: 'RAR 压缩包',
+    labelKey: 'fileType.rarArchive',
   },
   '7z': {
     icon: FileArchive,
     color: 'text-amber-600',
     bg: 'bg-amber-50',
-    label: '7z 压缩包',
+    labelKey: 'fileType.sevenZArchive',
   },
   tar: {
     icon: FileArchive,
     color: 'text-amber-700',
     bg: 'bg-amber-50',
-    label: 'TAR 归档',
+    labelKey: 'fileType.tarArchive',
   },
   gz: {
     icon: FileArchive,
     color: 'text-amber-700',
     bg: 'bg-amber-50',
-    label: 'GZ 压缩包',
+    labelKey: 'fileType.gzArchive',
   },
   tgz: {
     icon: FileArchive,
     color: 'text-amber-700',
     bg: 'bg-amber-50',
-    label: 'TGZ 压缩包',
+    labelKey: 'fileType.tgzArchive',
   },
   bz2: {
     icon: FileArchive,
     color: 'text-amber-700',
     bg: 'bg-amber-50',
-    label: 'BZ2 压缩包',
+    labelKey: 'fileType.bz2Archive',
   },
   xz: {
     icon: FileArchive,
     color: 'text-amber-700',
     bg: 'bg-amber-50',
-    label: 'XZ 压缩包',
+    labelKey: 'fileType.xzArchive',
   },
   // Fonts
   ttf: {
     icon: FileType,
     color: 'text-fuchsia-600',
     bg: 'bg-fuchsia-50',
-    label: 'TrueType 字体',
+    labelKey: 'fileType.truetypeFont',
   },
   otf: {
     icon: FileType,
     color: 'text-fuchsia-600',
     bg: 'bg-fuchsia-50',
-    label: 'OpenType 字体',
+    labelKey: 'fileType.opentypeFont',
   },
   woff: {
     icon: FileType,
     color: 'text-fuchsia-500',
     bg: 'bg-fuchsia-50',
-    label: 'WOFF 字体',
+    labelKey: 'fileType.woffFont',
   },
   woff2: {
     icon: FileType,
     color: 'text-fuchsia-500',
     bg: 'bg-fuchsia-50',
-    label: 'WOFF2 字体',
+    labelKey: 'fileType.woff2Font',
   },
   // Executables / installers
   exe: {
     icon: Cpu,
     color: 'text-slate-700',
     bg: 'bg-slate-100',
-    label: '可执行文件',
+    labelKey: 'fileType.executable',
   },
   msi: {
     icon: Cpu,
     color: 'text-slate-700',
     bg: 'bg-slate-100',
-    label: '安装包',
+    labelKey: 'fileType.installer',
   },
   dmg: {
     icon: Cpu,
     color: 'text-slate-700',
     bg: 'bg-slate-100',
-    label: 'DMG 镜像',
+    labelKey: 'fileType.dmgImage',
   },
   app: {
     icon: Cpu,
     color: 'text-slate-600',
     bg: 'bg-slate-100',
-    label: '应用程序',
+    labelKey: 'fileType.appBundle',
   },
   deb: {
     icon: Cpu,
     color: 'text-red-500',
     bg: 'bg-red-50',
-    label: 'DEB 安装包',
+    labelKey: 'fileType.debInstaller',
   },
   rpm: {
     icon: Cpu,
     color: 'text-red-500',
     bg: 'bg-red-50',
-    label: 'RPM 安装包',
+    labelKey: 'fileType.rpmInstaller',
   },
   apk: {
     icon: Cpu,
     color: 'text-green-600',
     bg: 'bg-green-50',
-    label: 'APK 安装包',
+    labelKey: 'fileType.apkInstaller',
   },
   ipa: {
     icon: Cpu,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: 'IPA 安装包',
+    labelKey: 'fileType.ipaInstaller',
   },
-  jar: { icon: Cpu, color: 'text-red-500', bg: 'bg-red-50', label: 'JAR 包' },
-  war: { icon: Cpu, color: 'text-red-500', bg: 'bg-red-50', label: 'WAR 包' },
+  jar: {
+    icon: Cpu,
+    color: 'text-red-500',
+    bg: 'bg-red-50',
+    labelKey: 'fileType.jarPackage',
+  },
+  war: {
+    icon: Cpu,
+    color: 'text-red-500',
+    bg: 'bg-red-50',
+    labelKey: 'fileType.warPackage',
+  },
   // Design
   psd: {
     icon: Palette,
     color: 'text-blue-700',
     bg: 'bg-blue-50',
-    label: 'Photoshop',
+    labelKey: 'fileType.photoshop',
   },
   ai: {
     icon: Palette,
     color: 'text-orange-700',
     bg: 'bg-orange-50',
-    label: 'Illustrator',
+    labelKey: 'fileType.illustrator',
   },
   sketch: {
     icon: Palette,
     color: 'text-amber-600',
     bg: 'bg-amber-50',
-    label: 'Sketch',
+    labelKey: 'fileType.sketch',
   },
   fig: {
     icon: Palette,
     color: 'text-purple-600',
     bg: 'bg-purple-50',
-    label: 'Figma',
+    labelKey: 'fileType.figma',
   },
   xd: {
     icon: Palette,
     color: 'text-pink-600',
     bg: 'bg-pink-50',
-    label: 'Adobe XD',
+    labelKey: 'fileType.adobeXD',
   },
   // eBooks
   epub: {
     icon: BookOpen,
     color: 'text-teal-600',
     bg: 'bg-teal-50',
-    label: 'EPUB 电子书',
+    labelKey: 'fileType.epub',
   },
   mobi: {
     icon: BookOpen,
     color: 'text-teal-600',
     bg: 'bg-teal-50',
-    label: 'Mobi 电子书',
+    labelKey: 'fileType.mobi',
   },
   azw: {
     icon: BookOpen,
     color: 'text-teal-700',
     bg: 'bg-teal-50',
-    label: 'Kindle 电子书',
+    labelKey: 'fileType.kindle',
   },
   azw3: {
     icon: BookOpen,
     color: 'text-teal-700',
     bg: 'bg-teal-50',
-    label: 'Kindle 电子书',
+    labelKey: 'fileType.kindle',
   },
   // Disk images
   iso: {
     icon: Disc,
     color: 'text-slate-700',
     bg: 'bg-slate-100',
-    label: 'ISO 镜像',
+    labelKey: 'fileType.iso',
   },
   img: {
     icon: Disc,
     color: 'text-slate-600',
     bg: 'bg-slate-100',
-    label: '磁盘映像',
+    labelKey: 'fileType.diskImage',
   },
   vmdk: {
     icon: Disc,
     color: 'text-slate-600',
     bg: 'bg-slate-100',
-    label: 'VMDK 虚拟盘',
+    labelKey: 'fileType.vmdk',
   },
   // Certificates
   pem: {
     icon: FileKey,
     color: 'text-green-700',
     bg: 'bg-green-50',
-    label: 'PEM 证书',
+    labelKey: 'fileType.pemCert',
   },
   crt: {
     icon: FileKey,
     color: 'text-green-700',
     bg: 'bg-green-50',
-    label: '证书文件',
+    labelKey: 'fileType.certificate',
   },
   cer: {
     icon: FileKey,
     color: 'text-green-600',
     bg: 'bg-green-50',
-    label: '证书文件',
+    labelKey: 'fileType.certificate',
   },
   p12: {
     icon: FileKey,
     color: 'text-green-600',
     bg: 'bg-green-50',
-    label: 'PKCS12 证书',
+    labelKey: 'fileType.pkcs12',
   },
   pfx: {
     icon: FileKey,
     color: 'text-green-600',
     bg: 'bg-green-50',
-    label: 'PFX 证书',
+    labelKey: 'fileType.pfx',
   },
 }
 
@@ -794,19 +835,19 @@ const mediaDefaults: Record<string, FileIconInfo> = {
     icon: Image,
     color: 'text-violet-600',
     bg: 'bg-violet-50',
-    label: '图片',
+    labelKey: 'fileType.image',
   },
   video: {
     icon: Video,
     color: 'text-violet-600',
     bg: 'bg-violet-50',
-    label: '视频',
+    labelKey: 'fileType.video',
   },
   audio: {
     icon: Music,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-    label: '音频',
+    labelKey: 'fileType.audio',
   },
 }
 
@@ -814,7 +855,7 @@ const defaultInfo: FileIconInfo = {
   icon: FileText,
   color: 'text-gray-500',
   bg: 'bg-gray-100',
-  label: '文件',
+  labelKey: 'fileType.file',
 }
 
 /** Get file icon info based on file_type, original_name, and mime_type */
@@ -862,13 +903,22 @@ export function getFileIconInfo(file: {
   return defaultInfo
 }
 
-/** Get friendly type label */
-export function getFileTypeLabel(file: {
-  file_type?: string
-  original_name?: string
-  mime_type?: string
-}): string {
-  return getFileIconInfo(file).label
+/**
+ * Resolve a friendly type label. Pass `t` from `useI18n()` to keep the
+ * label reactive to locale changes; omit it in non-React contexts and
+ * the standalone `translate()` helper will read the active locale from
+ * localStorage.
+ */
+export function getFileTypeLabel(
+  file: {
+    file_type?: string
+    original_name?: string
+    mime_type?: string
+  },
+  t?: (key: string) => string
+): string {
+  const key = getFileIconInfo(file).labelKey
+  return t ? t(key) : translate(key)
 }
 
 // Image formats the browser will actually render via <img>. Anything
