@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 // Provider brand marks are inlined as SVG components, not fetched from an
 // external CDN. The previous implementation pulled github / google logos
@@ -92,13 +93,21 @@ function WechatMark({ className }: { className?: string }) {
 
 // ─── Registry ────────────────────────────────────────────────────────
 
+// `label` is null for providers whose brand name doesn't translate
+// (GitHub, Google) — those keep the hard-coded mark below. WeChat
+// resolves through the i18n catalogue because the brand reads
+// "WeChat" in English contexts and "微信" in Chinese contexts.
 const PROVIDER_META: Record<
   SocialProviderKey,
-  { label: string; Mark: (props: { className?: string }) => React.ReactElement }
+  {
+    label: string | null
+    labelKey: string | null
+    Mark: (props: { className?: string }) => React.ReactElement
+  }
 > = {
-  wechat: { label: '微信', Mark: WechatMark },
-  github: { label: 'GitHub', Mark: GithubMark },
-  google: { label: 'Google', Mark: GoogleMark },
+  wechat: { label: null, labelKey: 'auth.providerWechat', Mark: WechatMark },
+  github: { label: 'GitHub', labelKey: null, Mark: GithubMark },
+  google: { label: 'Google', labelKey: null, Mark: GoogleMark },
 }
 
 // ─── Public component ────────────────────────────────────────────────
@@ -118,6 +127,7 @@ export function SocialProviderLogo({
   rounded = 'rounded-md',
   appearance = 'badge',
 }: SocialProviderLogoProps) {
+  const { t } = useI18n()
   // Unknown providers fall through to GitHub — every third-party
   // integration ever shipped here renders a real mark, so the fallback
   // is only relevant for corrupted config and shouldn't draw attention.
@@ -125,7 +135,9 @@ export function SocialProviderLogo({
     (provider as SocialProviderKey) in PROVIDER_META
       ? (provider as SocialProviderKey)
       : 'github'
-  const { label, Mark } = PROVIDER_META[key]
+  const meta = PROVIDER_META[key]
+  const label = meta.labelKey ? t(meta.labelKey) : (meta.label ?? '')
+  const Mark = meta.Mark
 
   // Shared inner scaling: the mark fills the container in `plain` mode
   // (logo sits directly on the surrounding surface) but gets a small

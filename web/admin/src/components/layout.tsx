@@ -1,41 +1,51 @@
-import { Navigate } from "react-router-dom";
-import { FolderKanban, Images, ShieldCheck } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
-import { PageTransition } from "@/components/page-transition";
-import { KiteLogo } from "@/components/kite-logo";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { Navigate } from 'react-router-dom'
+import { FolderKanban, Images, ShieldCheck } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
+import { PageTransition } from '@/components/page-transition'
+import { KiteLogo } from '@/components/kite-logo'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { useI18n } from '@/i18n'
 
-const features = [
-  {
-    icon: FolderKanban,
-    title: "统一文件管理",
-    desc: "集中管理多后端存储，一处掌控全部资产。",
-  },
-  {
-    icon: Images,
-    title: "智能相册归集",
-    desc: "自动整理相册与缩略图，浏览轻盈流畅。",
-  },
-  {
-    icon: ShieldCheck,
-    title: "精细权限控制",
-    desc: "用户、Token、配额一站式配置，安全无忧。",
-  },
-];
+// The features list is built inside the component so each item picks
+// up the active locale's strings from the catalogue. The icon stays
+// outside the catalogue because it's a component reference, not a
+// translatable string.
+function useHeroFeatures() {
+  const { t } = useI18n()
+  return [
+    {
+      icon: FolderKanban,
+      title: t('auth.feature1Title'),
+      desc: t('auth.feature1Desc'),
+    },
+    {
+      icon: Images,
+      title: t('auth.feature2Title'),
+      desc: t('auth.feature2Desc'),
+    },
+    {
+      icon: ShieldCheck,
+      title: t('auth.feature3Title'),
+      desc: t('auth.feature3Desc'),
+    },
+  ]
+}
 
 export function AuthLayout() {
-  const { user, loading } = useAuth();
+  const { user, loading } = useAuth()
+  const { t } = useI18n()
+  const features = useHeroFeatures()
 
   if (loading) {
     return (
       <div className="flex h-svh items-center justify-center bg-background">
         <KiteLogo className="size-8 animate-[splash-pulse_1.4s_ease-in-out_infinite]" />
       </div>
-    );
+    )
   }
 
   if (user) {
-    return <Navigate to="/user/dashboard" replace />;
+    return <Navigate to="/user/dashboard" replace />
   }
 
   return (
@@ -75,12 +85,10 @@ export function AuthLayout() {
         <div className="relative z-10 mt-auto max-w-md space-y-8">
           <div>
             <h2 className="text-3xl font-semibold tracking-tight text-foreground">
-              乘风而起
+              {t('auth.heroSlogan')}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              轻盈自如地管理你的文件、相册与资产。
-              <br />
-              让存储像风筝一样，灵动且触手可及。
+              {t('auth.heroTagline')}
             </p>
           </div>
 
@@ -102,5 +110,5 @@ export function AuthLayout() {
         </div>
       </div>
     </div>
-  );
+  )
 }

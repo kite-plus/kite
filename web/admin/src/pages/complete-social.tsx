@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { authApi } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
+import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,6 +19,7 @@ export default function CompleteSocialPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { refreshProfile } = useAuth()
+  const { t } = useI18n()
   const ticket = searchParams.get('ticket') ?? ''
   const checkedRef = useRef(false)
   const [form, setForm] = useState({
@@ -35,10 +37,10 @@ export default function CompleteSocialPage() {
     if (checkedRef.current) return
     checkedRef.current = true
     if (!ticket) {
-      toast.error('登录票据缺失，请重新发起第三方登录')
+      toast.error(t('auth.errTicketMissing'))
       navigate('/login', { replace: true })
     }
-  }, [navigate, ticket])
+  }, [navigate, ticket, t])
 
   const onboardMutation = useMutation({
     mutationFn: () =>
@@ -52,13 +54,13 @@ export default function CompleteSocialPage() {
       // need to load the new user's profile into the auth store.
       await refreshProfile()
       const data = res.data.data
-      toast.success('账号创建成功，欢迎使用 Kite！')
+      toast.success(t('auth.completeSuccess'))
       navigate(data.return_to || '/user/dashboard', { replace: true })
     },
     onError: (err: unknown) => {
       const backendMsg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? '补全资料失败，请稍后重试'
+          ?.message ?? t('auth.completeFailed')
       toast.error(backendMsg)
     },
   })
@@ -76,14 +78,14 @@ export default function CompleteSocialPage() {
       <div className="space-y-4 text-center">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            暂不可完成注册
+            {t('auth.completeRegistrationClosedTitle')}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            当前站点未开放注册，请联系管理员为你开通账号后再绑定第三方登录。
+            {t('auth.completeRegistrationClosedDesc')}
           </p>
         </div>
         <Button asChild>
-          <Link to="/login">返回登录</Link>
+          <Link to="/login">{t('auth.backToLogin')}</Link>
         </Button>
       </div>
     )
@@ -92,9 +94,11 @@ export default function CompleteSocialPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center">
-        <h2 className="text-2xl font-semibold tracking-tight">补全账号信息</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">
+          {t('auth.completeTitle')}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          本次第三方登录没有返回可直接使用的邮箱，请补全用户名和邮箱后继续。
+          {t('auth.completeSubtitle')}
         </p>
       </div>
 
@@ -103,14 +107,14 @@ export default function CompleteSocialPage() {
         onSubmit={(e) => {
           e.preventDefault()
           if (!form.username.trim() || !form.email.trim()) {
-            toast.error('请完整填写用户名和邮箱')
+            toast.error(t('auth.completeMissingFields'))
             return
           }
           onboardMutation.mutate()
         }}
       >
         <div className="grid gap-2">
-          <Label htmlFor="username">用户名</Label>
+          <Label htmlFor="username">{t('auth.username')}</Label>
           <Input
             id="username"
             value={form.username}
@@ -124,7 +128,7 @@ export default function CompleteSocialPage() {
           />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="email">邮箱</Label>
+          <Label htmlFor="email">{t('auth.email')}</Label>
           <Input
             id="email"
             type="email"
@@ -132,7 +136,7 @@ export default function CompleteSocialPage() {
             onChange={(e) =>
               setForm((prev) => ({ ...prev, email: e.target.value }))
             }
-            placeholder="name@example.com"
+            placeholder={t('auth.emailPlaceholder')}
             required
           />
         </div>
@@ -141,7 +145,7 @@ export default function CompleteSocialPage() {
           {onboardMutation.isPending && (
             <Loader2 className="size-4 animate-spin" />
           )}
-          完成并进入 Kite
+          {t('auth.completeFinish')}
         </Button>
       </form>
     </div>

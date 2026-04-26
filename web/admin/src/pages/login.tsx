@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { KiteLogo } from '@/components/kite-logo'
 import { SocialProviderLogo } from '@/components/social-provider-logo'
+import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 
 interface AuthOptions {
@@ -30,6 +31,7 @@ interface AuthOptions {
 
 export default function LoginPage() {
   const { login, verifyTotp } = useAuth()
+  const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
   const [username, setUsername] = useState('')
@@ -77,7 +79,7 @@ export default function LoginPage() {
     try {
       const [outcome] = await Promise.all([login(username, password), minDelay])
       if (outcome.ok) {
-        toast.success('登录成功啦！')
+        toast.success(t('auth.signInSuccess'))
         navigate(redirectTo, { replace: true })
         return
       }
@@ -98,15 +100,20 @@ export default function LoginPage() {
         ?.status
       const backendMsg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message
-      let msg = '登录失败，请稍后重试'
+      // Status-aware messages keep the UX friendly when the backend
+      // returns a generic envelope. The 401 / 403 / 429 / 5xx branches
+      // win over backendMsg because the catalogue copy is purpose-built
+      // for those flows; backendMsg is the fallback for everything else
+      // (validation errors, business-logic 400s, etc.).
+      let msg = t('auth.errLoginFailed')
       if (status === 401) {
-        msg = '账号或密码错误，请重试'
+        msg = t('auth.invalidCredentials')
       } else if (status === 403) {
-        msg = '账号已被停用，请联系管理员'
+        msg = t('auth.errAccountDisabled')
       } else if (status === 429) {
-        msg = '尝试过于频繁，请稍后再试'
+        msg = t('auth.errRateLimited')
       } else if (status && status >= 500) {
-        msg = '服务暂时不可用，请稍后再试'
+        msg = t('auth.errServerUnavailable')
       } else if (backendMsg) {
         msg = backendMsg
       }
@@ -122,17 +129,17 @@ export default function LoginPage() {
     setTotpLoading(true)
     try {
       await verifyTotp(challenge.token, totpCode)
-      toast.success('登录成功啦！')
+      toast.success(t('auth.signInSuccess'))
       navigate(redirectTo, { replace: true })
     } catch (err) {
       const status = (err as { response?: { status?: number } })?.response
         ?.status
       const backendMsg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message
-      let msg = '验证失败，请重新输入'
+      let msg = t('auth.errTotpInvalid')
       if (status === 401) {
         // challenge expired or invalid — return to password step
-        msg = '验证会话已过期，请重新登录'
+        msg = t('auth.errTotpExpired')
         setChallenge(null)
       } else if (backendMsg) {
         msg = backendMsg
@@ -171,18 +178,36 @@ export default function LoginPage() {
             <div className="mb-2 inline-flex size-10 items-center justify-center rounded-full border bg-muted/50 text-foreground">
               <ShieldCheck className="size-5" />
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight">两步验证</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              {t('auth.totpTitle')}
+            </h2>
+            {/* Split the locale entry around the {username} placeholder
+                so the username keeps its bold styling. The catalogue's
+                Chinese form puts the placeholder in the middle of the
+                sentence; the English form does too — both flank it with
+                fixed pre/post copy. */}
             <p className="text-sm text-muted-foreground">
-              账号{' '}
-              <span className="font-medium text-foreground">{username}</span>{' '}
-              已开启两步验证，请输入身份验证器上的 6 位数字动态码。
+              {t('auth.totpHint')
+                .split('{username}')
+                .flatMap((piece, idx, arr) =>
+                  idx < arr.length - 1
+                    ? [
+                        piece,
+                        <span key={idx} className="font-medium text-foreground">
+                          {username}
+                        </span>,
+                      ]
+                    : [piece]
+                )}
             </p>
           </div>
         ) : (
           <div className="flex flex-col space-y-1.5 text-start">
-            <h2 className="text-2xl font-semibold tracking-tight">欢迎回来</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              {t('auth.welcomeBack')}
+            </h2>
             <p className="text-sm text-muted-foreground">
-              请登录你的 Kite 账号
+              {t('auth.signInDesc')}
             </p>
           </div>
         )}
@@ -190,7 +215,7 @@ export default function LoginPage() {
         {challenge && (
           <form onSubmit={handleVerifyTotp} className="grid gap-3 pt-4">
             <div className="grid gap-2">
-              <Label htmlFor="totp">动态码</Label>
+              <Label htmlFor="totp">{t('auth.totpLabel')}</Label>
               <Input
                 id="totp"
                 ref={totpInputRef}
@@ -217,7 +242,7 @@ export default function LoginPage() {
               ) : (
                 <ShieldCheck className="size-4" />
               )}
-              {totpLoading ? '验证中...' : '验证并登录'}
+              {totpLoading ? t('auth.verifying') : t('auth.verifyAndLogin')}
             </Button>
             <Button
               type="button"
@@ -226,7 +251,7 @@ export default function LoginPage() {
               disabled={totpLoading}
             >
               <ArrowLeft className="size-4" />
-              返回登录
+              {t('auth.backToLogin')}
             </Button>
           </form>
         )}
@@ -235,7 +260,7 @@ export default function LoginPage() {
           <>
             <form onSubmit={handleSubmit} className="grid gap-3 pt-2">
               <div className="grid gap-2">
-                <Label htmlFor="username">账号</Label>
+                <Label htmlFor="username">{t('auth.usernameOrEmail')}</Label>
                 <Input
                   id="username"
                   autoCapitalize="none"
@@ -250,12 +275,12 @@ export default function LoginPage() {
 
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">密码</Label>
+                  <Label htmlFor="password">{t('auth.password')}</Label>
                   <Link
                     to="/forgot-password"
                     className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                   >
-                    忘记密码？
+                    {t('auth.forgotPassword')}
                   </Link>
                 </div>
                 <div className="relative">
@@ -274,7 +299,11 @@ export default function LoginPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
                     className="absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                    aria-label={
+                      showPassword
+                        ? t('auth.hidePassword')
+                        : t('auth.showPassword')
+                    }
                   >
                     {showPassword ? (
                       <EyeOff className="size-4" />
@@ -291,7 +320,7 @@ export default function LoginPage() {
                 ) : (
                   <LogIn className="size-4" />
                 )}
-                {loading ? '登录中...' : '登录'}
+                {loading ? t('auth.signingIn') : t('auth.login')}
               </Button>
 
               {socialProviders.length > 0 && (
@@ -302,7 +331,7 @@ export default function LoginPage() {
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
                       <span className="bg-background px-2 text-muted-foreground">
-                        或使用以下方式继续
+                        {t('auth.continueWith')}
                       </span>
                     </div>
                   </div>
@@ -332,35 +361,35 @@ export default function LoginPage() {
             <p className="mt-6 text-center text-sm text-muted-foreground">
               {allowRegistration ? (
                 <>
-                  还没有账号？{' '}
+                  {t('auth.noAccount')}{' '}
                   <Link
                     to="/register"
                     className="font-medium text-foreground underline-offset-4 hover:underline"
                   >
-                    立即注册
+                    {t('auth.signUpNow')}
                   </Link>
                 </>
               ) : (
-                '当前站点未开放注册'
+                t('auth.registrationClosed')
               )}
             </p>
 
             <p className="mt-4 text-center text-xs text-muted-foreground">
-              点击登录即表示您同意我们的{' '}
+              {t('auth.termsLoginPrefix')}{' '}
               <a
                 href="#"
                 className="underline underline-offset-4 hover:text-foreground"
               >
-                服务条款
+                {t('auth.termsTOS')}
               </a>{' '}
-              和{' '}
+              {t('auth.termsAnd')}{' '}
               <a
                 href="#"
                 className="underline underline-offset-4 hover:text-foreground"
               >
-                隐私政策
+                {t('auth.termsPrivacy')}
               </a>
-              。
+              {t('auth.termsSuffix')}
             </p>
           </>
         )}
