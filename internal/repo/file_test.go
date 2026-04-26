@@ -331,23 +331,57 @@ func TestFileRepo_GetStats(t *testing.T) {
 	r := NewFileRepo(newTestDB(t))
 	ctx := context.Background()
 
-	r.Create(ctx, makeFile("gs1", "u1", model.FileTypeImage, 100))
+	// Use distinct counts and sizes per type so the per-type breakdown can
+	// be validated alongside the totals — earlier the per-type *sizes*
+	// went uncovered, which let the loop refactor land without exercising
+	// the size accumulation path.
+	r.Create(ctx, makeFile("gs1a", "u1", model.FileTypeImage, 100))
+	r.Create(ctx, makeFile("gs1b", "u1", model.FileTypeImage, 50))
 	r.Create(ctx, makeFile("gs2", "u1", model.FileTypeVideo, 200))
 	r.Create(ctx, makeFile("gs3", "u1", model.FileTypeAudio, 300))
-	r.Create(ctx, makeFile("gs4", "u1", model.FileTypeFile, 400))
+	r.Create(ctx, makeFile("gs4a", "u1", model.FileTypeFile, 400))
+	r.Create(ctx, makeFile("gs4b", "u2", model.FileTypeFile, 1))
 
 	stats, err := r.GetStats(ctx)
 	if err != nil {
 		t.Fatalf("GetStats: %v", err)
 	}
-	if stats.TotalFiles != 4 {
-		t.Fatalf("TotalFiles: expected 4, got %d", stats.TotalFiles)
+	if stats.TotalFiles != 6 {
+		t.Fatalf("TotalFiles: expected 6, got %d", stats.TotalFiles)
 	}
-	if stats.TotalSize != 1000 {
-		t.Fatalf("TotalSize: expected 1000, got %d", stats.TotalSize)
+	if stats.TotalSize != 1051 {
+		t.Fatalf("TotalSize: expected 1051, got %d", stats.TotalSize)
 	}
-	if stats.ImageCount != 1 || stats.VideoCount != 1 || stats.AudioCount != 1 || stats.OtherCount != 1 {
+	if stats.ImageCount != 2 || stats.VideoCount != 1 || stats.AudioCount != 1 || stats.OtherCount != 2 {
 		t.Fatalf("per-type counts wrong: %+v", stats)
+	}
+	if stats.ImageSize != 150 || stats.VideoSize != 200 || stats.AudioSize != 300 || stats.OtherSize != 401 {
+		t.Fatalf("per-type sizes wrong: %+v", stats)
+	}
+}
+
+func TestFileRepo_GetStats_IgnoresDeleted(t *testing.T) {
+	// Soft-deleted rows must not pollute either the totals or the per-type
+	// buckets. The single-query collapse adds a WHERE is_deleted=false to
+	// the GROUP BY; this guards against accidentally dropping it.
+	r := NewFileRepo(newTestDB(t))
+	ctx := context.Background()
+
+	r.Create(ctx, makeFile("gd1", "u1", model.FileTypeImage, 100))
+	r.Create(ctx, makeFile("gd2", "u1", model.FileTypeImage, 999))
+	if err := r.SoftDelete(ctx, "gd2"); err != nil {
+		t.Fatalf("SoftDelete: %v", err)
+	}
+
+	stats, err := r.GetStats(ctx)
+	if err != nil {
+		t.Fatalf("GetStats: %v", err)
+	}
+	if stats.TotalFiles != 1 || stats.TotalSize != 100 {
+		t.Fatalf("totals leaked deleted rows: %+v", stats)
+	}
+	if stats.ImageCount != 1 || stats.ImageSize != 100 {
+		t.Fatalf("image bucket leaked deleted rows: %+v", stats)
 	}
 }
 
@@ -355,15 +389,28 @@ func TestFileRepo_GetUserStats(t *testing.T) {
 	r := NewFileRepo(newTestDB(t))
 	ctx := context.Background()
 
-	r.Create(ctx, makeFile("us1", "u1", model.FileTypeImage, 50))
-	r.Create(ctx, makeFile("us2", "u2", model.FileTypeImage, 999))
+	// Two users, each with files of every type, so the user_id predicate
+	// gets exercised against every per-type bucket and the cross-user
+	// rows must be invisible.
+	r.Create(ctx, makeFile("us1a", "u1", model.FileTypeImage, 50))
+	r.Create(ctx, makeFile("us1b", "u1", model.FileTypeVideo, 60))
+	r.Create(ctx, makeFile("us1c", "u1", model.FileTypeAudio, 70))
+	r.Create(ctx, makeFile("us1d", "u1", model.FileTypeFile, 80))
+	r.Create(ctx, makeFile("us2a", "u2", model.FileTypeImage, 999))
+	r.Create(ctx, makeFile("us2b", "u2", model.FileTypeFile, 999))
 
 	stats, err := r.GetUserStats(ctx, "u1")
 	if err != nil {
 		t.Fatalf("GetUserStats: %v", err)
 	}
-	if stats.TotalFiles != 1 || stats.TotalSize != 50 {
-		t.Fatalf("GetUserStats: %+v", stats)
+	if stats.TotalFiles != 4 || stats.TotalSize != 260 {
+		t.Fatalf("user totals wrong: %+v", stats)
+	}
+	if stats.ImageCount != 1 || stats.VideoCount != 1 || stats.AudioCount != 1 || stats.OtherCount != 1 {
+		t.Fatalf("user per-type counts wrong: %+v", stats)
+	}
+	if stats.ImageSize != 50 || stats.VideoSize != 60 || stats.AudioSize != 70 || stats.OtherSize != 80 {
+		t.Fatalf("user per-type sizes wrong: %+v", stats)
 	}
 }
 
