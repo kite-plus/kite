@@ -8,6 +8,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
+	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/model"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/service"
@@ -39,20 +41,22 @@ func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, fileRep
 
 	r.GET("/", func(c *gin.Context) {
 		settings := loadResolvedSettings(c.Request.Context(), settingRepo, settingDefaults)
-		data := landingTemplateData(getOptionalUser(c, cfg.AuthSvc, userRepo), settings, "", "")
+		data := landingTemplateData(c, getOptionalUser(c, cfg.AuthSvc, userRepo), settings, "", "")
 		c.HTML(http.StatusOK, "index.html", data)
 	})
 
 	r.GET("/explore", func(c *gin.Context) {
 		settings := loadResolvedSettings(c.Request.Context(), settingRepo, settingDefaults)
-		data := landingTemplateData(getOptionalUser(c, cfg.AuthSvc, userRepo), settings, "explore", "探索广场")
+		locale := middleware.LocaleFromGin(c)
+		data := landingTemplateData(c, getOptionalUser(c, cfg.AuthSvc, userRepo), settings, "explore", i18n.T(locale, "explore.title"))
 		data["GalleryEnabled"] = strings.EqualFold(settings[service.AllowPublicGallerySettingKey], "true")
 		c.HTML(http.StatusOK, "explore.html", data)
 	})
 
 	r.GET("/upload", func(c *gin.Context) {
 		settings := loadResolvedSettings(c.Request.Context(), settingRepo, settingDefaults)
-		data := landingTemplateData(getOptionalUser(c, cfg.AuthSvc, userRepo), settings, "upload", "上传文件")
+		locale := middleware.LocaleFromGin(c)
+		data := landingTemplateData(c, getOptionalUser(c, cfg.AuthSvc, userRepo), settings, "upload", i18n.T(locale, "upload.title"))
 		data["GuestUploadEnabled"] = strings.EqualFold(settings[service.AllowGuestUploadSettingKey], "true")
 		uploadMaxFileSizeBytes := resolveUploadMaxFileSizeBytes(settings, cfg.UploadMaxFileSize)
 		data["UploadMaxFileSizeBytes"] = uploadMaxFileSizeBytes
@@ -63,11 +67,12 @@ func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, fileRep
 	r.GET("/share/:hash", func(c *gin.Context) {
 		settings := loadResolvedSettings(c.Request.Context(), settingRepo, settingDefaults)
 		user := getOptionalUser(c, cfg.AuthSvc, userRepo)
+		locale := middleware.LocaleFromGin(c)
 
 		hash := c.Param("hash")
 		file, err := fileRepo.GetByHashPrefix(c.Request.Context(), hash)
 		if err != nil {
-			data := landingTemplateData(user, settings, "", "文件不存在")
+			data := landingTemplateData(c, user, settings, "", i18n.T(locale, "share.not_found_title"))
 			data["NotFound"] = true
 			c.HTML(http.StatusNotFound, "share.html", data)
 			return
@@ -79,7 +84,7 @@ func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, fileRep
 			sourceURL = cfg.FileSvc.GetSourceURL(c.Request.Context(), file, baseURL)
 		}
 
-		fileView := buildShareFileView(file, baseURL, sourceURL)
+		fileView := buildShareFileView(c, file, baseURL, sourceURL)
 
 		// Server-side syntax highlighting: when the file is text-shaped, read
 		// up to shareTextPreviewCap bytes and run them through chroma so the
@@ -96,7 +101,7 @@ func registerLanding(r *gin.Engine, cfg Config, userRepo *repo.UserRepo, fileRep
 			}
 		}
 
-		data := landingTemplateData(user, settings, "", file.OriginalName)
+		data := landingTemplateData(c, user, settings, "", file.OriginalName)
 		data["File"] = fileView
 		data["HighlightCSS"] = template.CSS(shareHighlightCSS)
 		c.HTML(http.StatusOK, "share.html", data)
@@ -119,7 +124,12 @@ func requestBaseURL(c *gin.Context) string {
 // reads. Raw URLs are picked per file_type so the template can drop the URL
 // directly into the right element without re-deriving it. Sizes/dates are
 // pre-formatted server-side to keep the template free of helpers.
-func buildShareFileView(file *model.File, baseURL, sourceURL string) gin.H {
+//
+// The gin context is required so the "Source URL" link label can be
+// translated alongside the rest of the page — the other labels (URL,
+// Markdown, HTML, BBCode) are technical identifiers so they stay in
+// English regardless of locale.
+func buildShareFileView(c *gin.Context, file *model.File, baseURL, sourceURL string) gin.H {
 	var rawPath, thumbPath string
 	switch file.FileType {
 	case model.FileTypeImage:
@@ -149,11 +159,12 @@ func buildShareFileView(file *model.File, baseURL, sourceURL string) gin.H {
 
 	absoluteURL := baseURL + rawPath
 
+	locale := middleware.LocaleFromGin(c)
 	links := []gin.H{
 		{"Label": "URL", "Value": absoluteURL},
 	}
 	if sourceURL != "" {
-		links = append(links, gin.H{"Label": "源站 URL", "Value": sourceURL})
+		links = append(links, gin.H{"Label": i18n.T(locale, "share.source_url_label"), "Value": sourceURL})
 	}
 	links = append(links,
 		gin.H{"Label": "Markdown", "Value": "![" + file.OriginalName + "](" + absoluteURL + ")"},

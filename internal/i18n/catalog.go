@@ -583,6 +583,12 @@ var Catalog = map[string]map[Locale]string{
 		LocaleZH: "获取统计数据失败",
 	},
 
+	// ── Admin page-title decoration ─────────────────────────────────────
+	"admin.page_title_suffix": {
+		LocaleEN: "%s admin",
+		LocaleZH: "%s 管理后台",
+	},
+
 	// ── Templates: layout / nav / footer ────────────────────────────────
 	"nav.explore": {
 		LocaleEN: "Explore",
@@ -607,8 +613,12 @@ var Catalog = map[string]map[Locale]string{
 
 	// ── Templates: index / landing hero ─────────────────────────────────
 	"index.hero_eyebrow": {
-		LocaleEN: "Self-hosted media library",
-		LocaleZH: "自托管媒体库",
+		LocaleEN: "Open source · self-hosted · single-binary launch",
+		LocaleZH: "开源 · 自部署 · 单文件极速启动",
+	},
+	"index.stats_files": {
+		LocaleEN: "%s files",
+		LocaleZH: "%s 个文件",
 	},
 	"index.hero_title_1": {
 		LocaleEN: "Drop in. Share out.",
@@ -696,6 +706,278 @@ var Catalog = map[string]map[Locale]string{
 		LocaleEN: "Failed to load — tap to retry",
 		LocaleZH: "加载失败 —— 点击重试",
 	},
+	"explore.tab_all": {
+		LocaleEN: "All",
+		LocaleZH: "全部",
+	},
+	"explore.tab_image": {
+		LocaleEN: "Images",
+		LocaleZH: "图片",
+	},
+	"explore.tab_video": {
+		LocaleEN: "Videos",
+		LocaleZH: "视频",
+	},
+	"explore.tab_audio": {
+		LocaleEN: "Audio",
+		LocaleZH: "音频",
+	},
+	"explore.tab_file": {
+		LocaleEN: "Files",
+		LocaleZH: "文件",
+	},
+	"explore.empty_files": {
+		LocaleEN: "No public files yet",
+		LocaleZH: "暂无公开文件",
+	},
+	"explore.type_pdf": {
+		LocaleEN: "PDF document",
+		LocaleZH: "PDF 文档",
+	},
+	"explore.type_word": {
+		LocaleEN: "Word document",
+		LocaleZH: "Word 文档",
+	},
+	"explore.type_odt": {
+		LocaleEN: "ODT document",
+		LocaleZH: "ODT 文档",
+	},
+	"explore.type_rtf": {
+		LocaleEN: "RTF document",
+		LocaleZH: "RTF 文档",
+	},
+	"explore.type_pages": {
+		LocaleEN: "Pages document",
+		LocaleZH: "Pages 文档",
+	},
+	"explore.type_excel": {
+		LocaleEN: "Excel spreadsheet",
+		LocaleZH: "Excel 表格",
+	},
+	"explore.type_ods": {
+		LocaleEN: "ODS spreadsheet",
+		LocaleZH: "ODS 表格",
+	},
+	"explore.type_numbers": {
+		LocaleEN: "Numbers spreadsheet",
+		LocaleZH: "Numbers 表格",
+	},
+	"explore.type_csv": {
+		LocaleEN: "CSV spreadsheet",
+		LocaleZH: "CSV 表格",
+	},
+	"explore.type_ppt": {
+		LocaleEN: "PowerPoint presentation",
+		LocaleZH: "PPT 演示",
+	},
+	"explore.type_odp": {
+		LocaleEN: "ODP presentation",
+		LocaleZH: "ODP 演示",
+	},
+	"explore.type_keynote": {
+		LocaleEN: "Keynote presentation",
+		LocaleZH: "Keynote 演示",
+	},
+	"explore.type_text": {
+		LocaleEN: "Plain text",
+		LocaleZH: "纯文本",
+	},
+	"explore.type_log": {
+		LocaleEN: "Log file",
+		LocaleZH: "日志文件",
+	},
+	"explore.type_ini": {
+		LocaleEN: "INI config",
+		LocaleZH: "INI 配置",
+	},
+	"explore.type_config": {
+		LocaleEN: "Config file",
+		LocaleZH: "配置文件",
+	},
+	"explore.type_env": {
+		LocaleEN: "Env file",
+		LocaleZH: "环境变量",
+	},
+	"explore.type_properties": {
+		LocaleEN: "Properties file",
+		LocaleZH: "属性文件",
+	},
+	"explore.type_c_header": {
+		LocaleEN: "C header",
+		LocaleZH: "C 头文件",
+	},
+	"explore.type_cpp_header": {
+		LocaleEN: "C++ header",
+		LocaleZH: "C++ 头文件",
+	},
+	"explore.type_shell": {
+		LocaleEN: "Shell",
+		LocaleZH: "Shell",
+	},
+	"explore.type_batch": {
+		LocaleEN: "Batch script",
+		LocaleZH: "批处理",
+	},
+	"explore.type_database": {
+		LocaleEN: "Database",
+		LocaleZH: "数据库",
+	},
+	"explore.type_zip_archive": {
+		LocaleEN: "ZIP archive",
+		LocaleZH: "ZIP 压缩包",
+	},
+	"explore.type_rar_archive": {
+		LocaleEN: "RAR archive",
+		LocaleZH: "RAR 压缩包",
+	},
+	"explore.type_7z_archive": {
+		LocaleEN: "7z archive",
+		LocaleZH: "7z 压缩包",
+	},
+	"explore.type_tar_archive": {
+		LocaleEN: "TAR archive",
+		LocaleZH: "TAR 归档",
+	},
+	"explore.type_gz_archive": {
+		LocaleEN: "GZ archive",
+		LocaleZH: "GZ 压缩包",
+	},
+	"explore.type_tgz_archive": {
+		LocaleEN: "TGZ archive",
+		LocaleZH: "TGZ 压缩包",
+	},
+	"explore.type_bz2_archive": {
+		LocaleEN: "BZ2 archive",
+		LocaleZH: "BZ2 压缩包",
+	},
+	"explore.type_xz_archive": {
+		LocaleEN: "XZ archive",
+		LocaleZH: "XZ 压缩包",
+	},
+	"explore.type_truetype_font": {
+		LocaleEN: "TrueType font",
+		LocaleZH: "TrueType 字体",
+	},
+	"explore.type_opentype_font": {
+		LocaleEN: "OpenType font",
+		LocaleZH: "OpenType 字体",
+	},
+	"explore.type_woff_font": {
+		LocaleEN: "WOFF font",
+		LocaleZH: "WOFF 字体",
+	},
+	"explore.type_woff2_font": {
+		LocaleEN: "WOFF2 font",
+		LocaleZH: "WOFF2 字体",
+	},
+	"explore.type_executable": {
+		LocaleEN: "Executable",
+		LocaleZH: "可执行文件",
+	},
+	"explore.type_installer": {
+		LocaleEN: "Installer",
+		LocaleZH: "安装包",
+	},
+	"explore.type_dmg_image": {
+		LocaleEN: "DMG image",
+		LocaleZH: "DMG 镜像",
+	},
+	"explore.type_application": {
+		LocaleEN: "Application",
+		LocaleZH: "应用程序",
+	},
+	"explore.type_deb_installer": {
+		LocaleEN: "DEB installer",
+		LocaleZH: "DEB 安装包",
+	},
+	"explore.type_rpm_installer": {
+		LocaleEN: "RPM installer",
+		LocaleZH: "RPM 安装包",
+	},
+	"explore.type_apk_installer": {
+		LocaleEN: "APK installer",
+		LocaleZH: "APK 安装包",
+	},
+	"explore.type_ipa_installer": {
+		LocaleEN: "IPA installer",
+		LocaleZH: "IPA 安装包",
+	},
+	"explore.type_jar_archive": {
+		LocaleEN: "JAR archive",
+		LocaleZH: "JAR 包",
+	},
+	"explore.type_war_archive": {
+		LocaleEN: "WAR archive",
+		LocaleZH: "WAR 包",
+	},
+	"explore.type_epub_book": {
+		LocaleEN: "EPUB book",
+		LocaleZH: "EPUB 电子书",
+	},
+	"explore.type_mobi_book": {
+		LocaleEN: "Mobi book",
+		LocaleZH: "Mobi 电子书",
+	},
+	"explore.type_kindle_book": {
+		LocaleEN: "Kindle book",
+		LocaleZH: "Kindle 电子书",
+	},
+	"explore.type_iso_image": {
+		LocaleEN: "ISO image",
+		LocaleZH: "ISO 镜像",
+	},
+	"explore.type_disk_image": {
+		LocaleEN: "Disk image",
+		LocaleZH: "磁盘映像",
+	},
+	"explore.type_vmdk_disk": {
+		LocaleEN: "VMDK virtual disk",
+		LocaleZH: "VMDK 虚拟盘",
+	},
+	"explore.type_pem_cert": {
+		LocaleEN: "PEM certificate",
+		LocaleZH: "PEM 证书",
+	},
+	"explore.type_cert": {
+		LocaleEN: "Certificate",
+		LocaleZH: "证书文件",
+	},
+	"explore.type_pkcs12_cert": {
+		LocaleEN: "PKCS12 certificate",
+		LocaleZH: "PKCS12 证书",
+	},
+	"explore.type_pfx_cert": {
+		LocaleEN: "PFX certificate",
+		LocaleZH: "PFX 证书",
+	},
+	"explore.type_lock": {
+		LocaleEN: "Lock file",
+		LocaleZH: "Lock 文件",
+	},
+	"explore.type_image": {
+		LocaleEN: "Image",
+		LocaleZH: "图片",
+	},
+	"explore.type_video": {
+		LocaleEN: "Video",
+		LocaleZH: "视频",
+	},
+	"explore.type_audio": {
+		LocaleEN: "Audio",
+		LocaleZH: "音频",
+	},
+	"explore.type_text_file": {
+		LocaleEN: "Text file",
+		LocaleZH: "文本文件",
+	},
+	"explore.type_unknown": {
+		LocaleEN: "Unknown type",
+		LocaleZH: "未知类型",
+	},
+	"explore.type_ext_suffix": {
+		LocaleEN: "%s file",
+		LocaleZH: "%s 文件",
+	},
 
 	// ── Templates: upload page ──────────────────────────────────────────
 	"upload.title": {
@@ -770,6 +1052,198 @@ var Catalog = map[string]map[Locale]string{
 		LocaleEN: "Upload failed",
 		LocaleZH: "上传失败",
 	},
+	"upload.subtitle_short": {
+		LocaleEN: "Drag or click to choose files. Share links appear right after upload.",
+		LocaleZH: "拖拽或点击选择文件，上传后即刻获取分享链接。",
+	},
+	"upload.dropzone_sub_long": {
+		LocaleEN: "Images, video, audio and documents · max %s per file",
+		LocaleZH: "支持图片、视频、音频和文档，单文件最大 %s",
+	},
+	"upload.guest_disabled_body_pre": {
+		LocaleEN: "Please ",
+		LocaleZH: "请",
+	},
+	"upload.guest_disabled_login_link": {
+		LocaleEN: "sign in",
+		LocaleZH: "登录",
+	},
+	"upload.guest_disabled_body_post": {
+		LocaleEN: " to upload, or ask an admin to enable guest uploads.",
+		LocaleZH: "后上传文件，或联系管理员开启游客上传。",
+	},
+	"upload.unnamed_file": {
+		LocaleEN: "Untitled file",
+		LocaleZH: "未命名文件",
+	},
+	"upload.rate_limited": {
+		LocaleEN: "Upload rate limited — please retry shortly",
+		LocaleZH: "上传请求过于频繁，请稍后再试",
+	},
+	"upload.processing": {
+		LocaleEN: "Processing",
+		LocaleZH: "处理中",
+	},
+	"upload.done": {
+		LocaleEN: "Done",
+		LocaleZH: "完成",
+	},
+	"upload.failed": {
+		LocaleEN: "Failed",
+		LocaleZH: "失败",
+	},
+	"upload.toast_success": {
+		LocaleEN: "Uploaded: %s",
+		LocaleZH: "上传成功：%s",
+	},
+	"upload.toast_failed": {
+		LocaleEN: "Upload failed: %s",
+		LocaleZH: "上传失败：%s",
+	},
+	"upload.toast_failed_name": {
+		LocaleEN: "Upload failed: %s",
+		LocaleZH: "上传失败：%s",
+	},
+	"upload.toast_network_error": {
+		LocaleEN: "Network error: %s",
+		LocaleZH: "网络错误：%s",
+	},
+	"upload.error_too_large_with_name": {
+		LocaleEN: "%s exceeds the per-file limit (%s)",
+		LocaleZH: "%s 超过单文件大小上限（%s）",
+	},
+	"upload.copy_label_default": {
+		LocaleEN: "Content",
+		LocaleZH: "内容",
+	},
+	"upload.copied_suffix": {
+		LocaleEN: "%s copied",
+		LocaleZH: "%s已复制",
+	},
+	"upload.copy_empty": {
+		LocaleEN: "Nothing to copy",
+		LocaleZH: "没有可复制的内容",
+	},
+	"upload.copy_failed": {
+		LocaleEN: "Copy failed — please copy manually",
+		LocaleZH: "复制失败，请手动复制",
+	},
+	"upload.uploaded_badge": {
+		LocaleEN: "Uploaded",
+		LocaleZH: "已上传",
+	},
+	"upload.link_short": {
+		LocaleEN: "Short link",
+		LocaleZH: "短链接",
+	},
+	"upload.link_source": {
+		LocaleEN: "Source URL",
+		LocaleZH: "源 URL",
+	},
+	"upload.copy_btn": {
+		LocaleEN: "Copy",
+		LocaleZH: "复制",
+	},
+	"upload.copy_tooltip": {
+		LocaleEN: "Click to copy",
+		LocaleZH: "点击复制",
+	},
+	"upload.type_html_page": {
+		LocaleEN: "HTML page",
+		LocaleZH: "HTML 页面",
+	},
+	"upload.type_css_style": {
+		LocaleEN: "CSS stylesheet",
+		LocaleZH: "CSS 样式",
+	},
+	"upload.type_scss_style": {
+		LocaleEN: "SCSS stylesheet",
+		LocaleZH: "SCSS 样式",
+	},
+	"upload.type_sass_style": {
+		LocaleEN: "Sass stylesheet",
+		LocaleZH: "Sass 样式",
+	},
+	"upload.type_less_style": {
+		LocaleEN: "Less stylesheet",
+		LocaleZH: "Less 样式",
+	},
+	"upload.type_vue_file": {
+		LocaleEN: "Vue file",
+		LocaleZH: "Vue 文件",
+	},
+	"upload.type_svelte_file": {
+		LocaleEN: "Svelte file",
+		LocaleZH: "Svelte 文件",
+	},
+	"upload.type_shell_script": {
+		LocaleEN: "Shell script",
+		LocaleZH: "Shell 脚本",
+	},
+	"upload.type_bash_script": {
+		LocaleEN: "Bash script",
+		LocaleZH: "Bash 脚本",
+	},
+	"upload.type_zsh_script": {
+		LocaleEN: "Zsh script",
+		LocaleZH: "Zsh 脚本",
+	},
+	"upload.type_fish_script": {
+		LocaleEN: "Fish script",
+		LocaleZH: "Fish 脚本",
+	},
+	"upload.type_powershell_script": {
+		LocaleEN: "PowerShell script",
+		LocaleZH: "PowerShell 脚本",
+	},
+	"upload.type_sql_file": {
+		LocaleEN: "SQL file",
+		LocaleZH: "SQL 文件",
+	},
+	"upload.type_db_file": {
+		LocaleEN: "Database file",
+		LocaleZH: "数据库文件",
+	},
+	"upload.type_sqlite_db": {
+		LocaleEN: "SQLite database",
+		LocaleZH: "SQLite 数据库",
+	},
+	"upload.type_targz_archive": {
+		LocaleEN: "TAR.GZ archive",
+		LocaleZH: "TAR.GZ 压缩包",
+	},
+	"upload.type_tarbz2_archive": {
+		LocaleEN: "TAR.BZ2 archive",
+		LocaleZH: "TAR.BZ2 压缩包",
+	},
+	"upload.type_tarxz_archive": {
+		LocaleEN: "TAR.XZ archive",
+		LocaleZH: "TAR.XZ 压缩包",
+	},
+	"upload.type_psd_file": {
+		LocaleEN: "Photoshop file",
+		LocaleZH: "Photoshop 文件",
+	},
+	"upload.type_ai_file": {
+		LocaleEN: "Illustrator file",
+		LocaleZH: "Illustrator 文件",
+	},
+	"upload.type_sketch_file": {
+		LocaleEN: "Sketch file",
+		LocaleZH: "Sketch 文件",
+	},
+	"upload.type_fig_file": {
+		LocaleEN: "Figma file",
+		LocaleZH: "Figma 文件",
+	},
+	"upload.type_xd_file": {
+		LocaleEN: "Adobe XD file",
+		LocaleZH: "Adobe XD 文件",
+	},
+	"upload.type_file": {
+		LocaleEN: "File",
+		LocaleZH: "文件",
+	},
 
 	// ── Templates: share page ───────────────────────────────────────────
 	"share.not_found_title": {
@@ -824,6 +1298,34 @@ var Catalog = map[string]map[Locale]string{
 		LocaleEN: "Source URL",
 		LocaleZH: "源站 URL",
 	},
+	"share.copy_link": {
+		LocaleEN: "Copy link",
+		LocaleZH: "复制链接",
+	},
+	"share.preview_truncated_256k": {
+		LocaleEN: "Truncated · showing first 256 KB",
+		LocaleZH: "已截断 · 仅展示前 256 KB",
+	},
+	"share.preview_failed": {
+		LocaleEN: "Preview failed — download to view the full file.",
+		LocaleZH: "预览加载失败，请下载文件查看。",
+	},
+	"share.no_preview_title": {
+		LocaleEN: "Inline preview unavailable",
+		LocaleZH: "该文件无法在线预览",
+	},
+	"share.no_preview_body": {
+		LocaleEN: "Browsers can't embed this file type — download a copy to open it locally.",
+		LocaleZH: "浏览器不支持这种文件的内嵌预览，请下载到本地后打开。",
+	},
+	"share.open_new_tab": {
+		LocaleEN: "Open in new tab",
+		LocaleZH: "新标签页打开",
+	},
+	"share.link_formats": {
+		LocaleEN: "Link formats",
+		LocaleZH: "链接格式",
+	},
 
 	// ── Footer ──────────────────────────────────────────────────────────
 	"footer.upload": {
@@ -858,6 +1360,12 @@ var Catalog = map[string]map[Locale]string{
 		LocaleEN: "%s install wizard",
 		LocaleZH: "%s 安装向导",
 	},
+	// Doc-title slug (no site-name interpolation) — used for the
+	// browser tab title on the install wizard.
+	"setup_page.doc_title": {
+		LocaleEN: "Install wizard",
+		LocaleZH: "安装向导",
+	},
 	"setup_page.subtitle": {
 		LocaleEN: "Two minutes to set up database / site / admin / storage.",
 		LocaleZH: "两分钟完成 数据库 / 站点 / 管理员 / 存储 配置",
@@ -885,6 +1393,10 @@ var Catalog = map[string]map[Locale]string{
 	"setup_page.db_current": {
 		LocaleEN: "Current %s · %s",
 		LocaleZH: "当前 %s · %s",
+	},
+	"setup_page.db_current_prefix": {
+		LocaleEN: "Current",
+		LocaleZH: "当前",
 	},
 	"setup_page.db_intro": {
 		LocaleEN: "SQLite needs no operations and fits a single user / small team. MySQL / PostgreSQL fit multi-instance deploys.",
@@ -1054,6 +1566,22 @@ var Catalog = map[string]map[Locale]string{
 		LocaleEN: "The new connection string was written to %s. Reopen this page after the restart to continue.",
 		LocaleZH: "新的连接串已写入 %s。重启进程后再次打开本页面即可继续后续步骤。",
 	},
+	"setup_page.restart_body_pre": {
+		LocaleEN: "The new connection string was written to ",
+		LocaleZH: "新的连接串已写入 ",
+	},
+	"setup_page.restart_body_post": {
+		LocaleEN: ". Reopen this page after the restart to continue.",
+		LocaleZH: "。重启进程后再次打开本页面即可继续后续步骤。",
+	},
+	"setup_page.restart_run_directly": {
+		LocaleEN: "Run directly",
+		LocaleZH: "直接运行",
+	},
+	"setup_page.restart_run_directly_cmd": {
+		LocaleEN: "After ^C, run ./kite again",
+		LocaleZH: "^C 后再次执行 ./kite",
+	},
 	"setup_page.restart_done": {
 		LocaleEN: "Restarted — refresh this page ↻",
 		LocaleZH: "重启完成，刷新本页 ↻",
@@ -1125,5 +1653,21 @@ var Catalog = map[string]map[Locale]string{
 	"setup_page.status_install_request_failed": {
 		LocaleEN: "Install request failed",
 		LocaleZH: "安装请求失败",
+	},
+	"setup_page.status_connect_anomaly": {
+		LocaleEN: "Connection error",
+		LocaleZH: "连接异常",
+	},
+	"setup_page.status_save_anomaly": {
+		LocaleEN: "Save error",
+		LocaleZH: "保存异常",
+	},
+	"setup_page.driver_sqlite_name": {
+		LocaleEN: "SQLite",
+		LocaleZH: "SQLite",
+	},
+	"setup_page.driver_postgres_name": {
+		LocaleEN: "PostgreSQL",
+		LocaleZH: "PostgreSQL",
 	},
 }

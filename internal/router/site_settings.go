@@ -6,9 +6,28 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
+	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/service"
 )
+
+// templateTranslator returns the closure templates use as `{{call .T "key"}}`.
+// Closures (instead of template.FuncMap) are how we get a per-request locale
+// into the template engine: html/template's FuncMap is resolved at parse
+// time, so the only way to thread a per-request value through is to bind
+// it into a value the template invokes via `{{call ...}}`.
+//
+// Variadic args support format strings — `{{call .T "upload.subtitle"
+// .UploadMaxFileSizeLabel}}` resolves the catalogue entry then sprintf's
+// the labels in. Templates that don't pass args still work because [i18n.T]
+// short-circuits to the literal entry when no args are supplied.
+func templateTranslator(c *gin.Context) func(string, ...any) string {
+	locale := middleware.LocaleFromGin(c)
+	return func(key string, args ...any) string {
+		return i18n.T(locale, key, args...)
+	}
+}
 
 func loadResolvedSettings(ctx context.Context, settingRepo *repo.SettingRepo, defaults map[string]string) map[string]string {
 	overrides, err := settingRepo.GetAll(ctx)
@@ -18,7 +37,12 @@ func loadResolvedSettings(ctx context.Context, settingRepo *repo.SettingRepo, de
 	return service.ResolveSettings(defaults, overrides)
 }
 
-func landingTemplateData(currentUser *publicUser, settings map[string]string, activeNav, pageTitle string) gin.H {
+// landingTemplateData assembles the per-request data map every public-page
+// template reads. The gin context is now required because we inject a
+// per-request translator (`T`) and the active locale (`Lang`) so templates
+// can render strings without hard-coding any one language.
+func landingTemplateData(c *gin.Context, currentUser *publicUser, settings map[string]string, activeNav, pageTitle string) gin.H {
+	locale := middleware.LocaleFromGin(c)
 	return gin.H{
 		"CurrentUser":         currentUser,
 		"ActiveNav":           activeNav,
@@ -32,6 +56,13 @@ func landingTemplateData(currentUser *publicUser, settings map[string]string, ac
 		"SiteHeaderGitHubURL": settings[service.SiteHeaderNavGitHubURLSettingKey],
 		"SiteFooterText":      settings[service.SiteFooterTextSettingKey],
 		"SiteFooterCopyright": settings[service.SiteFooterCopyrightSettingKey],
+		// Translation surface — every template that renders text reaches
+		// for these. Lang feeds <html lang="…"> / hreflang signals;
+		// SupportedLocales drives the language switcher dropdown.
+		"T":                templateTranslator(c),
+		"Lang":             string(locale),
+		"SupportedLocales": i18n.SupportedLocales(),
+		"LocaleLabels":     i18n.LocaleLabels,
 	}
 }
 
@@ -47,7 +78,7 @@ func buildPageTitle(siteTitle, pageTitle string) string {
 	return fmt.Sprintf("%s - %s", pageTitle, siteTitle)
 }
 
-func buildAdminPageTitle(settings map[string]string) string {
+func buildAdminPageTitle(c *gin.Context, settings map[string]string) string {
 	brand := strings.TrimSpace(settings[service.SiteNameSettingKey])
 	if brand == "" {
 		brand = strings.TrimSpace(settings[service.SiteHeaderBrandSettingKey])
@@ -55,7 +86,8 @@ func buildAdminPageTitle(settings map[string]string) string {
 	if brand == "" {
 		brand = "Kite"
 	}
-	return fmt.Sprintf("%s 管理后台", brand)
+	locale := middleware.LocaleFromGin(c)
+	return i18n.T(locale, "admin.page_title_suffix", brand)
 }
 
 func resolveUploadMaxFileSizeBytes(settings map[string]string, fallback int64) int64 {

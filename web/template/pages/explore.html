@@ -1,6 +1,6 @@
 {{define "explore.html"}}
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{.Lang}}">
 
 <head>
     {{template "head_common" .}}
@@ -109,20 +109,20 @@
         <div class="max-w-6xl mx-auto px-6 pt-24 pb-10 sm:pt-28">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight">探索广场</h1>
-                    <p class="mt-1 text-sm text-gray-500">浏览站内公开分享的图片和文件</p>
+                    <h1 class="text-2xl font-bold tracking-tight">{{call .T "explore.title"}}</h1>
+                    <p class="mt-1 text-sm text-gray-500">{{call .T "explore.subtitle"}}</p>
                 </div>
                 <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                     <button onclick="loadFiles('')" id="tab_all"
-                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition bg-white text-gray-900 shadow-sm">全部</button>
+                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition bg-white text-gray-900 shadow-sm">{{call .T "explore.tab_all"}}</button>
                     <button onclick="loadFiles('image')" id="tab_image"
-                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">图片</button>
+                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">{{call .T "explore.tab_image"}}</button>
                     <button onclick="loadFiles('video')" id="tab_video"
-                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">视频</button>
+                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">{{call .T "explore.tab_video"}}</button>
                     <button onclick="loadFiles('audio')" id="tab_audio"
-                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">音频</button>
+                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">{{call .T "explore.tab_audio"}}</button>
                     <button onclick="loadFiles('file')" id="tab_file"
-                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">文件</button>
+                        class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-gray-500 hover:text-gray-900">{{call .T "explore.tab_file"}}</button>
                 </div>
             </div>
 
@@ -135,7 +135,7 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    加载中...
+                    {{call .T "explore.loading"}}
                 </div>
             </div>
             <div id="emptyState" class="hidden py-20 text-center">
@@ -145,14 +145,79 @@
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                 </div>
-                <p class="text-gray-400">暂无公开文件</p>
+                <p class="text-gray-400">{{call .T "explore.empty_files"}}</p>
             </div>
             <div id="loadMore" class="hidden py-8 text-center">
                 <button onclick="loadNextPage()"
-                    class="px-6 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition">加载更多</button>
+                    class="px-6 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition">{{call .T "explore.load_more"}}</button>
             </div>
 
             <script>
+                window.__I18N__ = {
+                    empty_files: {{call .T "explore.empty_files"}},
+                    type_pdf: {{call .T "explore.type_pdf"}},
+                    type_word: {{call .T "explore.type_word"}},
+                    type_odt: {{call .T "explore.type_odt"}},
+                    type_rtf: {{call .T "explore.type_rtf"}},
+                    type_pages: {{call .T "explore.type_pages"}},
+                    type_excel: {{call .T "explore.type_excel"}},
+                    type_ods: {{call .T "explore.type_ods"}},
+                    type_numbers: {{call .T "explore.type_numbers"}},
+                    type_csv: {{call .T "explore.type_csv"}},
+                    type_ppt: {{call .T "explore.type_ppt"}},
+                    type_odp: {{call .T "explore.type_odp"}},
+                    type_keynote: {{call .T "explore.type_keynote"}},
+                    type_text: {{call .T "explore.type_text"}},
+                    type_log: {{call .T "explore.type_log"}},
+                    type_ini: {{call .T "explore.type_ini"}},
+                    type_config: {{call .T "explore.type_config"}},
+                    type_env: {{call .T "explore.type_env"}},
+                    type_properties: {{call .T "explore.type_properties"}},
+                    type_c_header: {{call .T "explore.type_c_header"}},
+                    type_cpp_header: {{call .T "explore.type_cpp_header"}},
+                    type_shell: {{call .T "explore.type_shell"}},
+                    type_batch: {{call .T "explore.type_batch"}},
+                    type_database: {{call .T "explore.type_database"}},
+                    type_zip_archive: {{call .T "explore.type_zip_archive"}},
+                    type_rar_archive: {{call .T "explore.type_rar_archive"}},
+                    type_7z_archive: {{call .T "explore.type_7z_archive"}},
+                    type_tar_archive: {{call .T "explore.type_tar_archive"}},
+                    type_gz_archive: {{call .T "explore.type_gz_archive"}},
+                    type_tgz_archive: {{call .T "explore.type_tgz_archive"}},
+                    type_bz2_archive: {{call .T "explore.type_bz2_archive"}},
+                    type_xz_archive: {{call .T "explore.type_xz_archive"}},
+                    type_truetype_font: {{call .T "explore.type_truetype_font"}},
+                    type_opentype_font: {{call .T "explore.type_opentype_font"}},
+                    type_woff_font: {{call .T "explore.type_woff_font"}},
+                    type_woff2_font: {{call .T "explore.type_woff2_font"}},
+                    type_executable: {{call .T "explore.type_executable"}},
+                    type_installer: {{call .T "explore.type_installer"}},
+                    type_dmg_image: {{call .T "explore.type_dmg_image"}},
+                    type_application: {{call .T "explore.type_application"}},
+                    type_deb_installer: {{call .T "explore.type_deb_installer"}},
+                    type_rpm_installer: {{call .T "explore.type_rpm_installer"}},
+                    type_apk_installer: {{call .T "explore.type_apk_installer"}},
+                    type_ipa_installer: {{call .T "explore.type_ipa_installer"}},
+                    type_jar_archive: {{call .T "explore.type_jar_archive"}},
+                    type_war_archive: {{call .T "explore.type_war_archive"}},
+                    type_epub_book: {{call .T "explore.type_epub_book"}},
+                    type_mobi_book: {{call .T "explore.type_mobi_book"}},
+                    type_kindle_book: {{call .T "explore.type_kindle_book"}},
+                    type_iso_image: {{call .T "explore.type_iso_image"}},
+                    type_disk_image: {{call .T "explore.type_disk_image"}},
+                    type_vmdk_disk: {{call .T "explore.type_vmdk_disk"}},
+                    type_pem_cert: {{call .T "explore.type_pem_cert"}},
+                    type_cert: {{call .T "explore.type_cert"}},
+                    type_pkcs12_cert: {{call .T "explore.type_pkcs12_cert"}},
+                    type_pfx_cert: {{call .T "explore.type_pfx_cert"}},
+                    type_lock: {{call .T "explore.type_lock"}},
+                    type_image: {{call .T "explore.type_image"}},
+                    type_video: {{call .T "explore.type_video"}},
+                    type_audio: {{call .T "explore.type_audio"}},
+                    type_text_file: {{call .T "explore.type_text_file"}},
+                    type_unknown: {{call .T "explore.type_unknown"}},
+                    type_ext_suffix: {{call .T "explore.type_ext_suffix"}}
+                };
                 (function () {
                     var currentType = '', currentPage = 1, totalFiles = 0, pageSize = 24;
                     var lazyImageObserver = null;
@@ -174,7 +239,7 @@
                         if (currentType) url += '&file_type=' + currentType;
                         fetch(url).then(function (r) { return r.json() }).then(function (res) {
                             ld.classList.add('hidden');
-                            if (res.code !== 0) { em.classList.remove('hidden'); var p = em.querySelector('p'); if (p) p.textContent = res.message || '暂无公开文件'; return; }
+                            if (res.code !== 0) { em.classList.remove('hidden'); var p = em.querySelector('p'); if (p) p.textContent = res.message || window.__I18N__.empty_files; return; }
                             var items = res.data.items || []; totalFiles = res.data.total || 0;
                             if (items.length === 0 && currentPage === 1) { em.classList.remove('hidden'); return; }
                             var g = document.getElementById('gallery');
@@ -460,43 +525,44 @@
                     };
 
                     function fmtSize(b) { if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' GB'; if (b >= 1048576) return (b / 1048576).toFixed(2) + ' MB'; if (b >= 1024) return (b / 1024).toFixed(1) + ' KB'; return b + ' B'; }
+                    var I = window.__I18N__;
                     var _typeNames = {
-                        'pdf': 'PDF 文档', 'doc': 'Word 文档', 'docx': 'Word 文档', 'odt': 'ODT 文档', 'rtf': 'RTF 文档', 'pages': 'Pages 文档',
-                        'xls': 'Excel 表格', 'xlsx': 'Excel 表格', 'ods': 'ODS 表格', 'numbers': 'Numbers 表格', 'csv': 'CSV 表格',
-                        'ppt': 'PPT 演示', 'pptx': 'PPT 演示', 'odp': 'ODP 演示', 'key': 'Keynote 演示',
-                        'txt': '纯文本', 'log': '日志文件', 'ini': 'INI 配置', 'cfg': '配置文件', 'conf': '配置文件', 'env': '环境变量', 'properties': '属性文件',
+                        'pdf': I.type_pdf, 'doc': I.type_word, 'docx': I.type_word, 'odt': I.type_odt, 'rtf': I.type_rtf, 'pages': I.type_pages,
+                        'xls': I.type_excel, 'xlsx': I.type_excel, 'ods': I.type_ods, 'numbers': I.type_numbers, 'csv': I.type_csv,
+                        'ppt': I.type_ppt, 'pptx': I.type_ppt, 'odp': I.type_odp, 'key': I.type_keynote,
+                        'txt': I.type_text, 'log': I.type_log, 'ini': I.type_ini, 'cfg': I.type_config, 'conf': I.type_config, 'env': I.type_env, 'properties': I.type_properties,
                         'md': 'Markdown', 'mdx': 'MDX', 'yaml': 'YAML', 'yml': 'YAML', 'json': 'JSON', 'jsonc': 'JSONC', 'json5': 'JSON5',
                         'xml': 'XML', 'xsl': 'XSL', 'toml': 'TOML', 'svg': 'SVG', 'graphql': 'GraphQL', 'proto': 'Protobuf',
                         'html': 'HTML', 'htm': 'HTML', 'css': 'CSS', 'scss': 'SCSS', 'sass': 'Sass', 'less': 'Less',
                         'js': 'JavaScript', 'jsx': 'JSX', 'mjs': 'JavaScript', 'ts': 'TypeScript', 'tsx': 'TSX',
                         'vue': 'Vue', 'svelte': 'Svelte',
                         'py': 'Python', 'go': 'Go', 'rs': 'Rust', 'java': 'Java', 'kt': 'Kotlin', 'scala': 'Scala',
-                        'c': 'C', 'cpp': 'C++', 'cc': 'C++', 'h': 'C 头文件', 'hpp': 'C++ 头文件', 'cs': 'C#',
+                        'c': 'C', 'cpp': 'C++', 'cc': 'C++', 'h': I.type_c_header, 'hpp': I.type_cpp_header, 'cs': 'C#',
                         'rb': 'Ruby', 'php': 'PHP', 'swift': 'Swift', 'dart': 'Dart', 'lua': 'Lua', 'r': 'R',
-                        'sh': 'Shell', 'bash': 'Bash', 'zsh': 'Zsh', 'fish': 'Fish', 'ps1': 'PowerShell', 'bat': '批处理', 'cmd': '批处理',
-                        'sql': 'SQL', 'db': '数据库', 'sqlite': 'SQLite', 'sqlite3': 'SQLite',
-                        'zip': 'ZIP 压缩包', 'rar': 'RAR 压缩包', '7z': '7z 压缩包', 'tar': 'TAR 归档', 'gz': 'GZ 压缩包', 'tgz': 'TGZ 压缩包', 'bz2': 'BZ2 压缩包', 'xz': 'XZ 压缩包',
-                        'ttf': 'TrueType 字体', 'otf': 'OpenType 字体', 'woff': 'WOFF 字体', 'woff2': 'WOFF2 字体',
-                        'exe': '可执行文件', 'msi': '安装包', 'dmg': 'DMG 镜像', 'app': '应用程序', 'deb': 'DEB 安装包', 'rpm': 'RPM 安装包', 'apk': 'APK 安装包', 'ipa': 'IPA 安装包',
-                        'jar': 'JAR 包', 'war': 'WAR 包',
+                        'sh': 'Shell', 'bash': 'Bash', 'zsh': 'Zsh', 'fish': 'Fish', 'ps1': 'PowerShell', 'bat': I.type_batch, 'cmd': I.type_batch,
+                        'sql': 'SQL', 'db': I.type_database, 'sqlite': 'SQLite', 'sqlite3': 'SQLite',
+                        'zip': I.type_zip_archive, 'rar': I.type_rar_archive, '7z': I.type_7z_archive, 'tar': I.type_tar_archive, 'gz': I.type_gz_archive, 'tgz': I.type_tgz_archive, 'bz2': I.type_bz2_archive, 'xz': I.type_xz_archive,
+                        'ttf': I.type_truetype_font, 'otf': I.type_opentype_font, 'woff': I.type_woff_font, 'woff2': I.type_woff2_font,
+                        'exe': I.type_executable, 'msi': I.type_installer, 'dmg': I.type_dmg_image, 'app': I.type_application, 'deb': I.type_deb_installer, 'rpm': I.type_rpm_installer, 'apk': I.type_apk_installer, 'ipa': I.type_ipa_installer,
+                        'jar': I.type_jar_archive, 'war': I.type_war_archive,
                         'psd': 'Photoshop', 'ai': 'Illustrator', 'sketch': 'Sketch', 'fig': 'Figma', 'xd': 'Adobe XD',
-                        'epub': 'EPUB 电子书', 'mobi': 'Mobi 电子书', 'azw': 'Kindle 电子书', 'azw3': 'Kindle 电子书',
-                        'iso': 'ISO 镜像', 'img': '磁盘映像', 'vmdk': 'VMDK 虚拟盘',
-                        'pem': 'PEM 证书', 'crt': '证书文件', 'cer': '证书文件', 'p12': 'PKCS12 证书', 'pfx': 'PFX 证书',
-                        'dockerfile': 'Dockerfile', 'makefile': 'Makefile', 'gradle': 'Gradle', 'lock': 'Lock 文件',
+                        'epub': I.type_epub_book, 'mobi': I.type_mobi_book, 'azw': I.type_kindle_book, 'azw3': I.type_kindle_book,
+                        'iso': I.type_iso_image, 'img': I.type_disk_image, 'vmdk': I.type_vmdk_disk,
+                        'pem': I.type_pem_cert, 'crt': I.type_cert, 'cer': I.type_cert, 'p12': I.type_pkcs12_cert, 'pfx': I.type_pfx_cert,
+                        'dockerfile': 'Dockerfile', 'makefile': 'Makefile', 'gradle': 'Gradle', 'lock': I.type_lock,
                         'wasm': 'WebAssembly', 'hs': 'Haskell', 'ml': 'OCaml', 'clj': 'Clojure', 'el': 'Emacs Lisp', 'nim': 'Nim', 'zig': 'Zig', 'v': 'V'
                     };
                     function fmtType(file) {
                         var nm = (file.original_name || '').toLowerCase();
                         var ext = nm.lastIndexOf('.') > 0 ? nm.substring(nm.lastIndexOf('.') + 1) : '';
                         if (_typeNames[ext]) return _typeNames[ext];
-                        if (ext) return ext.toUpperCase() + ' 文件';
+                        if (ext) return I.type_ext_suffix.replace('%s', ext.toUpperCase());
                         var mt = (file.mime_type || '').split(';')[0].trim();
-                        if (mt.startsWith('image/')) return '图片';
-                        if (mt.startsWith('video/')) return '视频';
-                        if (mt.startsWith('audio/')) return '音频';
-                        if (mt.startsWith('text/')) return '文本文件';
-                        return mt || '未知类型';
+                        if (mt.startsWith('image/')) return I.type_image;
+                        if (mt.startsWith('video/')) return I.type_video;
+                        if (mt.startsWith('audio/')) return I.type_audio;
+                        if (mt.startsWith('text/')) return I.type_text_file;
+                        return mt || I.type_unknown;
                     }
                     function escHTML(s) {
                         var d = document.createElement('div');
@@ -523,8 +589,8 @@
                             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 </div>
-                <p class="text-gray-500 font-medium">探索广场未开启</p>
-                <p class="mt-2 text-sm text-gray-400">管理员尚未开启公开浏览功能。</p>
+                <p class="text-gray-500 font-medium">{{call .T "explore.disabled_title"}}</p>
+                <p class="mt-2 text-sm text-gray-400">{{call .T "explore.disabled_body"}}</p>
             </div>
             {{end}}
         </div>

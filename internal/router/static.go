@@ -52,7 +52,7 @@ func registerStatic(r *gin.Engine, cfg Config, settingRepo *repo.SettingRepo, se
 				return
 			}
 			settings := loadResolvedSettings(c.Request.Context(), settingRepo, settingDefaults)
-			title := template.HTMLEscapeString(buildAdminPageTitle(settings))
+			title := template.HTMLEscapeString(buildAdminPageTitle(c, settings))
 			faviconURL := template.HTMLEscapeString(settings[service.SiteFaviconURLSettingKey])
 			html := strings.Replace(string(data), "__KITE_ADMIN_TITLE__", title, 1)
 			html = strings.Replace(html, "__KITE_FAVICON_URL__", faviconURL, 1)

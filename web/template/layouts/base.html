@@ -52,8 +52,8 @@
             <span class="font-bold text-base sm:text-lg tracking-tight dark:text-white">{{.SiteHeaderBrand}}</span>
         </a>
         <nav class="flex items-center gap-0.5 sm:gap-1 text-sm">
-            <a href="/explore" hx-boost="false" class="inline-flex h-9 items-center px-2.5 sm:px-3 text-sm font-medium transition-all duration-200 border-b-2 {{if eq .ActiveNav "explore"}}text-gray-900 dark:text-white border-gray-900 dark:border-white{{else}}text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-transparent hover:border-gray-300 dark:hover:border-gray-600{{end}}">探索</a>
-            <a href="/upload" hx-boost="false" class="inline-flex h-9 items-center px-2.5 sm:px-3 text-sm font-medium transition-all duration-200 border-b-2 {{if eq .ActiveNav "upload"}}text-gray-900 dark:text-white border-gray-900 dark:border-white{{else}}text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-transparent hover:border-gray-300 dark:hover:border-gray-600{{end}}">上传</a>
+            <a href="/explore" hx-boost="false" class="inline-flex h-9 items-center px-2.5 sm:px-3 text-sm font-medium transition-all duration-200 border-b-2 {{if eq .ActiveNav "explore"}}text-gray-900 dark:text-white border-gray-900 dark:border-white{{else}}text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-transparent hover:border-gray-300 dark:hover:border-gray-600{{end}}">{{call .T "nav.explore"}}</a>
+            <a href="/upload" hx-boost="false" class="inline-flex h-9 items-center px-2.5 sm:px-3 text-sm font-medium transition-all duration-200 border-b-2 {{if eq .ActiveNav "upload"}}text-gray-900 dark:text-white border-gray-900 dark:border-white{{else}}text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-transparent hover:border-gray-300 dark:hover:border-gray-600{{end}}">{{call .T "nav.upload"}}</a>
             {{if .SiteHeaderGitHubURL}}
             <a href="{{.SiteHeaderGitHubURL}}" target="_blank" rel="noreferrer"
                 class="hidden sm:inline-flex px-3 py-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition font-medium">GitHub</a>
@@ -82,7 +82,7 @@
             </a>
             {{else}}
             <a href="/login" hx-boost="false"
-                class="ml-1 sm:ml-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition font-medium text-sm">登录</a>
+                class="ml-1 sm:ml-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition font-medium text-sm">{{call .T "nav.login"}}</a>
             {{end}}
         </nav>
     </div>
@@ -155,14 +155,14 @@
 
         <!-- 桌面端导航 -->
         <div class="hidden md:flex items-center gap-3 text-gray-300 dark:text-gray-600">
-            <a href="/upload" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">上传</a>
+            <a href="/upload" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">{{call .T "footer.upload"}}</a>
             <span>·</span>
-            <a href="/explore" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">探索</a>
+            <a href="/explore" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">{{call .T "footer.explore"}}</a>
             <span>·</span>
             {{if .CurrentUser}}
-            <a href="/dashboard" hx-boost="false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">控制台</a>
+            <a href="/dashboard" hx-boost="false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">{{call .T "footer.dashboard"}}</a>
             {{else}}
-            <a href="/login" hx-boost="false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">登录</a>
+            <a href="/login" hx-boost="false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">{{call .T "footer.login"}}</a>
             {{end}}
         </div>
 
