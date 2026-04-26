@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/service"
@@ -101,7 +102,7 @@ type loginRequest struct {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "username and password are required")
+		BadRequest(c, M(c, i18n.KeyAuthUsernamePasswordRequired))
 		return
 	}
 
@@ -111,7 +112,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			Unauthorized(c, err.Error())
 			return
 		}
-		ServerError(c, "login failed")
+		ServerError(c, M(c, i18n.KeyAuthLoginFailed))
 		return
 	}
 
@@ -141,7 +142,7 @@ type registerRequest struct {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid registration data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyAuthInvalidRegistration, err.Error()))
 		return
 	}
 
@@ -161,7 +162,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			Fail(c, http.StatusConflict, 40900, err.Error())
 			return
 		}
-		ServerError(c, "registration failed")
+		ServerError(c, M(c, i18n.KeyAuthRegistrationFailed))
 		return
 	}
 
@@ -182,13 +183,13 @@ type refreshRequest struct {
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	token := extractRefreshToken(c)
 	if token == "" {
-		Unauthorized(c, "refresh_token is required")
+		Unauthorized(c, M(c, i18n.KeyAuthRefreshTokenRequired))
 		return
 	}
 
 	tokenPair, err := h.authSvc.RefreshToken(c.Request.Context(), token)
 	if err != nil {
-		Unauthorized(c, "invalid refresh token")
+		Unauthorized(c, M(c, i18n.KeyAuthInvalidRefreshToken))
 		return
 	}
 
@@ -230,7 +231,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 
 	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		Unauthorized(c, "user not found")
+		Unauthorized(c, M(c, i18n.KeyAuthUserNotFound))
 		return
 	}
 
@@ -261,14 +262,14 @@ type updateProfileRequest struct {
 func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	var req updateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid profile data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyAuthInvalidProfile, err.Error()))
 		return
 	}
 
 	userID := c.GetString(middleware.ContextKeyUserID)
 	user, err := h.authSvc.UpdateProfile(c.Request.Context(), userID, req.Nickname, req.AvatarURL)
 	if err != nil {
-		ServerError(c, "update profile failed")
+		ServerError(c, M(c, i18n.KeyAuthUpdateProfileFailed))
 		return
 	}
 
@@ -292,7 +293,7 @@ type changePasswordRequest struct {
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	var req changePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid password data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyAuthInvalidPassword, err.Error()))
 		return
 	}
 
@@ -306,7 +307,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 			Fail(c, http.StatusBadRequest, 40010, err.Error())
 			return
 		}
-		ServerError(c, "change password failed")
+		ServerError(c, M(c, i18n.KeyAuthChangePasswordFailed))
 		return
 	}
 
@@ -324,7 +325,7 @@ type firstLoginResetRequest struct {
 func (h *AuthHandler) FirstLoginReset(c *gin.Context) {
 	var req firstLoginResetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid reset data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyEmailInvalidResetData, err.Error()))
 		return
 	}
 
@@ -353,13 +354,13 @@ type requestEmailChangeRequest struct {
 // the caller can prove ownership before the address is rotated on the account.
 func (h *AuthHandler) RequestEmailChange(c *gin.Context) {
 	if h.emailChangeSvc == nil {
-		ServerError(c, "email change service unavailable")
+		ServerError(c, M(c, i18n.KeyEmailChangeServiceUnavailable))
 		return
 	}
 
 	var req requestEmailChangeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid email: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyEmailInvalid, err.Error()))
 		return
 	}
 
@@ -368,17 +369,17 @@ func (h *AuthHandler) RequestEmailChange(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidEmailFormat):
-			Fail(c, http.StatusBadRequest, 40001, "invalid email address")
+			Fail(c, http.StatusBadRequest, 40001, M(c, i18n.KeyEmailInvalidAddress))
 		case errors.Is(err, service.ErrSameAsCurrentEmail):
-			Fail(c, http.StatusBadRequest, 40002, "new email matches current email")
+			Fail(c, http.StatusBadRequest, 40002, M(c, i18n.KeyEmailNewMatchesCurrent))
 		case errors.Is(err, service.ErrEmailTaken):
-			Fail(c, http.StatusConflict, 40900, "email is already registered")
+			Fail(c, http.StatusConflict, 40900, M(c, i18n.KeyEmailAlreadyRegistered))
 		case errors.Is(err, service.ErrVerificationCooldown):
-			Fail(c, http.StatusTooManyRequests, 42900, "please wait before requesting another code")
+			Fail(c, http.StatusTooManyRequests, 42900, M(c, i18n.KeyEmailRateLimited))
 		case errors.Is(err, service.ErrSMTPNotConfigured):
 			Fail(c, http.StatusFailedDependency, 42400, err.Error())
 		default:
-			ServerError(c, "send verification email failed: "+err.Error())
+			ServerError(c, M(c, i18n.KeyEmailSendVerificationFailed, err.Error()))
 		}
 		return
 	}
@@ -399,13 +400,13 @@ type confirmEmailChangeRequest struct {
 // cache without a second round trip.
 func (h *AuthHandler) ConfirmEmailChange(c *gin.Context) {
 	if h.emailChangeSvc == nil {
-		ServerError(c, "email change service unavailable")
+		ServerError(c, M(c, i18n.KeyEmailChangeServiceUnavailable))
 		return
 	}
 
 	var req confirmEmailChangeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid payload: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyErrInvalidPayload, err.Error()))
 		return
 	}
 
@@ -414,17 +415,17 @@ func (h *AuthHandler) ConfirmEmailChange(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidEmailFormat):
-			Fail(c, http.StatusBadRequest, 40001, "invalid email address")
+			Fail(c, http.StatusBadRequest, 40001, M(c, i18n.KeyEmailInvalidAddress))
 		case errors.Is(err, service.ErrVerificationNotFound):
-			Fail(c, http.StatusNotFound, 40400, "no pending verification for this email")
+			Fail(c, http.StatusNotFound, 40400, M(c, i18n.KeyEmailNoPendingVerification))
 		case errors.Is(err, service.ErrVerificationCodeWrong):
-			Fail(c, http.StatusBadRequest, 40003, "verification code is incorrect")
+			Fail(c, http.StatusBadRequest, 40003, M(c, i18n.KeyTwoFACodeIncorrect))
 		case errors.Is(err, service.ErrVerificationExpired):
-			Fail(c, http.StatusGone, 41000, "verification code has expired")
+			Fail(c, http.StatusGone, 41000, M(c, i18n.KeyTwoFACodeExpired))
 		case errors.Is(err, service.ErrEmailTaken):
-			Fail(c, http.StatusConflict, 40900, "email is already registered")
+			Fail(c, http.StatusConflict, 40900, M(c, i18n.KeyEmailAlreadyRegistered))
 		default:
-			ServerError(c, "confirm email change failed: "+err.Error())
+			ServerError(c, M(c, i18n.KeyEmailConfirmChangeFailed, err.Error()))
 		}
 		return
 	}
@@ -456,26 +457,26 @@ type requestPasswordResetRequest struct {
 // shows up in the user's inbox.
 func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 	if h.passwordResetSvc == nil {
-		ServerError(c, "password reset service unavailable")
+		ServerError(c, M(c, i18n.KeyEmailPasswordResetUnavailable))
 		return
 	}
 	var req requestPasswordResetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "identifier is required")
+		BadRequest(c, M(c, i18n.KeyAuthIdentifierRequired))
 		return
 	}
 	expiresAt, err := h.passwordResetSvc.RequestPasswordReset(c.Request.Context(), req.Identifier)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrPasswordResetIdentifierRequired):
-			BadRequest(c, "identifier is required")
+			BadRequest(c, M(c, i18n.KeyAuthIdentifierRequired))
 		case errors.Is(err, service.ErrSMTPNotConfigured):
 			// SMTP misconfig is an admin problem, not an
 			// enumeration vector — surface it clearly so the
 			// deployer can fix it.
 			Fail(c, http.StatusFailedDependency, 42400, err.Error())
 		default:
-			ServerError(c, "send reset email failed: "+err.Error())
+			ServerError(c, M(c, i18n.KeyEmailSendResetFailed, err.Error()))
 		}
 		return
 	}
@@ -498,26 +499,26 @@ type confirmPasswordResetRequest struct {
 // honoured as usual.
 func (h *AuthHandler) ConfirmPasswordReset(c *gin.Context) {
 	if h.passwordResetSvc == nil {
-		ServerError(c, "password reset service unavailable")
+		ServerError(c, M(c, i18n.KeyEmailPasswordResetUnavailable))
 		return
 	}
 	var req confirmPasswordResetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid payload: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyErrInvalidPayload, err.Error()))
 		return
 	}
 	if err := h.passwordResetSvc.ConfirmPasswordReset(c.Request.Context(), req.Identifier, req.Code, req.NewPassword); err != nil {
 		switch {
 		case errors.Is(err, service.ErrPasswordResetIdentifierRequired):
-			BadRequest(c, "identifier is required")
+			BadRequest(c, M(c, i18n.KeyAuthIdentifierRequired))
 		case errors.Is(err, service.ErrVerificationNotFound):
-			Fail(c, http.StatusNotFound, 40400, "no pending reset for this account")
+			Fail(c, http.StatusNotFound, 40400, M(c, i18n.KeyEmailNoPendingReset))
 		case errors.Is(err, service.ErrVerificationCodeWrong):
-			Fail(c, http.StatusBadRequest, 40003, "verification code is incorrect")
+			Fail(c, http.StatusBadRequest, 40003, M(c, i18n.KeyTwoFACodeIncorrect))
 		case errors.Is(err, service.ErrVerificationExpired):
-			Fail(c, http.StatusGone, 41000, "verification code has expired")
+			Fail(c, http.StatusGone, 41000, M(c, i18n.KeyTwoFACodeExpired))
 		default:
-			ServerError(c, "confirm password reset failed: "+err.Error())
+			ServerError(c, M(c, i18n.KeyEmailConfirmResetFailed, err.Error()))
 		}
 		return
 	}

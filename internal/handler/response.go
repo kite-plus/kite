@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kite-plus/kite/internal/errcodes"
+	"github.com/kite-plus/kite/internal/i18n"
+	"github.com/kite-plus/kite/internal/middleware"
 )
 
 // Response is the unified JSON envelope returned by every API endpoint.
@@ -22,11 +24,28 @@ type PagedData struct {
 	Size  int         `json:"size"`
 }
 
-// Success writes a 200 OK response with code 0.
+// M is the per-request shorthand for [i18n.T]: it pulls the active locale
+// off the gin context and looks up key in the catalogue. Use it at every
+// call site that previously passed a literal English string into one of the
+// helpers below.
+//
+//	BadRequest(c, M(c, i18n.KeyAuthLoginFailed))
+//	BadRequest(c, M(c, i18n.KeySetupInvalidData, err.Error()))
+//
+// The first form is the common case; the second matches the catalogue
+// entries that include `%s` placeholders for an underlying error.
+func M(c *gin.Context, key string, args ...any) string {
+	return i18n.T(middleware.LocaleFromGin(c), key, args...)
+}
+
+// Success writes a 200 OK response with code 0 and a locale-aware success
+// message. The literal "success" we used to hard-code only made sense to
+// callers reading English — translating it costs us a single map lookup and
+// keeps the envelope consistent with the rest of the response surface.
 func Success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Response{
 		Code:    int(errcodes.Success),
-		Message: "success",
+		Message: M(c, i18n.KeySuccess),
 		Data:    data,
 	})
 }
@@ -35,14 +54,16 @@ func Success(c *gin.Context, data interface{}) {
 func Created(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusCreated, Response{
 		Code:    int(errcodes.Success),
-		Message: "success",
+		Message: M(c, i18n.KeySuccess),
 		Data:    data,
 	})
 }
 
 // Fail writes a non-successful response. errCode is the business code from
 // the [errcodes] package (httpCode is taken as-is — it must agree with the
-// canonical mapping in [errcodes.Catalog]).
+// canonical mapping in [errcodes.Catalog]). The message argument is the
+// already-translated string the caller wants on the wire — pass [M] output,
+// not a raw catalogue key.
 func Fail(c *gin.Context, httpCode int, errCode int, message string) {
 	c.JSON(httpCode, Response{
 		Code:    errCode,

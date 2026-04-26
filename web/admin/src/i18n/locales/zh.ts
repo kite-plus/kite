@@ -199,6 +199,23 @@ const zh: Translations = {
     activity: {
       title: '最近动态',
       sub: 'Kite 内正在发生的事',
+      fallbackActor: '你',
+      uploaded: '上传了',
+    },
+
+    greeting: {
+      lateNight: '夜深了',
+      lateNightSub: '记得早些休息 🌙',
+      morning: '早安',
+      morningSub: '新的一天从这里起飞',
+      noon: '午安',
+      noonSub: '午后时光，轻盈整理',
+      afternoon: '下午好',
+      afternoonSub: '收纳一下今天的灵感',
+      evening: '晚上好',
+      eveningSub: '今天又攒了不少好素材',
+      night: '夜安',
+      nightSub: '最后看一眼，然后休息',
     },
 
     topUsers: {
@@ -1053,6 +1070,14 @@ const zh: Translations = {
     confirmDisable: '停用',
     disableSuccess: '两步验证已停用',
     disableFailed: '无法停用两步验证',
+  },
+
+  relativeTime: {
+    justNow: '刚刚',
+    minutesAgo: '{n} 分钟前',
+    hoursAgo: '{n} 小时前',
+    yesterday: '昨天',
+    daysAgo: '{n} 天前',
   },
 }
 

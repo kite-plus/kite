@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/model"
 	"github.com/kite-plus/kite/internal/repo"
@@ -159,7 +160,7 @@ func (h *FileHandler) List(c *gin.Context) {
 
 	files, total, err := h.fileSvc.ListFiles(c.Request.Context(), params)
 	if err != nil {
-		ServerError(c, "failed to list files")
+		ServerError(c, M(c, i18n.KeyFileListFailed))
 		return
 	}
 
@@ -189,7 +190,7 @@ func (h *FileHandler) AdminList(c *gin.Context) {
 
 	files, total, err := h.fileSvc.ListFiles(c.Request.Context(), params)
 	if err != nil {
-		ServerError(c, "failed to list files")
+		ServerError(c, M(c, i18n.KeyFileListFailed))
 		return
 	}
 
@@ -228,12 +229,12 @@ func (h *FileHandler) AdminDelete(c *gin.Context) {
 	id := c.Param("id")
 	file, err := h.fileSvc.GetFile(c.Request.Context(), id)
 	if err != nil {
-		NotFound(c, "file not found")
+		NotFound(c, M(c, i18n.KeyFileNotFound))
 		return
 	}
 
 	if err := h.fileSvc.DeleteFile(c.Request.Context(), file.ID, file.UserID, "admin"); err != nil {
-		ServerError(c, "failed to delete file")
+		ServerError(c, M(c, i18n.KeyFileDeleteFailed))
 		return
 	}
 
@@ -246,11 +247,11 @@ func (h *FileHandler) Detail(c *gin.Context) {
 	userID := c.GetString(middleware.ContextKeyUserID)
 	file, err := h.fileSvc.GetFile(c.Request.Context(), id)
 	if err != nil {
-		NotFound(c, "file not found")
+		NotFound(c, M(c, i18n.KeyFileNotFound))
 		return
 	}
 	if file.UserID != userID {
-		NotFound(c, "file not found")
+		NotFound(c, M(c, i18n.KeyFileNotFound))
 		return
 	}
 	Success(c, file)
@@ -263,14 +264,14 @@ func (h *FileHandler) Delete(c *gin.Context) {
 
 	if err := h.fileSvc.DeleteFile(c.Request.Context(), id, userID, "user"); err != nil {
 		if errors.Is(err, service.ErrFileNotFound) {
-			NotFound(c, "file not found")
+			NotFound(c, M(c, i18n.KeyFileNotFound))
 			return
 		}
 		if errors.Is(err, service.ErrNotFileOwner) {
-			Forbidden(c, "not the owner of this file")
+			Forbidden(c, M(c, i18n.KeyFileNotOwner))
 			return
 		}
-		ServerError(c, "failed to delete file")
+		ServerError(c, M(c, i18n.KeyFileDeleteFailed))
 		return
 	}
 
@@ -283,7 +284,7 @@ func (h *FileHandler) BatchDelete(c *gin.Context) {
 		IDs []string `json:"ids" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "ids is required")
+		BadRequest(c, M(c, i18n.KeyFileIDsRequired))
 		return
 	}
 
@@ -313,30 +314,30 @@ func (h *FileHandler) MoveFile(c *gin.Context) {
 		FolderID *string `json:"folder_id"` // null = move to root
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid request")
+		BadRequest(c, M(c, i18n.KeyErrInvalidRequest))
 		return
 	}
 
 	file, err := h.fileRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		NotFound(c, "file not found")
+		NotFound(c, M(c, i18n.KeyFileNotFound))
 		return
 	}
 	if file.UserID != userID {
-		Forbidden(c, "not the owner of this file")
+		Forbidden(c, M(c, i18n.KeyFileNotOwner))
 		return
 	}
 
 	if req.FolderID != nil && *req.FolderID != "" {
 		folder, err := h.albumRepo.GetByID(c.Request.Context(), *req.FolderID)
 		if err != nil || folder.UserID != userID {
-			BadRequest(c, "invalid target folder")
+			BadRequest(c, M(c, i18n.KeyFileInvalidTargetFolder))
 			return
 		}
 	}
 
 	if err := h.fileRepo.SetAlbum(c.Request.Context(), id, req.FolderID); err != nil {
-		ServerError(c, "failed to move file")
+		ServerError(c, M(c, i18n.KeyFileMoveFailed))
 		return
 	}
 
@@ -373,11 +374,11 @@ func (h *FileHandler) ServeThumbnail(c *gin.Context) {
 
 	file, err := h.fileRepo.GetByHashPrefix(c.Request.Context(), hash)
 	if err != nil {
-		NotFound(c, "file not found")
+		NotFound(c, M(c, i18n.KeyFileNotFound))
 		return
 	}
 	if file.FileType != model.FileTypeImage {
-		NotFound(c, "thumbnail not found")
+		NotFound(c, M(c, i18n.KeyFileThumbnailNotFound))
 		return
 	}
 
@@ -385,7 +386,7 @@ func (h *FileHandler) ServeThumbnail(c *gin.Context) {
 	if err != nil {
 		reader, size, err = h.fileSvc.RegenerateThumbnail(c.Request.Context(), file)
 		if err != nil {
-			NotFound(c, "thumbnail not found")
+			NotFound(c, M(c, i18n.KeyFileThumbnailNotFound))
 			return
 		}
 	}
@@ -427,7 +428,7 @@ func (h *FileHandler) serveFile(c *gin.Context, _ string, forceDownload bool) {
 	// Look up the file matching the hash prefix.
 	file, err := h.findFileByHash(c, hash)
 	if err != nil {
-		NotFound(c, "file not found")
+		NotFound(c, M(c, i18n.KeyFileNotFound))
 		return
 	}
 
@@ -452,7 +453,7 @@ func (h *FileHandler) serveFile(c *gin.Context, _ string, forceDownload bool) {
 	if reader == nil {
 		reader, size, err = h.fileSvc.GetFileContent(c.Request.Context(), file)
 		if err != nil {
-			ServerError(c, "failed to read file")
+			ServerError(c, M(c, i18n.KeyFileReadFailed))
 			return
 		}
 	}

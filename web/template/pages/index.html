@@ -1,6 +1,6 @@
 {{define "index.html"}}
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{.Lang}}">
 <head>
     {{template "head_common" .}}
 </head>
@@ -46,15 +46,15 @@
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
-                开源 · 自部署 · 单文件极速启动
+                {{call .T "index.hero_eyebrow"}}
             </div>
 
             <h1 class="fade-in fade-in-delay-1 text-[2.25rem] sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.15] pb-2 text-transparent bg-clip-text bg-gradient-to-br from-gray-900 via-gray-800 to-gray-500 dark:from-white dark:via-gray-300 dark:to-gray-500">
-                自由部署 · 随心分享<br>你的专属媒体空间
+                {{call .T "index.hero_title_1"}}<br>{{call .T "index.hero_title_2"}}
             </h1>
 
             <p class="fade-in fade-in-delay-2 mt-3 sm:mt-8 text-sm sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed">
-                面向创作者的开源媒体托管平台。<br class="hidden sm:block">单文件启动，拖拽即传，一键分享，所有内容都留在你自己的服务器。
+                {{call .T "index.hero_subtitle"}}
             </p>
 
             <!-- Stats -->
@@ -65,10 +65,10 @@
                 <a href="/upload" class="group relative inline-flex items-center gap-2 px-5 py-2.5 sm:px-8 sm:py-3.5 bg-gray-900 dark:bg-white border border-gray-800 dark:border-gray-200 text-white dark:text-gray-900 rounded-xl font-medium text-sm hover:bg-black dark:hover:bg-gray-200 transition-all shadow-[0_0_20px_rgba(0,0,0,0.06)] dark:shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_0_25px_rgba(0,0,0,0.15)] dark:hover:shadow-[0_0_25px_rgba(255,255,255,0.15)] hover:-translate-y-0.5 overflow-hidden">
                     <div class="absolute inset-0 bg-gradient-to-t from-white/10 dark:from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                     <svg class="w-4 h-4 transition-transform group-hover:-translate-y-0.5 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                    <span class="relative z-10">立刻上传</span>
+                    <span class="relative z-10">{{call .T "index.cta_upload"}}</span>
                 </a>
                 <a href="/explore" class="group inline-flex items-center gap-2 px-5 py-2.5 sm:px-8 sm:py-3.5 border border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-gray-900/60 backdrop-blur-md text-gray-700 dark:text-gray-300 rounded-xl font-medium text-sm hover:bg-white dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all hover:-translate-y-0.5 shadow-sm hover:shadow dark:hover:shadow-gray-900/50">
-                    探索广场
+                    {{call .T "index.cta_explore"}}
                     <svg class="w-4 h-4 transition-transform group-hover:translate-x-1 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 </a>
             </div>
@@ -89,8 +89,12 @@
                 if (size >= 1073741824) { size = (size / 1073741824).toFixed(2); unit = 'GB'; }
                 else if (size >= 1048576) { size = (size / 1048576).toFixed(2); unit = 'MB'; }
                 else if (size >= 1024) { size = (size / 1024).toFixed(1); unit = 'KB'; }
+                // The "X files" label is templated server-side because
+                // pluralization rules differ per locale; the byte/unit
+                // figure is purely numeric and language-agnostic.
+                var filesLabel = {{call .T "index.stats_files" "__N__"}}.replace('__N__', d.total_files);
                 document.getElementById('siteStats').innerHTML =
-                    '<span class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>' + d.total_files + ' 个文件</span>'
+                    '<span class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>' + filesLabel + '</span>'
                     + '<span class="text-gray-300">|</span>'
                     + '<span class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>' + size + ' ' + unit + '</span>';
             }

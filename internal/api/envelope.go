@@ -8,7 +8,10 @@
 package api
 
 import (
+	"context"
+
 	"github.com/kite-plus/kite/internal/errcodes"
+	"github.com/kite-plus/kite/internal/i18n"
 )
 
 // Envelope is the shape every JSON response carries. Generics let each
@@ -17,13 +20,31 @@ import (
 // (web admin, PicGo plugins, scripts) keep working.
 type Envelope[T any] struct {
 	Code    int    `json:"code" doc:"Business error code; 0 indicates success. See errcodes catalog."`
-	Message string `json:"message" doc:"Human-readable description; localised in future revisions."`
+	Message string `json:"message" doc:"Human-readable description; localised per the request's Accept-Language / kite_locale cookie."`
 	Data    T      `json:"data" doc:"Endpoint-specific payload. Null on error responses."`
 }
 
-// Ok wraps payload in a success envelope.
+// Ok wraps payload in a success envelope. The message is hard-coded to the
+// English form here because Ok is called from operation handlers that
+// already have a context.Context — but they can't pass it without forcing
+// every Ok-callsite to thread ctx through. We use [OkCtx] when localisation
+// matters; Ok stays as the zero-friction default for handlers whose
+// success message never needs translating in practice (the SPA and SDKs
+// surface the wire `code` rather than the `message` text on success).
 func Ok[T any](data T) Envelope[T] {
 	return Envelope[T]{Code: int(errcodes.Success), Message: "success", Data: data}
+}
+
+// OkCtx is the locale-aware variant of [Ok]. Use it from operation handlers
+// that want the success message translated to the caller's locale —
+// typically when the response is rendered directly in a UI surface that
+// doesn't consume the `code` field.
+func OkCtx[T any](ctx context.Context, data T) Envelope[T] {
+	return Envelope[T]{
+		Code:    int(errcodes.Success),
+		Message: i18n.T(i18n.FromContext(ctx), i18n.KeySuccess),
+		Data:    data,
+	}
 }
 
 // Page is the standard pagination wrapper for list endpoints.
@@ -62,11 +83,30 @@ func (e *APIError) GetStatus() int { return e.Status }
 
 // Errf builds an APIError from an errcodes constant. The HTTP status is
 // resolved from the catalog so callers don't have to remember the mapping.
+//
+// The format argument is treated as a literal English message — for
+// localised messages reach for [ErrKey] instead, which looks up a
+// catalogue key against the request's locale.
 func Errf(code errcodes.Code, format string, args ...any) *APIError {
 	return &APIError{
 		Status:  errcodes.HTTPStatus(code),
 		Code:    code,
 		Message: sprintf(format, args...),
+	}
+}
+
+// ErrKey is the locale-aware [Errf]: it resolves a catalogue key against
+// the request's locale (extracted from ctx) and packages the result as an
+// APIError. Use this at every huma operation call site that previously
+// passed a literal English string.
+//
+//	return nil, ErrKey(ctx, errcodes.Unauthorized, i18n.KeyAuthRefreshTokenRequired)
+//	return nil, ErrKey(ctx, errcodes.InternalError, i18n.KeySetupInvalidData, err.Error())
+func ErrKey(ctx context.Context, code errcodes.Code, key string, args ...any) *APIError {
+	return &APIError{
+		Status:  errcodes.HTTPStatus(code),
+		Code:    code,
+		Message: i18n.T(i18n.FromContext(ctx), key, args...),
 	}
 }
 

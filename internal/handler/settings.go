@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/service"
@@ -36,7 +37,7 @@ func NewSettingsHandler(settingRepo *repo.SettingRepo, userRepo *repo.UserRepo, 
 func (h *SettingsHandler) Get(c *gin.Context) {
 	settings, err := h.settingRepo.GetAll(c.Request.Context())
 	if err != nil {
-		ServerError(c, "failed to get settings")
+		ServerError(c, M(c, i18n.KeySettingsGetFailed))
 		return
 	}
 	merged := service.ResolveSettings(h.defaults, settings)
@@ -78,7 +79,7 @@ type updateSettingsRequest struct {
 func (h *SettingsHandler) Update(c *gin.Context) {
 	var req updateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid settings data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySettingsInvalidData, err.Error()))
 		return
 	}
 
@@ -87,7 +88,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	// and let an admin ship tokens signed with an attacker-controlled value.
 	for key := range req.Settings {
 		if service.IsReadOnlySecretSettingKey(key) {
-			BadRequest(c, key+" cannot be modified through the settings API")
+			BadRequest(c, M(c, i18n.KeySettingsCannotModify, key))
 			return
 		}
 	}
@@ -103,7 +104,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	if raw, ok := req.Settings[service.UploadPathPatternSettingKey]; ok {
 		pattern, err := service.NormalizeUploadPathPattern(raw)
 		if err != nil {
-			BadRequest(c, "invalid upload.path_pattern: "+err.Error())
+			BadRequest(c, M(c, i18n.KeySettingsInvalidPathPattern, err.Error()))
 			return
 		}
 		req.Settings[service.UploadPathPatternSettingKey] = strings.TrimSpace(pattern)
@@ -111,7 +112,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	if raw, ok := req.Settings[service.DefaultQuotaSettingKey]; ok {
 		normalized, err := service.NormalizeDefaultQuota(raw)
 		if err != nil {
-			BadRequest(c, "invalid "+service.DefaultQuotaSettingKey+": "+err.Error())
+			BadRequest(c, M(c, i18n.KeySettingsInvalidValue, service.DefaultQuotaSettingKey, err.Error()))
 			return
 		}
 		req.Settings[service.DefaultQuotaSettingKey] = normalized
@@ -119,7 +120,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	if raw, ok := req.Settings[service.UploadMaxFileSizeMBSettingKey]; ok {
 		normalized, err := service.NormalizeUploadMaxFileSizeMB(raw)
 		if err != nil {
-			BadRequest(c, "invalid upload.max_file_size_mb: "+err.Error())
+			BadRequest(c, M(c, i18n.KeySettingsInvalidMaxFileSize, err.Error()))
 			return
 		}
 		req.Settings[service.UploadMaxFileSizeMBSettingKey] = normalized
@@ -127,7 +128,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	if raw, ok := req.Settings[service.UploadDangerousExtensionRulesSettingKey]; ok {
 		normalized, err := service.NormalizeDangerousExtensionRules(raw)
 		if err != nil {
-			BadRequest(c, "invalid upload.dangerous_extension_rules: "+err.Error())
+			BadRequest(c, M(c, i18n.KeySettingsInvalidDangerousExtension, err.Error()))
 			return
 		}
 		req.Settings[service.UploadDangerousExtensionRulesSettingKey] = normalized
@@ -135,7 +136,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	if raw, ok := req.Settings[service.UploadDangerousRenameSuffixSettingKey]; ok {
 		normalized, err := service.NormalizeDangerousRenameSuffix(raw)
 		if err != nil {
-			BadRequest(c, "invalid upload.dangerous_rename_suffix: "+err.Error())
+			BadRequest(c, M(c, i18n.KeySettingsInvalidDangerousRename, err.Error()))
 			return
 		}
 		req.Settings[service.UploadDangerousRenameSuffixSettingKey] = normalized
@@ -143,7 +144,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	if raw, ok := req.Settings[service.SMTPPortSettingKey]; ok {
 		normalized, err := service.NormalizeSMTPPort(raw)
 		if err != nil {
-			BadRequest(c, "invalid "+service.SMTPPortSettingKey+": "+err.Error())
+			BadRequest(c, M(c, i18n.KeySettingsInvalidValue, service.SMTPPortSettingKey, err.Error()))
 			return
 		}
 		req.Settings[service.SMTPPortSettingKey] = normalized
@@ -151,7 +152,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	if raw, ok := req.Settings[service.SMTPTLSSettingKey]; ok {
 		normalized, err := service.NormalizeSMTPBool(raw)
 		if err != nil {
-			BadRequest(c, "invalid "+service.SMTPTLSSettingKey+": "+err.Error())
+			BadRequest(c, M(c, i18n.KeySettingsInvalidValue, service.SMTPTLSSettingKey, err.Error()))
 			return
 		}
 		req.Settings[service.SMTPTLSSettingKey] = normalized
@@ -159,7 +160,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	if raw, ok := req.Settings[service.SMTPFromSettingKey]; ok {
 		normalized, err := service.NormalizeSMTPFrom(raw)
 		if err != nil {
-			BadRequest(c, "invalid "+service.SMTPFromSettingKey+": "+err.Error())
+			BadRequest(c, M(c, i18n.KeySettingsInvalidValue, service.SMTPFromSettingKey, err.Error()))
 			return
 		}
 		req.Settings[service.SMTPFromSettingKey] = normalized
@@ -180,7 +181,7 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		}
 		normalized, err := service.NormalizeRequestsPerMinute(raw)
 		if err != nil {
-			BadRequest(c, "invalid "+key+": "+err.Error())
+			BadRequest(c, M(c, i18n.KeySettingsInvalidValue, key, err.Error()))
 			return
 		}
 		req.Settings[key] = normalized
@@ -204,14 +205,14 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 		}
 		trimmed := strings.TrimSpace(raw)
 		if trimmed == "" && (key == service.SiteNameSettingKey || key == service.SiteTitleSettingKey || key == service.SiteHeaderBrandSettingKey) {
-			BadRequest(c, "invalid "+key+": cannot be empty")
+			BadRequest(c, M(c, i18n.KeySettingsInvalidEmpty, key))
 			return
 		}
 		req.Settings[key] = trimmed
 	}
 
 	if err := h.settingRepo.SetBatch(c.Request.Context(), req.Settings); err != nil {
-		ServerError(c, "failed to update settings")
+		ServerError(c, M(c, i18n.KeySettingsUpdateFailed))
 		return
 	}
 
@@ -220,13 +221,13 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 
 func (h *SettingsHandler) TestEmail(c *gin.Context) {
 	if h.emailSvc == nil || h.userRepo == nil {
-		ServerError(c, "email service is not configured")
+		ServerError(c, M(c, i18n.KeyEmailServiceNotConfigured))
 		return
 	}
 
 	var req updateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid settings data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySettingsInvalidData, err.Error()))
 		return
 	}
 
@@ -234,16 +235,16 @@ func (h *SettingsHandler) TestEmail(c *gin.Context) {
 	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			Unauthorized(c, "user not found")
+			Unauthorized(c, M(c, i18n.KeyAuthUserNotFound))
 			return
 		}
-		ServerError(c, "failed to load current user")
+		ServerError(c, M(c, i18n.KeyAuthLoadCurrentUserFailed))
 		return
 	}
 
 	storedSettings, err := h.settingRepo.GetAll(c.Request.Context())
 	if err != nil {
-		ServerError(c, "failed to get settings")
+		ServerError(c, M(c, i18n.KeySettingsGetFailed))
 		return
 	}
 
@@ -267,7 +268,7 @@ func (h *SettingsHandler) TestEmail(c *gin.Context) {
 
 	effectiveSettings := service.ResolveSettings(h.defaults, storedSettings)
 	if err := h.emailSvc.SendTestEmail(c.Request.Context(), *config, user.Email, effectiveSettings[service.SiteNameSettingKey]); err != nil {
-		Fail(c, 502, 50200, "测试邮件发送失败："+err.Error())
+		Fail(c, 502, 50200, M(c, i18n.KeyEmailTestSendFailed, err.Error()))
 		return
 	}
 

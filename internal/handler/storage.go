@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/model"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/storage"
@@ -57,25 +58,25 @@ func (h *StorageHandler) Catalog(c *gin.Context) {
 func (h *StorageHandler) Create(c *gin.Context) {
 	var req createStorageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid storage config: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyStorageInvalidConfig, err.Error()))
 		return
 	}
 
 	schemeKey := resolveStorageSchemeKey(req.SchemeKey, req.Driver)
 	driver, provider, normalizedConfig, scfg, err := storage.ResolveSchemeConfig(schemeKey, req.Config)
 	if err != nil {
-		BadRequest(c, "invalid "+schemeKey+" storage config: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySetupInvalidStorage, schemeKey, err.Error()))
 		return
 	}
 
 	// Verify the driver can be constructed.
 	if _, err := storage.NewDriver(scfg); err != nil {
-		BadRequest(c, "storage config validation failed: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySetupStorageValidationFailed, err.Error()))
 		return
 	}
 
 	if req.CapacityLimitBytes < 0 {
-		BadRequest(c, "capacity_limit_bytes must not be negative")
+		BadRequest(c, M(c, i18n.KeySettingsCapacityNegative))
 		return
 	}
 
@@ -101,7 +102,7 @@ func (h *StorageHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.storageRepo.Create(c.Request.Context(), cfg); err != nil {
-		ServerError(c, "failed to create storage config")
+		ServerError(c, M(c, i18n.KeyStorageCreateFailed))
 		return
 	}
 
@@ -109,7 +110,7 @@ func (h *StorageHandler) Create(c *gin.Context) {
 	// so the Manager does not observe two defaults simultaneously.
 	if req.IsDefault {
 		if err := h.storageRepo.SetDefault(c.Request.Context(), cfg.ID); err != nil {
-			ServerError(c, "failed to set default storage: "+err.Error())
+			ServerError(c, M(c, i18n.KeyStorageSetDefaultFailed, err.Error()))
 			return
 		}
 	}
@@ -129,7 +130,7 @@ func (h *StorageHandler) Create(c *gin.Context) {
 func (h *StorageHandler) List(c *gin.Context) {
 	configs, err := h.storageRepo.List(c.Request.Context())
 	if err != nil {
-		ServerError(c, "failed to list storage configs")
+		ServerError(c, M(c, i18n.KeyStorageListFailed))
 		return
 	}
 
@@ -173,7 +174,7 @@ func (h *StorageHandler) GetOne(c *gin.Context) {
 
 	cfg, err := h.storageRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		NotFound(c, "storage config not found")
+		NotFound(c, M(c, i18n.KeyStorageNotFound))
 		return
 	}
 
@@ -205,29 +206,29 @@ func (h *StorageHandler) Update(c *gin.Context) {
 
 	existing, err := h.storageRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		NotFound(c, "storage config not found")
+		NotFound(c, M(c, i18n.KeyStorageNotFound))
 		return
 	}
 
 	var req createStorageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid storage config: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyStorageInvalidConfig, err.Error()))
 		return
 	}
 
 	if req.CapacityLimitBytes < 0 {
-		BadRequest(c, "capacity_limit_bytes must not be negative")
+		BadRequest(c, M(c, i18n.KeySettingsCapacityNegative))
 		return
 	}
 
 	schemeKey := resolveStorageSchemeKey(req.SchemeKey, req.Driver)
 	driver, provider, normalizedConfig, scfg, err := storage.ResolveSchemeConfig(schemeKey, req.Config)
 	if err != nil {
-		BadRequest(c, "invalid "+schemeKey+" storage config: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySetupInvalidStorage, schemeKey, err.Error()))
 		return
 	}
 	if _, err := storage.NewDriver(scfg); err != nil {
-		BadRequest(c, "storage config validation failed: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySetupStorageValidationFailed, err.Error()))
 		return
 	}
 
@@ -245,13 +246,13 @@ func (h *StorageHandler) Update(c *gin.Context) {
 	}
 
 	if err := h.storageRepo.Update(c.Request.Context(), existing); err != nil {
-		ServerError(c, "failed to update storage config")
+		ServerError(c, M(c, i18n.KeyStorageUpdateFailed))
 		return
 	}
 
 	if req.IsDefault && !existing.IsDefault {
 		if err := h.storageRepo.SetDefault(c.Request.Context(), id); err != nil {
-			ServerError(c, "failed to set default storage: "+err.Error())
+			ServerError(c, M(c, i18n.KeyStorageSetDefaultFailed, err.Error()))
 			return
 		}
 	}
@@ -266,7 +267,7 @@ func (h *StorageHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
 	if err := h.storageRepo.Delete(c.Request.Context(), id); err != nil {
-		ServerError(c, "failed to delete storage config")
+		ServerError(c, M(c, i18n.KeyStorageDeleteFailed))
 		return
 	}
 
@@ -280,13 +281,13 @@ func (h *StorageHandler) Test(c *gin.Context) {
 
 	cfg, err := h.storageRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		NotFound(c, "storage config not found")
+		NotFound(c, M(c, i18n.KeyStorageNotFound))
 		return
 	}
 
 	scfg, err := storage.ParseConfig(cfg.Driver, json.RawMessage(cfg.Config))
 	if err != nil {
-		ServerError(c, "failed to parse storage config")
+		ServerError(c, M(c, i18n.KeyStorageParseConfigFailed))
 		return
 	}
 
@@ -332,11 +333,11 @@ func (h *StorageHandler) Test(c *gin.Context) {
 func (h *StorageHandler) SetDefault(c *gin.Context) {
 	id := c.Param("id")
 	if _, err := h.storageRepo.GetByID(c.Request.Context(), id); err != nil {
-		NotFound(c, "storage config not found")
+		NotFound(c, M(c, i18n.KeyStorageNotFound))
 		return
 	}
 	if err := h.storageRepo.SetDefault(c.Request.Context(), id); err != nil {
-		ServerError(c, "failed to set default storage: "+err.Error())
+		ServerError(c, M(c, i18n.KeyStorageSetDefaultFailed, err.Error()))
 		return
 	}
 	h.reloadStorage()
@@ -351,15 +352,15 @@ type reorderRequest struct {
 func (h *StorageHandler) Reorder(c *gin.Context) {
 	var req reorderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid reorder payload: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyStorageInvalidReorder, err.Error()))
 		return
 	}
 	if len(req.OrderedIDs) == 0 {
-		BadRequest(c, "ordered_ids must not be empty")
+		BadRequest(c, M(c, i18n.KeyStorageOrderedIDsEmpty))
 		return
 	}
 	if err := h.storageRepo.Reorder(c.Request.Context(), req.OrderedIDs); err != nil {
-		ServerError(c, "failed to reorder storages: "+err.Error())
+		ServerError(c, M(c, i18n.KeyStorageReorderFailed, err.Error()))
 		return
 	}
 	h.reloadStorage()

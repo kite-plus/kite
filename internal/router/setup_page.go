@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
+	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/repo"
 )
 
@@ -37,7 +39,8 @@ func registerSetupPage(r *gin.Engine, cfg Config, settingRepo *repo.SettingRepo,
 			return
 		}
 
-		data := landingTemplateData(nil, settings, "setup", "安装向导")
+		locale := middleware.LocaleFromGin(c)
+		data := landingTemplateData(c, nil, settings, "setup", i18n.T(locale, "setup_page.doc_title"))
 		data["DatabaseDriver"] = cfg.CurrentDatabase.Driver
 		data["DatabaseDSN"] = cfg.CurrentDatabase.DSN
 		data["DatabaseSwitchEnabled"] = cfg.SaveDatabaseConfig != nil

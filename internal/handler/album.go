@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/model"
 	"github.com/kite-plus/kite/internal/repo"
@@ -40,7 +41,7 @@ type albumListData struct {
 func (h *AlbumHandler) Create(c *gin.Context) {
 	var req createAlbumRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid album data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyAlbumInvalidData, err.Error()))
 		return
 	}
 
@@ -56,14 +57,14 @@ func (h *AlbumHandler) Create(c *gin.Context) {
 	if req.ParentID != "" {
 		parent, err := h.albumRepo.GetByID(c.Request.Context(), req.ParentID)
 		if err != nil || parent.UserID != userID {
-			BadRequest(c, "invalid parent folder")
+			BadRequest(c, M(c, i18n.KeyAlbumInvalidParentFolder))
 			return
 		}
 		album.ParentID = &req.ParentID
 	}
 
 	if err := h.albumRepo.Create(c.Request.Context(), album); err != nil {
-		ServerError(c, "failed to create album")
+		ServerError(c, M(c, i18n.KeyAlbumCreateFailed))
 		return
 	}
 
@@ -90,20 +91,20 @@ func (h *AlbumHandler) List(c *gin.Context) {
 		parentIDPtr = &parentID
 		folder, err := h.albumRepo.GetByID(c.Request.Context(), parentID)
 		if err != nil || folder.UserID != userID {
-			NotFound(c, "folder not found")
+			NotFound(c, M(c, i18n.KeyAlbumFolderNotFound))
 			return
 		}
 		currentFolder = folder
 		ancestors, err = h.albumRepo.ListAncestors(c.Request.Context(), userID, parentID)
 		if err != nil {
-			ServerError(c, "failed to load folder path")
+			ServerError(c, M(c, i18n.KeyAlbumLoadFolderFailed))
 			return
 		}
 	}
 
 	albums, total, err := h.albumRepo.ListByUser(c.Request.Context(), userID, parentIDPtr, page, size)
 	if err != nil {
-		ServerError(c, "failed to list albums")
+		ServerError(c, M(c, i18n.KeyAlbumListFailed))
 		return
 	}
 
@@ -139,18 +140,18 @@ func (h *AlbumHandler) Update(c *gin.Context) {
 
 	album, err := h.albumRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		NotFound(c, "album not found")
+		NotFound(c, M(c, i18n.KeyAlbumNotFound))
 		return
 	}
 
 	if album.UserID != userID {
-		Forbidden(c, "not the owner of this album")
+		Forbidden(c, M(c, i18n.KeyAlbumNotOwner))
 		return
 	}
 
 	var req updateAlbumRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid album data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyAlbumInvalidData, err.Error()))
 		return
 	}
 
@@ -168,22 +169,22 @@ func (h *AlbumHandler) Update(c *gin.Context) {
 			album.ParentID = nil
 		} else {
 			if *req.ParentID == album.ID {
-				BadRequest(c, "folder cannot be its own parent")
+				BadRequest(c, M(c, i18n.KeyAlbumFolderSelfParent))
 				return
 			}
 			parent, err := h.albumRepo.GetByID(c.Request.Context(), *req.ParentID)
 			if err != nil || parent.UserID != userID {
-				BadRequest(c, "invalid parent folder")
+				BadRequest(c, M(c, i18n.KeyAlbumInvalidParentFolder))
 				return
 			}
 			ancestors, err := h.albumRepo.ListAncestors(c.Request.Context(), userID, *req.ParentID)
 			if err != nil {
-				BadRequest(c, "invalid parent folder")
+				BadRequest(c, M(c, i18n.KeyAlbumInvalidParentFolder))
 				return
 			}
 			for _, ancestor := range ancestors {
 				if ancestor.ID == album.ID {
-					BadRequest(c, "cannot move folder into its descendant")
+					BadRequest(c, M(c, i18n.KeyAlbumDescendantMove))
 					return
 				}
 			}
@@ -192,7 +193,7 @@ func (h *AlbumHandler) Update(c *gin.Context) {
 	}
 
 	if err := h.albumRepo.Update(c.Request.Context(), album); err != nil {
-		ServerError(c, "failed to update album")
+		ServerError(c, M(c, i18n.KeyAlbumUpdateFailed))
 		return
 	}
 
@@ -206,17 +207,17 @@ func (h *AlbumHandler) Delete(c *gin.Context) {
 
 	album, err := h.albumRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		NotFound(c, "album not found")
+		NotFound(c, M(c, i18n.KeyAlbumNotFound))
 		return
 	}
 
 	if album.UserID != userID {
-		Forbidden(c, "not the owner of this album")
+		Forbidden(c, M(c, i18n.KeyAlbumNotOwner))
 		return
 	}
 
 	if err := h.albumRepo.Delete(c.Request.Context(), id); err != nil {
-		ServerError(c, "failed to delete album")
+		ServerError(c, M(c, i18n.KeyAlbumDeleteFailed))
 		return
 	}
 

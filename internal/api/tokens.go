@@ -7,6 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/kite-plus/kite/internal/errcodes"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/model"
 )
@@ -84,15 +85,15 @@ func registerTokens(api huma.API, deps Deps) {
 	}, func(ctx context.Context, _ *ListTokensInput) (*ListTokensOutput, error) {
 		c := ginContextFromHuma(ctx)
 		if c == nil {
-			return nil, Errf(errcodes.InternalError, "missing request context")
+			return nil, ErrKey(ctx, errcodes.InternalError, i18n.KeyErrMissingRequestCtx)
 		}
 		userID := c.GetString(middleware.ContextKeyUserID)
 		if userID == "" {
-			return nil, Errf(errcodes.Unauthorized, "missing user context")
+			return nil, ErrKey(ctx, errcodes.Unauthorized, i18n.KeyErrMissingUserCtx)
 		}
 		records, err := deps.AuthSvc.TokenRepo().ListByUser(ctx, userID)
 		if err != nil {
-			return nil, Errf(errcodes.InternalError, "failed to list tokens")
+			return nil, ErrKey(ctx, errcodes.InternalError, i18n.KeyTokenListFailed)
 		}
 		out := make([]TokenSummary, 0, len(records))
 		for i := range records {
@@ -114,11 +115,11 @@ func registerTokens(api huma.API, deps Deps) {
 	}, func(ctx context.Context, in *CreateTokenInput) (*CreateTokenOutput, error) {
 		c := ginContextFromHuma(ctx)
 		if c == nil {
-			return nil, Errf(errcodes.InternalError, "missing request context")
+			return nil, ErrKey(ctx, errcodes.InternalError, i18n.KeyErrMissingRequestCtx)
 		}
 		userID := c.GetString(middleware.ContextKeyUserID)
 		if userID == "" {
-			return nil, Errf(errcodes.Unauthorized, "missing user context")
+			return nil, ErrKey(ctx, errcodes.Unauthorized, i18n.KeyErrMissingUserCtx)
 		}
 
 		var expiresAt *time.Time
@@ -128,7 +129,7 @@ func registerTokens(api huma.API, deps Deps) {
 		}
 		plain, token, err := deps.AuthSvc.CreateAPIToken(ctx, userID, in.Body.Name, expiresAt)
 		if err != nil {
-			return nil, Errf(errcodes.InternalError, "failed to create token")
+			return nil, ErrKey(ctx, errcodes.InternalError, i18n.KeyTokenCreateFailed)
 		}
 		return &CreateTokenOutput{Body: Ok(CreatedToken{
 			ID:        token.ID,
@@ -151,14 +152,14 @@ func registerTokens(api huma.API, deps Deps) {
 	}, func(ctx context.Context, in *DeleteTokenInput) (*DeleteTokenOutput, error) {
 		c := ginContextFromHuma(ctx)
 		if c == nil {
-			return nil, Errf(errcodes.InternalError, "missing request context")
+			return nil, ErrKey(ctx, errcodes.InternalError, i18n.KeyErrMissingRequestCtx)
 		}
 		userID := c.GetString(middleware.ContextKeyUserID)
 		if userID == "" {
-			return nil, Errf(errcodes.Unauthorized, "missing user context")
+			return nil, ErrKey(ctx, errcodes.Unauthorized, i18n.KeyErrMissingUserCtx)
 		}
 		if err := deps.AuthSvc.TokenRepo().Delete(ctx, in.ID, userID); err != nil {
-			return nil, Errf(errcodes.NotFound, "token not found")
+			return nil, ErrKey(ctx, errcodes.NotFound, i18n.KeyTokenNotFound)
 		}
 		return &DeleteTokenOutput{Body: Ok(struct{}{})}, nil
 	})

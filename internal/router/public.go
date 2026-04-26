@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kite-plus/kite/internal/handler"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/version"
 	"gorm.io/gorm"
@@ -106,7 +107,7 @@ func registerPublic(
 	pub.GET("/stats", func(c *gin.Context) {
 		stats, err := fileRepo.GetStats(c.Request.Context())
 		if err != nil {
-			handler.ServerError(c, "failed to get stats")
+			handler.ServerError(c, handler.M(c, i18n.KeySettingsStatsFailed))
 			return
 		}
 		handler.Success(c, gin.H{
@@ -121,7 +122,7 @@ func registerPublic(
 	pub.GET("/files", func(c *gin.Context) {
 		val, _ := settingRepo.Get(c.Request.Context(), "allow_public_gallery")
 		if val != "true" {
-			handler.Fail(c, http.StatusForbidden, 40300, "public gallery is disabled")
+			handler.Fail(c, http.StatusForbidden, 40300, handler.M(c, i18n.KeyPublicGalleryDisabled))
 			return
 		}
 
@@ -142,7 +143,7 @@ func registerPublic(
 			Order:    "DESC",
 		})
 		if err != nil {
-			handler.ServerError(c, "failed to list files")
+			handler.ServerError(c, handler.M(c, i18n.KeyFileListFailed))
 			return
 		}
 		handler.Success(c, gin.H{
@@ -158,7 +159,7 @@ func registerPublic(
 	uploadGroup.POST("/upload", func(c *gin.Context) {
 		val, err := settingRepo.Get(c.Request.Context(), "allow_guest_upload")
 		if err != nil || val != "true" {
-			handler.Fail(c, http.StatusForbidden, 40300, "guest upload is disabled")
+			handler.Fail(c, http.StatusForbidden, 40300, handler.M(c, i18n.KeyPublicGuestUploadDisabled))
 			return
 		}
 		fileHandler.GuestUpload(c)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/service"
 	"gorm.io/gorm"
@@ -32,7 +33,7 @@ type setPasswordRequest struct {
 // StartOAuth redirects the browser to the selected provider.
 func (h *AuthHandler) StartOAuth(c *gin.Context) {
 	if h.socialAuthSvc == nil {
-		ServerError(c, "social login is not configured")
+		ServerError(c, M(c, i18n.KeyOAuthSocialNotConfigured))
 		return
 	}
 
@@ -62,7 +63,7 @@ func (h *AuthHandler) StartOAuth(c *gin.Context) {
 // OAuthCallback handles the provider callback and redirects back into the SPA.
 func (h *AuthHandler) OAuthCallback(c *gin.Context) {
 	if h.socialAuthSvc == nil {
-		ServerError(c, "social login is not configured")
+		ServerError(c, M(c, i18n.KeyOAuthSocialNotConfigured))
 		return
 	}
 
@@ -114,7 +115,7 @@ func (h *AuthHandler) OAuthCallback(c *gin.Context) {
 func (h *AuthHandler) ExchangeOAuth(c *gin.Context) {
 	var req exchangeOAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "ticket is required")
+		BadRequest(c, M(c, i18n.KeyOAuthTicketRequired))
 		return
 	}
 
@@ -128,7 +129,7 @@ func (h *AuthHandler) ExchangeOAuth(c *gin.Context) {
 			Forbidden(c, err.Error())
 			return
 		}
-		ServerError(c, "exchange oauth ticket failed")
+		ServerError(c, M(c, i18n.KeyOAuthExchangeFailed))
 		return
 	}
 
@@ -146,7 +147,7 @@ func (h *AuthHandler) ExchangeOAuth(c *gin.Context) {
 func (h *AuthHandler) OnboardOAuth(c *gin.Context) {
 	var req onboardOAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid onboarding data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyOAuthInvalidOnboarding, err.Error()))
 		return
 	}
 
@@ -165,7 +166,7 @@ func (h *AuthHandler) OnboardOAuth(c *gin.Context) {
 		case errors.Is(err, service.ErrUserExists):
 			Fail(c, http.StatusConflict, 40900, err.Error())
 		default:
-			ServerError(c, "oauth onboarding failed")
+			ServerError(c, M(c, i18n.KeyOAuthOnboardingFailed))
 		}
 		return
 	}
@@ -185,12 +186,12 @@ func (h *AuthHandler) ListIdentities(c *gin.Context) {
 	userID := c.GetString(middleware.ContextKeyUserID)
 	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		Unauthorized(c, "user not found")
+		Unauthorized(c, M(c, i18n.KeyAuthUserNotFound))
 		return
 	}
 	providers, err := h.socialAuthSvc.ListUserIdentities(c.Request.Context(), userID)
 	if err != nil {
-		ServerError(c, "failed to list identities")
+		ServerError(c, M(c, i18n.KeyOAuthListIdentitiesFailed))
 		return
 	}
 
@@ -211,9 +212,9 @@ func (h *AuthHandler) UnlinkIdentity(c *gin.Context) {
 		case errors.Is(err, service.ErrOAuthProviderUnsupported):
 			BadRequest(c, err.Error())
 		case errors.Is(err, gorm.ErrRecordNotFound):
-			NotFound(c, "identity not found")
+			NotFound(c, M(c, i18n.KeyOAuthIdentityNotFound))
 		default:
-			ServerError(c, "failed to unlink identity")
+			ServerError(c, M(c, i18n.KeyOAuthUnlinkIdentityFailed))
 		}
 		return
 	}
@@ -224,13 +225,13 @@ func (h *AuthHandler) UnlinkIdentity(c *gin.Context) {
 func (h *AuthHandler) SetPassword(c *gin.Context) {
 	var req setPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid password data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyAuthInvalidPassword, err.Error()))
 		return
 	}
 
 	userID := c.GetString(middleware.ContextKeyUserID)
 	if err := h.authSvc.SetPassword(c.Request.Context(), userID, req.NewPassword); err != nil {
-		ServerError(c, "set password failed")
+		ServerError(c, M(c, i18n.KeyAuthSetPasswordFailed))
 		return
 	}
 	Success(c, nil)

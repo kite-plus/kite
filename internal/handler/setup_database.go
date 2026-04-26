@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/kite-plus/kite/internal/i18n"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -71,7 +72,7 @@ func (h *SetupDatabaseHandler) TestDatabase(c *gin.Context) {
 	}
 	var req databaseChoiceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid database config: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySetupInvalidDatabase, err.Error()))
 		return
 	}
 	if err := probeDatabase(req.Driver, req.DSN); err != nil {
@@ -97,7 +98,7 @@ func (h *SetupDatabaseHandler) SaveDatabase(c *gin.Context) {
 	}
 	var req databaseChoiceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid database config: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySetupInvalidDatabase, err.Error()))
 		return
 	}
 	if err := probeDatabase(req.Driver, req.DSN); err != nil {
@@ -105,7 +106,7 @@ func (h *SetupDatabaseHandler) SaveDatabase(c *gin.Context) {
 		return
 	}
 	if err := h.persistDatabase(req.Driver, req.DSN); err != nil {
-		ServerError(c, "save database config: "+err.Error())
+		ServerError(c, M(c, i18n.KeySetupSaveDatabaseFailed, err.Error()))
 		return
 	}
 	Success(c, gin.H{

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/service"
@@ -28,7 +29,7 @@ type createTokenRequest struct {
 func (h *TokenHandler) Create(c *gin.Context) {
 	var req createTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid token data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyTokenInvalidData, err.Error()))
 		return
 	}
 
@@ -42,7 +43,7 @@ func (h *TokenHandler) Create(c *gin.Context) {
 
 	plainToken, token, err := h.authSvc.CreateAPIToken(c.Request.Context(), userID, req.Name, expiresAt)
 	if err != nil {
-		ServerError(c, "failed to create token")
+		ServerError(c, M(c, i18n.KeyTokenCreateFailed))
 		return
 	}
 
@@ -62,7 +63,7 @@ func (h *TokenHandler) List(c *gin.Context) {
 
 	tokens, err := h.tokenRepo.ListByUser(c.Request.Context(), userID)
 	if err != nil {
-		ServerError(c, "failed to list tokens")
+		ServerError(c, M(c, i18n.KeyTokenListFailed))
 		return
 	}
 
@@ -75,7 +76,7 @@ func (h *TokenHandler) Delete(c *gin.Context) {
 	userID := c.GetString(middleware.ContextKeyUserID)
 
 	if err := h.tokenRepo.Delete(c.Request.Context(), id, userID); err != nil {
-		NotFound(c, "token not found")
+		NotFound(c, M(c, i18n.KeyTokenNotFound))
 		return
 	}
 

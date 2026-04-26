@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/service"
 )
@@ -23,7 +24,7 @@ func (h *AuthHandler) SetupTOTP(c *gin.Context) {
 			Fail(c, http.StatusConflict, 40900, err.Error())
 			return
 		}
-		ServerError(c, "failed to start 2fa setup")
+		ServerError(c, M(c, i18n.KeyTwoFAStartSetupFailed))
 		return
 	}
 	Success(c, gin.H{
@@ -42,7 +43,7 @@ type enableTOTPRequest struct {
 func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 	var req enableTOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "verification code is required")
+		BadRequest(c, M(c, i18n.KeyTwoFACodeRequired))
 		return
 	}
 	userID := c.GetString(middleware.ContextKeyUserID)
@@ -55,7 +56,7 @@ func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 		case errors.Is(err, service.ErrTOTPInvalidCode):
 			Fail(c, http.StatusBadRequest, 40001, err.Error())
 		default:
-			ServerError(c, "failed to enable 2fa")
+			ServerError(c, M(c, i18n.KeyTwoFAEnableFailed))
 		}
 		return
 	}
@@ -64,12 +65,12 @@ func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 	// request doesn't bounce them to /login.
 	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		ServerError(c, "failed to reload user")
+		ServerError(c, M(c, i18n.KeyAuthReloadUserFailed))
 		return
 	}
 	pair, err := h.authSvc.IssueTokenPair(user)
 	if err != nil {
-		ServerError(c, "failed to refresh session")
+		ServerError(c, M(c, i18n.KeyAuthRefreshSessionFailed))
 		return
 	}
 	writeAuthCookies(c, pair)
@@ -88,7 +89,7 @@ type disableTOTPRequest struct {
 func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 	var req disableTOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "password and code are required")
+		BadRequest(c, M(c, i18n.KeyTwoFAPasswordAndCodeRequired))
 		return
 	}
 	userID := c.GetString(middleware.ContextKeyUserID)
@@ -103,7 +104,7 @@ func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 		case errors.Is(err, service.ErrLocalPasswordNotSet):
 			Fail(c, http.StatusBadRequest, 40003, err.Error())
 		default:
-			ServerError(c, "failed to disable 2fa")
+			ServerError(c, M(c, i18n.KeyTwoFADisableFailed))
 		}
 		return
 	}
@@ -111,12 +112,12 @@ func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 	// is holding was just invalidated. Re-issue to stay logged in.
 	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		ServerError(c, "failed to reload user")
+		ServerError(c, M(c, i18n.KeyAuthReloadUserFailed))
 		return
 	}
 	pair, err := h.authSvc.IssueTokenPair(user)
 	if err != nil {
-		ServerError(c, "failed to refresh session")
+		ServerError(c, M(c, i18n.KeyAuthRefreshSessionFailed))
 		return
 	}
 	writeAuthCookies(c, pair)
@@ -134,7 +135,7 @@ type verifyTOTPRequest struct {
 func (h *AuthHandler) VerifyTOTP(c *gin.Context) {
 	var req verifyTOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "challenge_token and code are required")
+		BadRequest(c, M(c, i18n.KeyTwoFAChallengeRequired))
 		return
 	}
 	pair, err := h.authSvc.ConsumeTOTPChallenge(c.Request.Context(), req.ChallengeToken, req.Code)
@@ -149,7 +150,7 @@ func (h *AuthHandler) VerifyTOTP(c *gin.Context) {
 		case errors.Is(err, service.ErrTOTPInvalidCode):
 			Fail(c, http.StatusBadRequest, 40001, err.Error())
 		default:
-			ServerError(c, "failed to verify 2fa")
+			ServerError(c, M(c, i18n.KeyTwoFAVerifyFailed))
 		}
 		return
 	}

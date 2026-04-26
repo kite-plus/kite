@@ -113,25 +113,47 @@ interface DashboardHeatmap {
  * Helpers
  * ──────────────────────────────────────────────────────────── */
 
-/** Chinese + English greeting based on hour of day. */
-function buildGreeting(locale: Locale): { main: string; sub: string } {
+/**
+ * Greeting for the dashboard hero, picked by hour of day.
+ *
+ * The bilingual table is gone — both languages now live in the i18n
+ * catalogue under `dashboard.greeting.*`, so adding a third locale is a
+ * one-file change rather than touching this helper.
+ */
+function buildGreeting(t: (key: string) => string): {
+  main: string
+  sub: string
+} {
   const h = new Date().getHours()
-  if (locale === 'zh') {
-    if (h < 5) return { main: '夜深了', sub: '记得早些休息 🌙' }
-    if (h < 11) return { main: '早安', sub: '新的一天从这里起飞' }
-    if (h < 14) return { main: '午安', sub: '午后时光，轻盈整理' }
-    if (h < 18) return { main: '下午好', sub: '收纳一下今天的灵感' }
-    if (h < 22) return { main: '晚上好', sub: '今天又攒了不少好素材' }
-    return { main: '夜安', sub: '最后看一眼，然后休息' }
-  }
-  if (h < 5) return { main: 'Still up?', sub: 'Get some rest soon 🌙' }
-  if (h < 11) return { main: 'Good morning', sub: 'A fresh day, ready to fly' }
+  if (h < 5)
+    return {
+      main: t('dashboard.greeting.lateNight'),
+      sub: t('dashboard.greeting.lateNightSub'),
+    }
+  if (h < 11)
+    return {
+      main: t('dashboard.greeting.morning'),
+      sub: t('dashboard.greeting.morningSub'),
+    }
   if (h < 14)
-    return { main: 'Good afternoon', sub: 'Tidy up in the soft midday' }
-  if (h < 18) return { main: 'Afternoon', sub: "File today's inspiration" }
+    return {
+      main: t('dashboard.greeting.noon'),
+      sub: t('dashboard.greeting.noonSub'),
+    }
+  if (h < 18)
+    return {
+      main: t('dashboard.greeting.afternoon'),
+      sub: t('dashboard.greeting.afternoonSub'),
+    }
   if (h < 22)
-    return { main: 'Good evening', sub: 'Nice haul of material today' }
-  return { main: 'Wind down', sub: 'One last look, then rest' }
+    return {
+      main: t('dashboard.greeting.evening'),
+      sub: t('dashboard.greeting.eveningSub'),
+    }
+  return {
+    main: t('dashboard.greeting.night'),
+    sub: t('dashboard.greeting.nightSub'),
+  }
 }
 
 function emptyHeatmapGrid(): number[][] {
@@ -165,11 +187,11 @@ interface ActivityItem {
 }
 
 function buildActivityFromRecent(
-  locale: Locale,
+  t: (key: string) => string,
   recentItems: ThumbFile[],
   actorName: string
 ): ActivityItem[] {
-  const fallbackActor = locale === 'zh' ? '你' : 'You'
+  const fallbackActor = t('dashboard.activity.fallbackActor')
   return recentItems.slice(0, 6).map((item) => ({
     id: item.id,
     actor: actorName || fallbackActor,
@@ -180,24 +202,33 @@ function buildActivityFromRecent(
   }))
 }
 
-function actionLabel(key: ActivityItem['actionKey'], locale: Locale): string {
-  if (locale === 'zh') return { uploaded: '上传了' }[key]
-  return { uploaded: 'uploaded' }[key]
+function actionLabel(
+  key: ActivityItem['actionKey'],
+  t: (k: string) => string
+): string {
+  // Single-key map for now — kept as a switch so a future second action
+  // (e.g. `deleted`, `shared`) is a one-line addition rather than a
+  // refactor.
+  switch (key) {
+    case 'uploaded':
+      return t('dashboard.activity.uploaded')
+    default:
+      return key
+  }
 }
 
-function formatRelativeTime(timestamp: string, locale: Locale): string {
+function formatRelativeTime(
+  timestamp: string,
+  t: (k: string) => string
+): string {
   const diffMs = Date.now() - new Date(timestamp).getTime()
   const mins = Math.max(0, Math.floor(diffMs / 60_000))
-  if (locale === 'zh') {
-    if (mins < 60) return `${mins} 分钟前`
-    const h = Math.floor(mins / 60)
-    if (h < 24) return `${h} 小时前`
-    return `${Math.floor(h / 24)} 天前`
-  }
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 60)
+    return t('relativeTime.minutesAgo').replace('{n}', String(mins))
   const h = Math.floor(mins / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  if (h < 24) return t('relativeTime.hoursAgo').replace('{n}', String(h))
+  const d = Math.floor(h / 24)
+  return t('relativeTime.daysAgo').replace('{n}', String(d))
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -281,14 +312,14 @@ export default function DashboardPage() {
   })
 
   /* ── derived values ─────────────────────────────────────── */
-  const greeting = useMemo(() => buildGreeting(locale), [locale])
+  const greeting = useMemo(() => buildGreeting(t), [t])
   const heatmap = useMemo(
     () => normalizeHeatmapGrid(heatmapData?.grid),
     [heatmapData?.grid]
   )
   const activity = useMemo(
-    () => buildActivityFromRecent(locale, recent?.items ?? [], displayName),
-    [displayName, locale, recent?.items]
+    () => buildActivityFromRecent(t, recent?.items ?? [], displayName),
+    [displayName, t, recent?.items]
   )
 
   const days30: TrendPoint[] = useMemo(() => {
@@ -814,7 +845,7 @@ export default function DashboardPage() {
                         <b className="font-medium">{a.actor}</b>
                         <span className="text-muted-foreground">
                           {' '}
-                          {actionLabel(a.actionKey, locale)}{' '}
+                          {actionLabel(a.actionKey, t)}{' '}
                         </span>
                         <span className="truncate">
                           {locale === 'zh' ? '「' : '\u201c'}
@@ -823,7 +854,7 @@ export default function DashboardPage() {
                         </span>
                       </p>
                       <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
-                        {formatRelativeTime(a.createdAt, locale)}
+                        {formatRelativeTime(a.createdAt, t)}
                       </p>
                     </div>
                   </div>

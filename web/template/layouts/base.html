@@ -52,12 +52,35 @@
             <span class="font-bold text-base sm:text-lg tracking-tight dark:text-white">{{.SiteHeaderBrand}}</span>
         </a>
         <nav class="flex items-center gap-0.5 sm:gap-1 text-sm">
-            <a href="/explore" hx-boost="false" class="inline-flex h-9 items-center px-2.5 sm:px-3 text-sm font-medium transition-all duration-200 border-b-2 {{if eq .ActiveNav "explore"}}text-gray-900 dark:text-white border-gray-900 dark:border-white{{else}}text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-transparent hover:border-gray-300 dark:hover:border-gray-600{{end}}">探索</a>
-            <a href="/upload" hx-boost="false" class="inline-flex h-9 items-center px-2.5 sm:px-3 text-sm font-medium transition-all duration-200 border-b-2 {{if eq .ActiveNav "upload"}}text-gray-900 dark:text-white border-gray-900 dark:border-white{{else}}text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-transparent hover:border-gray-300 dark:hover:border-gray-600{{end}}">上传</a>
+            <a href="/explore" hx-boost="false" class="inline-flex h-9 items-center px-2.5 sm:px-3 text-sm font-medium transition-all duration-200 border-b-2 {{if eq .ActiveNav "explore"}}text-gray-900 dark:text-white border-gray-900 dark:border-white{{else}}text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-transparent hover:border-gray-300 dark:hover:border-gray-600{{end}}">{{call .T "nav.explore"}}</a>
+            <a href="/upload" hx-boost="false" class="inline-flex h-9 items-center px-2.5 sm:px-3 text-sm font-medium transition-all duration-200 border-b-2 {{if eq .ActiveNav "upload"}}text-gray-900 dark:text-white border-gray-900 dark:border-white{{else}}text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-transparent hover:border-gray-300 dark:hover:border-gray-600{{end}}">{{call .T "nav.upload"}}</a>
             {{if .SiteHeaderGitHubURL}}
             <a href="{{.SiteHeaderGitHubURL}}" target="_blank" rel="noreferrer"
                 class="hidden sm:inline-flex px-3 py-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition font-medium">GitHub</a>
             {{end}}
+
+            <!-- Language switcher: writes the kite_locale cookie and reloads.
+                 The cookie is what the backend middleware reads to pick the
+                 active locale, so reloading is the simplest way to flip the
+                 entire server-rendered surface. -->
+            <div class="relative" id="langSwitcher">
+                <button id="langSwitcherBtn" type="button" aria-haspopup="listbox" aria-expanded="false"
+                    class="ml-1 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition relative outline-none inline-flex items-center gap-1"
+                    title="{{call .T "nav.language"}}">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                </button>
+                <ul id="langSwitcherMenu" role="listbox"
+                    class="hidden absolute right-0 mt-1.5 min-w-[8rem] rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg z-30 overflow-hidden">
+                    {{range .SupportedLocales}}
+                    <li>
+                        <button type="button" data-locale="{{.}}" role="option"
+                            class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 {{if eq (printf "%s" .) $.Lang}}font-semibold text-gray-900 dark:text-white{{else}}text-gray-600 dark:text-gray-300{{end}}">
+                            {{index $.LocaleLabels .}}
+                        </button>
+                    </li>
+                    {{end}}
+                </ul>
+            </div>
 
             <button id="themeToggleBtn" class="ml-1 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition relative outline-none">
                 <!-- Sun -->
@@ -82,7 +105,7 @@
             </a>
             {{else}}
             <a href="/login" hx-boost="false"
-                class="ml-1 sm:ml-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition font-medium text-sm">登录</a>
+                class="ml-1 sm:ml-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition font-medium text-sm">{{call .T "nav.login"}}</a>
             {{end}}
         </nav>
     </div>
@@ -134,6 +157,42 @@
         updateUI(localStorage.getItem('kite-ui-theme') || 'system');
     })();
 </script>
+<script>
+    (function() {
+        // Language switcher behaviour: writing the kite_locale cookie +
+        // localStorage and reloading is enough — the backend middleware
+        // reads the cookie next request, the SPA reads localStorage on
+        // mount, so both surfaces stay in sync without an extra fetch.
+        var btn = document.getElementById('langSwitcherBtn');
+        var menu = document.getElementById('langSwitcherMenu');
+        var wrap = document.getElementById('langSwitcher');
+        if (!btn || !menu || !wrap) return;
+        function setOpen(open) {
+            menu.classList.toggle('hidden', !open);
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            setOpen(menu.classList.contains('hidden'));
+        });
+        document.addEventListener('click', function(e) {
+            if (!wrap.contains(e.target)) setOpen(false);
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') setOpen(false);
+        });
+        menu.querySelectorAll('[data-locale]').forEach(function(item) {
+            item.addEventListener('click', function() {
+                var locale = item.getAttribute('data-locale');
+                if (locale !== 'en' && locale !== 'zh') return;
+                var oneYear = 60 * 60 * 24 * 365;
+                document.cookie = 'kite_locale=' + locale + '; path=/; max-age=' + oneYear + '; SameSite=Lax';
+                try { localStorage.setItem('kite_locale', locale); } catch (e) { /* private mode */ }
+                window.location.reload();
+            });
+        });
+    })();
+</script>
 {{end}}
 
 {{define "footer"}}
@@ -155,14 +214,14 @@
 
         <!-- 桌面端导航 -->
         <div class="hidden md:flex items-center gap-3 text-gray-300 dark:text-gray-600">
-            <a href="/upload" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">上传</a>
+            <a href="/upload" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">{{call .T "footer.upload"}}</a>
             <span>·</span>
-            <a href="/explore" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">探索</a>
+            <a href="/explore" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">{{call .T "footer.explore"}}</a>
             <span>·</span>
             {{if .CurrentUser}}
-            <a href="/dashboard" hx-boost="false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">控制台</a>
+            <a href="/dashboard" hx-boost="false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">{{call .T "footer.dashboard"}}</a>
             {{else}}
-            <a href="/login" hx-boost="false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">登录</a>
+            <a href="/login" hx-boost="false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition">{{call .T "footer.login"}}</a>
             {{end}}
         </div>
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/model"
 	"github.com/kite-plus/kite/internal/repo"
@@ -39,7 +40,7 @@ func (h *UserHandler) List(c *gin.Context) {
 
 	users, total, err := h.userRepo.List(c.Request.Context(), page, size)
 	if err != nil {
-		ServerError(c, "failed to list users")
+		ServerError(c, M(c, i18n.KeyUserListFailed))
 		return
 	}
 
@@ -59,7 +60,7 @@ type createUserRequest struct {
 func (h *UserHandler) Create(c *gin.Context) {
 	var req createUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid user data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyUserInvalidData, err.Error()))
 		return
 	}
 
@@ -90,7 +91,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 			Fail(c, 409, 40900, err.Error())
 			return
 		}
-		ServerError(c, "failed to create user: "+err.Error())
+		ServerError(c, M(c, i18n.KeyUserCreateFailed, err.Error()))
 		return
 	}
 
@@ -99,7 +100,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 		if nickname != "" {
 			createdUser.Nickname = &nickname
 			if err := h.userRepo.Update(c.Request.Context(), createdUser); err != nil {
-				ServerError(c, "failed to save user nickname")
+				ServerError(c, M(c, i18n.KeyAuthSaveNicknameFailed))
 				return
 			}
 		}
@@ -123,13 +124,13 @@ func (h *UserHandler) Update(c *gin.Context) {
 
 	user, err := h.userRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		NotFound(c, "user not found")
+		NotFound(c, M(c, i18n.KeyUserNotFound))
 		return
 	}
 
 	var req updateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid user data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyUserInvalidData, err.Error()))
 		return
 	}
 
@@ -147,7 +148,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 	if req.Email != nil {
 		conflict, conflictErr := h.userRepo.ExistsByUsernameOrEmailExcept(c.Request.Context(), user.Username, *req.Email, user.ID)
 		if conflictErr != nil {
-			ServerError(c, "failed to validate user email")
+			ServerError(c, M(c, i18n.KeyEmailValidateFailed))
 			return
 		}
 		if conflict {
@@ -160,7 +161,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 	if req.Password != nil && strings.TrimSpace(*req.Password) != "" {
 		hash, hashErr := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
 		if hashErr != nil {
-			ServerError(c, "failed to hash password")
+			ServerError(c, M(c, i18n.KeyAuthHashPasswordFailed))
 			return
 		}
 		user.PasswordHash = string(hash)
@@ -175,7 +176,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 
 	if err := h.userRepo.Update(c.Request.Context(), user); err != nil {
-		ServerError(c, "failed to update user")
+		ServerError(c, M(c, i18n.KeyUserUpdateFailed))
 		return
 	}
 
@@ -187,7 +188,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 	// freshness check the middleware runs on the next request.
 	if passwordChanged {
 		if err := h.userRepo.BumpTokenVersion(c.Request.Context(), user.ID); err != nil {
-			ServerError(c, "failed to revoke existing sessions")
+			ServerError(c, M(c, i18n.KeyAuthRevokeSessionsFailed))
 			return
 		}
 	}
@@ -200,7 +201,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
 	if err := h.userRepo.Delete(c.Request.Context(), id); err != nil {
-		ServerError(c, "failed to delete user")
+		ServerError(c, M(c, i18n.KeyUserDeleteFailed))
 		return
 	}
 
@@ -221,7 +222,7 @@ func (h *UserHandler) ResetTOTP(c *gin.Context) {
 			Fail(c, 400, 40000, err.Error())
 			return
 		}
-		ServerError(c, "failed to reset 2fa")
+		ServerError(c, M(c, i18n.KeyTwoFAResetFailed))
 		return
 	}
 	Success(c, nil)
@@ -233,7 +234,7 @@ func (h *UserHandler) Stats(c *gin.Context) {
 	userID := c.GetString(middleware.ContextKeyUserID)
 	stats, err := h.fileRepo.GetUserStats(c.Request.Context(), userID)
 	if err != nil {
-		ServerError(c, "failed to get stats")
+		ServerError(c, M(c, i18n.KeySettingsStatsFailed))
 		return
 	}
 
@@ -255,7 +256,7 @@ func (h *UserHandler) Stats(c *gin.Context) {
 func (h *UserHandler) AdminStats(c *gin.Context) {
 	stats, err := h.fileRepo.GetStats(c.Request.Context())
 	if err != nil {
-		ServerError(c, "failed to get stats")
+		ServerError(c, M(c, i18n.KeySettingsStatsFailed))
 		return
 	}
 
@@ -309,12 +310,12 @@ func (h *UserHandler) dailyStats(c *gin.Context, userID string) {
 
 	uploads, err := h.fileRepo.GetDailyUploadStats(c.Request.Context(), userID, start, end)
 	if err != nil {
-		ServerError(c, "failed to get upload stats")
+		ServerError(c, M(c, i18n.KeySettingsUploadStatsFailed))
 		return
 	}
 	accesses, err := h.accessLogRepo.GetDailyAccessStats(c.Request.Context(), userID, start, end)
 	if err != nil {
-		ServerError(c, "failed to get access stats")
+		ServerError(c, M(c, i18n.KeySettingsAccessStatsFailed))
 		return
 	}
 
@@ -363,12 +364,12 @@ func (h *UserHandler) heatmapStats(c *gin.Context, userID string) {
 
 	uploads, err := h.fileRepo.GetHourlyUploadHeatmapStats(c.Request.Context(), userID, start, end)
 	if err != nil {
-		ServerError(c, "failed to get upload heatmap stats")
+		ServerError(c, M(c, i18n.KeySettingsUploadHeatmapFailed))
 		return
 	}
 	accesses, err := h.accessLogRepo.GetHourlyAccessHeatmapStats(c.Request.Context(), userID, start, end)
 	if err != nil {
-		ServerError(c, "failed to get access heatmap stats")
+		ServerError(c, M(c, i18n.KeySettingsAccessHeatmapFailed))
 		return
 	}
 

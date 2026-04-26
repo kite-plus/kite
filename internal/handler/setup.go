@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/model"
 	"github.com/kite-plus/kite/internal/repo"
 	"github.com/kite-plus/kite/internal/service"
@@ -67,13 +68,13 @@ func (h *SetupHandler) Setup(c *gin.Context) {
 	// as installed and lock the wizard out before the operator ever gets
 	// to use it.
 	if installed, _ := h.settingRepo.Get(c.Request.Context(), "is_installed"); strings.EqualFold(strings.TrimSpace(installed), "true") {
-		BadRequest(c, "system is already initialized")
+		BadRequest(c, M(c, i18n.KeySetupAlreadyInitialized))
 		return
 	}
 
 	var req setupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid setup data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySetupInvalidData, err.Error()))
 		return
 	}
 
@@ -86,14 +87,14 @@ func (h *SetupHandler) Setup(c *gin.Context) {
 		"is_installed": "true",
 	}
 	if err := h.settingRepo.SetBatch(ctx, settings); err != nil {
-		ServerError(c, "failed to save site settings")
+		ServerError(c, M(c, i18n.KeySetupSaveSiteSettingsFailed))
 		return
 	}
 
 	// 2. Create the admin account.
 	admin, err := h.authSvc.CreateAdminUser(ctx, req.AdminUsername, req.AdminEmail, req.AdminPassword, false)
 	if err != nil {
-		ServerError(c, "failed to create admin user: "+err.Error())
+		ServerError(c, M(c, i18n.KeySetupCreateAdminFailed, err.Error()))
 		return
 	}
 
@@ -104,13 +105,13 @@ func (h *SetupHandler) Setup(c *gin.Context) {
 	}
 	driver, provider, normalizedConfig, scfg, err := storage.ResolveSchemeConfig(schemeKey, req.StorageConfig)
 	if err != nil {
-		BadRequest(c, "invalid "+schemeKey+" storage config: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySetupInvalidStorage, schemeKey, err.Error()))
 		return
 	}
 
 	// Validate the storage configuration.
 	if _, err := storage.NewDriver(scfg); err != nil {
-		BadRequest(c, "storage config validation failed: "+err.Error())
+		BadRequest(c, M(c, i18n.KeySetupStorageValidationFailed, err.Error()))
 		return
 	}
 
@@ -126,7 +127,7 @@ func (h *SetupHandler) Setup(c *gin.Context) {
 	}
 
 	if err := h.storageRepo.Create(ctx, storageCfg); err != nil {
-		ServerError(c, "failed to create storage config")
+		ServerError(c, M(c, i18n.KeySetupCreateStorageFailed))
 		return
 	}
 

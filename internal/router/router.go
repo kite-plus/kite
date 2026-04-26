@@ -88,6 +88,11 @@ func Setup(cfg Config) *gin.Engine {
 	r.Use(middleware.Recovery())
 	r.Use(middleware.AccessLog())
 	r.Use(middleware.APIVersion())
+	// Locale must run before any handler/template that wants to render a
+	// translated string. Placed after the structural middleware (recovery,
+	// logging, version stamp) but before CORS / auth so a preflight 204
+	// still picks up a locale for any error envelopes it may emit.
+	r.Use(middleware.Locale())
 	// Stamps *gin.Context onto the request's context.Context so the typed
 	// huma handlers in internal/api can reach gin-only state (cookies, the
 	// auth-middleware context keys, X-Forwarded-Proto, etc.).

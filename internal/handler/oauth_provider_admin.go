@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/service"
 )
 
@@ -27,7 +28,7 @@ type updateOAuthProviderRequest struct {
 func (h *OAuthProviderAdminHandler) List(c *gin.Context) {
 	items, err := h.oauthConfigSvc.ListProviders(c.Request.Context())
 	if err != nil {
-		ServerError(c, "failed to load oauth providers")
+		ServerError(c, M(c, i18n.KeyOAuthLoadProvidersFailed))
 		return
 	}
 	Success(c, items)
@@ -37,7 +38,7 @@ func (h *OAuthProviderAdminHandler) List(c *gin.Context) {
 func (h *OAuthProviderAdminHandler) Update(c *gin.Context) {
 	var req updateOAuthProviderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "invalid oauth provider data: "+err.Error())
+		BadRequest(c, M(c, i18n.KeyOAuthInvalidProvider, err.Error()))
 		return
 	}
 
@@ -55,7 +56,7 @@ func (h *OAuthProviderAdminHandler) Update(c *gin.Context) {
 		case errors.Is(err, service.ErrOAuthSiteURLInvalid):
 			Fail(c, http.StatusBadRequest, 40031, err.Error())
 		default:
-			ServerError(c, "failed to update oauth provider")
+			ServerError(c, M(c, i18n.KeyOAuthUpdateProviderFailed))
 		}
 		return
 	}

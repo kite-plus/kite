@@ -9,6 +9,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/kite-plus/kite/internal/errcodes"
+	"github.com/kite-plus/kite/internal/i18n"
 	"github.com/kite-plus/kite/internal/middleware"
 	"github.com/kite-plus/kite/internal/service"
 )
@@ -113,9 +114,13 @@ func registerAuth(api huma.API, deps Deps) {
 		result, err := deps.AuthSvc.LoginOrChallenge(ctx, in.Body.Username, in.Body.Password)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidCredentials) || errors.Is(err, service.ErrUserInactive) {
+				// Service-layer error message comes back unlocalized
+				// because translating "invalid credentials" eagerly
+				// would leak the user's locale into authn audit logs.
+				// Pass it verbatim so the client decides how to render.
 				return nil, Errf(errcodes.Unauthorized, "%s", err.Error())
 			}
-			return nil, Errf(errcodes.InternalError, "login failed")
+			return nil, ErrKey(ctx, errcodes.InternalError, i18n.KeyAuthLoginFailed)
 		}
 
 		// 2FA branch: hand back the challenge instead of a token pair.
@@ -157,11 +162,11 @@ func registerAuth(api huma.API, deps Deps) {
 			}
 		}
 		if token == "" {
-			return nil, Errf(errcodes.Unauthorized, "refresh_token is required")
+			return nil, ErrKey(ctx, errcodes.Unauthorized, i18n.KeyAuthRefreshTokenRequired)
 		}
 		pair, err := deps.AuthSvc.RefreshToken(ctx, token)
 		if err != nil {
-			return nil, Errf(errcodes.InvalidToken, "invalid refresh token")
+			return nil, ErrKey(ctx, errcodes.InvalidToken, i18n.KeyAuthInvalidRefreshToken)
 		}
 		writeAuthCookiesFromCtx(ctx, pair)
 		return &RefreshOutput{Body: Ok(LoginData{
@@ -198,15 +203,15 @@ func registerAuth(api huma.API, deps Deps) {
 	}, func(ctx context.Context, _ *ProfileInput) (*ProfileOutput, error) {
 		c := ginContextFromHuma(ctx)
 		if c == nil {
-			return nil, Errf(errcodes.InternalError, "missing request context")
+			return nil, ErrKey(ctx, errcodes.InternalError, i18n.KeyErrMissingRequestCtx)
 		}
 		userID := c.GetString(middleware.ContextKeyUserID)
 		if userID == "" {
-			return nil, Errf(errcodes.Unauthorized, "missing user context")
+			return nil, ErrKey(ctx, errcodes.Unauthorized, i18n.KeyErrMissingUserCtx)
 		}
 		user, err := deps.AuthSvc.UserRepo().GetByID(ctx, userID)
 		if err != nil {
-			return nil, Errf(errcodes.Unauthorized, "user not found")
+			return nil, ErrKey(ctx, errcodes.Unauthorized, i18n.KeyAuthUserNotFound)
 		}
 		return &ProfileOutput{Body: Ok(ProfileData{
 			UserID:             user.ID,
