@@ -198,6 +198,30 @@ const en = {
     activity: {
       title: 'Recent activity',
       sub: "What's happening on Kite",
+      // Used by buildActivityFromRecent / actionLabel in
+      // dashboard/index.tsx so the rendered activity feed reads in the
+      // active locale instead of the bilingual hard-coded helpers we
+      // shipped first.
+      fallbackActor: 'You',
+      uploaded: 'uploaded',
+    },
+
+    greeting: {
+      // Time-of-day buckets keyed by the same boundaries the dashboard
+      // helper uses (5 / 11 / 14 / 18 / 22). Localising the table here
+      // means future locales can be added without touching the helper.
+      lateNight: 'Still up?',
+      lateNightSub: 'Get some rest soon 🌙',
+      morning: 'Good morning',
+      morningSub: 'A fresh day, ready to fly',
+      noon: 'Good afternoon',
+      noonSub: 'Tidy up in the soft midday',
+      afternoon: 'Afternoon',
+      afternoonSub: "File today's inspiration",
+      evening: 'Good evening',
+      eveningSub: 'Nice haul of material today',
+      night: 'Wind down',
+      nightSub: 'One last look, then rest',
     },
 
     topUsers: {
@@ -1104,6 +1128,19 @@ const en = {
     confirmDisable: 'Disable',
     disableSuccess: 'Two-factor auth disabled',
     disableFailed: 'Could not disable two-factor auth',
+  },
+
+  // Relative-time strings shared across pages. These are top-level
+  // (rather than scoped to one section) because formatRelativeTime in
+  // lib/utils.ts is consumed from files.tsx, admin/files.tsx,
+  // dashboard/components.tsx and dashboard/index.tsx — duplicating a
+  // local copy in each section would drift the wording over time.
+  relativeTime: {
+    justNow: 'just now',
+    minutesAgo: '{n}m ago',
+    hoursAgo: '{n}h ago',
+    yesterday: 'yesterday',
+    daysAgo: '{n}d ago',
   },
 } as const
 
