@@ -279,83 +279,83 @@ type FileStats struct {
 	OtherSize  int64 `json:"other_size"`
 }
 
+// fileTypeAggRow is the per-file-type aggregate scanned out of the
+// stats GROUP BY query. The column tags match the SELECT aliases below
+// so GORM can hydrate the struct directly without an intermediate map.
+type fileTypeAggRow struct {
+	FileType  string `gorm:"column:file_type"`
+	Cnt       int64  `gorm:"column:cnt"`
+	TotalSize int64  `gorm:"column:total_size"`
+}
+
+// applyFileTypeAggregate folds a slice of GROUP BY rows into a FileStats
+// value. TotalFiles / TotalSize accumulate every row (so unknown
+// file_type values still count toward the totals, matching the original
+// COUNT(*) behaviour); the per-type buckets only react to the four
+// known categories defined in [model.FileType*].
+func applyFileTypeAggregate(stats *FileStats, rows []fileTypeAggRow) {
+	for _, row := range rows {
+		stats.TotalFiles += row.Cnt
+		stats.TotalSize += row.TotalSize
+		switch row.FileType {
+		case model.FileTypeImage:
+			stats.ImageCount = row.Cnt
+			stats.ImageSize = row.TotalSize
+		case model.FileTypeVideo:
+			stats.VideoCount = row.Cnt
+			stats.VideoSize = row.TotalSize
+		case model.FileTypeAudio:
+			stats.AudioCount = row.Cnt
+			stats.AudioSize = row.TotalSize
+		case model.FileTypeFile:
+			stats.OtherCount = row.Cnt
+			stats.OtherSize = row.TotalSize
+		}
+	}
+}
+
 // GetStats returns site-wide file statistics.
+//
+// A single GROUP BY file_type query covers both the count and the byte
+// total for every category in one round-trip. Earlier revisions ran
+// ten queries here (two for the totals plus eight for the four typed
+// buckets), which was wasteful at any scale and visibly slow on
+// instances backed by a remote MySQL/Postgres. Folding the totals from
+// the GROUP BY rows preserves the original COUNT(*) semantics — rows
+// with an unknown file_type still feed TotalFiles/TotalSize, they just
+// don't land in any per-type bucket.
 func (r *FileRepo) GetStats(ctx context.Context) (*FileStats, error) {
+	var rows []fileTypeAggRow
+	if err := r.db.WithContext(ctx).Model(&model.File{}).
+		Where("is_deleted = ?", false).
+		Select("file_type, COUNT(*) AS cnt, COALESCE(SUM(size_bytes), 0) AS total_size").
+		Group("file_type").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("aggregate file stats: %w", err)
+	}
+
 	var stats FileStats
-	db := r.db.WithContext(ctx).Model(&model.File{}).Where("is_deleted = ?", false)
-
-	if err := db.Count(&stats.TotalFiles).Error; err != nil {
-		return nil, fmt.Errorf("count total files: %w", err)
-	}
-
-	if err := db.Select("COALESCE(SUM(size_bytes), 0)").Scan(&stats.TotalSize).Error; err != nil {
-		return nil, fmt.Errorf("sum total size: %w", err)
-	}
-
-	for _, ft := range []struct {
-		typ   string
-		count *int64
-		size  *int64
-	}{
-		{"image", &stats.ImageCount, &stats.ImageSize},
-		{"video", &stats.VideoCount, &stats.VideoSize},
-		{"audio", &stats.AudioCount, &stats.AudioSize},
-		{"file", &stats.OtherCount, &stats.OtherSize},
-	} {
-		if err := r.db.WithContext(ctx).Model(&model.File{}).
-			Where("is_deleted = ? AND file_type = ?", false, ft.typ).
-			Count(ft.count).Error; err != nil {
-			return nil, fmt.Errorf("count %s files: %w", ft.typ, err)
-		}
-		if err := r.db.WithContext(ctx).Model(&model.File{}).
-			Where("is_deleted = ? AND file_type = ?", false, ft.typ).
-			Select("COALESCE(SUM(size_bytes), 0)").
-			Scan(ft.size).Error; err != nil {
-			return nil, fmt.Errorf("sum %s size: %w", ft.typ, err)
-		}
-	}
-
+	applyFileTypeAggregate(&stats, rows)
 	return &stats, nil
 }
 
 // GetUserStats returns file statistics scoped to a single user.
+//
+// Mirrors GetStats — one GROUP BY query, one allocation for the
+// aggregate slice — with the user_id predicate added. See GetStats for
+// the reasoning behind the GROUP BY collapse.
 func (r *FileRepo) GetUserStats(ctx context.Context, userID string) (*FileStats, error) {
-	var stats FileStats
-	db := r.db.WithContext(ctx).Model(&model.File{}).Where("user_id = ? AND is_deleted = ?", userID, false)
-
-	if err := db.Count(&stats.TotalFiles).Error; err != nil {
-		return nil, fmt.Errorf("count user files: %w", err)
-	}
-
+	var rows []fileTypeAggRow
 	if err := r.db.WithContext(ctx).Model(&model.File{}).
 		Where("user_id = ? AND is_deleted = ?", userID, false).
-		Select("COALESCE(SUM(size_bytes), 0)").Scan(&stats.TotalSize).Error; err != nil {
-		return nil, fmt.Errorf("sum user file size: %w", err)
+		Select("file_type, COUNT(*) AS cnt, COALESCE(SUM(size_bytes), 0) AS total_size").
+		Group("file_type").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("aggregate user file stats: %w", err)
 	}
 
-	for _, ft := range []struct {
-		typ   string
-		count *int64
-		size  *int64
-	}{
-		{"image", &stats.ImageCount, &stats.ImageSize},
-		{"video", &stats.VideoCount, &stats.VideoSize},
-		{"audio", &stats.AudioCount, &stats.AudioSize},
-		{"file", &stats.OtherCount, &stats.OtherSize},
-	} {
-		if err := r.db.WithContext(ctx).Model(&model.File{}).
-			Where("user_id = ? AND is_deleted = ? AND file_type = ?", userID, false, ft.typ).
-			Count(ft.count).Error; err != nil {
-			return nil, fmt.Errorf("count user %s files: %w", ft.typ, err)
-		}
-		if err := r.db.WithContext(ctx).Model(&model.File{}).
-			Where("user_id = ? AND is_deleted = ? AND file_type = ?", userID, false, ft.typ).
-			Select("COALESCE(SUM(size_bytes), 0)").
-			Scan(ft.size).Error; err != nil {
-			return nil, fmt.Errorf("sum user %s size: %w", ft.typ, err)
-		}
-	}
-
+	var stats FileStats
+	applyFileTypeAggregate(&stats, rows)
 	return &stats, nil
 }
 
