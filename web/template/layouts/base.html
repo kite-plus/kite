@@ -59,6 +59,29 @@
                 class="hidden sm:inline-flex px-3 py-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition font-medium">GitHub</a>
             {{end}}
 
+            <!-- Language switcher: writes the kite_locale cookie and reloads.
+                 The cookie is what the backend middleware reads to pick the
+                 active locale, so reloading is the simplest way to flip the
+                 entire server-rendered surface. -->
+            <div class="relative" id="langSwitcher">
+                <button id="langSwitcherBtn" type="button" aria-haspopup="listbox" aria-expanded="false"
+                    class="ml-1 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition relative outline-none inline-flex items-center gap-1"
+                    title="{{call .T "nav.language"}}">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                </button>
+                <ul id="langSwitcherMenu" role="listbox"
+                    class="hidden absolute right-0 mt-1.5 min-w-[8rem] rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg z-30 overflow-hidden">
+                    {{range .SupportedLocales}}
+                    <li>
+                        <button type="button" data-locale="{{.}}" role="option"
+                            class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 {{if eq (printf "%s" .) $.Lang}}font-semibold text-gray-900 dark:text-white{{else}}text-gray-600 dark:text-gray-300{{end}}">
+                            {{index $.LocaleLabels .}}
+                        </button>
+                    </li>
+                    {{end}}
+                </ul>
+            </div>
+
             <button id="themeToggleBtn" class="ml-1 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition relative outline-none">
                 <!-- Sun -->
                 <svg id="themeIconSun" class="w-4 h-4 hidden" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
@@ -132,6 +155,42 @@
 
         // 初始化按钮状态
         updateUI(localStorage.getItem('kite-ui-theme') || 'system');
+    })();
+</script>
+<script>
+    (function() {
+        // Language switcher behaviour: writing the kite_locale cookie +
+        // localStorage and reloading is enough — the backend middleware
+        // reads the cookie next request, the SPA reads localStorage on
+        // mount, so both surfaces stay in sync without an extra fetch.
+        var btn = document.getElementById('langSwitcherBtn');
+        var menu = document.getElementById('langSwitcherMenu');
+        var wrap = document.getElementById('langSwitcher');
+        if (!btn || !menu || !wrap) return;
+        function setOpen(open) {
+            menu.classList.toggle('hidden', !open);
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            setOpen(menu.classList.contains('hidden'));
+        });
+        document.addEventListener('click', function(e) {
+            if (!wrap.contains(e.target)) setOpen(false);
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') setOpen(false);
+        });
+        menu.querySelectorAll('[data-locale]').forEach(function(item) {
+            item.addEventListener('click', function() {
+                var locale = item.getAttribute('data-locale');
+                if (locale !== 'en' && locale !== 'zh') return;
+                var oneYear = 60 * 60 * 24 * 365;
+                document.cookie = 'kite_locale=' + locale + '; path=/; max-age=' + oneYear + '; SameSite=Lax';
+                try { localStorage.setItem('kite_locale', locale); } catch (e) { /* private mode */ }
+                window.location.reload();
+            });
+        });
     })();
 </script>
 {{end}}
