@@ -9,6 +9,7 @@ toolchain go1.26.8
 
 require (
 	github.com/alecthomas/chroma/v2 v2.27.0
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/spf13/cobra v1.10.2
 	github.com/yuin/goldmark v1.8.6
