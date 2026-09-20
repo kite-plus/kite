@@ -1,0 +1,12 @@
+{{ define "main" }}
+  <article>
+    <header>
+      <h1>{{ .Page.Title }}</h1>
+      {{ partial "meta.html" .Page }}
+    </header>
+    {{ if and .Site.ThemeSettings.show_toc .Page.TableOfContents }}
+      {{ partial "toc.html" .Page }}
+    {{ end }}
+    <div class="content">{{ .Page.Content }}</div>
+  </article>
+{{ end }}

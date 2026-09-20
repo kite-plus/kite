@@ -1,0 +1,11 @@
+<ul class="posts">
+  {{ range .Pages }}
+    <li>
+      <a class="title" href="{{ .RelPermalink }}">{{ .Title }}</a>
+      {{ partial "meta.html" . }}
+      {{ with .Excerpt }}<p class="excerpt">{{ . }}</p>{{ end }}
+    </li>
+  {{ else }}
+    <li class="empty">Nothing here yet.</li>
+  {{ end }}
+</ul>

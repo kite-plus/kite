@@ -1,0 +1,7 @@
+<nav class="toc">
+  <ol>
+    {{ range .TableOfContents }}
+      {{ if le .Level 3 }}<li class="lvl{{ .Level }}"><a href="#{{ .ID }}">{{ .Text }}</a></li>{{ end }}
+    {{ end }}
+  </ol>
+</nav>

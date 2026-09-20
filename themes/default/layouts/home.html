@@ -1,0 +1,6 @@
+{{ define "main" }}
+  <h1>{{ .Site.Title }}</h1>
+  {{ with .Site.Description }}<p class="lede">{{ . }}</p>{{ end }}
+  {{ partial "post-list.html" . }}
+  {{ partial "pagination.html" . }}
+{{ end }}

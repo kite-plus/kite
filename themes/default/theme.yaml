@@ -1,0 +1,25 @@
+name: default
+title: Kite Default
+version: 0.1.0
+apiVersion: kite/v1
+requires: ">=0.1.0 <2.0.0"
+description: The theme Kite ships with. Readable, dependency free, dark mode aware.
+license: MIT
+
+capabilities: [static, dynamic]
+contentTypes: [post, page]
+taxonomies: [tag, category]
+
+settings:
+  - key: accent
+    type: color
+    label: Accent colour
+    default: "#2563eb"
+  - key: show_toc
+    type: boolean
+    label: Show a table of contents on posts
+    default: true
+  - key: footer_text
+    type: string
+    label: Footer text
+    default: ""

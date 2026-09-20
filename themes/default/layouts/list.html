@@ -1,0 +1,5 @@
+{{ define "main" }}
+  <h1>{{ with .Page }}{{ .Title }}{{ else }}Archive{{ end }}</h1>
+  {{ partial "post-list.html" . }}
+  {{ partial "pagination.html" . }}
+{{ end }}

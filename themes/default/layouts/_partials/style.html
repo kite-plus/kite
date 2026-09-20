@@ -1,0 +1,38 @@
+<style>
+  :root {
+    --accent: {{ default "#2563eb" .Site.ThemeSettings.accent }};
+    --fg: #16181d; --muted: #5b626e; --bg: #ffffff; --line: #e6e8ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #e8eaed; --muted: #9aa3b0; --bg: #14161a; --line: #2a2e36; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main, header.site, footer.site { max-width: 42rem; margin: 0 auto; padding: 0 1rem; }
+  header.site { display: flex; gap: 1.5rem; align-items: baseline; padding-top: 2rem; padding-bottom: 2rem; }
+  .brand { font-weight: 650; color: var(--fg); text-decoration: none; }
+  nav a { color: var(--muted); text-decoration: none; margin-right: .75rem; font-size: .9rem; }
+  a { color: var(--accent); }
+  h1 { font-size: 1.6rem; line-height: 1.25; letter-spacing: -.01em; }
+  .lede { color: var(--muted); }
+  ul.posts { list-style: none; padding: 0; }
+  ul.posts li { padding: 1.25rem 0; border-bottom: 1px solid var(--line); }
+  ul.posts .title { font-size: 1.1rem; font-weight: 600; text-decoration: none; }
+  .meta { color: var(--muted); font-size: .85rem; display: flex; gap: .75rem; flex-wrap: wrap; }
+  .meta .tags a { margin-right: .4rem; }
+  .excerpt { color: var(--muted); margin: .4rem 0 0; }
+  .toc { border-left: 2px solid var(--line); padding-left: 1rem; margin: 1.5rem 0; }
+  .toc ol { list-style: none; padding: 0; margin: 0; font-size: .9rem; }
+  .toc .lvl3 { padding-left: 1rem; }
+  .content pre { overflow-x: auto; padding: .9rem; border-radius: 6px; background: var(--line); }
+  .content code { font-size: .9em; }
+  .content img { max-width: 100%; height: auto; }
+  .content blockquote { margin: 0; padding-left: 1rem; border-left: 3px solid var(--line); color: var(--muted); }
+  .pagination { display: flex; gap: 1rem; justify-content: center; padding: 2rem 0; color: var(--muted); }
+  ul.terms { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .75rem; }
+  ul.terms .count { color: var(--muted); font-size: .8rem; }
+  footer.site { border-top: 1px solid var(--line); margin-top: 3rem; padding: 1.5rem 1rem 3rem; color: var(--muted); font-size: .85rem; }
+</style>

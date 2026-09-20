@@ -1,0 +1,7 @@
+<header class="site">
+  <a class="brand" href="/">{{ .Site.Title }}</a>
+  <nav>
+    <a href="/posts/">Posts</a>
+    {{ range .Site.Taxonomies }}<a href="/{{ . }}/">{{ str.Title . }}</a>{{ end }}
+  </nav>
+</header>

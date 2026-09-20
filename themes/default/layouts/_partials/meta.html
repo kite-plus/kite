@@ -1,0 +1,7 @@
+<p class="meta">
+  <time datetime="{{ time.Format "2006-01-02" .PublishDate }}">{{ time.Format "January 2, 2006" .PublishDate }}</time>
+  <span class="reading">{{ time.Minutes .ReadingTime }} min read</span>
+  {{ with .Terms "tag" }}
+    <span class="tags">{{ range . }}<a href="{{ .RelPermalink }}">{{ .Name }}</a>{{ end }}</span>
+  {{ end }}
+</p>

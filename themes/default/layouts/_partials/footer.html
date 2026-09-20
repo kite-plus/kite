@@ -1,0 +1,4 @@
+<footer class="site">
+  {{ with .Site.ThemeSettings.footer_text }}<p>{{ . }}</p>{{ end }}
+  <p class="built">Built {{ time.Format "2006-01-02" .Site.BuildTime }} with Kite {{ .Site.Version }}</p>
+</footer>
