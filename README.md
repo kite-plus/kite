@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" alt="" width="88" height="88">
+  <img src="docs/assets/logo.svg" alt="" width="84" height="84">
 </p>
 
 <h1 align="center">Kite</h1>
@@ -11,12 +11,21 @@
 
 <p align="center">
   <a href="https://github.com/kite-plus/kite/actions/workflows/ci.yml"><img
-    src="https://github.com/kite-plus/kite/actions/workflows/ci.yml/badge.svg"
-    alt="CI"></a>
+    alt="CI"
+    src="https://img.shields.io/github/actions/workflow/status/kite-plus/kite/ci.yml?branch=main&style=flat-square&logo=github&logoColor=white&label=CI&labelColor=1f2328"></a>
+  <a href="go.mod"><img
+    alt="Go"
+    src="https://img.shields.io/github/go-mod/go-version/kite-plus/kite?style=flat-square&logo=go&logoColor=white&label=Go&labelColor=1f2328&color=4A77D6"></a>
   <a href="LICENSE"><img
-    src="https://img.shields.io/badge/license-Apache--2.0-blue.svg"
-    alt="Apache-2.0"></a>
-  <img src="https://img.shields.io/badge/go-1.26-00ADD8.svg" alt="Go 1.26">
+    alt="License"
+    src="https://img.shields.io/github/license/kite-plus/kite?style=flat-square&label=License&labelColor=1f2328&color=4A77D6"></a>
+  <a href="docs/design/"><img
+    alt="Design docs"
+    src="https://img.shields.io/badge/design-docs-4A77D6?style=flat-square&labelColor=1f2328"></a>
+</p>
+
+<p align="center">
+  English · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 ---
@@ -24,60 +33,83 @@
 Kite manages your content. Where it is deployed is a property of the content,
 not a different product.
 
-> Status: early development. The static path works end to end; the admin
-> interface and the dynamic runtime are not built yet. See [Roadmap](#roadmap).
+> **Status: early development.** The static path works end to end. The admin
+> interface and the dynamic runtime are not built yet — see [Roadmap](#roadmap).
 
----
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="A site built with Kite, in light and dark" width="880">
+</p>
 
 ## Why
 
 Publishing tools split into two camps, and picking one is hard to undo.
 
-**Static site generators** give you Markdown, Git and cheap hosting, but no
-real content management: you edit files, and there is no media library, no
-category browser, no publish button.
+**Static site generators** give you Markdown, Git and cheap hosting, but no real
+content management: you edit files, and there is no media library, no category
+browser, no publish button.
 
 **Content management systems** give you all of that, but they assume a server
 and a database. Git, Markdown and static hosting fit awkwardly at best.
 
 Kite refuses the choice. The same content, the same admin and the same themes
-work whether the site is built into static files, served from a database, or
+work whether a site is built into static files, served from a database, or
 consumed through an API. Deployment becomes a setting rather than a migration.
 
-## What works today
+## Try it
 
-```
-kite init                 # create a project
-kite new post "Hello"     # create content
-kite doctor --fix-ids     # adopt content written for another generator
-kite index                # refresh the derived index
-kite list --tag go        # query it
-kite build --verify       # render the site, twice, and compare every byte
+```bash
+go install github.com/kite-plus/kite/cmd/kite@latest
 ```
 
-The build produces pages, listings, pagination, taxonomy and term pages, a
-404 page, `sitemap.xml` and `rss.xml`.
+```bash
+kite init blog && cd blog
+kite new post "Hello, Kite"
+kite build
+```
 
-Content written for Hugo or Hexo is read as it is: `draft: true`, `date`,
-`lastmod`, `tags` and `categories` are all understood.
+That produces a complete site in `public/`: pages, listings, pagination,
+taxonomy and term pages, a 404, `sitemap.xml` and `rss.xml`.
+
+Already have content written for another generator? Point Kite at it.
+
+```bash
+kite doctor --fix-ids   # adopt files that have no id yet
+kite build --verify     # build twice, compare every byte
+```
+
+`draft: true`, `date`, `lastmod`, `tags` and `categories` are understood as they
+are; nothing needs rewriting first.
+
+### Commands
+
+| | |
+|---|---|
+| `kite init` | create a project |
+| `kite new <kind> <title>` | create content |
+| `kite build` | render the site into `public/` |
+| `kite index` | refresh the derived index |
+| `kite list` | query content from the index |
+| `kite doctor` | check the project, and repair what is safe to repair |
+
+Every command takes `--json`, so none of them have to be parsed as prose.
 
 ## Design
 
 Three decisions shape everything else.
 
-**Markdown files are the source of truth.** In static mode nothing is stored
-in a database that is not derived from the files. The index under `.kite/` is
-a cache: delete it and rebuild, and you get the same rows back.
+**Markdown files are the source of truth.** In static mode nothing is stored in
+a database that is not derived from the files. The index under `.kite/` is a
+cache: delete it, rebuild, and the same rows come back.
 
 **Your files are edited, not rewritten.** Saving a document rewrites only the
 keys that changed. Key order, comments and flow-style lists survive untouched,
 so changing a title produces a one-line diff.
 
 **Store and runtime are independent.** Where content lives and how it is
-delivered are separate choices, and all of their combinations are legal.
+delivered are separate choices, and every combination of them is legal.
 
 The full reasoning, including the parts deliberately left unbuilt, is in
-[docs/design](docs/design/):
+[docs/design](docs/design/).
 
 | Document | Contents |
 |---|---|
@@ -89,44 +121,39 @@ The full reasoning, including the parts deliberately left unbuilt, is in
 
 Go 1.26 or newer:
 
-```
+```bash
 make build      # ./bin/kite
-make check      # format, vet, layering rules, tests
+make check      # format, vet, layering rules, linter, tests
 ```
 
-The binary is self-contained: the admin assets, the default theme and the
-SQLite driver are all compiled in, and nothing needs cgo.
-
-## Roadmap
-
-| Milestone | Delivers |
-|---|---|
-| M0 | `kite build`: content model, index, markdown, themes, static output |
-| M1 | `kite serve`: render per request, watch and reload |
-| M2 | Read-only admin over an existing repository |
-| M3 | Editing admin: editor, media, conflict handling |
-| M4 | Git publisher — **v1.0** |
-| M5 | Public theme contract |
-| M6 | `kite.lock` and the `kitew` wrapper |
-| M7 | Dynamic mode backed by SQLite |
-| M8 | WebAssembly plugins |
-
-M0 is complete.
+The binary is self-contained. The default theme and the SQLite driver are
+compiled in, nothing needs cgo, and every release target cross-compiles from any
+host.
 
 ## Releases
 
 Release binaries are reproducible: a given commit, built with the toolchain
 pinned in `go.mod`, compiles to the same bytes anywhere.
 
-```
+```bash
 GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot --clean
 ```
 
 Verify a download against the `checksums.txt` published with the release.
 
-## License
+## Roadmap
 
-[Apache License 2.0](LICENSE).
+| Milestone | Delivers | |
+|---|---|---|
+| M0 | `kite build`: content model, index, markdown, themes, static output | done |
+| M1 | `kite serve`: render per request, watch and reload | |
+| M2 | Read-only admin over an existing repository | |
+| M3 | Editing admin: editor, media, conflict handling | |
+| M4 | Git publisher — **v1.0** | |
+| M5 | Public theme contract | |
+| M6 | `kite.lock` and the `kitew` wrapper | |
+| M7 | Dynamic mode backed by SQLite | |
+| M8 | WebAssembly plugins | |
 
 ## Contributing
 
@@ -136,6 +163,10 @@ core may not import storage, rendering or runtime packages. Commits follow
 
 Before opening a pull request:
 
-```
+```bash
 make check
 ```
+
+## License
+
+[Apache License 2.0](LICENSE).
