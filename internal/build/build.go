@@ -47,7 +47,9 @@ type Stats struct {
 
 // Builder renders a site.
 type Builder struct {
-	opts Options
+	opts     Options
+	buildCtx *Context
+	site     render.Site
 }
 
 // New returns a builder.
@@ -59,8 +61,6 @@ func New(opts Options) (*Builder, error) {
 		return nil, fmt.Errorf("build: a url resolver is required")
 	case opts.Engine == nil:
 		return nil, fmt.Errorf("build: a theme engine is required")
-	case opts.Emitter == nil:
-		return nil, fmt.Errorf("build: an emitter is required")
 	}
 	if opts.Markdown == nil {
 		opts.Markdown = markdown.New(markdown.DefaultOptions())
@@ -74,7 +74,29 @@ func New(opts Options) (*Builder, error) {
 	if opts.Now.IsZero() {
 		opts.Now = time.Now()
 	}
-	return &Builder{opts: opts}, nil
+
+	b := &Builder{opts: opts}
+	b.buildCtx = NewContext(opts.Now, b.sharedKey()...)
+	b.site = b.newSite(b.buildCtx)
+	return b, nil
+}
+
+// Plan expands the site into every output it would produce.
+//
+// A server resolves a request by looking up the target the build would have
+// written for that URL, which is what keeps the two runtimes from drifting:
+// they render the same target through the same code.
+func (b *Builder) Plan(ctx context.Context) (*Plan, error) {
+	return b.plan(ctx, b.buildCtx)
+}
+
+// Site is the site view handed to templates.
+func (b *Builder) Site() render.Site { return b.site }
+
+// Render produces one output. Request is nil during a build; a server passes
+// the live request, which templates reach only through {{ with .Request }}.
+func (b *Builder) Render(ctx context.Context, t Target, req render.Request) ([]byte, hook.PageInfo, error) {
+	return b.renderTarget(ctx, b.buildCtx.ForOutput(), t, req)
 }
 
 // Run plans and renders the whole site.
@@ -82,10 +104,11 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 	start := time.Now()
 	var stats Stats
 
-	buildCtx := NewContext(b.opts.Now, b.sharedKey()...)
-	site := b.site(buildCtx)
+	if b.opts.Emitter == nil {
+		return stats, fmt.Errorf("build: an emitter is required to write a site")
+	}
 
-	plan, err := b.plan(ctx, buildCtx)
+	plan, err := b.Plan(ctx)
 	if err != nil {
 		return stats, err
 	}
@@ -101,14 +124,17 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 			return stats, err
 		}
 
-		out := buildCtx.ForOutput()
+		out := b.buildCtx.ForOutput()
 		if b.cached(out, target) {
 			stats.Skipped++
 			continue
 		}
 
-		info, err := b.render(ctx, out, site, target)
+		html, info, err := b.renderTarget(ctx, out, target, nil)
 		if err != nil {
+			return stats, err
+		}
+		if err := b.opts.Emitter.Write(target.Path, html); err != nil {
 			return stats, err
 		}
 		stats.Rendered++
@@ -146,7 +172,7 @@ func (b *Builder) sharedKey() []string {
 	}
 }
 
-func (b *Builder) site(c *Context) render.Site {
+func (b *Builder) newSite(c *Context) render.Site {
 	info := b.opts.Site
 	info.BuildTime = c.Now()
 	info.Build = true
@@ -164,13 +190,13 @@ func (b *Builder) statuses() []content.Status {
 	return []content.Status{content.StatusPublished, content.StatusScheduled}
 }
 
-// render produces one output file.
-func (b *Builder) render(ctx context.Context, out *Context, site render.Site, t Target) (hook.PageInfo, error) {
+// renderTarget produces the bytes of one output.
+func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req render.Request) ([]byte, hook.PageInfo, error) {
 	var info hook.PageInfo
 
 	page, pages, err := b.pages(ctx, out, t)
 	if err != nil {
-		return info, err
+		return nil, info, err
 	}
 
 	target := theme.Target{
@@ -181,7 +207,7 @@ func (b *Builder) render(ctx context.Context, out *Context, site render.Site, t 
 	}
 	found, _, ok := b.opts.Engine.Lookup(target)
 	if !ok {
-		return info, fmt.Errorf("build: %s: no template found", t.ID())
+		return nil, info, fmt.Errorf("build: %s: no template found", t.ID())
 	}
 	out.Read(Node{Kind: NodeTemplate, ID: found.Path}, "", "content")
 
@@ -191,26 +217,22 @@ func (b *Builder) render(ctx context.Context, out *Context, site render.Site, t 
 	}
 
 	data := render.NewContext(render.ContextOptions{
-		Site:      site,
+		Site:      b.site,
 		Page:      page,
 		Pages:     pages,
 		Paginator: paginator,
 		Terms:     b.terms(ctx, out, t),
-		Request:   nil, // a static build has no request; themes guard with {{ with .Request }}
+		Request:   req, // nil in a build; themes guard with {{ with .Request }}
 	})
 
 	html, err := b.opts.Engine.Render(target, data)
 	if err != nil {
-		return info, fmt.Errorf("build: %s: %w", t.ID(), err)
+		return nil, info, fmt.Errorf("build: %s: %w", t.ID(), err)
 	}
 
 	doc := hook.HTMLDoc{Item: t.Item, URL: t.URL, HTML: string(html)}
 	if err := b.opts.Hooks.TransformHTML(ctx, &doc); err != nil {
-		return info, err
-	}
-
-	if err := b.opts.Emitter.Write(t.Path, []byte(doc.HTML)); err != nil {
-		return info, err
+		return nil, info, err
 	}
 
 	info = hook.PageInfo{
@@ -223,7 +245,7 @@ func (b *Builder) render(ctx context.Context, out *Context, site render.Site, t 
 		info.Title = page.Title()
 		info.Excerpt = page.Excerpt()
 	}
-	return info, nil
+	return []byte(doc.HTML), info, nil
 }
 
 // pages builds the Page view of a target and of everything it lists.

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/kite-plus/kite/internal/build"
@@ -28,6 +29,14 @@ import (
 
 // Site is an opened project with every layer assembled.
 type Site struct {
+	// Problems lists content the index refused, such as a file with no id.
+	//
+	// Opening does not fail on them, because how much to tolerate is the
+	// caller's decision rather than the project's: a build refuses to publish
+	// a site it cannot fully see, while a preview keeps serving the rest and
+	// says on the page what it skipped.
+	Problems []string
+
 	Project  *project.Project
 	Config   *config.Config
 	Index    *index.Index
@@ -54,9 +63,9 @@ func Open(ctx context.Context, dir string) (*Site, error) {
 	if err != nil {
 		return nil, err
 	}
+	var problems []string
 	if _, err := ix.Reconcile(ctx); err != nil {
-		_ = ix.Close()
-		return nil, err
+		problems = strings.Split(err.Error(), "\n")
 	}
 
 	resolver, err := kurl.New(kurl.Options{
@@ -87,6 +96,7 @@ func Open(ctx context.Context, dir string) (*Site, error) {
 	})
 
 	return &Site{
+		Problems: problems,
 		Project:  p,
 		Config:   cfg,
 		Index:    ix,
@@ -149,8 +159,47 @@ type BuildOptions struct {
 	Now    time.Time
 }
 
+// Builder assembles the build engine without running it, so a server can
+// render one target at a time through exactly the path a build would take.
+func (s *Site) Builder(opts BuildOptions) (*build.Builder, error) {
+	return s.newBuilder(opts, nil)
+}
+
+func (s *Site) newBuilder(opts BuildOptions, emitter *build.Emitter) (*build.Builder, error) {
+	return build.New(build.Options{
+		Site: render.SiteInfo{
+			Title:         s.Config.Site.Title,
+			Description:   s.Config.Site.Description,
+			BaseURL:       s.Config.Site.BaseURL,
+			Language:      s.Config.Site.Language,
+			Params:        s.Config.Site.Params,
+			ThemeSettings: s.ThemeSettings(),
+			Version:       buildinfo.Version,
+			Build:         emitter != nil,
+		},
+		Reader:        s.Reader,
+		Resolver:      s.Resolver,
+		Engine:        s.Engine,
+		Markdown:      s.Markdown,
+		Hooks:         s.Hooks,
+		Types:         s.Project.Types,
+		Emitter:       emitter,
+		PageSize:      s.Config.Build.PageSize,
+		IncludeDrafts: opts.Drafts,
+		Now:           opts.Now,
+	})
+}
+
 // Build renders the whole site to disk.
+//
+// Content the index could not read stops a build. Publishing a site with a
+// page quietly missing is worse than publishing nothing, and the author is at
+// a terminal here, where an error is read.
 func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []string, error) {
+	if len(s.Problems) > 0 {
+		return build.Stats{}, nil, fmt.Errorf("%s", strings.Join(s.Problems, "\n"))
+	}
+
 	outDir := opts.OutDir
 	if outDir == "" {
 		outDir = filepath.Join(s.Project.Root, s.Config.Build.Output)
@@ -180,27 +229,7 @@ func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []str
 		}
 	}
 
-	builder, err := build.New(build.Options{
-		Site: render.SiteInfo{
-			Title:         s.Config.Site.Title,
-			Description:   s.Config.Site.Description,
-			BaseURL:       s.Config.Site.BaseURL,
-			Language:      s.Config.Site.Language,
-			Params:        s.Config.Site.Params,
-			ThemeSettings: s.ThemeSettings(),
-			Version:       buildinfo.Version,
-		},
-		Reader:        s.Reader,
-		Resolver:      s.Resolver,
-		Engine:        s.Engine,
-		Markdown:      s.Markdown,
-		Hooks:         s.Hooks,
-		Types:         s.Project.Types,
-		Emitter:       emitter,
-		PageSize:      s.Config.Build.PageSize,
-		IncludeDrafts: opts.Drafts,
-		Now:           opts.Now,
-	})
+	builder, err := s.newBuilder(opts, emitter)
 	if err != nil {
 		_ = emitter.Discard()
 		return build.Stats{}, nil, err
