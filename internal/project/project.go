@@ -9,12 +9,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/store/file"
 )
 
 // ConfigName is the project configuration file that marks a project root.
-const ConfigName = "kite.yaml"
+const ConfigName = config.Name
 
 // ErrNotFound is returned when no project root can be located.
 var ErrNotFound = errors.New("project: no kite.yaml found in this directory or any parent")
