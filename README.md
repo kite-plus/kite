@@ -94,6 +94,17 @@ SQLite driver are all compiled in, and nothing needs cgo.
 
 M0 is complete.
 
+## Releases
+
+Release binaries are reproducible: a given commit, built with the toolchain
+pinned in `go.mod`, compiles to the same bytes anywhere.
+
+```
+GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot --clean
+```
+
+Verify a download against the `checksums.txt` published with the release.
+
 ## License
 
 [Apache License 2.0](LICENSE).

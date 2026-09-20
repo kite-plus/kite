@@ -2,6 +2,11 @@ module github.com/kite-plus/kite
 
 go 1.26.4
 
+// Pinned exactly, not as a floor. A floating patch version means the same
+// tag rebuilt later compiles with a different compiler and produces different
+// bytes, which would make the release checksums unverifiable.
+toolchain go1.26.8
+
 require (
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/spf13/cobra v1.10.2
