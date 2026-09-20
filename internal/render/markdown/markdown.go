@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	"github.com/yuin/goldmark/ast"
@@ -37,6 +38,11 @@ type Options struct {
 	HardWraps bool
 
 	// HighlightTheme names the chroma style used for fenced code blocks.
+	//
+	// It only selects which token classes are emitted, never their colors:
+	// highlighting is written as classes so a theme can carry one palette for
+	// light and another for dark. Inline colors could not answer a media
+	// query, which is why a code block used to stay light on a dark page.
 	HighlightTheme string
 }
 
@@ -77,7 +83,10 @@ func New(opts Options) *Renderer {
 		extension.GFM,
 		extension.Footnote,
 		extension.DefinitionList,
-		highlighting.NewHighlighting(highlighting.WithStyle(opts.HighlightTheme)),
+		highlighting.NewHighlighting(
+			highlighting.WithStyle(opts.HighlightTheme),
+			highlighting.WithFormatOptions(chromahtml.WithClasses(true)),
+		),
 	}
 	if opts.Typographer {
 		extensions = append(extensions, extension.Typographer)
