@@ -1,0 +1,115 @@
+version: 2
+
+project_name: kite
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: kite
+    main: ./cmd/kite
+    binary: kite
+
+    # Every target is built without cgo. Shipping one self-contained binary
+    # per platform is a hard requirement, and a dependency that quietly needs
+    # a C toolchain has to fail here rather than at install time.
+    env:
+      - CGO_ENABLED=0
+
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64, arm]
+    goarm: ["7"]
+    ignore:
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+
+    flags:
+      - -trimpath
+
+    ldflags:
+      - -s -w
+      - -X github.com/kite-plus/kite/internal/buildinfo.Version={{ .Version }}
+      - -X github.com/kite-plus/kite/internal/buildinfo.Commit={{ .ShortCommit }}
+      - -X github.com/kite-plus/kite/internal/buildinfo.Date={{ .CommitDate }}
+
+    # Stamping the commit time rather than the build time makes the binaries
+    # byte-reproducible: rebuilding a tag produces the same artifact, which is
+    # the same property `kite build --verify` guarantees for a site.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: kite
+    ids: [kite]
+
+    # This name is a contract. The kitew wrapper resolves a download URL from
+    # a version alone, so the pattern cannot change without breaking every
+    # checked-in wrapper in every user's repository.
+    name_template: "kite_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+    files:
+      - README*
+      - LICENSE*
+      - src: docs/design/*.md
+        dst: docs
+
+checksum:
+  # kitew verifies a downloaded binary against this file, so its name and
+  # format are part of the same contract as the archive names.
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "^style:"
+      - "merge conflict"
+  groups:
+    - title: Features
+      regexp: '^feat(\([^)]+\))?!?:'
+      order: 0
+    - title: Fixes
+      regexp: '^fix(\([^)]+\))?!?:'
+      order: 1
+    - title: Performance
+      regexp: '^perf(\([^)]+\))?!?:'
+      order: 2
+    - title: Refactors
+      regexp: '^refactor(\([^)]+\))?!?:'
+      order: 3
+    - title: Documentation
+      regexp: '^docs(\([^)]+\))?!?:'
+      order: 4
+    - title: Other
+      order: 99
+
+release:
+  draft: false
+  prerelease: auto
+  name_template: "{{ .ProjectName }} {{ .Version }}"
+  footer: |
+    ## Install
+
+    Download the archive for your platform, or pin the version in a project
+    so that local builds and CI agree:
+
+    ```
+    ./kitew build
+    ```
+
+    Verify a download against `checksums.txt` before running it.

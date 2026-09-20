@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build the artifacts without publishing a release
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.26"
+  GORELEASER_VERSION: v2.18.2
+
+jobs:
+  # A tag is not a promise that the code works. Releasing something that fails
+  # its own checks is worse than releasing nothing, so the gate runs first and
+  # the publish step depends on it.
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+      - name: Check import boundaries
+        run: sh scripts/check-imports.sh
+
+      - name: Build a site twice and compare every byte
+        run: |
+          set -eu
+          CGO_ENABLED=0 go build -o /tmp/kite ./cmd/kite
+          site=$(mktemp -d)
+          cd "$site"
+          /tmp/kite init . >/dev/null
+          for i in 1 2 3; do /tmp/kite new post "Post $i" >/dev/null; done
+          /tmp/kite build --verify
+
+  release:
+    name: Release
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # goreleaser reads the commit history to build the changelog and the
+          # commit timestamp that makes the binaries reproducible.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Release
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: ${{ env.GORELEASER_VERSION }}
+          args: >-
+            ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run)
+                && 'release --snapshot --clean --skip=publish'
+                || 'release --clean' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # A release nobody can verify is a release nobody should trust, and the
+      # kitew wrapper checks this file before it runs a downloaded binary.
+      - name: Show the published checksums
+        run: cat dist/checksums.txt
+
+      - name: Upload artifacts for a dry run
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: kite-snapshot
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+          retention-days: 7

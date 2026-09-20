@@ -9,3 +9,6 @@ coverage.out
 # local tooling
 /node_modules/
 .DS_Store
+
+# goreleaser output
+/dist/

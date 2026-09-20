@@ -25,6 +25,7 @@ func newVersionCmd() *cobra.Command {
 			info := map[string]any{
 				"version":   buildinfo.Version,
 				"commit":    buildinfo.Commit,
+				"date":      buildinfo.Date,
 				"go":        runtime.Version(),
 				"platform":  runtime.GOOS + "/" + runtime.GOARCH,
 				"themeAPI":  buildinfo.ThemeAPIVersion,
@@ -34,8 +35,8 @@ func newVersionCmd() *cobra.Command {
 			if jsonOut(cmd) {
 				return writeJSON(cmd.OutOrStdout(), info)
 			}
-			printf(cmd, "kite %s (%s) %s %s\n", buildinfo.Version, buildinfo.Commit,
-				runtime.Version(), info["platform"])
+			printf(cmd, "kite %s (%s, %s) %s %s\n", buildinfo.Version, buildinfo.Commit,
+				buildinfo.Date, runtime.Version(), info["platform"])
 			printf(cmd, "theme api %s, plugin abi %d\n", buildinfo.ThemeAPIVersion, buildinfo.PluginABIVersion)
 			return nil
 		},

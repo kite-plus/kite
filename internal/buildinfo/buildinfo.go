@@ -7,6 +7,11 @@ var Version = "dev"
 // Commit is the source revision the binary was built from.
 var Commit = "none"
 
+// Date is the commit timestamp of that revision. The commit time is stamped
+// rather than the build time so that rebuilding a tag reproduces the same
+// binary, byte for byte.
+var Date = "unknown"
+
 // ThemeAPIVersion is the theme contract version this binary implements. A theme
 // declaring a different apiVersion is refused rather than rendered best effort.
 const ThemeAPIVersion = "kite/v1"

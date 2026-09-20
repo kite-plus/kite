@@ -2,9 +2,11 @@ GO       ?= go
 BINARY   ?= kite
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT   ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
+DATE     ?= $(shell git log -1 --format=%cI 2>/dev/null || echo unknown)
 LDFLAGS  := -s -w \
 	-X github.com/kite-plus/kite/internal/buildinfo.Version=$(VERSION) \
-	-X github.com/kite-plus/kite/internal/buildinfo.Commit=$(COMMIT)
+	-X github.com/kite-plus/kite/internal/buildinfo.Commit=$(COMMIT) \
+	-X github.com/kite-plus/kite/internal/buildinfo.Date=$(DATE)
 
 .PHONY: all build install test test-race cover fmt vet lint check-imports check clean tidy
 
