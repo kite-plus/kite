@@ -1,0 +1,11 @@
+# build output
+/bin/
+/public/
+coverage.out
+
+# derived state, never committed
+/.kite/
+
+# local tooling
+/node_modules/
+.DS_Store
