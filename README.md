@@ -94,6 +94,10 @@ SQLite driver are all compiled in, and nothing needs cgo.
 
 M0 is complete.
 
+## License
+
+[Apache License 2.0](LICENSE).
+
 ## Contributing
 
 The layering rule in `scripts/check-imports.sh` is enforced in CI: the domain
