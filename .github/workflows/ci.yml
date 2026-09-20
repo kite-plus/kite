@@ -141,6 +141,21 @@ jobs:
           /tmp/kite new page "About" >/dev/null
           /tmp/kite build --verify
 
+      - name: Refuse content the index cannot read
+        run: |
+          set -eu
+          site=$(mktemp -d)
+          cd "$site"
+          /tmp/kite init . >/dev/null
+          mkdir -p content/posts/no-id
+          printf -- '---\ntitle: No id\n---\n\nbody\n' > content/posts/no-id/index.md
+          # Publishing a site with a page quietly missing is worse than
+          # publishing nothing, so a build has to stop here.
+          if /tmp/kite build 2>/dev/null; then
+            echo "expected the build to refuse a file without an id"
+            exit 1
+          fi
+
       - name: Build an unmigrated content directory
         run: |
           set -eu
