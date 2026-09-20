@@ -165,7 +165,7 @@ func builtinTypes() []*Type {
 			Dir:        "posts",
 			Route:      "/posts/:slug",
 			Layout:     LayoutBundle,
-			Taxonomies: []string{"tag", "category"},
+			Taxonomies: []string{"tags", "categories"},
 			Templates:  TemplateHints{Single: "single", List: "list"},
 			Sortable:   []string{"published_at", "updated_at", "title"},
 			Fields: schema.Schema{

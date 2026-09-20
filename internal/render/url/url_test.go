@@ -54,8 +54,8 @@ func TestOutputPathIsTheInverseOfTheURL(t *testing.T) {
 			cases := []string{
 				r.For(post("hello")),
 				r.ForList("post", ""),
-				r.ForTaxonomy("tag", ""),
-				r.ForTerm("tag", "Go", ""),
+				r.ForTaxonomy("tags", ""),
+				r.ForTerm("tags", "Go", ""),
 				r.ForPage(r.ForList("post", ""), 3),
 				"/",
 			}
@@ -104,11 +104,11 @@ func TestPaginationFirstPageHasOneURL(t *testing.T) {
 
 func TestTermSegmentsAreNormalized(t *testing.T) {
 	r := newResolver(t, nil)
-	if got := r.ForTerm("tag", "Web Dev", ""); got != "/tag/web-dev/" {
+	if got := r.ForTerm("tags", "Web Dev", ""); got != "/tags/web-dev/" {
 		t.Errorf("ForTerm = %q", got)
 	}
 	// A term containing a slash must not create an extra path level.
-	if got := r.ForTerm("tag", "a/b", ""); got != "/tag/a-b/" {
+	if got := r.ForTerm("tags", "a/b", ""); got != "/tags/a-b/" {
 		t.Errorf("ForTerm with slash = %q", got)
 	}
 }

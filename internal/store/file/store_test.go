@@ -48,7 +48,7 @@ func TestPutCreatesBundle(t *testing.T) {
 		Title:      "Hello World",
 		Status:     content.StatusDraft,
 		Body:       content.Body{Format: content.FormatMarkdown, Raw: "\nbody text\n"},
-		Taxonomies: map[string][]string{"tag": {"Go"}},
+		Taxonomies: map[string][]string{"tags": {"Go"}},
 	}
 	res, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.PutContent{Content: item}}})
 	if err != nil {
@@ -72,7 +72,7 @@ func TestPutCreatesBundle(t *testing.T) {
 		"title: Hello World",
 		"slug: hello-world",
 		"status: draft",
-		"tag:\n  - Go",
+		"tags:\n  - Go",
 		"body text",
 	} {
 		if !strings.Contains(got, must) {
@@ -125,7 +125,7 @@ slug: original
 status: published
 created_at: 2026-01-01T00:00:00Z
 updated_at: 2026-01-01T00:00:00Z
-tag: [Go, CMS]
+tags: [Go, CMS]
 
 # grouping for the docs site
 category:
@@ -162,7 +162,7 @@ Body stays put.
 		}
 	}
 	for _, must := range []string{
-		"tag: [Go, CMS]",
+		"tags: [Go, CMS]",
 		"# grouping for the docs site",
 		"custom_key: keep me",
 		"Body stays put.",
@@ -317,9 +317,9 @@ title: Legacy Post
 date: 2024-03-05
 lastmod: 2024-04-01
 draft: true
-tag:
+tags:
   - Go
-category: Tech
+categories: Tech
 ---
 legacy body
 `)
@@ -342,12 +342,12 @@ legacy body
 	if want := time.Date(2024, 3, 5, 0, 0, 0, 0, time.UTC); !item.CreatedAt.Equal(want) {
 		t.Errorf("CreatedAt = %v, want %v", item.CreatedAt, want)
 	}
-	if !slices.Equal(item.Terms("tag"), []string{"Go"}) {
-		t.Errorf("tag = %v", item.Terms("tag"))
+	if !slices.Equal(item.Terms("tags"), []string{"Go"}) {
+		t.Errorf("tag = %v", item.Terms("tags"))
 	}
 	// A bare scalar is the common shorthand for a single term.
-	if !slices.Equal(item.Terms("category"), []string{"Tech"}) {
-		t.Errorf("category = %v", item.Terms("category"))
+	if !slices.Equal(item.Terms("categories"), []string{"Tech"}) {
+		t.Errorf("category = %v", item.Terms("categories"))
 	}
 	if item.ID != "" {
 		t.Errorf("legacy file should have no ID until doctor assigns one, got %q", item.ID)

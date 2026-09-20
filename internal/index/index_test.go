@@ -59,8 +59,8 @@ const (
 
 func TestReconcileIndexesContent(t *testing.T) {
 	root, types := newProject(t)
-	write(t, root, "content/posts/a/index.md", post(idA, "Alpha", "alpha", "tag: [Go, CMS]"))
-	write(t, root, "content/posts/b/index.md", post(idB, "Beta", "beta", "tag: [Go]"))
+	write(t, root, "content/posts/a/index.md", post(idA, "Alpha", "alpha", "tags: [Go, CMS]"))
+	write(t, root, "content/posts/b/index.md", post(idB, "Beta", "beta", "tags: [Go]"))
 
 	ix := openIndex(t, root, types)
 	stats, err := ix.Reconcile(t.Context())
@@ -79,8 +79,8 @@ func TestReconcileIndexesContent(t *testing.T) {
 	if item.Title != "Alpha" {
 		t.Errorf("Title = %q", item.Title)
 	}
-	if !slices.Equal(item.Terms("tag"), []string{"Go", "CMS"}) {
-		t.Errorf("tag terms = %v, want the front matter order preserved", item.Terms("tag"))
+	if !slices.Equal(item.Terms("tags"), []string{"Go", "CMS"}) {
+		t.Errorf("tag terms = %v, want the front matter order preserved", item.Terms("tags"))
 	}
 }
 
@@ -90,7 +90,7 @@ func TestRebuildProducesIdenticalRows(t *testing.T) {
 	root, types := newProject(t)
 	for i, id := range []string{idA, idB, idC} {
 		write(t, root, "content/posts/p"+string(rune('a'+i))+"/index.md",
-			post(id, "Post", "post-"+string(rune('a'+i)), "tag: [Go]"))
+			post(id, "Post", "post-"+string(rune('a'+i)), "tags: [Go]"))
 	}
 	write(t, root, "content/pages/about.md", post("01J8KQ2P3R4S5T6V7W8X9YZAB4", "About", "about"))
 

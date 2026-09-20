@@ -44,7 +44,7 @@ title: Post %02d
 slug: post-%02d
 status: published
 published_at: 2026-01-%02dT00:00:00Z
-tag: [Go]
+tags: [Go]
 ---
 
 # Heading
@@ -140,8 +140,8 @@ func TestBuildProducesEveryPageKind(t *testing.T) {
 		"page/2/index.html", // home pagination
 		"posts/index.html",  // listing
 		"posts/post-00/index.html",
-		"tag/index.html",    // taxonomy
-		"tag/go/index.html", // term
+		"tags/index.html",    // taxonomy
+		"tags/go/index.html", // term
 		"404.html",
 		"sitemap.xml",
 		"rss.xml",

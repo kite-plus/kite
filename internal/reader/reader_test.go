@@ -162,13 +162,13 @@ func TestCursorIsStableWhenItemsAreInsertedMidPagination(t *testing.T) {
 func TestQueryFiltersByTerm(t *testing.T) {
 	r := fixture(t, 6, func(i int) string {
 		if i%2 == 0 {
-			return "tag: [Go, Even]\n"
+			return "tags: [Go, Even]\n"
 		}
-		return "tag: [Go, Odd]\n"
+		return "tags: [Go, Odd]\n"
 	})
 
 	page, err := r.Query(t.Context(), content.Query{
-		TermsAny: map[string][]string{"tag": {"Even"}},
+		TermsAny: map[string][]string{"tags": {"Even"}},
 	})
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -178,7 +178,7 @@ func TestQueryFiltersByTerm(t *testing.T) {
 	}
 
 	both, err := r.Query(t.Context(), content.Query{
-		TermsAll: map[string][]string{"tag": {"Go", "Odd"}},
+		TermsAll: map[string][]string{"tags": {"Go", "Odd"}},
 	})
 	if err != nil {
 		t.Fatalf("Query: %v", err)
@@ -218,12 +218,12 @@ func TestQueryFiltersByStatusAndText(t *testing.T) {
 func TestCountTerms(t *testing.T) {
 	r := fixture(t, 6, func(i int) string {
 		if i%3 == 0 {
-			return "tag: [Go]\n"
+			return "tags: [Go]\n"
 		}
-		return "tag: [Go, Extra]\n"
+		return "tags: [Go, Extra]\n"
 	})
 
-	counts, err := r.CountTerms(t.Context(), "tag", content.Query{})
+	counts, err := r.CountTerms(t.Context(), "tags", content.Query{})
 	if err != nil {
 		t.Fatalf("CountTerms: %v", err)
 	}
@@ -281,15 +281,15 @@ func TestLimitIsClamped(t *testing.T) {
 }
 
 func TestSummariesCarryTerms(t *testing.T) {
-	r := fixture(t, 2, func(int) string { return "tag: [Go, CMS]\ncategory: [Tech]\n" })
+	r := fixture(t, 2, func(int) string { return "tags: [Go, CMS]\ncategories: [Tech]\n" })
 	page, err := r.Query(t.Context(), content.Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := page.Items[0].Taxonomies["tag"]; !slices.Equal(got, []string{"Go", "CMS"}) {
+	if got := page.Items[0].Taxonomies["tags"]; !slices.Equal(got, []string{"Go", "CMS"}) {
 		t.Errorf("tag = %v", got)
 	}
-	if got := page.Items[0].Taxonomies["category"]; !slices.Equal(got, []string{"Tech"}) {
+	if got := page.Items[0].Taxonomies["categories"]; !slices.Equal(got, []string{"Tech"}) {
 		t.Errorf("category = %v", got)
 	}
 }

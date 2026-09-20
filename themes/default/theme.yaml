@@ -8,7 +8,7 @@ license: MIT
 
 capabilities: [static, dynamic]
 contentTypes: [post, page]
-taxonomies: [tag, category]
+taxonomies: [tags, categories]
 
 settings:
   - key: accent
