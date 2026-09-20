@@ -42,13 +42,19 @@ lint:
 check-imports:
 	@sh scripts/check-imports.sh
 
-# Runs the same comparison CI does. Tidy rewrites the files as a side effect,
-# which is the point: it leaves them in the state CI expects rather than only
-# reporting that they were wrong.
+# Compares the files before and after tidy rather than against HEAD: locally
+# they often carry legitimate uncommitted edits, and diffing against the commit
+# would report those as untidiness. CI never notices the difference because it
+# starts from a clean checkout.
 check-tidy:
+	@cp go.mod .go.mod.check && cp go.sum .go.sum.check
 	@$(GO) mod tidy
-	@git diff --exit-code -- go.mod go.sum \
-		|| { echo "go.mod or go.sum was not tidy; the fix is staged above"; exit 1; }
+	@if ! cmp -s go.mod .go.mod.check || ! cmp -s go.sum .go.sum.check; then \
+		rm -f .go.mod.check .go.sum.check; \
+		echo "go.mod or go.sum was not tidy; tidy has fixed them in place"; \
+		exit 1; \
+	fi
+	@rm -f .go.mod.check .go.sum.check
 
 check: fmt vet check-imports check-tidy lint test
 

@@ -12,3 +12,7 @@ coverage.out
 
 # goreleaser output
 /dist/
+
+# check-tidy scratch
+.go.mod.check
+.go.sum.check
