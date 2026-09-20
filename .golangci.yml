@@ -1,30 +1,46 @@
 version: "2"
 
+run:
+  timeout: 5m
+
 linters:
   enable:
+    - bodyclose
+    - copyloopvar
     - errcheck
+    - errorlint
     - govet
     - ineffassign
-    - staticcheck
-    - unused
     - misspell
     - revive
-    - bodyclose
-    - errorlint
-    - copyloopvar
+    - staticcheck
+    - unused
 
   settings:
-    revive:
-      rules:
-        - name: exported
-          disabled: false
     misspell:
       locale: US
+    revive:
+      rules:
+        # Package, type and function documentation is required; the "exported"
+        # rule additionally demands a comment on every enum constant and on
+        # every method that merely implements a documented interface. Those
+        # comments can only restate the code, which this project does not
+        # write. Packages are documented, and the reasoning that a reader
+        # cannot infer lives in comments that say why.
+        - name: exported
+          disabled: true
+        - name: package-comments
+        - name: var-naming
+        - name: indent-error-flow
+        - name: errorf
+        - name: context-as-argument
+        - name: unreachable-code
 
   exclusions:
     rules:
+      # Assertions are the point of a test; a failed Close in one is noise.
       - path: _test\.go$
-        linters: [errcheck]
+        linters: [errcheck, bodyclose]
 
 formatters:
   enable:

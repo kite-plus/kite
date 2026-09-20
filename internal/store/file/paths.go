@@ -15,7 +15,7 @@ const ContentDir = "content"
 // BundleIndex is the file that carries an item's text inside a bundle.
 const BundleIndex = "index.md"
 
-// markdownExt is the only source extension recognised today.
+// markdownExt is the only source extension recognized today.
 const markdownExt = ".md"
 
 // Slugify turns a title into a URL fragment. Letters and digits of any script

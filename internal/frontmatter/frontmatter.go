@@ -3,7 +3,7 @@
 //
 // A naive unmarshal/marshal round trip reorders keys, drops comments and
 // rewrites "tags: [a, b]" as a block list, which turns a one word edit into a
-// large diff. That is the most common complaint levelled at git-backed content
+// large diff. That is the most common complaint leveled at git-backed content
 // systems, so this package edits a document surgically: an untouched document
 // round trips byte for byte, and changing one key rewrites only that key's
 // lines.
@@ -498,7 +498,7 @@ func adoptStyle(old, replacement *yaml.Node) {
 }
 
 // nodesEqual compares two nodes by decoded value, ignoring formatting, so that
-// rewriting a key with an identical value is recognised as a no-op.
+// rewriting a key with an identical value is recognized as a no-op.
 func nodesEqual(a, b *yaml.Node) (bool, error) {
 	av, err := canonical(a)
 	if err != nil {

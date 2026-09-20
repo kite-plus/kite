@@ -104,7 +104,8 @@ func (r *Recorder) Deps() []Dep {
 // every output.
 func (r *Recorder) CacheKey(shared ...string) string {
 	h := sha256.New()
-	field := func(s string) { fmt.Fprintf(h, "%s\x00", s) }
+	// A hash.Hash never returns an error.
+	field := func(s string) { _, _ = fmt.Fprintf(h, "%s\x00", s) }
 
 	field(fmt.Sprintf("abi=%d", buildinfo.BuildABIVersion))
 	for _, s := range shared {

@@ -55,7 +55,7 @@ func Open(ctx context.Context, dir string) (*Site, error) {
 		return nil, err
 	}
 	if _, err := ix.Reconcile(ctx); err != nil {
-		ix.Close()
+		_ = ix.Close()
 		return nil, err
 	}
 
@@ -69,13 +69,13 @@ func Open(ctx context.Context, dir string) (*Site, error) {
 		LocalePrefix:   true,
 	}, p.Types)
 	if err != nil {
-		ix.Close()
+		_ = ix.Close()
 		return nil, err
 	}
 
 	th, sources, err := loadTheme(p.Root, cfg.Theme.Name)
 	if err != nil {
-		ix.Close()
+		_ = ix.Close()
 		return nil, err
 	}
 
@@ -165,17 +165,17 @@ func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []str
 	// reference them and a failed render discards them along with everything
 	// else.
 	if err := emitter.CopyTree(s.Theme.Static, ""); err != nil {
-		emitter.Discard()
+		_ = emitter.Discard()
 		return build.Stats{}, nil, err
 	}
 	if err := emitter.CopyTree(s.Theme.Assets, "assets"); err != nil {
-		emitter.Discard()
+		_ = emitter.Discard()
 		return build.Stats{}, nil, err
 	}
 	staticDir := filepath.Join(s.Project.Root, "static")
 	if info, err := os.Stat(staticDir); err == nil && info.IsDir() {
 		if err := emitter.CopyTree(os.DirFS(staticDir), ""); err != nil {
-			emitter.Discard()
+			_ = emitter.Discard()
 			return build.Stats{}, nil, err
 		}
 	}
@@ -202,13 +202,13 @@ func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []str
 		Now:           opts.Now,
 	})
 	if err != nil {
-		emitter.Discard()
+		_ = emitter.Discard()
 		return build.Stats{}, nil, err
 	}
 
 	stats, err := builder.Run(ctx)
 	if err != nil {
-		emitter.Discard()
+		_ = emitter.Discard()
 		return stats, nil, err
 	}
 	return stats, emitter.Files(), nil

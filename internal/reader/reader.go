@@ -86,7 +86,7 @@ func (r *Reader) Query(ctx context.Context, q content.Query) (content.Page[conte
 	if err != nil {
 		return page, fmt.Errorf("reader: query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []string
 	for rows.Next() {
@@ -143,7 +143,7 @@ func (r *Reader) CountTerms(ctx context.Context, taxonomy string, q content.Quer
 	if err != nil {
 		return nil, fmt.Errorf("reader: count terms: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []content.TermCount
 	for rows.Next() {
@@ -217,7 +217,7 @@ func (r *Reader) termsFor(ctx context.Context, ids []string) (map[string]map[str
 	if err != nil {
 		return nil, fmt.Errorf("reader: load terms: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id, taxonomy, term string

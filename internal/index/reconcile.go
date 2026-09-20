@@ -161,7 +161,7 @@ func (ix *Index) knownFiles(ctx context.Context) (map[string]fileRow, error) {
 	if err != nil {
 		return nil, fmt.Errorf("index: read file table: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make(map[string]fileRow)
 	for rows.Next() {
@@ -256,8 +256,8 @@ func collapseSpace(s string) string {
 	out := make([]rune, 0, len(s))
 	space := true
 	for _, r := range s {
-		switch {
-		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+		switch r {
+		case ' ', '\t', '\n', '\r':
 			if !space {
 				out = append(out, ' ')
 				space = true

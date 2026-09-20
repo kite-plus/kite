@@ -63,7 +63,7 @@ func Open(root string, types *content.Registry) (*Index, error) {
 	// older build would be stamped as current and silently kept.
 	version, found, err := ix.schemaVersion()
 	if err != nil {
-		ix.Close()
+		_ = ix.Close()
 		return nil, err
 	}
 	if found && version != SchemaVersion {
@@ -72,7 +72,7 @@ func Open(root string, types *content.Registry) (*Index, error) {
 		}
 	}
 	if err := ix.setMeta(metaSchemaVersion, strconv.Itoa(SchemaVersion)); err != nil {
-		ix.Close()
+		_ = ix.Close()
 		return nil, err
 	}
 	return ix, nil
@@ -85,7 +85,7 @@ func OpenMemory(root string, types *content.Registry) (*Index, error) {
 		return nil, err
 	}
 	if err := ix.setMeta(metaSchemaVersion, strconv.Itoa(SchemaVersion)); err != nil {
-		ix.Close()
+		_ = ix.Close()
 		return nil, err
 	}
 	return ix, nil
@@ -96,12 +96,12 @@ func open(dsn, root string, types *content.Registry) (*Index, error) {
 	if err != nil {
 		return nil, fmt.Errorf("index: open %s: %w", dsn, err)
 	}
-	// SQLite tolerates a single writer; serialising here avoids SQLITE_BUSY
+	// SQLite tolerates a single writer; serializing here avoids SQLITE_BUSY
 	// entirely rather than retrying around it.
 	db.SetMaxOpenConns(1)
 
 	if _, err := db.Exec(schemaSQL); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("index: apply schema: %w", err)
 	}
 	return &Index{db: db, root: root, types: types, scanner: file.NewScanner(root, types)}, nil

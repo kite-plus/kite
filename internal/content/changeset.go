@@ -114,7 +114,7 @@ func (o DeleteMedia) Describe() string { return o.Name }
 // The same structure is simultaneously the git commit, the database
 // transaction, the conflict detection unit, the audit record and the undo
 // record. Field level mutators are deliberately absent: retrofitting those five
-// behaviours onto a wide set of per-field setters is the rewrite this design
+// behaviors onto a wide set of per-field setters is the rewrite this design
 // exists to avoid.
 type ChangeSet struct {
 	Ops     []Op

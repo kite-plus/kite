@@ -227,8 +227,8 @@ func slugSegment(s string) string {
 	var b strings.Builder
 	lastDash := true
 	for _, r := range strings.TrimSpace(s) {
-		switch {
-		case r == '/' || r == ' ' || r == '\t':
+		switch r {
+		case '/', ' ', '\t':
 			if !lastDash {
 				b.WriteByte('-')
 				lastDash = true

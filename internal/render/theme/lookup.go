@@ -139,7 +139,7 @@ func exists(fsys fs.FS, name string) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	return err == nil && !info.IsDir()
 }

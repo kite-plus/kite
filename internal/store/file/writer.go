@@ -351,14 +351,14 @@ func (w *Writer) write(relPath string, data []byte) error {
 		return err
 	}
 	tmpName := f.Name()
-	defer os.Remove(tmpName)
+	defer func() { _ = os.Remove(tmpName) }()
 
 	if _, err := f.Write(data); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Sync(); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Close(); err != nil {
@@ -415,7 +415,7 @@ func syncDir(dir string) error {
 	if err != nil {
 		return nil // best effort: not all platforms allow opening a directory
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_ = f.Sync()
 	return nil
 }

@@ -51,5 +51,6 @@ func writeJSON(w io.Writer, v any) error {
 }
 
 func printf(cmd *cobra.Command, format string, args ...any) {
-	fmt.Fprintf(cmd.OutOrStdout(), format, args...)
+	// Failing to write to stdout is not something a command can react to.
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), format, args...)
 }

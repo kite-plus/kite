@@ -44,7 +44,7 @@ func newBuildCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer s.Close()
+			defer func() { _ = s.Close() }()
 
 			outDir := out
 			if outDir == "" {
@@ -123,7 +123,7 @@ func verifyBuild(cmd *cobra.Command, s *site.Site, outDir string, drafts bool) (
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(scratch)
+	defer func() { _ = os.RemoveAll(scratch) }()
 
 	second := filepath.Join(scratch, "public")
 	if _, _, err := s.Build(cmd.Context(), site.BuildOptions{OutDir: second, Drafts: drafts}); err != nil {

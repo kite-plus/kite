@@ -36,7 +36,7 @@ func newIndexCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer ix.Close()
+			defer func() { _ = ix.Close() }()
 
 			run := ix.Reconcile
 			if rebuild {
@@ -92,7 +92,7 @@ func newListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer ix.Close()
+			defer func() { _ = ix.Close() }()
 			if _, err := ix.Reconcile(cmd.Context()); err != nil {
 				return err
 			}

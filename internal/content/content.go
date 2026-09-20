@@ -30,7 +30,7 @@ const (
 
 var knownStatuses = []Status{StatusDraft, StatusScheduled, StatusPublished, StatusArchived}
 
-// Valid reports whether s is a recognised status.
+// Valid reports whether s is a recognized status.
 func (s Status) Valid() bool { return slices.Contains(knownStatuses, s) }
 
 // Format is the source format of a [Body].

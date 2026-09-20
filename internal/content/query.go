@@ -119,7 +119,7 @@ func (q *Query) Normalize() error {
 // key, so paging stays correct even while items are being edited.
 //
 // Offset pagination is deliberately not offered: over a mutable set it both
-// repeats and skips rows, and once a public API exposes it the behaviour
+// repeats and skips rows, and once a public API exposes it the behavior
 // cannot be fixed.
 type Cursor struct {
 	Values []string `json:"v"`

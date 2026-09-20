@@ -221,7 +221,7 @@ func TestDelete(t *testing.T) {
 		t.Error("deleted key still parses")
 	}
 	if !strings.Contains(got, "tags: [Go, CMS]") {
-		t.Error("delete disturbed a neighbouring key")
+		t.Error("delete disturbed a neighboring key")
 	}
 }
 

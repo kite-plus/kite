@@ -1,3 +1,8 @@
+// Package file implements the content store backed by markdown files.
+//
+// The files are the source of truth: every write lands in the working tree
+// where the user's editor and git see it immediately, and nothing here
+// consults a database.
 package file
 
 import (
