@@ -1,6 +1,25 @@
-# Kite
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="" width="88" height="88">
+</p>
 
-**A modern open-source publishing platform. One Content, Multiple Destinations.**
+<h1 align="center">Kite</h1>
+
+<p align="center">
+  <strong>A modern open-source publishing platform.</strong><br>
+  One Content, Multiple Destinations.
+</p>
+
+<p align="center">
+  <a href="https://github.com/kite-plus/kite/actions/workflows/ci.yml"><img
+    src="https://github.com/kite-plus/kite/actions/workflows/ci.yml/badge.svg"
+    alt="CI"></a>
+  <a href="LICENSE"><img
+    src="https://img.shields.io/badge/license-Apache--2.0-blue.svg"
+    alt="Apache-2.0"></a>
+  <img src="https://img.shields.io/badge/go-1.26-00ADD8.svg" alt="Go 1.26">
+</p>
+
+---
 
 Kite manages your content. Where it is deployed is a property of the content,
 not a different product.
