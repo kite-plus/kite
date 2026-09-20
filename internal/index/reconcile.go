@@ -201,7 +201,7 @@ func upsert(ctx context.Context, tx *sql.Tx, e *file.Entry, nowNS int64) error {
 		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		string(item.ID), string(item.Kind), item.Slug, item.Title, string(item.Status),
 		item.Locale, string(item.Locator), e.Path, string(item.Revision),
-		item.Body.Raw, string(item.Body.Format), excerpt(item.Body.Raw),
+		item.Body.Raw, string(item.Body.Format), summarize(description(item.Meta), item.Body.Raw),
 		string(meta), string(aliases),
 		unixOrZero(item.CreatedAt), unixOrZero(item.UpdatedAt),
 		unixPtr(item.PublishedAt), unixPtr(item.DeletedAt),
@@ -241,33 +241,12 @@ func deleteByPath(ctx context.Context, tx *sql.Tx, path string) error {
 	return err
 }
 
-// excerpt takes the leading prose of a body for list views, so that a summary
-// never requires loading and rendering the whole document.
-func excerpt(body string) string {
-	const limit = 240
-	runes := []rune(collapseSpace(body))
-	if len(runes) <= limit {
-		return string(runes)
+// description returns an author-written summary from the item's metadata.
+func description(meta map[string]any) string {
+	if v, ok := meta["description"].(string); ok {
+		return v
 	}
-	return string(runes[:limit])
-}
-
-func collapseSpace(s string) string {
-	out := make([]rune, 0, len(s))
-	space := true
-	for _, r := range s {
-		switch r {
-		case ' ', '\t', '\n', '\r':
-			if !space {
-				out = append(out, ' ')
-				space = true
-			}
-		default:
-			out = append(out, r)
-			space = false
-		}
-	}
-	return string(out)
+	return ""
 }
 
 func unixOrZero(t time.Time) int64 {
