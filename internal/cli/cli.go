@@ -33,6 +33,8 @@ func newRootCmd() *cobra.Command {
 		newIndexCmd(),
 		newListCmd(),
 		newBuildCmd(),
+		newServeCmd(),
+		newRunCmd(),
 	)
 	return root
 }
