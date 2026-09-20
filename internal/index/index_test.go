@@ -115,7 +115,7 @@ func TestReconcileSkipsUnchangedFiles(t *testing.T) {
 	write(t, root, "content/posts/a/index.md", post(idA, "Alpha", "alpha"))
 
 	// Age the file well past the racy window: inside it every file is re-read
-	// regardless of stat, which is the behaviour the companion test covers.
+	// regardless of stat, which is the behavior the companion test covers.
 	old := time.Now().Add(-10 * time.Second)
 	p := filepath.Join(root, "content", "posts", "a", "index.md")
 	if err := os.Chtimes(p, old, old); err != nil {
@@ -148,7 +148,7 @@ func TestRacyTimestampForcesReread(t *testing.T) {
 
 	// Put the recorded index time just after the file's own timestamp. The
 	// rule only applies inside that window, and how long the first index run
-	// took is a property of the machine, not of the behaviour under test.
+	// took is a property of the machine, not of the behavior under test.
 	if _, err := ix.DB().Exec(`UPDATE files SET indexed_at_ns = mtime_ns + 1`); err != nil {
 		t.Fatal(err)
 	}

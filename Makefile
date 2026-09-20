@@ -34,15 +34,15 @@ fmt:
 vet:
 	$(GO) vet ./...
 
+LINT_VERSION ?= v2.13.2
+
 lint:
-	@command -v golangci-lint >/dev/null 2>&1 \
-		&& golangci-lint run \
-		|| echo "golangci-lint not installed, skipping"
+	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(LINT_VERSION) run ./...
 
 check-imports:
 	@sh scripts/check-imports.sh
 
-check: fmt vet check-imports test
+check: fmt vet check-imports lint test
 
 tidy:
 	$(GO) mod tidy
