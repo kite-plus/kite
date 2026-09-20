@@ -8,6 +8,7 @@ go 1.26.4
 toolchain go1.26.8
 
 require (
+	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/spf13/cobra v1.10.2
 	github.com/yuin/goldmark v1.8.6
@@ -17,7 +18,6 @@ require (
 )
 
 require (
-	github.com/alecthomas/chroma/v2 v2.27.0 // indirect
 	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect

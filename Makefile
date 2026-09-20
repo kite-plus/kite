@@ -8,7 +8,7 @@ LDFLAGS  := -s -w \
 	-X github.com/kite-plus/kite/internal/buildinfo.Commit=$(COMMIT) \
 	-X github.com/kite-plus/kite/internal/buildinfo.Date=$(DATE)
 
-.PHONY: all build install test test-race cover fmt vet lint check-imports check clean tidy
+.PHONY: all build install test test-race cover fmt vet lint check-imports check-tidy check clean tidy
 
 all: check build
 
@@ -42,7 +42,15 @@ lint:
 check-imports:
 	@sh scripts/check-imports.sh
 
-check: fmt vet check-imports lint test
+# Runs the same comparison CI does. Tidy rewrites the files as a side effect,
+# which is the point: it leaves them in the state CI expects rather than only
+# reporting that they were wrong.
+check-tidy:
+	@$(GO) mod tidy
+	@git diff --exit-code -- go.mod go.sum \
+		|| { echo "go.mod or go.sum was not tidy; the fix is staged above"; exit 1; }
+
+check: fmt vet check-imports check-tidy lint test
 
 tidy:
 	$(GO) mod tidy
