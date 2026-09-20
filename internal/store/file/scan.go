@@ -30,6 +30,7 @@ type Entry struct {
 	Path    string // source file, project relative, slash separated
 	Size    int64
 	ModTime int64 // unix nanoseconds
+	Hash    content.Revision
 	Item    *content.Content
 }
 
@@ -72,12 +73,21 @@ func (r *Result) Err() error {
 	return errors.Join(errs...)
 }
 
-// Scan reads every content source file under the project's content directory.
+// Stat is what a walk reports about a source file without reading it.
+type Stat struct {
+	Type    *content.Type
+	Locator content.Locator
+	Path    string
+	Size    int64
+	ModTime int64 // unix nanoseconds
+}
+
+// Walk visits every content source file, reading only directory metadata.
 //
-// Entries come back sorted by path so that any output derived from a scan is
-// deterministic, which is a precondition for reproducible builds.
-func (s *Scanner) Scan() (*Result, error) {
-	res := &Result{}
+// A stat-only pass over ten thousand files costs tens of milliseconds, which
+// is what lets the index verify coherence before every authoritative read
+// rather than trusting a file watcher.
+func (s *Scanner) Walk(fn func(Stat) error) error {
 	for _, t := range s.types.Types() {
 		dir := abs(s.root, path.Join(ContentDir, t.Dir))
 		info, err := os.Stat(dir)
@@ -85,24 +95,19 @@ func (s *Scanner) Scan() (*Result, error) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("scan %s: %w", t.Dir, err)
+			return fmt.Errorf("scan %s: %w", t.Dir, err)
 		}
 		if !info.IsDir() {
 			continue
 		}
-		if err := s.scanType(t, dir, res); err != nil {
-			return nil, err
+		if err := s.walkType(t, dir, fn); err != nil {
+			return err
 		}
 	}
-
-	slices.SortFunc(res.Entries, func(a, b *Entry) int { return strings.Compare(a.Path, b.Path) })
-	if err := s.checkDuplicateIDs(res); err != nil {
-		return nil, err
-	}
-	return res, nil
+	return nil
 }
 
-func (s *Scanner) scanType(t *content.Type, dir string, res *Result) error {
+func (s *Scanner) walkType(t *content.Type, dir string, fn func(Stat) error) error {
 	return filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -132,31 +137,65 @@ func (s *Scanner) scanType(t *content.Type, dir string, res *Result) error {
 			loc = content.Locator(path.Dir(relPath))
 		}
 
-		data, err := os.ReadFile(p)
-		if err != nil {
-			res.Problems = append(res.Problems, Problem{Path: relPath, Err: err})
-			return nil
-		}
-		item, err := s.codec.Decode(t, loc, data)
-		if err != nil {
-			res.Problems = append(res.Problems, Problem{Path: relPath, Err: err})
-			return nil
-		}
-
 		info, err := d.Info()
 		if err != nil {
 			return err
 		}
-		res.Entries = append(res.Entries, &Entry{
+		return fn(Stat{
 			Type:    t,
 			Locator: loc,
 			Path:    relPath,
 			Size:    info.Size(),
 			ModTime: info.ModTime().UnixNano(),
-			Item:    item,
 		})
+	})
+}
+
+// Load reads and decodes one source file.
+func (s *Scanner) Load(st Stat) (*Entry, error) {
+	data, err := os.ReadFile(abs(s.root, st.Path))
+	if err != nil {
+		return nil, err
+	}
+	item, err := s.codec.Decode(st.Type, st.Locator, data)
+	if err != nil {
+		return nil, err
+	}
+	return &Entry{
+		Type:    st.Type,
+		Locator: st.Locator,
+		Path:    st.Path,
+		Size:    st.Size,
+		ModTime: st.ModTime,
+		Hash:    RevisionOf(data),
+		Item:    item,
+	}, nil
+}
+
+// Scan reads and decodes every content source file.
+//
+// Entries come back sorted by path so that any output derived from a scan is
+// deterministic, which is a precondition for reproducible builds.
+func (s *Scanner) Scan() (*Result, error) {
+	res := &Result{}
+	err := s.Walk(func(st Stat) error {
+		e, err := s.Load(st)
+		if err != nil {
+			res.Problems = append(res.Problems, Problem{Path: st.Path, Err: err})
+			return nil
+		}
+		res.Entries = append(res.Entries, e)
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	slices.SortFunc(res.Entries, func(a, b *Entry) int { return strings.Compare(a.Path, b.Path) })
+	if err := s.checkDuplicateIDs(res); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // checkDuplicateIDs reports items sharing an ID.
