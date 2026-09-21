@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"reflect"
 
@@ -206,4 +207,13 @@ func listParameters() []parameter {
 
 func (s *Server) handleOpenAPI(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, openAPI())
+}
+
+// Document returns the API description as indented JSON.
+//
+// It is exported so the description can be produced without running a server,
+// which is what lets a client be generated in a build that has no port to
+// listen on.
+func Document() ([]byte, error) {
+	return json.MarshalIndent(openAPI(), "", "  ")
 }

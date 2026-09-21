@@ -8,9 +8,26 @@ LDFLAGS  := -s -w \
 	-X github.com/kite-plus/kite/internal/buildinfo.Commit=$(COMMIT) \
 	-X github.com/kite-plus/kite/internal/buildinfo.Date=$(DATE)
 
-.PHONY: all build install test test-race cover fmt vet lint check-imports check-tidy check clean tidy
+.PHONY: all build install test test-race cover fmt vet lint check-imports check-tidy check clean tidy web web-gen web-check
 
 all: check build
+
+PNPM ?= pnpm
+
+# The admin is built separately because it needs Node, which a Go-only
+# contributor should not have to install. web/dist is committed empty, so a
+# binary built without this target compiles and reports the admin is missing.
+web:
+	cd web && $(PNPM) install --frozen-lockfile && $(PNPM) build
+
+# web-gen regenerates the API client from this build's own description, so the
+# types the admin compiles against cannot describe an API the server does not
+# serve.
+web-gen:
+	cd web && $(PNPM) gen
+
+web-check:
+	cd web && $(PNPM) lint
 
 build:
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o bin/$(BINARY) ./cmd/kite

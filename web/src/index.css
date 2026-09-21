@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/*
+ * Tokens follow the shadcn/ui names so its components can be added later
+ * without restyling what is already here.
+ */
+@theme {
+  --color-brand: #4a77d6;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #14171f;
+  --muted: #f4f5f7;
+  --muted-foreground: #6b7280;
+  --border: #e5e7eb;
+  --accent: #f0f4fc;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0e1116;
+    --foreground: #e6e8ec;
+    --muted: #171b22;
+    --muted-foreground: #9099a8;
+    --border: #262b34;
+    --accent: #182034;
+  }
+}
+
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}

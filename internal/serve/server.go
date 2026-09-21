@@ -30,6 +30,7 @@ import (
 	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/render"
 	"github.com/kite-plus/kite/internal/site"
+	"github.com/kite-plus/kite/web"
 )
 
 // Options configures a server.
@@ -154,6 +155,8 @@ func (s *Server) Handler() http.Handler {
 	}
 	if s.opts.Admin {
 		api.New(api.Options{Site: s.view, Logger: s.log}).Mount(mux)
+		mux.Handle(web.Path+"/", web.Handler())
+		mux.Handle(web.Path, http.RedirectHandler(web.Path+"/", http.StatusMovedPermanently))
 	}
 	mux.HandleFunc("/", s.handle)
 	return mux
