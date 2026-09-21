@@ -67,7 +67,11 @@ func write(t *testing.T, path, body string) {
 }
 
 // newServer opens a project and serves its read model.
-func newServer(t *testing.T, root string) (http.Handler, *site.Site) {
+//
+// The options are taken as functions so that a test which needs one thing
+// changed -- a guard, say -- says only that, and every other test goes on
+// describing a plain server.
+func newServer(t *testing.T, root string, with ...func(*api.Options)) (http.Handler, *site.Site) {
 	t.Helper()
 	s, err := site.Open(t.Context(), root)
 	if err != nil {
@@ -75,7 +79,7 @@ func newServer(t *testing.T, root string) (http.Handler, *site.Site) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 
-	srv := api.New(api.Options{Site: func() api.View {
+	opts := api.Options{Site: func() api.View {
 		return api.View{
 			Reader:   s.Reader,
 			Resolver: s.Resolver,
@@ -85,7 +89,11 @@ func newServer(t *testing.T, root string) (http.Handler, *site.Site) {
 			Runtime:  "test",
 			Problems: s.Problems,
 		}
-	}})
+	}}
+	for _, apply := range with {
+		apply(&opts)
+	}
+	srv := api.New(opts)
 
 	// Mounted the way a running server mounts it, so the tests exercise the
 	// prefix and the routing together.

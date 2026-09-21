@@ -19,6 +19,11 @@ const (
 	CodeConflict         = "conflict"
 	CodeReadOnly         = "read_only"
 
+	// Refusals that are about the caller rather than the request.
+	CodeUnauthorized    = "unauthorized"
+	CodeTooManyAttempts = "too_many_attempts"
+	CodeCrossOrigin     = "cross_origin"
+
 	// A publish can be refused outright, need a warning acknowledged, or
 	// fail partway. They are told apart because the client acts on each
 	// differently.

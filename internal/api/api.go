@@ -9,6 +9,8 @@ package api
 import (
 	"log/slog"
 	"net/http"
+
+	"github.com/kite-plus/kite/internal/auth"
 )
 
 // Prefix is where the API is mounted. It is versioned in the path so that a
@@ -19,12 +21,18 @@ const Prefix = "/api/v1"
 type Options struct {
 	Site   SiteSource
 	Logger *slog.Logger
+
+	// Auth decides who may call. A guard with no account behind it is an
+	// open server, which is what a local preview of a project that has never
+	// had a password is.
+	Auth *auth.Guard
 }
 
 // Server answers API requests.
 type Server struct {
-	src SiteSource
-	log *slog.Logger
+	src  SiteSource
+	log  *slog.Logger
+	auth *auth.Guard
 }
 
 // Routes lists the endpoints this server registers, for tests that check the
@@ -43,7 +51,15 @@ func New(opts Options) *Server {
 	if log == nil {
 		log = discardLogger()
 	}
-	return &Server{src: opts.Site, log: log}
+	guard := opts.Auth
+	if guard == nil {
+		// An open server still gets a guard, because the cross-origin check
+		// is not about who is calling: a page on the internet can post to a
+		// server listening on localhost, and an admin with no password is
+		// exactly the one that would do as it was told.
+		guard = auth.New(nil)
+	}
+	return &Server{src: opts.Site, log: log, auth: guard}
 }
 
 // Handler returns the API's own routes, addressed without [Prefix].
@@ -62,6 +78,13 @@ func (s *Server) Handler() http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Who is asking is settled before the router is consulted, so that a
+		// caller with no session cannot learn which endpoints exist by
+		// reading which ones answer 404.
+		if !s.allow(w, r) {
+			return
+		}
+
 		// An empty pattern means the router itself matched nothing, so no
 		// handler of ours will run and whatever is written is the router's
 		// own refusal. Anything else is a handler's answer and must reach the
@@ -128,6 +151,9 @@ type route struct {
 func (s *Server) routes() []route {
 	return []route{
 		{http.MethodGet, OpenAPIPath, s.handleOpenAPI},
+		{http.MethodGet, "/auth/session", s.handleSession},
+		{http.MethodPost, "/auth/login", s.handleLogin},
+		{http.MethodPost, "/auth/logout", s.handleLogout},
 		{http.MethodGet, "/site", s.handleSite},
 		{http.MethodGet, "/content-types", s.handleContentTypes},
 		{http.MethodGet, "/publish", s.handlePublishState},

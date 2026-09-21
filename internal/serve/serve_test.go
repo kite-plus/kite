@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kite-plus/kite/internal/auth"
 	"github.com/kite-plus/kite/internal/serve"
 	"github.com/kite-plus/kite/internal/site"
 )
@@ -621,4 +622,62 @@ func renderHome(t *testing.T, h http.Handler) string {
 		t.Fatalf("GET /: %d", rec.Code)
 	}
 	return rec.Body.String()
+}
+
+// The studio on a public address with nobody guarding it is the one mistake
+// that looks like success from the operator's side, so it is refused at the
+// point the server is built rather than warned about in a log nobody reads.
+func TestAnUnguardedStudioRefusesAnAddressOtherMachinesCanReach(t *testing.T) {
+	root := newProject(t, 1)
+	s := openSite(t, root)
+
+	start := func(opts serve.Options) error {
+		_, err := serve.NewWithClock(t.Context(), s, opts, func() time.Time { return frozen })
+		return err
+	}
+
+	if err := start(serve.Options{Addr: "0.0.0.0:1717", Admin: true}); err == nil {
+		t.Fatal("an open studio started on 0.0.0.0")
+	}
+
+	// The site itself is meant to be reachable; only the studio is not.
+	if err := start(serve.Options{Addr: "0.0.0.0:1717"}); err != nil {
+		t.Errorf("serving the site publicly was refused: %v", err)
+	}
+	if err := start(serve.Options{Addr: "127.0.0.1:1717", Admin: true}); err != nil {
+		t.Errorf("serving the studio on localhost was refused: %v", err)
+	}
+
+	account, err := auth.SetPassword(root, "admin", "correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := start(serve.Options{Addr: "0.0.0.0:1717", Admin: true, Auth: auth.New(account)}); err != nil {
+		t.Errorf("a guarded studio was refused a public address: %v", err)
+	}
+}
+
+// The admin's own files stay readable without a session: they are how a
+// person reaches the sign-in form in the first place.
+func TestTheStudioItselfLoadsBeforeAnybodyHasSignedIn(t *testing.T) {
+	root := newProject(t, 1)
+	account, err := auth.SetPassword(root, "admin", "correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := newServer(t, root, serve.Options{Admin: true, Auth: auth.New(account)}).Handler()
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/admin/", nil))
+	if rec.Code == http.StatusUnauthorized || rec.Code == http.StatusForbidden {
+		t.Errorf("the studio refused to load its own page: %d", rec.Code)
+	}
+
+	// What it then asks for does need a session.
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/site", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("GET /api/v1/site without a session: %d, want 401", rec.Code)
+	}
 }

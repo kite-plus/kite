@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -16,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kite-plus/kite/internal/api"
+	"github.com/kite-plus/kite/internal/auth"
 	"github.com/kite-plus/kite/internal/serve"
 	"github.com/kite-plus/kite/internal/site"
 	"github.com/kite-plus/kite/web"
@@ -98,6 +100,16 @@ func serveCommand(shape commandShape) *cobra.Command {
 				return err
 			}
 
+			// The account is read once, here, so that the server is handed a
+			// decision rather than a file to consult: a password changed
+			// while the server runs takes effect at the next start, which is
+			// also when a restart is the honest way to end open sessions.
+			account, err := auth.Open(s.Project.Root)
+			if err != nil && !errors.Is(err, auth.ErrNoAccount) {
+				return err
+			}
+			guard := auth.New(account)
+
 			level := slog.LevelInfo
 			if quiet {
 				level = slog.LevelWarn
@@ -110,6 +122,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 				Watch:      watch,
 				Drafts:     drafts,
 				Admin:      admin,
+				Auth:       guard,
 				Write:      write,
 				Logger:     log,
 			})
@@ -128,8 +141,19 @@ func serveCommand(shape commandShape) *cobra.Command {
 			if admin {
 				printf(cmd, "  studio at %s%s/\n", url, web.Path)
 				printf(cmd, "  api at %s%s\n", url, api.Prefix)
+				if guard.Required() {
+					printf(cmd, "  sign in as %s\n", guard.User())
+				} else {
+					printf(cmd, "  no password set (kite auth set-password)\n")
+				}
 				if !write {
 					printf(cmd, "  read only\n")
+				}
+				// Kite terminates no TLS of its own, so a studio anyone can
+				// reach is a password crossing the network in the clear
+				// unless something in front of it is doing that job.
+				if !auth.Loopback(listenAddr) {
+					printf(cmd, "  reachable from other machines: put it behind HTTPS\n")
 				}
 			}
 			printf(cmd, "  press ctrl-c to stop\n\n")

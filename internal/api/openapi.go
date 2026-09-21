@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/kite-plus/kite/internal/auth"
 	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/publish"
 )
@@ -22,6 +23,10 @@ type document struct {
 	// lives: a generated client should not have to be told it separately.
 	Paths      map[string]pathItem `json:"paths"`
 	Components components          `json:"components"`
+
+	// Security applies to every operation that does not override it, which
+	// is how "everything needs a session except the way in" is said once.
+	Security []map[string][]string `json:"security,omitempty"`
 }
 
 type server struct {
@@ -35,7 +40,16 @@ type info struct {
 }
 
 type components struct {
-	Schemas map[string]*jsonSchema `json:"schemas"`
+	Schemas         map[string]*jsonSchema    `json:"schemas"`
+	SecuritySchemes map[string]securityScheme `json:"securitySchemes,omitempty"`
+}
+
+// securityScheme describes how a caller proves who it is.
+type securityScheme struct {
+	Type        string `json:"type"`
+	In          string `json:"in,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 type pathItem struct {
@@ -51,6 +65,10 @@ type operation struct {
 	Parameters  []parameter         `json:"parameters,omitempty"`
 	RequestBody *requestBody        `json:"requestBody,omitempty"`
 	Responses   map[string]response `json:"responses"`
+
+	// Security overrides the document's. An empty list -- not an absent one
+	// -- is how OpenAPI says "this one answers without a session".
+	Security *[]map[string][]string `json:"security,omitempty"`
 }
 
 type requestBody struct {
@@ -147,6 +165,11 @@ func openAPI() *document {
 		out["409"] = response{Description: "The publish did not fully happen.", Content: jsonOf(schema)}
 		return out
 	}
+	// public marks an endpoint that answers without a session. It is a
+	// variable rather than a literal because OpenAPI needs the empty list to
+	// be present, and a pointer to it is the only way to say that in Go.
+	public := []map[string][]string{}
+
 	// A conflict is its own body, not the ordinary error shape: it carries the
 	// version that is now stored so the client can show both.
 	withConflict := func(schema *jsonSchema, out map[string]response) map[string]response {
@@ -160,10 +183,33 @@ func openAPI() *document {
 			Title:   "Kite read model",
 			Version: buildinfo.Version,
 			Description: "The read side of a Kite project. " +
-				"Listings are paged by opaque cursor; there is no offset.",
+				"Listings are paged by opaque cursor; there is no offset. " +
+				"When the server has an account configured, every endpoint " +
+				"but these three and this description needs a session.",
 		},
-		Servers: []server{{URL: Prefix}},
+		Servers:  []server{{URL: Prefix}},
+		Security: []map[string][]string{{"session": {}}},
 		Paths: map[string]pathItem{
+			"/auth/session": {Get: &operation{
+				OperationID: "getSession",
+				Summary:     "Report whether this server needs a sign-in, and whether the caller has one.",
+				Security:    &public,
+				Responses:   ok(ref(SessionInfo{}), "Whether a session is needed, and the current one."),
+			}},
+			"/auth/login": {Post: &operation{
+				OperationID: "login",
+				Summary:     "Exchange credentials for a session cookie.",
+				Security:    &public,
+				RequestBody: body(ref(Credentials{})),
+				Responses: ok(ref(SessionInfo{}),
+					"The session. The cookie is in Set-Cookie.", "400", "401", "429"),
+			}},
+			"/auth/logout": {Post: &operation{
+				OperationID: "logout",
+				Summary:     "Discard the session cookie.",
+				Security:    &public,
+				Responses:   map[string]response{"204": {Description: "Signed out."}},
+			}},
 			"/site": {Get: &operation{
 				OperationID: "getSite",
 				Summary:     "Describe the open project.",
@@ -315,7 +361,43 @@ func openAPI() *document {
 				Responses:   ok(ref(List[TermCount]{}), "Term counts, most used first.", "400", "404"),
 			}},
 		},
-		Components: components{Schemas: schemas},
+		Components: components{
+			Schemas: schemas,
+			SecuritySchemes: map[string]securityScheme{"session": {
+				Type: "apiKey",
+				In:   "cookie",
+				Name: auth.CookieName,
+				Description: "Set by POST /auth/login. A server with no account " +
+					"configured accepts every request without one.",
+			}},
+		},
+	}
+
+	// Two refusals apply to nearly every endpoint, and writing them out
+	// fifteen times above would bury what actually differs between them: a
+	// session is needed unless the operation says otherwise, and anything
+	// that changes something is refused when it came from another site.
+	for _, item := range doc.Paths {
+		for method, op := range map[string]*operation{
+			http.MethodGet:    item.Get,
+			http.MethodPost:   item.Post,
+			http.MethodPut:    item.Put,
+			http.MethodDelete: item.Delete,
+		} {
+			if op == nil {
+				continue
+			}
+			if op.Security == nil {
+				op.Responses["401"] = response{
+					Description: "Not signed in.", Content: jsonOf(errorRef),
+				}
+			}
+			if method != http.MethodGet {
+				op.Responses["403"] = response{
+					Description: "The request came from another site.", Content: jsonOf(errorRef),
+				}
+			}
+		}
 	}
 	return doc
 }

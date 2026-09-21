@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/kite-plus/kite/internal/api"
+	"github.com/kite-plus/kite/internal/auth"
 	"github.com/kite-plus/kite/internal/build"
 	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/config"
@@ -61,6 +62,11 @@ type Options struct {
 	// and files the index refused, none of which a publicly reachable server
 	// should hand out; local authoring turns it on deliberately.
 	Admin bool
+
+	// Auth is who may use the admin. A nil guard, or one with no account
+	// behind it, is an open server -- which is why a server that would put
+	// one on a public address refuses to start.
+	Auth *auth.Guard
 
 	// Write lets the API change the project.
 	//
@@ -116,6 +122,15 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 	}
 	if opts.Logger == nil {
 		opts.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	// Refused here rather than warned about, because the mistake is silent
+	// from the operator's side: an open studio on a public address looks
+	// exactly like a working one until somebody else finds it.
+	if opts.Admin && !opts.Auth.Required() && !auth.Loopback(opts.Addr) {
+		return nil, fmt.Errorf("serve: %s can be reached from outside this machine "+
+			"and this project has no account, so the studio would be open to anyone;\n"+
+			"       set one with `kite auth set-password`, or with KITE_ADMIN_USER "+
+			"and KITE_ADMIN_PASSWORD", opts.Addr)
 	}
 
 	srv := &Server{
@@ -193,7 +208,7 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET "+ReloadPath, s.hub.handleReload)
 	}
 	if s.opts.Admin {
-		api.New(api.Options{Site: s.view, Logger: s.log}).Mount(mux)
+		api.New(api.Options{Site: s.view, Logger: s.log, Auth: s.opts.Auth}).Mount(mux)
 		mux.Handle(web.Path+"/", web.Handler())
 		mux.Handle(web.Path, http.RedirectHandler(web.Path+"/", http.StatusMovedPermanently))
 	}
