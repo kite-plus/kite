@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api, unwrap, type Settings } from "@/api/client";
 import { useI18n, useProblem, type Key } from "@/i18n";
 import { Alert } from "@/components/Alert";
+import { LanguageSelect } from "@/components/LanguageSelect";
 import { Page } from "@/components/Shell";
 import { SchemaForm } from "@/components/SchemaForm";
 import { Button } from "@/components/ui/button";
@@ -130,14 +131,26 @@ export function SettingsPage() {
             {(Object.keys(sitePaths) as (keyof typeof sitePaths)[]).map((key) => (
               <div key={key} className="space-y-1.5">
                 <Label htmlFor={key}>{t(labels[key])}</Label>
-                <Input
-                  id={key}
-                  value={String(site[key] ?? "")}
-                  onChange={(e) => {
-                    setSite({ ...site, [key]: e.target.value });
-                    setDirty(true);
-                  }}
-                />
+                {key === "language" ? (
+                  <LanguageSelect
+                    id={key}
+                    value={String(site[key] ?? "")}
+                    onChange={(v) => {
+                      setSite({ ...site, [key]: v });
+                      setDirty(true);
+                    }}
+                  />
+                ) : (
+                  <Input
+                    id={key}
+                    type={key === "base_url" ? "url" : "text"}
+                    value={String(site[key] ?? "")}
+                    onChange={(e) => {
+                      setSite({ ...site, [key]: e.target.value });
+                      setDirty(true);
+                    }}
+                  />
+                )}
               </div>
             ))}
           </CardContent>

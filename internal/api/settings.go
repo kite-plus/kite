@@ -3,9 +3,11 @@ package api
 import (
 	"maps"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
+	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 )
 
@@ -27,6 +29,37 @@ var settable = []string{
 // settablePrefix covers the keys a theme declares for itself, which cannot be
 // listed here because only the theme knows them.
 const settablePrefix = "theme.settings."
+
+// checkSetting reports why a value cannot be stored, or "" when it can.
+//
+// The admin offers a list rather than a text box for most of these, but the
+// admin is not the only client: the whole point of it going through the
+// public API is that something else can too.
+func checkSetting(path string, value any) string {
+	text, _ := value.(string)
+
+	switch path {
+	case "site.language":
+		// Empty is allowed and means "use the default"; anything present has
+		// to be a language tag, because it becomes the lang attribute on
+		// every page and the prefix in every localized URL.
+		if text != "" && !config.WellFormedLanguage(text) {
+			return "not a language tag; try something like en or zh-CN"
+		}
+	case "site.baseURL":
+		if text == "" {
+			return "a site needs an address"
+		}
+		if u, err := url.Parse(text); err != nil || u.Scheme == "" || u.Host == "" {
+			return "not an absolute URL; try something like https://example.com"
+		}
+	case "site.title":
+		if strings.TrimSpace(text) == "" {
+			return "a site needs a name"
+		}
+	}
+	return ""
+}
 
 // handleSettings describes what can be configured and what it is set to.
 func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
@@ -62,12 +95,18 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, path := range slices.Sorted(maps.Keys(values)) {
-		if slices.Contains(settable, path) || strings.HasPrefix(path, settablePrefix) {
-			continue
+		if !slices.Contains(settable, path) && !strings.HasPrefix(path, settablePrefix) {
+			failField(w, http.StatusBadRequest, CodeInvalidRequest, path,
+				"this setting cannot be changed through the API")
+			return
 		}
-		failField(w, http.StatusBadRequest, CodeInvalidRequest, path,
-			"this setting cannot be changed through the API")
-		return
+		// Checked before anything is written, not after. Validating on the
+		// reload that follows a write would leave the bad value in the file
+		// and the project unable to open.
+		if problem := checkSetting(path, values[path]); problem != "" {
+			failField(w, http.StatusBadRequest, CodeInvalidRequest, path, problem)
+			return
+		}
 	}
 
 	if _, err := s.apply(r, view, content.ChangeSet{

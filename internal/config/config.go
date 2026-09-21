@@ -11,11 +11,34 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+// languageTag is the shape of a BCP 47 tag: a language, then optional
+// subtags for script, region and variant.
+//
+// The shape is checked rather than the tag being looked up in a registry.
+// What this is for is catching a typo or an emptied form field, and a
+// registry would also refuse the private-use and grandfathered tags a real
+// site is entitled to.
+var languageTag = regexp.MustCompile(`^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$`)
+
+// WellFormedLanguage reports whether a language tag can be used.
+//
+// It is the lang attribute on every page, the prefix in every localized URL
+// and the locale dates are written in. A wrong one does not fail: it produces
+// a site that claims to be written in a language that does not exist, and an
+// empty one produces <html lang="">.
+func WellFormedLanguage(tag string) bool {
+	return languageTag.MatchString(tag)
+}
+
+// DefaultLanguage is used when a project does not name one.
+const DefaultLanguage = "en"
 
 // Name is the configuration file that marks a project root.
 const Name = "kite.yaml"
@@ -161,6 +184,12 @@ func (c *Config) normalize() {
 	if c.Theme.Name == "" {
 		c.Theme.Name = "default"
 	}
+	// An absent language is not a broken one. Defaulting it here means a
+	// project that never mentioned a language keeps working, and an emptied
+	// form field falls back rather than producing <html lang="">.
+	if c.Site.Language == "" {
+		c.Site.Language = DefaultLanguage
+	}
 }
 
 // Validate rejects configurations that would fail later in a confusing place.
@@ -172,6 +201,10 @@ func (c *Config) Validate() error {
 	}
 	if c.Content.Store != "" && c.Content.Store != "file" {
 		return fmt.Errorf("config: content.store %q is not implemented yet (only file)", c.Content.Store)
+	}
+	if !WellFormedLanguage(c.Site.Language) {
+		return fmt.Errorf("config: site.language %q is not a language tag (want something like en or zh-CN)",
+			c.Site.Language)
 	}
 	if strings.Contains(c.Build.Output, "..") {
 		return fmt.Errorf("config: build.output must stay inside the project")

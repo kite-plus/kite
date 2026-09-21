@@ -684,3 +684,67 @@ func TestSettingsCarryTheThemesOwnSchema(t *testing.T) {
 		t.Errorf("writable does not list site.title: %v", settings.Writable)
 	}
 }
+
+// A language tag becomes the lang attribute on every page and the prefix in
+// every localized URL, so a typo in it does not fail: it produces a site that
+// claims to be written in a language that does not exist.
+func TestASettingThatWouldBreakTheSiteIsRefusedBeforeItIsWritten(t *testing.T) {
+	root := newProject(t, 1)
+	config := filepath.Join(root, "kite.yaml")
+	before, err := os.ReadFile(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h, _ := newWritableServer(t, root)
+
+	for _, tc := range []struct{ name, path, value string }{
+		{"a mistyped language", "site.language", "engrish!!"},
+		{"a language with spaces", "site.language", "en US"},
+		{"an address that is not one", "site.baseURL", "example.com"},
+		{"no address at all", "site.baseURL", ""},
+		{"a site with no name", "site.title", "   "},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
+				map[string]any{tc.path: tc.value}, nil)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400\n%s", rec.Code, rec.Body.String())
+			}
+			body := decode[api.ErrorBody](t, rec)
+			if body.Error.Field != tc.path {
+				t.Errorf("field = %q, want %q", body.Error.Field, tc.path)
+			}
+			// Refused before writing: a value rejected on the reload that
+			// follows a write would leave the file broken and the project
+			// unable to open.
+			after, err := os.ReadFile(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(after) != string(before) {
+				t.Errorf("the file was written anyway:\n%s", after)
+			}
+		})
+	}
+}
+
+// Clearing the language is not the same as breaking it: a project that never
+// named one has always worked, and an emptied form field should fall back
+// rather than produce <html lang="">.
+func TestClearingTheLanguageFallsBackToTheDefault(t *testing.T) {
+	root := newProject(t, 1)
+	h, _ := newWritableServer(t, root)
+
+	rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
+		map[string]any{"site.language": ""}, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body.String())
+	}
+
+	settings := decode[api.Settings](t, rec)
+	if settings.Site.Language != "en" {
+		t.Errorf("language = %q, want the default", settings.Site.Language)
+	}
+}
