@@ -38,14 +38,23 @@ type components struct {
 }
 
 type pathItem struct {
-	Get *operation `json:"get,omitempty"`
+	Get    *operation `json:"get,omitempty"`
+	Post   *operation `json:"post,omitempty"`
+	Put    *operation `json:"put,omitempty"`
+	Delete *operation `json:"delete,omitempty"`
 }
 
 type operation struct {
 	OperationID string              `json:"operationId"`
 	Summary     string              `json:"summary"`
 	Parameters  []parameter         `json:"parameters,omitempty"`
+	RequestBody *requestBody        `json:"requestBody,omitempty"`
 	Responses   map[string]response `json:"responses"`
+}
+
+type requestBody struct {
+	Required bool                 `json:"required"`
+	Content  map[string]mediaType `json:"content"`
 }
 
 type parameter struct {
@@ -102,22 +111,39 @@ func openAPI() *document {
 	}
 
 	errorRef := ref(ErrorBody{})
+	conflictRef := ref(ConflictBody{})
+
+	jsonOf := func(schema *jsonSchema) map[string]mediaType {
+		return map[string]mediaType{"application/json": {Schema: schema}}
+	}
+	body := func(schema *jsonSchema) *requestBody {
+		return &requestBody{Required: true, Content: jsonOf(schema)}
+	}
+	pathParam := func(name string) parameter {
+		return parameter{Name: name, In: "path", Required: true, Schema: &jsonSchema{Type: "string"}}
+	}
 	fails := func(codes ...string) map[string]response {
 		out := map[string]response{}
 		for _, code := range codes {
-			out[code] = response{
-				Description: "Failed.",
-				Content:     map[string]mediaType{"application/json": {Schema: errorRef}},
-			}
+			out[code] = response{Description: "Failed.", Content: jsonOf(errorRef)}
 		}
 		return out
 	}
 	ok := func(schema *jsonSchema, desc string, failures ...string) map[string]response {
 		out := fails(failures...)
-		out["200"] = response{
-			Description: desc,
-			Content:     map[string]mediaType{"application/json": {Schema: schema}},
-		}
+		out["200"] = response{Description: desc, Content: jsonOf(schema)}
+		return out
+	}
+
+	created := func(schema *jsonSchema, desc string, failures ...string) map[string]response {
+		out := fails(failures...)
+		out["201"] = response{Description: desc, Content: jsonOf(schema)}
+		return out
+	}
+	// A conflict is its own body, not the ordinary error shape: it carries the
+	// version that is now stored so the client can show both.
+	withConflict := func(schema *jsonSchema, out map[string]response) map[string]response {
+		out["409"] = response{Description: "The item changed since it was loaded.", Content: jsonOf(schema)}
 		return out
 	}
 
@@ -141,21 +167,48 @@ func openAPI() *document {
 				Summary:     "List content types and the field schema forms are generated from.",
 				Responses:   ok(ref(List[ContentType]{}), "The registry."),
 			}},
-			"/contents": {Get: &operation{
-				OperationID: "listContents",
-				Summary:     "List content.",
-				Parameters:  listParameters(),
-				Responses:   ok(ref(List[Summary]{}), "One page of items.", "400"),
-			}},
-			"/contents/{id}": {Get: &operation{
-				OperationID: "getContent",
-				Summary:     "Read one item, including its source body.",
-				Parameters: []parameter{{
-					Name: "id", In: "path", Required: true,
-					Schema: &jsonSchema{Type: "string"},
-				}},
-				Responses: ok(ref(Item{}), "The item.", "404"),
-			}},
+			"/contents": {
+				Get: &operation{
+					OperationID: "listContents",
+					Summary:     "List content.",
+					Parameters:  listParameters(),
+					Responses:   ok(ref(List[Summary]{}), "One page of items.", "400"),
+				},
+				Post: &operation{
+					OperationID: "createContent",
+					Summary:     "Write a new item.",
+					RequestBody: body(ref(Draft{})),
+					Responses:   created(ref(Item{}), "The item as stored.", "400", "405"),
+				},
+			},
+			"/contents/{id}": {
+				Get: &operation{
+					OperationID: "getContent",
+					Summary:     "Read one item, including its source body.",
+					Parameters:  []parameter{pathParam("id")},
+					Responses:   ok(ref(Item{}), "The item. ETag carries its revision.", "404"),
+				},
+				Put: &operation{
+					OperationID: "updateContent",
+					Summary:     "Replace an item, refusing an edit made against a replaced version.",
+					Parameters:  []parameter{pathParam("id"), ifMatch(true)},
+					RequestBody: body(ref(Draft{})),
+					Responses: withConflict(conflictRef,
+						ok(ref(Item{}), "The item as stored.", "400", "404", "405", "428")),
+				},
+				Delete: &operation{
+					OperationID: "deleteContent",
+					Summary:     "Remove an item and everything its bundle owns.",
+					Parameters:  []parameter{pathParam("id"), ifMatch(true)},
+					Responses: withConflict(conflictRef,
+						map[string]response{
+							"204": {Description: "Removed."},
+							"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+							"405": {Description: "Failed.", Content: jsonOf(errorRef)},
+							"428": {Description: "Failed.", Content: jsonOf(errorRef)},
+						}),
+				},
+			},
 			"/taxonomies": {Get: &operation{
 				OperationID: "listTaxonomies",
 				Summary:     "List taxonomies and how many terms each holds.",
@@ -164,11 +217,8 @@ func openAPI() *document {
 			"/taxonomies/{taxonomy}/terms": {Get: &operation{
 				OperationID: "listTerms",
 				Summary:     "Count one taxonomy's terms over a filtered set.",
-				Parameters: append([]parameter{{
-					Name: "taxonomy", In: "path", Required: true,
-					Schema: &jsonSchema{Type: "string"},
-				}}, listParameters()...),
-				Responses: ok(ref(List[TermCount]{}), "Term counts, most used first.", "400", "404"),
+				Parameters:  append([]parameter{pathParam("taxonomy")}, listParameters()...),
+				Responses:   ok(ref(List[TermCount]{}), "Term counts, most used first.", "400", "404"),
 			}},
 		},
 		Components: components{Schemas: schemas},
@@ -203,6 +253,16 @@ func listParameters() []parameter {
 		out = append(out, p)
 	}
 	return out
+}
+
+// ifMatch describes the precondition every write to an existing item carries.
+func ifMatch(required bool) parameter {
+	return parameter{
+		Name: "If-Match", In: "header", Required: required,
+		Description: "The revision this edit was made against, as returned in ETag. " +
+			"Required: without it a save would overwrite whatever is there.",
+		Schema: &jsonSchema{Type: "string"},
+	}
 }
 
 func (s *Server) handleOpenAPI(w http.ResponseWriter, _ *http.Request) {

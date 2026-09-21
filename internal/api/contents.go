@@ -54,6 +54,9 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 		s.failErr(w, err)
 		return
 	}
+	// The revision travels as an entity tag so an editor can send it straight
+	// back in If-Match, rather than having to dig it out of the body.
+	w.Header().Set("ETag", etag(item.Revision))
 	writeJSON(w, http.StatusOK, itemOf(item, view.Resolver))
 }
 

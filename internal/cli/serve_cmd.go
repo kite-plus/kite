@@ -44,6 +44,7 @@ func newRunCmd() *cobra.Command {
 		defaultReload: true,
 		defaultDrafts: true,
 		defaultAdmin:  true,
+		defaultWrite:  true,
 		open:          true,
 	})
 }
@@ -54,6 +55,7 @@ type commandShape struct {
 	defaultReload    bool
 	defaultDrafts    bool
 	defaultAdmin     bool
+	defaultWrite     bool
 	open             bool
 }
 
@@ -65,6 +67,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 		reload bool
 		drafts bool
 		admin  bool
+		write  bool
 		open   bool
 		quiet  bool
 	)
@@ -107,6 +110,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 				Watch:      watch,
 				Drafts:     drafts,
 				Admin:      admin,
+				Write:      write,
 				Logger:     log,
 			})
 			if err != nil {
@@ -124,6 +128,9 @@ func serveCommand(shape commandShape) *cobra.Command {
 			if admin {
 				printf(cmd, "  studio at %s%s/\n", url, web.Path)
 				printf(cmd, "  api at %s%s\n", url, api.Prefix)
+				if !write {
+					printf(cmd, "  read only\n")
+				}
 			}
 			printf(cmd, "  press ctrl-c to stop\n\n")
 
@@ -140,6 +147,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 	cmd.Flags().BoolVar(&reload, "live-reload", shape.defaultReload, "refresh open pages after a change")
 	cmd.Flags().BoolVar(&drafts, "drafts", shape.defaultDrafts, "include unpublished content")
 	cmd.Flags().BoolVar(&admin, "admin", shape.defaultAdmin, "serve the read model API")
+	cmd.Flags().BoolVar(&write, "write", shape.defaultWrite, "let the API change the project")
 	cmd.Flags().BoolVar(&open, "open", shape.open, "open the site in a browser")
 	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "only log warnings and errors")
 	return cmd

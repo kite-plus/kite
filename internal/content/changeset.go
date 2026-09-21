@@ -12,22 +12,32 @@ var (
 
 	// ErrConflict is returned when IfRevision does not match what is stored,
 	// meaning the item changed underneath the caller. The API surfaces it as
-	// 409 together with a three-way diff.
+	// 409 together with the version that is now stored.
 	ErrConflict = errors.New("content: revision conflict")
 
 	// ErrDuplicateID is returned when two items claim the same ID. Copying a
 	// bundle directory is a normal user action, so this is always reported and
 	// never silently repaired.
 	ErrDuplicateID = errors.New("content: duplicate id")
+
+	// ErrInvalid is returned when an item is not well formed. It exists so a
+	// caller can tell "what you sent is wrong" from "something broke", which
+	// is the difference between a 400 and a 500 and cannot be recovered by
+	// reading the message.
+	ErrInvalid = errors.New("content: invalid")
 )
 
-// ConflictError carries the data the admin needs to render a three-way merge.
+// ConflictError reports an edit made against a version that has since been
+// replaced.
+//
+// Theirs is what is stored now. There is no base: the file store keeps no
+// history to read one from, and the caller that made the edit still holds the
+// version it started from. Carrying a field the store can never fill would
+// only invite callers to rely on it.
 type ConflictError struct {
 	ID       ID
 	Expected Revision
 	Actual   Revision
-	Base     []byte
-	Ours     []byte
 	Theirs   []byte
 }
 

@@ -169,3 +169,68 @@ func contentTypeOf(t *content.Type) ContentType {
 		Fields:     t.Fields,
 	}
 }
+
+// Draft is the editable part of an item: exactly what a client may send.
+//
+// Every field the server owns is absent on purpose. The id comes from the
+// path or is generated, the revision travels in If-Match, the timestamps
+// belong to the store, and the locator is a physical address that only an
+// explicit move changes. Accepting them would mean quietly ignoring them,
+// which is worse than refusing them: a client would go on sending a value it
+// believes is being honored.
+type Draft struct {
+	Kind   string `json:"kind"`
+	Title  string `json:"title"`
+	Slug   string `json:"slug,omitempty"`
+	Status string `json:"status"`
+	Body   string `json:"body"`
+
+	Meta       map[string]any      `json:"meta,omitempty"`
+	Taxonomies map[string][]string `json:"taxonomies,omitempty"`
+	Aliases    []string            `json:"aliases,omitempty"`
+	Locale     string              `json:"locale,omitempty"`
+
+	PublishedAt time.Time `json:"published_at,omitzero"`
+}
+
+// ConflictBody is the 409 response.
+//
+// It carries what is on disk now. The client is not sent a base version
+// because the file store has no history to read one from: what the client
+// loaded is the base, and it still has it. Pretending otherwise would mean
+// caching every version the server ever handed out.
+type ConflictBody struct {
+	Error    ErrorDetail `json:"error"`
+	Conflict Conflict    `json:"conflict"`
+}
+
+// Conflict describes an edit that was made against a version that has since
+// been replaced.
+type Conflict struct {
+	ExpectedRevision string `json:"expected_revision"`
+	ActualRevision   string `json:"actual_revision"`
+
+	// Theirs is the item as it now stands on disk.
+	Theirs *Item `json:"theirs,omitempty"`
+}
+
+// contentOf turns a draft into a domain item.
+func (d Draft) contentOf(id content.ID) *content.Content {
+	item := &content.Content{
+		ID:         id,
+		Kind:       content.Kind(d.Kind),
+		Slug:       d.Slug,
+		Title:      d.Title,
+		Status:     content.Status(d.Status),
+		Body:       content.Body{Format: content.FormatMarkdown, Raw: d.Body},
+		Meta:       d.Meta,
+		Taxonomies: d.Taxonomies,
+		Aliases:    d.Aliases,
+		Locale:     d.Locale,
+	}
+	if !d.PublishedAt.IsZero() {
+		published := d.PublishedAt
+		item.PublishedAt = &published
+	}
+	return item
+}

@@ -58,6 +58,13 @@ type Options struct {
 	// should hand out; local authoring turns it on deliberately.
 	Admin bool
 
+	// Write lets the API change the project.
+	//
+	// Separate from Admin, and off unless asked for, because reading a
+	// repository over HTTP and letting anyone who can reach the port rewrite
+	// it are not the same decision.
+	Write bool
+
 	Logger *slog.Logger
 }
 
@@ -172,7 +179,7 @@ func (s *Server) view() api.View {
 	problems := s.problems
 	s.mu.RUnlock()
 
-	return api.View{
+	v := api.View{
 		Reader:   s.site.Reader,
 		Resolver: s.site.Resolver,
 		Types:    s.site.Project.Types,
@@ -183,6 +190,24 @@ func (s *Server) view() api.View {
 		Version:  buildinfo.Version,
 		Problems: problems,
 	}
+	if s.opts.Write {
+		v.Writer = s.site.Project.Writer()
+		v.Refresh = s.refresh
+	}
+	return v
+}
+
+// refresh reindexes, replans and tells open pages to reload.
+//
+// It runs before a write is answered rather than being left to the file
+// watcher, so that reading back what was just written returns what is on disk
+// rather than what the client sent.
+func (s *Server) refresh(ctx context.Context) error {
+	if err := s.Reload(ctx); err != nil {
+		return err
+	}
+	s.hub.broadcast()
+	return nil
 }
 
 // ListenAndServe runs until the context is canceled.

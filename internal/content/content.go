@@ -145,23 +145,19 @@ func (c *Content) IsPublic(now time.Time) bool {
 
 // Validate checks the invariants every store must uphold.
 func (c *Content) Validate() error {
-	if c.ID == "" {
-		return fmt.Errorf("content: id is required")
-	}
-	if !ValidID(string(c.ID)) {
-		return fmt.Errorf("content: id %q is not a valid ULID", c.ID)
-	}
-	if c.Kind == "" {
-		return fmt.Errorf("content %s: kind is required", c.ID)
-	}
-	if c.Slug == "" {
-		return fmt.Errorf("content %s: slug is required", c.ID)
-	}
-	if !c.Status.Valid() {
-		return fmt.Errorf("content %s: unknown status %q", c.ID, c.Status)
-	}
-	if c.Status == StatusScheduled && c.PublishedAt == nil {
-		return fmt.Errorf("content %s: scheduled status requires published_at", c.ID)
+	switch {
+	case c.ID == "":
+		return fmt.Errorf("%w: id is required", ErrInvalid)
+	case !ValidID(string(c.ID)):
+		return fmt.Errorf("%w: id %q is not a valid ULID", ErrInvalid, c.ID)
+	case c.Kind == "":
+		return fmt.Errorf("%w: %s: kind is required", ErrInvalid, c.ID)
+	case c.Slug == "":
+		return fmt.Errorf("%w: %s: slug is required", ErrInvalid, c.ID)
+	case !c.Status.Valid():
+		return fmt.Errorf("%w: %s: unknown status %q", ErrInvalid, c.ID, c.Status)
+	case c.Status == StatusScheduled && c.PublishedAt == nil:
+		return fmt.Errorf("%w: %s: scheduled status requires published_at", ErrInvalid, c.ID)
 	}
 	return nil
 }

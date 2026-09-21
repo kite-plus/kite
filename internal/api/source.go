@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render/url"
@@ -16,6 +18,20 @@ type View struct {
 	Runtime  string
 	Theme    string
 	Version  string
+
+	// Writer is nil when this deployment may not be written to, which is the
+	// difference between a preview an author is typing into and a read-only
+	// server someone pointed at a repository.
+	Writer content.Writer
+
+	// Refresh brings the read model and the routing table up to date after a
+	// write, and is called before the response is sent.
+	//
+	// Waiting for the file watcher instead would make a write followed by a
+	// read return what the client sent a moment ago, which is exactly the
+	// kind of stale answer that teaches a UI to keep its own copy of the
+	// truth.
+	Refresh func(context.Context) error
 
 	// Problems is the content the index refused, as of this view.
 	Problems []string

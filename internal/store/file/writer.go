@@ -126,18 +126,9 @@ func (w *Writer) putContent(op content.PutContent, located map[content.ID]*Entry
 	if item.ID == "" {
 		item.ID = content.NewID()
 	}
-	now := w.now().UTC().Truncate(time.Second)
-	if item.CreatedAt.IsZero() {
-		item.CreatedAt = now
-	}
-	item.UpdatedAt = now
 	if item.Slug == "" {
 		item.Slug = Slugify(item.Title)
 	}
-	if err := item.Validate(); err != nil {
-		return err
-	}
-
 	// The ID identifies the item, but the locator is its physical address. Both
 	// are consulted: a known ID wins, and a caller-supplied locator covers the
 	// case of adopting a file that exists but carries no ID yet.
@@ -168,6 +159,12 @@ func (w *Writer) putContent(op content.PutContent, located map[content.ID]*Entry
 		return fmt.Errorf("file store: read %s: %w", src, err)
 	}
 
+	w.stamp(item, current)
+
+	if err := item.Validate(); err != nil {
+		return err
+	}
+
 	data, err := w.codec.Encode(t, item, current)
 	if err != nil {
 		return err
@@ -181,6 +178,27 @@ func (w *Writer) putContent(op content.PutContent, located map[content.ID]*Entry
 	res.IDs = append(res.IDs, item.ID)
 	appendUnique(&res.Written, src)
 	return nil
+}
+
+// stamp fills in the timestamps Kite is entitled to write.
+//
+// Only a file Kite creates gets a created_at, and updated_at is maintained
+// only for a document that already declares one. Stamping both on every save
+// would add two lines to the diff of a one word fix, which is the complaint
+// every git-backed CMS earns first; and a file that never recorded when it
+// was updated is telling the truth rather than waiting to be corrected.
+func (w *Writer) stamp(item *content.Content, current []byte) {
+	now := w.now().UTC().Truncate(time.Second)
+
+	if current == nil {
+		if item.CreatedAt.IsZero() {
+			item.CreatedAt = now
+		}
+		return
+	}
+	if w.codec.Declares(current, keyUpdatedAt) {
+		item.UpdatedAt = now
+	}
 }
 
 func (w *Writer) deleteContent(op content.DeleteContent, located map[content.ID]*Entry, res *content.Result) error {

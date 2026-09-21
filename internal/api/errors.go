@@ -16,6 +16,8 @@ const (
 	CodeNotFound         = "not_found"
 	CodeInvalidRequest   = "invalid_request"
 	CodeUnsupportedQuery = "unsupported_query"
+	CodeConflict         = "conflict"
+	CodeReadOnly         = "read_only"
 	CodeInternal         = "internal"
 )
 

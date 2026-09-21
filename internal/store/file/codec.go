@@ -111,6 +111,19 @@ func (c *Codec) Decode(t *content.Type, loc content.Locator, data []byte) (*cont
 	return item, nil
 }
 
+// Declares reports whether a document already carries a front matter key.
+//
+// The writer asks before maintaining a key, so that a value the author never
+// kept is not introduced on their behalf.
+func (c *Codec) Declares(data []byte, key string) bool {
+	doc, err := frontmatter.Parse(data)
+	if err != nil {
+		return false
+	}
+	_, ok := doc.Get(key)
+	return ok
+}
+
 // Encode renders an item back to file bytes.
 //
 // When existing holds the file's current bytes the update is surgical: keys

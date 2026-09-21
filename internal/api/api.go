@@ -131,7 +131,10 @@ func (s *Server) routes() []route {
 		{http.MethodGet, "/site", s.handleSite},
 		{http.MethodGet, "/content-types", s.handleContentTypes},
 		{http.MethodGet, "/contents", s.handleContents},
+		{http.MethodPost, "/contents", s.handleCreate},
 		{http.MethodGet, "/contents/{id}", s.handleContent},
+		{http.MethodPut, "/contents/{id}", s.handleUpdate},
+		{http.MethodDelete, "/contents/{id}", s.handleDelete},
 		{http.MethodGet, "/taxonomies", s.handleTaxonomies},
 		{http.MethodGet, "/taxonomies/{taxonomy}/terms", s.handleTerms},
 	}
