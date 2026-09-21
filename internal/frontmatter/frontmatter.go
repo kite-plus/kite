@@ -33,12 +33,18 @@ const (
 	editReplace editKind = iota
 	editInsert
 	editDelete
+
+	// editLines replaces a key's whole block with text already rendered,
+	// which is how a nested mapping is put back after being edited in its
+	// own right.
+	editLines
 )
 
 type pendingEdit struct {
 	kind  editKind
 	key   string
 	value *yaml.Node
+	lines []string
 }
 
 // Document is a parsed markdown file: a YAML front matter block plus a body.
@@ -50,6 +56,10 @@ type Document struct {
 	hasFM   bool
 	fmLines []string
 	body    []byte
+
+	// bare marks a document that is YAML all the way down, with no
+	// delimiters and no body.
+	bare bool
 
 	root *yaml.Node // mapping node, nil when there is no front matter
 
@@ -96,6 +106,38 @@ func Parse(data []byte) (*Document, error) {
 		d.fmLines = append(d.fmLines, strings.TrimRight(l, "\r"))
 	}
 	d.body = joinLines(lines[closeAt+1:], d.eol, terminated)
+
+	root, err := parseMapping(strings.Join(d.fmLines, "\n"))
+	if err != nil {
+		return nil, fmt.Errorf("frontmatter: %w", err)
+	}
+	d.root = root
+	return d, nil
+}
+
+// ParseYAML reads a whole file as YAML, with no delimiters and no body.
+//
+// Editing a configuration file asks for exactly what editing front matter
+// asks for: changing one value must not reorder the keys around it or drop
+// the comments explaining them. Unmarshaling and marshaling back would do
+// both, which is why the same surgical editor serves here.
+func ParseYAML(data []byte) (*Document, error) {
+	d := &Document{raw: bytes.Clone(data), eol: defaultEOL, bare: true}
+
+	rest := data
+	if after, ok := bytes.CutPrefix(rest, utf8BOM); ok {
+		d.bom = utf8BOM
+		rest = after
+	}
+	if i := bytes.IndexByte(rest, '\n'); i > 0 && rest[i-1] == '\r' {
+		d.eol = "\r\n"
+	}
+
+	lines, _ := splitLines(rest)
+	d.fmLines = make([]string, 0, len(lines))
+	for _, l := range lines {
+		d.fmLines = append(d.fmLines, strings.TrimRight(l, "\r"))
+	}
 
 	root, err := parseMapping(strings.Join(d.fmLines, "\n"))
 	if err != nil {
@@ -284,6 +326,15 @@ func (d *Document) Bytes() ([]byte, error) {
 
 	var buf bytes.Buffer
 	buf.Write(d.bom)
+
+	if d.bare {
+		for _, l := range lines {
+			buf.WriteString(l)
+			buf.WriteString(d.eol)
+		}
+		return buf.Bytes(), nil
+	}
+
 	if len(lines) > 0 || d.hasFM {
 		buf.WriteString(openDelim)
 		buf.WriteString(d.eol)
@@ -415,6 +466,10 @@ func (d *Document) applyEdits() ([]string, error) {
 			if exists {
 				inPlace = append(inPlace, placed{span: sp, del: true})
 			}
+		case e.kind == editLines:
+			if exists {
+				inPlace = append(inPlace, placed{span: sp, text: e.lines})
+			}
 		case exists:
 			text, err := encodePair(d.keyNode(key), e.value)
 			if err != nil {
@@ -444,6 +499,95 @@ func (d *Document) applyEdits() ([]string, error) {
 	}
 
 	return append(lines, appended...), nil
+}
+
+// SetNested sets a key inside a nested mapping, such as theme.settings.
+//
+// The section is lifted out, edited as a document in its own right and put
+// back, rather than being rebuilt from a decoded map. Rebuilding it would
+// reorder its keys and drop the comments inside it, which is the one thing
+// this package exists to prevent.
+func (d *Document) SetNested(path []string, key string, value any) error {
+	if len(path) == 0 {
+		return d.Set(key, value)
+	}
+
+	block, indent, ok := d.block(path[0])
+	if !ok {
+		// Nothing is there to preserve, so building the section whole costs
+		// nothing.
+		return d.Set(path[0], nest(path[1:], key, value))
+	}
+
+	sub, err := ParseYAML([]byte(strings.Join(block, "\n") + "\n"))
+	if err != nil {
+		return fmt.Errorf("frontmatter: %s: %w", path[0], err)
+	}
+	if err := sub.SetNested(path[1:], key, value); err != nil {
+		return err
+	}
+	if !sub.Dirty() {
+		return nil
+	}
+
+	out, err := sub.Bytes()
+	if err != nil {
+		return err
+	}
+	edited := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+
+	lines := make([]string, 0, len(edited)+1)
+	lines = append(lines, d.fmLines[d.keySpans()[path[0]].start])
+	for _, l := range edited {
+		if l == "" {
+			lines = append(lines, "")
+			continue
+		}
+		lines = append(lines, indent+l)
+	}
+	d.edits = append(d.edits, pendingEdit{kind: editLines, key: path[0], lines: lines})
+	return nil
+}
+
+// block returns the indented lines under a key, with their common indent
+// removed, plus that indent.
+//
+// It reports false for a key that has no block of its own, such as a mapping
+// written in flow style on one line, where there is nothing to lift out.
+func (d *Document) block(key string) ([]string, string, bool) {
+	sp, ok := d.keySpans()[key]
+	if !ok || sp.end <= sp.start {
+		return nil, "", false
+	}
+
+	body := d.fmLines[sp.start+1 : sp.end+1]
+	indent := ""
+	for _, l := range body {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		lead := l[:len(l)-len(strings.TrimLeft(l, " \t"))]
+		if indent == "" || len(lead) < len(indent) {
+			indent = lead
+		}
+	}
+	if indent == "" {
+		return nil, "", false
+	}
+
+	out := make([]string, 0, len(body))
+	for _, l := range body {
+		out = append(out, strings.TrimPrefix(l, indent))
+	}
+	return out, indent, true
+}
+
+// nest builds the mapping a missing section would have to hold.
+func nest(path []string, key string, value any) map[string]any {
+	if len(path) == 0 {
+		return map[string]any{key: value}
+	}
+	return map[string]any{path[0]: nest(path[1:], key, value)}
 }
 
 func (d *Document) keyNode(key string) *yaml.Node {
@@ -483,7 +627,14 @@ func encodePair(k, v *yaml.Node) ([]string, error) {
 
 // adoptStyle carries the old value's formatting over to the replacement, so a
 // flow list stays a flow list and a quoted scalar stays quoted.
+//
+// The trailing comment comes too. It describes the field rather than the
+// value, so changing a title should not cost the author the note they left
+// themselves about what the title is for.
 func adoptStyle(old, replacement *yaml.Node) {
+	if replacement.LineComment == "" {
+		replacement.LineComment = old.LineComment
+	}
 	if old.Kind != replacement.Kind {
 		return
 	}
