@@ -3,11 +3,13 @@ package build_test
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/kite-plus/kite/internal/build"
@@ -376,4 +378,60 @@ func documentTitle(t *testing.T, page string) string {
 		t.Fatal("page has no title element")
 	}
 	return strings.TrimSpace(page[i+len(open) : j])
+}
+
+// Under the extension url style every bundle in a section shares one output
+// directory, so two items can own a file of the same name. Publishing one
+// over the other would leave a page showing another page's picture.
+func TestTwoBundlesCannotQuietlyPublishOneFile(t *testing.T) {
+	plan := &build.Plan{Targets: []build.Target{
+		{Kind: render.KindSingle, Path: "posts/one.html",
+			Item: &content.Content{ID: "1", Locator: "content/posts/one"}},
+		{Kind: render.KindSingle, Path: "posts/two.html",
+			Item: &content.Content{ID: "2", Locator: "content/posts/two"}},
+	}}
+
+	media := fstest.MapFS{
+		"content/posts/one/index.md":  {Data: []byte("x")},
+		"content/posts/one/cover.png": {Data: []byte("one")},
+		"content/posts/two/index.md":  {Data: []byte("x")},
+		"content/posts/two/cover.png": {Data: []byte("two")},
+	}
+
+	_, err := build.MediaFiles(plan, media)
+	if err == nil {
+		t.Fatal("two bundles were allowed to publish one file")
+	}
+	for _, want := range []string{"content/posts/one", "content/posts/two", "cover.png"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error does not name %s: %v", want, err)
+		}
+	}
+}
+
+// The same two files under the directory style have addresses of their own.
+func TestBundlesWithTheirOwnDirectoriesDoNotCollide(t *testing.T) {
+	plan := &build.Plan{Targets: []build.Target{
+		{Kind: render.KindSingle, Path: "posts/one/index.html",
+			Item: &content.Content{ID: "1", Locator: "content/posts/one"}},
+		{Kind: render.KindSingle, Path: "posts/two/index.html",
+			Item: &content.Content{ID: "2", Locator: "content/posts/two"}},
+	}}
+
+	media := fstest.MapFS{
+		"content/posts/one/cover.png": {Data: []byte("one")},
+		"content/posts/two/cover.png": {Data: []byte("two")},
+	}
+
+	files, err := build.MediaFiles(plan, media)
+	if err != nil {
+		t.Fatalf("MediaFiles: %v", err)
+	}
+	want := map[string]string{
+		"posts/one/cover.png": "content/posts/one/cover.png",
+		"posts/two/cover.png": "content/posts/two/cover.png",
+	}
+	if !maps.Equal(files, want) {
+		t.Errorf("files = %v, want %v", files, want)
+	}
 }

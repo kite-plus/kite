@@ -3,8 +3,11 @@ package build
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"maps"
+	"path"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/kite-plus/kite/internal/content"
@@ -25,6 +28,14 @@ type Options struct {
 	Hooks    *hook.Bus
 	Types    *content.Registry
 	Emitter  *Emitter
+
+	// Media reads the files that live beside content, rooted at the project.
+	//
+	// A page bundle keeps an item's images next to its text so the markdown
+	// can link them relatively and stay readable in an editor and on GitHub.
+	// That only holds if the build puts the images beside the page too, which
+	// is what this is for.
+	Media fs.FS
 
 	// PageSize is how many items a listing shows.
 	PageSize int
@@ -145,17 +156,90 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 		}
 	}
 
+	media, err := MediaFiles(plan, b.opts.Media)
+	if err != nil {
+		return stats, err
+	}
+	for _, out := range slices.Sorted(maps.Keys(media)) {
+		data, err := fs.ReadFile(b.opts.Media, media[out])
+		if err != nil {
+			return stats, fmt.Errorf("build: read %s: %w", media[out], err)
+		}
+		if err := b.opts.Emitter.Write(out, data); err != nil {
+			return stats, err
+		}
+		stats.Extra++
+	}
+
 	extra, err := b.runCompletionHooks(ctx, pages)
 	if err != nil {
 		return stats, err
 	}
-	stats.Extra = extra
+	stats.Extra += extra
 
 	if err := b.opts.Emitter.Commit(); err != nil {
 		return stats, err
 	}
 	stats.Duration = time.Since(start)
 	return stats, nil
+}
+
+// MediaFiles lists what a page bundle contributes to the output, mapping the
+// path a build writes to the path it is read from.
+//
+// A bundle keeps an item's images next to its text so the markdown can say
+// ![](cover.png) and stay readable in an editor and on GitHub. That link only
+// resolves if the image is published beside the page, and a relative link
+// lands in the same place under either url style because both resolve it
+// against the page.
+//
+// Both runtimes read this one table rather than each deciding for itself,
+// which is what keeps a preview from showing an image the built site would
+// not have, or the reverse.
+func MediaFiles(plan *Plan, media fs.FS) (map[string]string, error) {
+	if media == nil {
+		return nil, nil
+	}
+	out := make(map[string]string)
+	owner := make(map[string]content.Locator)
+
+	for _, t := range plan.Targets {
+		if t.Item == nil {
+			continue
+		}
+		dir := string(t.Item.Locator)
+		entries, err := fs.ReadDir(media, dir)
+		if err != nil {
+			// A single-file item has no directory of its own, which is not a
+			// problem to report: it simply owns nothing.
+			continue
+		}
+
+		outDir := path.Dir(t.Path)
+		for _, e := range entries {
+			name := e.Name()
+			switch {
+			case e.IsDir(), strings.HasPrefix(name, "."):
+				continue
+			case strings.EqualFold(path.Ext(name), ".md"):
+				continue // the source is rendered, not published
+			}
+
+			target := path.Join(outDir, name)
+			// Under the extension style every bundle in a section shares one
+			// output directory, so two items can own a file of the same name.
+			// Publishing one over the other would leave a page showing
+			// another page's picture, with nothing said.
+			if held, taken := owner[target]; taken && held != t.Item.Locator {
+				return nil, fmt.Errorf(
+					"build: %s and %s both own %s; rename one, or use the directory url style",
+					held, t.Item.Locator, name)
+			}
+			owner[target] = t.Item.Locator
+			out[target] = path.Join(dir, name)
+		}
+	}
+	return out, nil
 }
 
 // cached reports whether a target's previous output is still valid.

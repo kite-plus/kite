@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"path"
 	"strings"
 	"sync"
 
@@ -17,10 +18,29 @@ type router struct {
 	mu       sync.RWMutex
 	byURL    map[string]build.Target
 	notFound *build.Target
+
+	// media maps an output path to the file inside a page bundle it is read
+	// from, using the same table the build publishes from.
+	media map[string]string
 }
 
 func newRouter() *router {
 	return &router{byURL: make(map[string]build.Target)}
+}
+
+// loadMedia records what the page bundles contribute.
+func (r *router) loadMedia(m map[string]string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.media = m
+}
+
+// bundleFile resolves a request to a file a page bundle owns.
+func (r *router) bundleFile(p string) (string, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	src, ok := r.media[strings.TrimPrefix(path.Clean("/"+p), "/")]
+	return src, ok
 }
 
 // load replaces the routing table from a plan.

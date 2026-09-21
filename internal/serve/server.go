@@ -146,6 +146,12 @@ func (s *Server) Reload(ctx context.Context) error {
 	}
 	s.router.load(plan)
 
+	media, err := build.MediaFiles(plan, os.DirFS(s.site.Project.Root))
+	if err != nil {
+		return err
+	}
+	s.router.loadMedia(media)
+
 	s.mu.Lock()
 	s.builder, s.problems = builder, problems
 	s.mu.Unlock()
@@ -300,6 +306,19 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 	rel := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 	if rel == "" || rel == "." || strings.HasPrefix(rel, "..") {
 		return false
+	}
+
+	// A page bundle's own files are looked up first, because they are the
+	// ones whose address depends on where the page went.
+	if src, ok := s.router.bundleFile(rel); ok {
+		if data, modTime, found := readFile(os.DirFS(s.site.Project.Root), src); found {
+			if ctype := mime.TypeByExtension(path.Ext(rel)); ctype != "" {
+				w.Header().Set("Content-Type", ctype)
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			http.ServeContent(w, r, rel, modTime, bytes.NewReader(data))
+			return true
+		}
 	}
 
 	for _, root := range s.staticRoots() {

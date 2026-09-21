@@ -184,6 +184,7 @@ func (s *Site) newBuilder(opts BuildOptions, emitter *build.Emitter) (*build.Bui
 		Hooks:         s.Hooks,
 		Types:         s.Project.Types,
 		Emitter:       emitter,
+		Media:         os.DirFS(s.Project.Root),
 		PageSize:      s.Config.Build.PageSize,
 		IncludeDrafts: opts.Drafts,
 		Now:           opts.Now,

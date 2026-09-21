@@ -1,6 +1,7 @@
 package serve_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -416,5 +417,64 @@ func TestNoBannerWhenEverythingIndexes(t *testing.T) {
 
 	if strings.Contains(rec.Body.String(), "not indexed") {
 		t.Error("a banner appeared with nothing to report")
+	}
+}
+
+// A page bundle keeps an item's images beside its text so the markdown can
+// link them relatively. Before this worked, a bundle image was a 404 in both
+// runtimes while the page confidently pointed at it.
+func TestAPageBundlesOwnFilesAreServedAndBuiltAlike(t *testing.T) {
+	root := newProject(t, 3)
+
+	dir := filepath.Join(root, "content", "posts", "post-01")
+	if err := os.WriteFile(filepath.Join(dir, "cover.png"), []byte("pretend png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	appendTo(t, filepath.Join(dir, "index.md"), "\n![cover](cover.png)\n")
+
+	built := openSite(t, root)
+	outDir := filepath.Join(root, "public")
+	if _, _, err := built.Build(t.Context(), site.BuildOptions{OutDir: outDir, Now: frozen}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	onDisk, err := os.ReadFile(filepath.Join(outDir, "posts", "post-01", "cover.png"))
+	if err != nil {
+		t.Fatalf("the build did not publish the bundle's image: %v", err)
+	}
+
+	srv := newServer(t, root, serve.Options{LiveReload: false})
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/posts/post-01/cover.png", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("serving the bundle's image returned %d, want 200", rec.Code)
+	}
+	if !bytes.Equal(rec.Body.Bytes(), onDisk) {
+		t.Error("the served image differs from the built one")
+	}
+	if ctype := rec.Header().Get("Content-Type"); !strings.HasPrefix(ctype, "image/png") {
+		t.Errorf("content type = %q, want image/png", ctype)
+	}
+
+	// The markdown source is rendered, never published beside the page.
+	if _, err := os.Stat(filepath.Join(outDir, "posts", "post-01", "index.md")); err == nil {
+		t.Error("the markdown source was published alongside the page")
+	}
+	source := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(source, httptest.NewRequest(http.MethodGet, "/posts/post-01/index.md", nil))
+	if source.Code == http.StatusOK {
+		t.Error("the markdown source is reachable over HTTP")
+	}
+}
+
+func appendTo(t *testing.T, path, extra string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append(data, extra...), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
