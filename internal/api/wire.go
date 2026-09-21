@@ -234,3 +234,17 @@ func (d Draft) contentOf(id content.ID) *content.Content {
 	}
 	return item
 }
+
+// Media is a file stored beside a page.
+type Media struct {
+	Name string `json:"name"`
+
+	// Path is where the bytes live in the repository; URL is where the file
+	// appears on the site; Link is what belongs in the markdown.
+	Path string `json:"path"`
+	URL  string `json:"url"`
+	Link string `json:"link"`
+
+	Size int    `json:"size"`
+	Type string `json:"type,omitempty"`
+}

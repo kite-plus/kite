@@ -3,6 +3,7 @@ package serve_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -477,4 +478,92 @@ func appendTo(t *testing.T, path, extra string) {
 	if err := os.WriteFile(path, append(data, extra...), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// The preview renders on the server, through the same builder, theme and
+// resolver a build uses. This is what that is worth: an author looking at the
+// preview is looking at the page, not at an approximation of it that happens
+// to live in the admin.
+//
+// A front end running its own markdown library would disagree about
+// footnotes, highlighting, raw html and every extension either side adds
+// later, and "the preview does not match the site" is a complaint with no end.
+func TestPreviewOfSavedContentIsByteIdenticalToTheBuiltPage(t *testing.T) {
+	root := newProject(t, 4)
+
+	built := openSite(t, root)
+	outDir := filepath.Join(root, "public")
+	if _, _, err := built.Build(t.Context(), site.BuildOptions{OutDir: outDir, Now: frozen}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	want, err := os.ReadFile(filepath.Join(outDir, "posts", "post-01", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handler := newServer(t, root, serve.Options{Admin: true, Write: true}).Handler()
+
+	// Read the item back the way the admin does, then preview exactly what
+	// was read: unchanged content must render to the same bytes.
+	item := readItem(t, handler, findID(t, handler, "post-01"))
+	draft, err := json.Marshal(map[string]any{
+		"kind":         item["kind"],
+		"title":        item["title"],
+		"slug":         item["slug"],
+		"status":       item["status"],
+		"body":         item["body"],
+		"meta":         item["meta"],
+		"taxonomies":   item["taxonomies"],
+		"published_at": item["published_at"],
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost,
+		"/api/v1/preview?id="+item["id"].(string), bytes.NewReader(draft))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview returned %d\n%s", rec.Code, rec.Body.String())
+	}
+	if !bytes.Equal(rec.Body.Bytes(), want) {
+		t.Errorf("the preview differs from the built page\n%s", firstDifference(string(want), rec.Body.String()))
+	}
+}
+
+func findID(t *testing.T, h http.Handler, slug string) string {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/contents?limit=500", nil))
+
+	var page struct {
+		Items []struct{ ID, Slug string } `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range page.Items {
+		if item.Slug == slug {
+			return item.ID
+		}
+	}
+	t.Fatalf("no item with slug %q", slug)
+	return ""
+}
+
+func readItem(t *testing.T, h http.Handler, id string) map[string]any {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/contents/"+id, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET %s: %d", id, rec.Code)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
 }

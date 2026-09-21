@@ -209,6 +209,53 @@ func openAPI() *document {
 						}),
 				},
 			},
+			"/preview": {Post: &operation{
+				OperationID: "preview",
+				Summary:     "Render a draft through the real theme, without storing it.",
+				Parameters: []parameter{{
+					Name: "id", In: "query",
+					Description: "The item being edited, so its own images resolve.",
+					Schema:      &jsonSchema{Type: "string"},
+				}},
+				RequestBody: body(ref(Draft{})),
+				Responses: map[string]response{
+					"200": {
+						Description: "The rendered page.",
+						Content:     map[string]mediaType{"text/html": {Schema: &jsonSchema{Type: "string"}}},
+					},
+					"400": {Description: "Failed.", Content: jsonOf(errorRef)},
+					"501": {Description: "Failed.", Content: jsonOf(errorRef)},
+				},
+			}},
+			"/contents/{id}/media": {Post: &operation{
+				OperationID: "uploadMedia",
+				Summary:     "Store a file beside a page and report the link that reaches it.",
+				Parameters:  []parameter{pathParam("id")},
+				RequestBody: &requestBody{
+					Required: true,
+					Content: map[string]mediaType{"multipart/form-data": {Schema: &jsonSchema{
+						Type: "object",
+						Properties: map[string]*jsonSchema{
+							"file": {Type: "string", Format: "binary"},
+						},
+						Required: []string{"file"},
+					}}},
+				},
+				Responses: created(ref(Media{}),
+					"The stored file. The name may differ from the one sent, since an "+
+						"upload never replaces a file of the same name.",
+					"400", "404", "405", "413", "415"),
+			}},
+			"/contents/{id}/media/{name}": {Delete: &operation{
+				OperationID: "deleteMedia",
+				Summary:     "Remove a file from a page's bundle.",
+				Parameters:  []parameter{pathParam("id"), pathParam("name")},
+				Responses: map[string]response{
+					"204": {Description: "Removed."},
+					"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+					"405": {Description: "Failed.", Content: jsonOf(errorRef)},
+				},
+			}},
 			"/taxonomies": {Get: &operation{
 				OperationID: "listTaxonomies",
 				Summary:     "List taxonomies and how many terms each holds.",

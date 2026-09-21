@@ -28,6 +28,7 @@ import (
 	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/build"
 	"github.com/kite-plus/kite/internal/buildinfo"
+	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render"
 	"github.com/kite-plus/kite/internal/site"
 	"github.com/kite-plus/kite/web"
@@ -200,7 +201,28 @@ func (s *Server) view() api.View {
 		v.Writer = s.site.Project.Writer()
 		v.Refresh = s.refresh
 	}
+	v.Preview = s.preview
 	return v
+}
+
+// preview renders an item that is not on disk.
+//
+// It goes through the builder rather than a renderer of its own, so an author
+// is looking at the page the build would produce, not at an approximation of
+// it that happens to live in the admin.
+func (s *Server) preview(ctx context.Context, item *content.Content) ([]byte, error) {
+	s.mu.RLock()
+	builder := s.builder
+	s.mu.RUnlock()
+
+	target := build.Target{
+		Kind: render.KindSingle,
+		Type: string(item.Kind),
+		URL:  s.site.Resolver.For(item),
+		Item: item,
+	}
+	html, _, err := builder.Render(ctx, target, nil)
+	return html, err
 }
 
 // refresh reindexes, replans and tells open pages to reload.

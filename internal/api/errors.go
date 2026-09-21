@@ -21,6 +21,10 @@ const (
 	CodeInternal         = "internal"
 )
 
+// errNothingWritten reports a store that accepted a write and reported no
+// file, which would leave a client with no link to insert.
+var errNothingWritten = errors.New("api: the store wrote nothing")
+
 // ErrorBody is what every failing response carries.
 type ErrorBody struct {
 	Error ErrorDetail `json:"error"`

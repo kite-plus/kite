@@ -135,6 +135,9 @@ func (s *Server) routes() []route {
 		{http.MethodGet, "/contents/{id}", s.handleContent},
 		{http.MethodPut, "/contents/{id}", s.handleUpdate},
 		{http.MethodDelete, "/contents/{id}", s.handleDelete},
+		{http.MethodPost, "/preview", s.handlePreview},
+		{http.MethodPost, "/contents/{id}/media", s.handleUpload},
+		{http.MethodDelete, "/contents/{id}/media/{name}", s.handleDeleteMedia},
 		{http.MethodGet, "/taxonomies", s.handleTaxonomies},
 		{http.MethodGet, "/taxonomies/{taxonomy}/terms", s.handleTerms},
 	}

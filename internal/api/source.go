@@ -24,6 +24,10 @@ type View struct {
 	// server someone pointed at a repository.
 	Writer content.Writer
 
+	// Preview renders an item that is not on disk, through the same renderer,
+	// theme and resolver a build uses.
+	Preview func(context.Context, *content.Content) ([]byte, error)
+
 	// Refresh brings the read model and the routing table up to date after a
 	// write, and is called before the response is sent.
 	//

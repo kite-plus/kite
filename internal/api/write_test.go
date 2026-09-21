@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -420,5 +421,155 @@ func TestATimestampTheAuthorKeepsIsMaintained(t *testing.T) {
 	// Nothing the author did not keep may appear.
 	if strings.Contains(string(data), "created_at:") {
 		t.Error("created_at was invented on a file that never had one")
+	}
+}
+
+// upload posts a file the way a browser does when something is dropped on the
+// editor.
+func upload(t *testing.T, h http.Handler, id, name string, data []byte) *httptest.ResponseRecorder {
+	t.Helper()
+
+	var buf bytes.Buffer
+	form := multipart.NewWriter(&buf)
+	part, err := form.CreateFormFile("file", name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := form.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, api.Prefix+"/contents/"+id+"/media", &buf)
+	req.Header.Set("Content-Type", form.FormDataContentType())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestDroppedFilesLandInTheBundleAndReportALinkTheMarkdownCanUse(t *testing.T) {
+	root := newProject(t, 2)
+	h, _ := newWritableServer(t, root)
+
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
+	item, _ := load(t, h, list.Items[0].ID)
+
+	rec := upload(t, h, item.ID, "diagram.png", []byte("pretend png"))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201\n%s", rec.Code, rec.Body.String())
+	}
+	media := decode[api.Media](t, rec)
+
+	// The link is a bare name: a bundle publishes its files beside the page,
+	// which is what keeps the markdown readable in an editor and on GitHub.
+	if media.Link != "diagram.png" {
+		t.Errorf("link = %q, want a bundle relative name", media.Link)
+	}
+	if media.URL != item.URL+"diagram.png" {
+		t.Errorf("url = %q, want it under %q", media.URL, item.URL)
+	}
+	if media.Type != "image/png" {
+		t.Errorf("type = %q, want image/png", media.Type)
+	}
+
+	stored := filepath.Join(root, filepath.FromSlash(media.Path))
+	data, err := os.ReadFile(stored)
+	if err != nil {
+		t.Fatalf("nothing was written: %v", err)
+	}
+	if string(data) != "pretend png" {
+		t.Errorf("stored bytes = %q", data)
+	}
+	if got, want := filepath.Dir(stored), filepath.Join(root, filepath.FromSlash(item.Locator)); got != want {
+		t.Errorf("stored in %s, want the item's own bundle %s", got, want)
+	}
+}
+
+// Two screenshots are both called screenshot.png. Losing one of them is not a
+// reasonable reading of "put this here".
+func TestASecondFileOfTheSameNameDoesNotReplaceTheFirst(t *testing.T) {
+	root := newProject(t, 2)
+	h, _ := newWritableServer(t, root)
+
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
+	item, _ := load(t, h, list.Items[0].ID)
+
+	first := decode[api.Media](t, upload(t, h, item.ID, "shot.png", []byte("the first one")))
+	second := decode[api.Media](t, upload(t, h, item.ID, "shot.png", []byte("the second one")))
+
+	if first.Name == second.Name {
+		t.Fatalf("both uploads were stored as %q, so one overwrote the other", first.Name)
+	}
+	for _, m := range []struct {
+		media api.Media
+		want  string
+	}{{first, "the first one"}, {second, "the second one"}} {
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m.media.Path)))
+		if err != nil {
+			t.Fatalf("%s is gone: %v", m.media.Name, err)
+		}
+		if string(data) != m.want {
+			t.Errorf("%s holds %q, want %q", m.media.Name, data, m.want)
+		}
+	}
+}
+
+// A bundle is published from the site's own origin, so what may be stored
+// there is a list, not whatever was dropped.
+func TestAFileTypeABundleWillNotHoldIsRefused(t *testing.T) {
+	h, _ := newWritableServer(t, newProject(t, 2))
+
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
+	id := list.Items[0].ID
+
+	for _, name := range []string{"payload.html", "script.js", "run.sh", "noextension"} {
+		rec := upload(t, h, id, name, []byte("x"))
+		if rec.Code != http.StatusUnsupportedMediaType {
+			t.Errorf("%s: status = %d, want 415", name, rec.Code)
+		}
+	}
+}
+
+// A name that tries to climb out of the bundle must land inside it anyway.
+func TestAnUploadCannotEscapeTheBundle(t *testing.T) {
+	root := newProject(t, 2)
+	h, _ := newWritableServer(t, root)
+
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
+	item, _ := load(t, h, list.Items[0].ID)
+
+	rec := upload(t, h, item.ID, "../../../escaped.png", []byte("x"))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	media := decode[api.Media](t, rec)
+
+	if !strings.HasPrefix(media.Path, string(item.Locator)+"/") {
+		t.Errorf("stored at %q, which is outside the bundle %q", media.Path, item.Locator)
+	}
+	if _, err := os.Stat(filepath.Join(root, "escaped.png")); err == nil {
+		t.Error("a file was written outside the bundle")
+	}
+}
+
+func TestRemovingAFileTakesItOffDisk(t *testing.T) {
+	root := newProject(t, 2)
+	h, _ := newWritableServer(t, root)
+
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
+	item, _ := load(t, h, list.Items[0].ID)
+
+	media := decode[api.Media](t, upload(t, h, item.ID, "gone.png", []byte("x")))
+	stored := filepath.Join(root, filepath.FromSlash(media.Path))
+
+	rec := send(t, h, http.MethodDelete,
+		api.Prefix+"/contents/"+item.ID+"/media/"+media.Name, nil, nil)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204\n%s", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(stored); err == nil {
+		t.Error("the file is still on disk")
 	}
 }

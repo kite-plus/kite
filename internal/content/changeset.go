@@ -105,6 +105,13 @@ type PutMedia struct {
 	Owner ID
 	Name  string
 	Data  []byte
+
+	// Replace overwrites a file of the same name. Without it the store picks
+	// a free name instead, because two screenshots an author drags in are
+	// both called screenshot.png and losing one of them is not a reasonable
+	// reading of "put this here". The name actually used is reported in
+	// Result.Written.
+	Replace bool
 }
 
 func (o PutMedia) Kind() OpKind     { return OpPutMedia }

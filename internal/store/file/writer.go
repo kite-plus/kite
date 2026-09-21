@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +26,10 @@ const (
 	filePerm = 0o644
 	dirPerm  = 0o755
 )
+
+// maxFreeNames bounds the search for an unused name, so a directory that
+// somehow cannot accept one fails loudly rather than spinning.
+const maxFreeNames = 1000
 
 // Writer implements content.Writer on top of markdown files.
 //
@@ -304,11 +309,40 @@ func (w *Writer) putMedia(op content.PutMedia, located map[content.ID]*Entry, re
 		return fmt.Errorf("file store: invalid media name %q", op.Name)
 	}
 	target := path.Join(dir, name)
+	if !op.Replace {
+		free, err := w.freeMediaName(dir, name)
+		if err != nil {
+			return err
+		}
+		target = free
+	}
 	if err := w.write(target, op.Data); err != nil {
 		return err
 	}
 	appendUnique(&res.Written, target)
 	return nil
+}
+
+// freeMediaName returns a path in dir that nothing occupies, suffixing the
+// base name until one is free.
+func (w *Writer) freeMediaName(dir, name string) (string, error) {
+	ext := path.Ext(name)
+	base := strings.TrimSuffix(name, ext)
+
+	for n := range maxFreeNames {
+		candidate := path.Join(dir, name)
+		if n > 0 {
+			candidate = path.Join(dir, fmt.Sprintf("%s-%d%s", base, n+1, ext))
+		}
+		_, err := os.Stat(abs(w.root, candidate))
+		if errors.Is(err, fs.ErrNotExist) {
+			return candidate, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	return "", fmt.Errorf("file store: no free name for %s in %s", name, dir)
 }
 
 func (w *Writer) deleteMedia(op content.DeleteMedia, located map[content.ID]*Entry, res *content.Result) error {
