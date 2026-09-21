@@ -22,4 +22,10 @@ settings:
   - key: footer_text
     type: string
     label: Footer text
+    help: An extra line above the copyright, such as a licence or a registration number.
+    default: ""
+  - key: copyright
+    type: string
+    label: Copyright
+    help: Left empty, the site is credited to itself for the year it was last built.
     default: ""

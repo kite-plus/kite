@@ -1,4 +1,4 @@
 <footer class="site">
   {{ with .Site.ThemeSettings.footer_text }}<p>{{ . }}</p>{{ end }}
-  <p class="built">Built {{ time.Format "2006-01-02" .Site.BuildTime }} with Kite {{ .Site.Version }}</p>
+  <p class="copyright">{{ with .Site.ThemeSettings.copyright }}{{ . }}{{ else }}&copy; {{ time.Format "2006" .Site.BuildTime }} {{ .Site.Title }}{{ end }}</p>
 </footer>
