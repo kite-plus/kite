@@ -1,7 +1,7 @@
-import { useDeferredValue, useState } from "react";
+import { Suspense, lazy, useDeferredValue, useState } from "react";
+import { Plus, Search } from "lucide-react";
 
 import {
-  useContentTypes,
   useContents,
   useSite,
   useTaxonomies,
@@ -9,20 +9,40 @@ import {
   type Filters,
 } from "@/hooks/useContents";
 import { ContentTable } from "@/components/ContentTable";
-import { EditorPage } from "@/components/EditorPage";
-import { SettingsPage } from "@/components/SettingsPage";
-import { Failure, Panel, Select } from "@/components/ui";
 
-/** open is which item the editor holds: nothing, a new one, or an existing id. */
+import { SettingsPage } from "@/components/SettingsPage";
+import { PublishPanel } from "@/components/PublishPanel";
+import { Page, Shell, type Section } from "@/components/Shell";
+import { Alert } from "@/components/Alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// The editor carries CodeMirror, which is the heaviest thing in the admin and
+// is needed on one screen out of four. Loading it when that screen opens keeps
+// the list -- the first thing anybody sees -- light.
+const EditorPage = lazy(() =>
+  import("@/components/EditorPage").then((m) => ({ default: m.EditorPage })),
+);
+
+/** open is what the editor holds: nothing, a new item, or an existing id. */
 type Open = { id: string | null; kind: string } | null;
+
+/** The value a Select uses for "no filter", since it cannot hold an empty one. */
+const ANY = "__any__";
 
 export default function App() {
   const site = useSite();
-  const types = useContentTypes();
   const taxonomies = useTaxonomies();
 
+  const [section, setSection] = useState<Section>("post");
   const [open, setOpen] = useState<Open>(null);
-  const [settings, setSettings] = useState(false);
   const [filters, setFilters] = useState<Filters>({});
   const [search, setSearch] = useState("");
   const [taxonomy, setTaxonomy] = useState("");
@@ -32,152 +52,140 @@ export default function App() {
   const deferred = useDeferredValue(search);
   const terms = useTerms(taxonomy || undefined);
 
-  const contents = useContents({ ...filters, q: deferred });
+  const kind = section === "post" || section === "page" ? section : undefined;
+  const contents = useContents({ ...filters, kind, q: deferred });
   const total = contents.data?.pages[0]?.total;
   const items = contents.data?.pages.flatMap((p) => p.items) ?? [];
 
   const set = (patch: Partial<Filters>) =>
     setFilters((current) => ({ ...current, ...patch }));
 
-  if (settings) {
-    return <SettingsPage onClose={() => setSettings(false)} />;
-  }
-
   if (open) {
     return (
-      <EditorPage
-        id={open.id}
-        kind={open.kind}
-        onClose={() => setOpen(null)}
-        onCreated={(id) => setOpen({ id, kind: open.kind })}
-      />
+      <Suspense
+        fallback={
+          <div className="p-10 text-center text-sm text-muted-foreground">Loading</div>
+        }
+      >
+        <EditorPage
+          id={open.id}
+          kind={open.kind}
+          onClose={() => setOpen(null)}
+          onCreated={(id) => setOpen({ id, kind: open.kind })}
+        />
+      </Suspense>
     );
   }
 
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <header className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {site.data?.title ?? "Kite Studio"}
-          </h1>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-            {site.data
-              ? `${site.data.store} store, ${site.data.runtime} runtime`
-              : "connecting"}
-          </p>
-        </div>
-        <div className="flex items-center gap-4 text-sm text-[var(--muted-foreground)]">
-          {Object.entries(site.data?.counts ?? {}).map(([kind, n]) => (
-            <span key={kind}>
-              <strong className="text-[var(--foreground)]">{n}</strong> {kind}
-              {n === 1 ? "" : "s"}
-            </span>
-          ))}
-          <button
-            type="button"
-            onClick={() => setSettings(true)}
-            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--accent)]"
-          >
-            Settings
-          </button>
-          <button
-            type="button"
-            onClick={() => setOpen({ id: null, kind: filters.kind ?? "post" })}
-            className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:opacity-90"
-          >
-            New
-          </button>
-        </div>
-      </header>
+  const shell = (children: React.ReactNode) => (
+    <Shell
+      site={site.data}
+      counts={site.data?.counts}
+      section={section}
+      onSection={setSection}
+      footer={<PublishPanel compact />}
+    >
+      {children}
+    </Shell>
+  );
 
+  if (section === "settings") {
+    return shell(<SettingsPage />);
+  }
+  if (section === "taxonomies") {
+    return shell(
+      <Page title="Taxonomies" description="Terms are derived from what your content carries.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {taxonomies.data?.items.map((t) => (
+            <div key={t.name} className="rounded-md border p-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm font-medium">{t.name}</span>
+                <span className="text-xs text-muted-foreground">{t.terms} terms</span>
+              </div>
+              <a
+                href={t.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 block truncate font-mono text-xs text-muted-foreground hover:text-primary"
+              >
+                {t.url}
+              </a>
+            </div>
+          ))}
+        </div>
+      </Page>,
+    );
+  }
+
+  const label = section === "post" ? "Posts" : "Pages";
+
+  return shell(
+    <Page
+      title={label}
+      description={total !== undefined ? `${total} in this section` : undefined}
+      actions={
+        <Button size="sm" onClick={() => setOpen({ id: null, kind: section })}>
+          <Plus className="size-4" />
+          New
+        </Button>
+      }
+    >
       {site.data?.problems?.length ? (
-        <Panel className="mb-6 border-amber-500/40 bg-amber-500/5 p-4">
-          <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
-            {site.data.problems.length} file
-            {site.data.problems.length === 1 ? "" : "s"} could not be indexed
-          </p>
-          <ul className="mt-2 space-y-1 font-mono text-xs text-[var(--muted-foreground)]">
+        <Alert
+          tone="warn"
+          className="mb-4"
+          title={`${site.data.problems.length} file${site.data.problems.length === 1 ? "" : "s"} could not be indexed`}
+        >
+          <ul className="mt-1 space-y-0.5 font-mono text-xs">
             {site.data.problems.map((p) => (
               <li key={p}>{p}</li>
             ))}
           </ul>
-        </Panel>
+        </Alert>
       ) : null}
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search title, excerpt and body"
-          className="min-w-56 flex-1 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-52 flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search title, excerpt and body"
+            className="h-8 pl-8"
+          />
+        </div>
+
+        <Filter
+          label="Status"
+          value={filters.status}
+          onChange={(v) => set({ status: v ?? undefined })}
+          options={["published", "draft", "scheduled", "archived"]}
         />
 
-        <Select
-          label="Kind"
-          value={filters.kind ?? ""}
-          onChange={(e) => set({ kind: e.target.value || undefined })}
-        >
-          <option value="">any</option>
-          {types.data?.items.map((t) => (
-            <option key={t.kind} value={t.kind}>
-              {t.label}
-            </option>
-          ))}
-        </Select>
-
-        <Select
-          label="Status"
-          value={filters.status ?? ""}
-          onChange={(e) => set({ status: e.target.value || undefined })}
-        >
-          <option value="">any</option>
-          {["published", "draft", "scheduled", "archived"].map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </Select>
-
-        <Select
+        <Filter
           label="In"
           value={taxonomy}
-          onChange={(e) => {
-            setTaxonomy(e.target.value);
+          onChange={(v) => {
+            setTaxonomy(v ?? "");
             set({ term: undefined });
           }}
-        >
-          <option value="">any</option>
-          {taxonomies.data?.items.map((t) => (
-            <option key={t.name} value={t.name}>
-              {t.name}
-            </option>
-          ))}
-        </Select>
+          options={taxonomies.data?.items.map((t) => t.name) ?? []}
+        />
 
         {taxonomy && (
-          <Select
+          <Filter
             label="Term"
-            value={filters.term?.split(":")[1] ?? ""}
-            onChange={(e) =>
-              set({
-                term: e.target.value ? `${taxonomy}:${e.target.value}` : undefined,
-              })
-            }
-          >
-            <option value="">any</option>
-            {terms.data?.items.map((t) => (
-              <option key={t.term} value={t.term}>
-                {t.term} ({t.count})
-              </option>
-            ))}
-          </Select>
+            value={filters.term?.split(":")[1]}
+            onChange={(v) => set({ term: v ? `${taxonomy}:${v}` : undefined })}
+            options={terms.data?.items.map((t) => t.term) ?? []}
+          />
         )}
       </div>
 
       {contents.error ? (
-        <Failure error={contents.error} />
+        <Alert tone="stop" title="Could not load content">
+          {String(contents.error)}
+        </Alert>
       ) : (
         <ContentTable
           items={items}
@@ -196,6 +204,47 @@ export default function App() {
           onMore={() => contents.fetchNextPage()}
         />
       )}
-    </div>
+    </Page>,
+  );
+}
+
+function Filter({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value?: string;
+  onChange: (value: string | undefined) => void;
+  options: string[];
+}) {
+  if (options.length === 0) return null;
+  return (
+    <Select
+      value={value ?? ANY}
+      onValueChange={(v) => onChange(!v || v === ANY ? undefined : v)}
+    >
+      <SelectTrigger size="sm" className="w-auto min-w-28">
+        {/* base-ui renders the raw value unless told otherwise, and the
+            sentinel is not something to show a person. */}
+        <SelectValue>
+          {(v: string) => (
+            <span className="truncate">
+              <span className="text-muted-foreground">{label}: </span>
+              {!v || v === ANY ? "any" : v}
+            </span>
+          )}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ANY}>any</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>
+            {o}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

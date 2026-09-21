@@ -1,5 +1,18 @@
 import type { components } from "@/api/schema";
-import { cn } from "@/lib/cn";
+import { cn } from "cn";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 type Field = components["schemas"]["Field"];
 
@@ -22,15 +35,16 @@ export function SchemaForm({ fields, values, onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      {fields.map((field) => (
-        <FieldRow
-          key={field.key}
-          field={field}
-          value={values[field.key]}
-          onChange={(v) => set(field.key, v)}
-          hidden={!visible(field, values)}
-        />
-      ))}
+      {fields.map((field) =>
+        visible(field, values) ? (
+          <FieldRow
+            key={field.key}
+            field={field}
+            value={values[field.key]}
+            onChange={(v) => set(field.key, v)}
+          />
+        ) : null,
+      )}
     </div>
   );
 }
@@ -45,66 +59,73 @@ function FieldRow({
   field,
   value,
   onChange,
-  hidden,
 }: {
   field: Field;
   value: unknown;
   onChange: (value: unknown) => void;
-  hidden: boolean;
 }) {
-  if (hidden) return null;
-
   const label = field.label || field.key;
-  const input = "w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
+
+  // A switch reads better beside its label than under it, which is the one
+  // field shape that does not fit the others.
+  if (field.type === "boolean") {
+    return (
+      <div className="flex items-center justify-between gap-3 py-0.5">
+        <div className="min-w-0">
+          <Label htmlFor={field.key}>{label}</Label>
+          {field.help && (
+            <p className="text-xs text-muted-foreground">{field.help}</p>
+          )}
+        </div>
+        <Switch
+          id={field.key}
+          checked={Boolean(value)}
+          onCheckedChange={(checked) => onChange(checked)}
+        />
+      </div>
+    );
+  }
 
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+    <div className="space-y-1.5">
+      <Label htmlFor={field.key}>
         {label}
-        {field.required && <span className="ml-0.5 text-red-500">*</span>}
-      </span>
+        {field.required && <span className="text-destructive">*</span>}
+      </Label>
 
       {field.type === "text" || field.type === "code" ? (
-        <textarea
+        <Textarea
+          id={field.key}
           rows={field.type === "code" ? 6 : 3}
           value={asString(value)}
           placeholder={field.placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(input, field.type === "code" && "font-mono")}
-        />
-      ) : field.type === "boolean" ? (
-        <input
-          type="checkbox"
-          checked={Boolean(value)}
-          onChange={(e) => onChange(e.target.checked)}
-          className="size-4 accent-[var(--color-brand)]"
+          className={cn(field.type === "code" && "font-mono text-xs")}
         />
       ) : field.type === "select" ? (
-        <select value={asString(value)} onChange={(e) => onChange(e.target.value)} className={input}>
-          <option value="" />
-          {field.options?.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label || o.value}
-            </option>
-          ))}
-        </select>
-      ) : field.type === "number" ? (
-        <input
-          type="number"
-          value={asString(value)}
-          min={field.min}
-          max={field.max}
-          onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-          className={input}
-        />
+        <Select value={asString(value)} onValueChange={(v) => v && onChange(v)}>
+          <SelectTrigger id={field.key} className="w-full">
+            <SelectValue placeholder={field.placeholder ?? "Choose"} />
+          </SelectTrigger>
+          <SelectContent>
+            {field.options?.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label || o.value}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       ) : field.type === "multiselect" ? (
-        <div className="flex flex-wrap gap-1.5 py-1">
+        <div className="flex flex-wrap gap-1.5">
           {field.options?.map((o) => {
             const chosen = Array.isArray(value) && value.includes(o.value);
             return (
-              <button
+              <Button
                 key={o.value}
                 type="button"
+                size="sm"
+                variant={chosen ? "default" : "outline"}
+                className="h-7 px-2 text-xs font-normal"
                 onClick={() =>
                   onChange(
                     chosen
@@ -112,33 +133,53 @@ function FieldRow({
                       : [...(Array.isArray(value) ? (value as string[]) : []), o.value],
                   )
                 }
-                className={cn(
-                  "rounded-md border px-2 py-0.5 text-xs",
-                  chosen
-                    ? "border-brand bg-brand/10 text-brand"
-                    : "border-[var(--border)] text-[var(--muted-foreground)]",
-                )}
               >
                 {o.label || o.value}
-              </button>
+              </Button>
             );
           })}
         </div>
       ) : (
-        <input
-          type={field.type === "date" ? "datetime-local" : field.type === "color" ? "color" : "text"}
+        <Input
+          id={field.key}
+          type={inputType(field.type)}
           value={asString(value)}
           placeholder={field.placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          className={input}
+          min={field.min}
+          max={field.max}
+          onChange={(e) =>
+            onChange(
+              field.type === "number"
+                ? e.target.value === ""
+                  ? undefined
+                  : Number(e.target.value)
+                : e.target.value,
+            )
+          }
+          className={cn(field.type === "color" && "h-9 w-16 p-1")}
         />
       )}
 
-      {field.help && (
-        <span className="mt-1 block text-xs text-[var(--muted-foreground)]">{field.help}</span>
+      {field.help && field.type !== "boolean" && (
+        <p className="text-xs text-muted-foreground">{field.help}</p>
       )}
-    </label>
+    </div>
   );
+}
+
+function inputType(type: string): string {
+  switch (type) {
+    case "date":
+      return "datetime-local";
+    case "color":
+      return "color";
+    case "number":
+      return "number";
+    case "url":
+      return "url";
+    default:
+      return "text";
+  }
 }
 
 function asString(value: unknown): string {

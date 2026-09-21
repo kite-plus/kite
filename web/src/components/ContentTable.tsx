@@ -1,6 +1,18 @@
+import type { ReactNode } from "react";
+import { ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
+import { cn } from "cn";
+
 import type { Summary } from "@/api/client";
-import { Panel, StatusBadge, Tag } from "@/components/ui";
-import { cn } from "@/lib/cn";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface Props {
   items: Summary[];
@@ -23,6 +35,18 @@ const columns: { key: string; label: string; className?: string }[] = [
   { key: "published_at", label: "Published", className: "w-36" },
 ];
 
+/**
+ * A status is one small word, so it carries its meaning in colour rather than
+ * being labelled twice.
+ */
+const statusTone: Record<string, string> = {
+  published:
+    "border-emerald-600/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  draft: "border-amber-600/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  scheduled: "border-sky-600/20 bg-sky-500/10 text-sky-700 dark:text-sky-400",
+  archived: "border-border bg-muted text-muted-foreground",
+};
+
 export function ContentTable({
   items,
   total,
@@ -44,120 +68,121 @@ export function ContentTable({
   };
 
   return (
-    <Panel className="overflow-hidden">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-[var(--border)] text-left">
+    <div className="overflow-hidden rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
             {columns.map((c) => (
-              <th
-                key={c.label}
-                className={cn(
-                  "px-4 py-2.5 font-medium text-[var(--muted-foreground)]",
-                  c.className,
-                )}
-              >
+              <TableHead key={c.label} className={cn("h-9", c.className)}>
                 {c.key ? (
                   <button
                     type="button"
                     onClick={() => toggle(c.key)}
-                    className="inline-flex items-center gap-1 hover:text-[var(--foreground)]"
+                    className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
                   >
                     {c.label}
-                    <span className="text-xs">
-                      {sort === `-${c.key}` ? "↓" : sort === c.key ? "↑" : ""}
-                    </span>
+                    {sort === `-${c.key}` ? (
+                      <ArrowDown className="size-3" />
+                    ) : sort === c.key ? (
+                      <ArrowUp className="size-3" />
+                    ) : null}
                   </button>
                 ) : (
                   c.label
                 )}
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+
+        <TableBody>
           {items.map((item) => (
-            <tr
-              key={item.id}
-              className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--accent)]"
-            >
-              <td className="px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => onOpen(item.id, item.kind)}
-                  className="text-left font-medium hover:text-brand hover:underline"
-                >
-                  {item.title || item.slug}
-                </button>
-                <div className="mt-0.5 flex items-center gap-2">
-                  <span className="truncate font-mono text-xs text-[var(--muted-foreground)]">
-                    {item.locator}
-                  </span>
+            <TableRow key={item.id} className="group">
+              <TableCell className="py-2.5">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpen(item.id, item.kind)}
+                    className="truncate text-left text-sm font-medium transition-colors hover:text-primary"
+                  >
+                    {item.title || item.slug}
+                  </button>
+                  {/* Shown on hover: the address is useful, but not so often
+                      that it should compete with the title. */}
                   <a
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="shrink-0 text-xs text-[var(--muted-foreground)] hover:text-brand"
+                    title="Open on the site"
+                    className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-primary"
                   >
-                    view
+                    <ExternalLink className="size-3.5" />
                   </a>
                 </div>
-              </td>
-              <td className="hidden px-4 py-3 md:table-cell">
+                <div className="truncate font-mono text-xs text-muted-foreground">
+                  {item.locator}
+                </div>
+              </TableCell>
+
+              <TableCell className="hidden py-2.5 md:table-cell">
                 <div className="flex flex-wrap gap-1">
-                  {Object.entries(item.taxonomies ?? {}).flatMap(
-                    ([taxonomy, terms]) =>
-                      (terms as string[]).map((term) => (
-                        <Tag
-                          key={`${taxonomy}:${term}`}
-                          active={activeTerm === `${taxonomy}:${term}`}
-                          onClick={() => onTerm(`${taxonomy}:${term}`)}
-                        >
-                          {term}
-                        </Tag>
-                      )),
+                  {Object.entries(item.taxonomies ?? {}).flatMap(([taxonomy, terms]) =>
+                    (terms as string[]).map((term) => {
+                      const key = `${taxonomy}:${term}`;
+                      return (
+                        <button key={key} type="button" onClick={() => onTerm(key)}>
+                          <Badge
+                            variant={activeTerm === key ? "default" : "secondary"}
+                            className="font-normal"
+                          >
+                            {term}
+                          </Badge>
+                        </button>
+                      );
+                    }),
                   )}
                 </div>
-              </td>
-              <td className="px-4 py-3">
-                <StatusBadge status={item.status} />
-              </td>
-              <td className="px-4 py-3 tabular-nums text-[var(--muted-foreground)]">
-                {item.published_at ? item.published_at.slice(0, 10) : "—"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </TableCell>
 
-      {loading && <Row>Loading</Row>}
-      {!loading && items.length === 0 && <Row>Nothing matches these filters</Row>}
+              <TableCell className="py-2.5">
+                <Badge
+                  variant="outline"
+                  className={cn("font-normal", statusTone[item.status])}
+                >
+                  {item.status}
+                </Badge>
+              </TableCell>
+
+              <TableCell className="py-2.5 text-sm tabular-nums text-muted-foreground">
+                {item.published_at ? item.published_at.slice(0, 10) : "—"}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      {loading && <Empty>Loading</Empty>}
+      {!loading && items.length === 0 && <Empty>Nothing matches these filters</Empty>}
 
       {items.length > 0 && (
-        <div className="flex items-center justify-between border-t border-[var(--border)] px-4 py-2.5 text-xs text-[var(--muted-foreground)]">
+        <div className="flex items-center justify-between border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
           <span>
             {items.length}
             {total !== undefined && total > items.length ? ` of ${total}` : ""}
           </span>
           {hasMore && (
-            <button
-              type="button"
-              onClick={onMore}
-              disabled={fetchingMore}
-              className="rounded-md border border-[var(--border)] px-3 py-1 hover:bg-[var(--accent)] disabled:opacity-50"
-            >
+            <Button size="sm" variant="outline" onClick={onMore} disabled={fetchingMore}>
               {fetchingMore ? "Loading" : "Load more"}
-            </button>
+            </Button>
           )}
         </div>
       )}
-    </Panel>
+    </div>
   );
 }
 
-function Row({ children }: { children: React.ReactNode }) {
+function Empty({ children }: { children: ReactNode }) {
   return (
-    <div className="px-4 py-10 text-center text-sm text-[var(--muted-foreground)]">
-      {children}
-    </div>
+    <div className="px-4 py-14 text-center text-sm text-muted-foreground">{children}</div>
   );
 }

@@ -3,7 +3,12 @@ import { Annotation, EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
+import {
+  syntaxHighlighting,
+  defaultHighlightStyle,
+  HighlightStyle,
+} from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 
 interface Props {
   value: string;
@@ -20,6 +25,26 @@ interface Props {
  * document replaced after a conflict is resolved is not an unsaved edit.
  */
 const loaded = Annotation.define<boolean>();
+
+/**
+ * Markdown highlighting drawn from the app's tokens.
+ *
+ * CodeMirror's default style is a fixed light palette. Reusing the theme
+ * variables is what keeps the editor from being the one pane that ignores
+ * dark mode.
+ */
+const kiteHighlight = HighlightStyle.define([
+  { tag: tags.heading, color: "var(--foreground)", fontWeight: "600" },
+  { tag: tags.strong, color: "var(--foreground)", fontWeight: "600" },
+  { tag: tags.emphasis, fontStyle: "italic" },
+  { tag: tags.link, color: "var(--primary)" },
+  { tag: tags.url, color: "var(--primary)", textDecoration: "underline" },
+  { tag: tags.monospace, color: "var(--primary)" },
+  { tag: tags.quote, color: "var(--muted-foreground)", fontStyle: "italic" },
+  { tag: tags.list, color: "var(--muted-foreground)" },
+  { tag: tags.contentSeparator, color: "var(--muted-foreground)" },
+  { tag: tags.processingInstruction, color: "var(--muted-foreground)" },
+]);
 
 /**
  * A markdown editor over CodeMirror.
@@ -50,6 +75,10 @@ export function Editor({ value, onChange, onDropFiles, onReady }: Props) {
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           markdown(),
+          // The editor reads the app's own tokens rather than carrying a
+          // palette of its own, so it follows the theme instead of staying
+          // light while everything around it goes dark.
+          syntaxHighlighting(kiteHighlight, { fallback: true }),
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {
@@ -58,13 +87,30 @@ export function Editor({ value, onChange, onDropFiles, onReady }: Props) {
             emit.current(update.state.doc.toString());
           }),
           EditorView.theme({
-            "&": { height: "100%", fontSize: "14px" },
+            "&": {
+              height: "100%",
+              fontSize: "13px",
+              backgroundColor: "transparent",
+              color: "var(--foreground)",
+            },
             "&.cm-focused": { outline: "none" },
             ".cm-content": {
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-              padding: "12px 0",
+              padding: "16px 0",
+              caretColor: "var(--foreground)",
             },
-            ".cm-gutters": { border: "none", background: "transparent", opacity: "0.5" },
+            ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--foreground)" },
+            ".cm-gutters": {
+              border: "none",
+              backgroundColor: "transparent",
+              color: "var(--muted-foreground)",
+              opacity: "0.6",
+            },
+            ".cm-activeLine": { backgroundColor: "var(--muted)" },
+            ".cm-activeLineGutter": { backgroundColor: "transparent" },
+            "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
+              backgroundColor: "color-mix(in oklab, var(--primary) 22%, transparent)",
+            },
           }),
         ],
       }),

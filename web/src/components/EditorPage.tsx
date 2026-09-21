@@ -1,14 +1,25 @@
 import { useCallback, useRef, useState } from "react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 
 import { useContentTypes } from "@/hooks/useContents";
 import { useItem } from "@/hooks/useItem";
+import { Alert } from "@/components/Alert";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { Editor } from "@/components/Editor";
 import { Preview } from "@/components/Preview";
 import { PublishPanel } from "@/components/PublishPanel";
 import { SchemaForm } from "@/components/SchemaForm";
-import { Failure, Select } from "@/components/ui";
-import { cn } from "@/lib/cn";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 
 interface Props {
   id: string | null;
@@ -48,60 +59,64 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
   );
 
   if (item.status === "loading") {
-    return <div className="p-10 text-center text-sm text-[var(--muted-foreground)]">Loading</div>;
+    return (
+      <div className="p-10 text-center text-sm text-muted-foreground">Loading</div>
+    );
   }
   if (!item.draft) {
     return (
       <div className="p-6">
-        <Failure error={item.error ?? "nothing to edit"} />
+        <Alert tone="stop" title="Nothing to edit">
+          {item.error}
+        </Alert>
       </div>
     );
   }
 
   const draft = item.draft;
+  const state =
+    uploading > 0
+      ? `uploading ${uploading}`
+      : item.status === "saving"
+        ? "saving"
+        : item.dirty
+          ? "unsaved"
+          : "saved";
 
   return (
-    <div className="flex h-dvh flex-col">
-      <header className="flex flex-wrap items-center gap-3 border-b border-[var(--border)] px-4 py-2.5">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md border border-[var(--border)] px-2 py-1 text-sm hover:bg-[var(--accent)]"
-        >
-          Back
-        </button>
+    <div className="flex h-svh flex-col bg-background">
+      <header className="flex min-h-14 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4">
+        <Button variant="ghost" size="icon" onClick={onClose} title="Back">
+          <ArrowLeft className="size-4" />
+        </Button>
 
-        <input
+        <Input
           value={draft.title}
           onChange={(e) => item.edit({ title: e.target.value })}
           placeholder="Title"
-          className="min-w-40 flex-1 bg-transparent text-lg font-semibold outline-none placeholder:text-[var(--muted-foreground)]"
+          className="min-w-40 flex-1 border-0 bg-transparent px-1 text-base font-semibold shadow-none focus-visible:ring-0 md:text-base"
         />
 
         <Select
-          label="Status"
           value={draft.status}
-          onChange={(e) => item.edit({ status: e.target.value })}
+          onValueChange={(v) => v && item.edit({ status: v })}
         >
-          {statuses.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
+          <SelectTrigger size="sm" className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {statuses.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
 
-        <span className="text-xs text-[var(--muted-foreground)]">
-          {uploading > 0
-            ? `uploading ${uploading}`
-            : item.status === "saving"
-              ? "saving"
-              : item.dirty
-                ? "unsaved"
-                : "saved"}
-        </span>
+        <span className="w-20 text-right text-xs text-muted-foreground">{state}</span>
 
-        <button
-          type="button"
+        <Button
+          size="sm"
           disabled={!item.dirty || item.status === "saving"}
           onClick={async () => {
             const saved = await item.save();
@@ -109,95 +124,97 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
             // editor needs it before a file can be attached to it.
             if (saved && !id) onCreated(saved);
           }}
-          className="rounded-md bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-40"
         >
           Save
-        </button>
+        </Button>
       </header>
 
       {(item.error || uploadError) && (
-        <div className="border-b border-[var(--border)] bg-red-500/5 px-4 py-2 text-sm text-red-700 dark:text-red-400">
-          {item.error ?? uploadError}
+        <div className="border-b px-4 py-2">
+          <Alert tone="stop">{item.error ?? uploadError}</Alert>
         </div>
       )}
 
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-64 shrink-0 overflow-auto border-r border-[var(--border)] p-4 lg:block">
-          <Field label="Slug">
-            <input
-              value={draft.slug ?? ""}
-              onChange={(e) => item.edit({ slug: e.target.value })}
-              placeholder="derived from the title"
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm outline-none focus:border-brand"
-            />
-          </Field>
-
-          <Field label="Published">
-            <input
-              type="datetime-local"
-              value={toLocalInput(draft.published_at)}
-              onChange={(e) =>
-                item.edit({
-                  published_at: e.target.value ? new Date(e.target.value).toISOString() : undefined,
-                })
-              }
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm outline-none focus:border-brand"
-            />
-          </Field>
-
-          {type?.taxonomies?.map((taxonomy) => (
-            <Field key={taxonomy} label={taxonomy}>
-              <input
-                value={(draft.taxonomies?.[taxonomy] ?? []).join(", ")}
-                onChange={(e) =>
-                  item.edit({
-                    taxonomies: {
-                      ...draft.taxonomies,
-                      [taxonomy]: e.target.value
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    },
-                  })
-                }
-                placeholder="comma separated"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm outline-none focus:border-brand"
+        <aside className="hidden w-72 shrink-0 overflow-auto border-r p-4 lg:block">
+          <div className="space-y-3">
+            <Field label="Slug">
+              <Input
+                value={draft.slug ?? ""}
+                onChange={(e) => item.edit({ slug: e.target.value })}
+                placeholder="derived from the title"
               />
             </Field>
-          ))}
+
+            <Field label="Published">
+              <Input
+                type="datetime-local"
+                value={toLocalInput(draft.published_at)}
+                onChange={(e) =>
+                  item.edit({
+                    published_at: e.target.value
+                      ? new Date(e.target.value).toISOString()
+                      : undefined,
+                  })
+                }
+              />
+            </Field>
+
+            {type?.taxonomies?.map((taxonomy) => (
+              <Field key={taxonomy} label={taxonomy}>
+                <Input
+                  value={(draft.taxonomies?.[taxonomy] ?? []).join(", ")}
+                  onChange={(e) =>
+                    item.edit({
+                      taxonomies: {
+                        ...draft.taxonomies,
+                        [taxonomy]: e.target.value
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean),
+                      },
+                    })
+                  }
+                  placeholder="comma separated"
+                />
+              </Field>
+            ))}
+          </div>
 
           {type?.fields && type.fields.length > 0 && (
-            <div className="mt-5 border-t border-[var(--border)] pt-4">
+            <>
+              <Separator className="my-4" />
               <SchemaForm
                 fields={type.fields}
                 values={draft.meta ?? {}}
                 onChange={(meta) => item.edit({ meta })}
               />
-            </div>
+            </>
           )}
 
           {id && (
-            <div className="mt-5 border-t border-[var(--border)] pt-4">
+            <>
+              <Separator className="my-4" />
               <PublishPanel ids={[id]} />
-            </div>
-          )}
-
-          {id && (
-            <button
-              type="button"
-              onClick={async () => {
-                if (confirm("Delete this item and everything in its folder?")) {
-                  if (await item.remove()) onClose();
-                }
-              }}
-              className="mt-6 w-full rounded-md border border-red-500/30 px-2 py-1.5 text-sm text-red-600 hover:bg-red-500/5 dark:text-red-400"
-            >
-              Delete
-            </button>
+              <Separator className="my-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={async () => {
+                  if (confirm("Delete this item and everything in its folder?")) {
+                    if (await item.remove()) onClose();
+                  }
+                }}
+              >
+                <Trash2 className="size-4" />
+                Delete
+              </Button>
+            </>
           )}
         </aside>
 
-        <div className={cn("min-w-0 flex-1 border-r border-[var(--border)]")}>
+        <div className="min-w-0 flex-1 border-r">
           <Editor
             value={draft.body}
             onChange={(body) => item.edit({ body })}
@@ -228,10 +245,10 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="mb-3 block">
-      <span className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">{label}</span>
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
       {children}
-    </label>
+    </div>
   );
 }
 
