@@ -138,7 +138,7 @@ GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot 
 | M0 | `kite build`：内容模型、索引、Markdown、主题、静态产出 | 已完成 |
 | M1 | `kite serve`：按请求渲染，文件监听与热重载 | 已完成 |
 | M2 | 只读后台，能打开现有仓库 | 已完成 |
-| M3 | 可写后台：编辑器、媒体、冲突处理 | |
+| M3 | 可写后台：编辑器、媒体、冲突处理 | 已完成 |
 | M4 | Git 发布器 —— **v1.0** | |
 | M5 | 公开主题契约 | |
 | M6 | `kite.lock` 与 `kitew` wrapper | |
