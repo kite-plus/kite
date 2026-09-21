@@ -26,7 +26,10 @@ export function useItem(id: string | null, kind: string) {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [status, setStatus] = useState<Status>("loading");
-  const [error, setError] = useState<string | null>(null);
+  // The code travels with the message so the editor can say it in the
+  // operator's language; the server's own sentence names the file or the
+  // revision a general phrase cannot.
+  const [error, setError] = useState<{ code?: string; detail: string } | null>(null);
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const [dirty, setDirty] = useState(false);
 
@@ -55,7 +58,10 @@ export function useItem(id: string | null, kind: string) {
       });
       if (cancelled) return;
       if (error || !data) {
-        setError(error?.error.message ?? "could not load this item");
+        setError({
+          code: error?.error.code,
+          detail: error?.error.message ?? "",
+        });
         setStatus("error");
         return;
       }
@@ -93,13 +99,16 @@ export function useItem(id: string | null, kind: string) {
     if (result.error) {
       // A conflict is not a failure to report and forget: it is a decision
       // the author has to make, so it is kept until they make it.
-      const body = result.error as unknown as { conflict?: Conflict; error: { message: string } };
+      const body = result.error as unknown as {
+        conflict?: Conflict;
+        error: { code?: string; message: string };
+      };
       if (result.response.status === 409 && body.conflict) {
         setConflict(body.conflict);
         setStatus("conflict");
         return null;
       }
-      setError(body.error?.message ?? "could not save");
+      setError({ code: body.error?.code, detail: body.error?.message ?? "" });
       setStatus("ready");
       return null;
     }
@@ -139,7 +148,7 @@ export function useItem(id: string | null, kind: string) {
       params: { path: { id }, header: { "If-Match": revision.current } },
     });
     if (error) {
-      setError(error.error.message);
+      setError({ code: error.error.code, detail: error.error.message });
       return false;
     }
     await queryClient.invalidateQueries({ queryKey: ["contents"] });

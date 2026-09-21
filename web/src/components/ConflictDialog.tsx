@@ -1,4 +1,5 @@
 import type { Draft } from "@/api/client";
+import { useI18n } from "@/i18n";
 import type { Conflict } from "@/hooks/useItem";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,37 +33,40 @@ export function ConflictDialog({
   onKeepOurs,
   onCancel,
 }: Props) {
+  const { t } = useI18n();
   const theirs = conflict.theirs;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>This changed while you were editing</DialogTitle>
-          <DialogDescription>
-            Something else saved this item since you opened it. Nothing has been
-            overwritten. Choose which version to keep.
-          </DialogDescription>
+          <DialogTitle>{t("conflict.title")}</DialogTitle>
+          <DialogDescription>{t("conflict.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Side title="Yours" subtitle="what you have been writing" heading={ours.title} body={ours.body} />
           <Side
-            title="Stored"
-            subtitle="what is on disk now"
+            title={t("conflict.ours")}
+            subtitle={t("conflict.oursNote")}
+            heading={ours.title}
+            body={ours.body}
+          />
+          <Side
+            title={t("conflict.theirs")}
+            subtitle={t("conflict.theirsNote")}
             heading={theirs?.title ?? ""}
-            body={theirs?.body ?? "(could not be read)"}
+            body={theirs?.body ?? t("conflict.unreadable")}
           />
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={onCancel}>
-            Keep editing
+            {t("conflict.keepEditing")}
           </Button>
           <Button variant="outline" onClick={onTakeTheirs}>
-            Discard mine, load stored
+            {t("conflict.takeTheirs")}
           </Button>
-          <Button onClick={onKeepOurs}>Overwrite with mine</Button>
+          <Button onClick={onKeepOurs}>{t("conflict.keepOurs")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

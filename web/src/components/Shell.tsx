@@ -1,10 +1,18 @@
 import type { ReactNode } from "react";
 import { cn } from "cn";
-import { FileText, Files, Settings2, Tags, Search } from "lucide-react";
+import { FileText, Files, Languages, Settings2, Tags, Search } from "lucide-react";
+
+import { locales, useI18n, type Locale } from "@/i18n";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export type Section = "post" | "page" | "taxonomies" | "settings";
 
@@ -35,6 +43,8 @@ export function Shell({
   footer,
   children,
 }: Props) {
+  const { t } = useI18n();
+
   return (
     <div className="flex min-h-svh bg-background">
       <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r bg-sidebar md:flex">
@@ -54,38 +64,38 @@ export function Shell({
             className="flex w-full items-center gap-2 rounded-md bg-muted px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <Search className="size-3.5" />
-            <span className="flex-1 text-left">Search</span>
+            <span className="flex-1 text-left">{t("nav.search")}</span>
           </button>
         </div>
 
         <nav className="mt-4 flex-1 space-y-6 px-3">
-          <Group label="Content">
+          <Group label={t("nav.content")}>
             <Item
               icon={<FileText className="size-4" />}
-              label="Posts"
+              label={t("nav.posts")}
               count={counts?.post}
               active={section === "post"}
               onClick={() => onSection("post")}
             />
             <Item
               icon={<Files className="size-4" />}
-              label="Pages"
+              label={t("nav.pages")}
               count={counts?.page}
               active={section === "page"}
               onClick={() => onSection("page")}
             />
             <Item
               icon={<Tags className="size-4" />}
-              label="Taxonomies"
+              label={t("nav.taxonomies")}
               active={section === "taxonomies"}
               onClick={() => onSection("taxonomies")}
             />
           </Group>
 
-          <Group label="Site">
+          <Group label={t("nav.site")}>
             <Item
               icon={<Settings2 className="size-4" />}
-              label="Settings"
+              label={t("nav.settings")}
               active={section === "settings"}
               onClick={() => onSection("settings")}
             />
@@ -95,14 +105,49 @@ export function Shell({
         <div className="p-3">
           {footer}
           <Separator className="my-3" />
-          <p className="px-2 text-xs text-muted-foreground">
-            {site ? `${site.store} store · ${site.runtime}` : "connecting"}
-          </p>
+          <div className="flex items-center justify-between gap-2 px-2">
+            <p className="min-w-0 truncate text-xs text-muted-foreground">
+              {site
+                ? t("shell.runtime", { store: site.store ?? "", runtime: site.runtime ?? "" })
+                : t("shell.connecting")}
+            </p>
+            <LanguagePicker />
+          </div>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col md:ml-60">{children}</div>
     </div>
+  );
+}
+
+/**
+ * The admin speaks the operator's language, which is not the site's: a
+ * Chinese author may well publish in English, and the reverse.
+ */
+function LanguagePicker() {
+  const { locale, setLocale, t } = useI18n();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon" className="size-6" title={t("nav.language")}>
+            <Languages className="size-3.5" />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end">
+        {(Object.keys(locales) as Locale[]).map((code) => (
+          <DropdownMenuItem
+            key={code}
+            onClick={() => setLocale(code)}
+            className={cn(code === locale && "font-medium text-primary")}
+          >
+            {locales[code].label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

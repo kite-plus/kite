@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { ArrowLeft, Trash2 } from "lucide-react";
 
+import { useI18n, useProblem, type Key } from "@/i18n";
 import { useContentTypes } from "@/hooks/useContents";
 import { useItem } from "@/hooks/useItem";
 import { Alert } from "@/components/Alert";
@@ -31,6 +32,8 @@ interface Props {
 const statuses = ["draft", "published", "scheduled", "archived"];
 
 export function EditorPage({ id, kind, onClose, onCreated }: Props) {
+  const { t } = useI18n();
+  const problem = useProblem();
   const types = useContentTypes();
   const item = useItem(id, kind);
   const [uploading, setUploading] = useState(0);
@@ -60,14 +63,16 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
 
   if (item.status === "loading") {
     return (
-      <div className="p-10 text-center text-sm text-muted-foreground">Loading</div>
+      <div className="p-10 text-center text-sm text-muted-foreground">
+        {t("editor.loading")}
+      </div>
     );
   }
   if (!item.draft) {
     return (
       <div className="p-6">
-        <Alert tone="stop" title="Nothing to edit">
-          {item.error}
+        <Alert tone="stop" title={t("editor.nothingToEdit")}>
+          {item.error?.detail}
         </Alert>
       </div>
     );
@@ -76,24 +81,24 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
   const draft = item.draft;
   const state =
     uploading > 0
-      ? `uploading ${uploading}`
+      ? t("editor.uploading", { count: uploading })
       : item.status === "saving"
-        ? "saving"
+        ? t("editor.saving")
         : item.dirty
-          ? "unsaved"
-          : "saved";
+          ? t("editor.unsaved")
+          : t("editor.saved");
 
   return (
     <div className="flex h-svh flex-col bg-background">
       <header className="flex min-h-14 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4">
-        <Button variant="ghost" size="icon" onClick={onClose} title="Back">
+        <Button variant="ghost" size="icon" onClick={onClose} title={t("editor.back")}>
           <ArrowLeft className="size-4" />
         </Button>
 
         <Input
           value={draft.title}
           onChange={(e) => item.edit({ title: e.target.value })}
-          placeholder="Title"
+          placeholder={t("editor.titlePlaceholder")}
           className="min-w-40 flex-1 border-0 bg-transparent px-1 text-base font-semibold shadow-none focus-visible:ring-0 md:text-base"
         />
 
@@ -102,12 +107,14 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
           onValueChange={(v) => v && item.edit({ status: v })}
         >
           <SelectTrigger size="sm" className="w-32">
-            <SelectValue />
+            {/* base-ui renders the stored value, which is the English name
+                the file carries; a person should read their own language. */}
+            <SelectValue>{(v: string) => t(`status.${v}` as Key)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {statuses.map((s) => (
               <SelectItem key={s} value={s}>
-                {s}
+                {t(`status.${s}` as Key)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -125,28 +132,37 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
             if (saved && !id) onCreated(saved);
           }}
         >
-          Save
+          {t("editor.save")}
         </Button>
       </header>
 
       {(item.error || uploadError) && (
         <div className="border-b px-4 py-2">
-          <Alert tone="stop">{item.error ?? uploadError}</Alert>
+          <Alert
+            tone="stop"
+            title={
+              item.error
+                ? problem(item.error.code, item.error.detail).title
+                : (uploadError ?? "")
+            }
+          >
+            {item.error ? problem(item.error.code, item.error.detail).detail : null}
+          </Alert>
         </div>
       )}
 
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-72 shrink-0 overflow-auto border-r p-4 lg:block">
           <div className="space-y-3">
-            <Field label="Slug">
+            <Field label={t("editor.slug")}>
               <Input
                 value={draft.slug ?? ""}
                 onChange={(e) => item.edit({ slug: e.target.value })}
-                placeholder="derived from the title"
+                placeholder={t("editor.slugPlaceholder")}
               />
             </Field>
 
-            <Field label="Published">
+            <Field label={t("editor.publishedAt")}>
               <Input
                 type="datetime-local"
                 value={toLocalInput(draft.published_at)}
@@ -175,7 +191,7 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
                       },
                     })
                   }
-                  placeholder="comma separated"
+                  placeholder={t("editor.commaSeparated")}
                 />
               </Field>
             ))}
@@ -202,13 +218,13 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
                 size="sm"
                 className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={async () => {
-                  if (confirm("Delete this item and everything in its folder?")) {
+                  if (confirm(t("editor.confirmDelete"))) {
                     if (await item.remove()) onClose();
                   }
                 }}
               >
                 <Trash2 className="size-4" />
-                Delete
+                {t("editor.delete")}
               </Button>
             </>
           )}

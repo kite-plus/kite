@@ -1,6 +1,8 @@
 import { Suspense, lazy, useDeferredValue, useState } from "react";
 import { Plus, Search } from "lucide-react";
 
+import { useI18n } from "@/i18n";
+
 import {
   useContents,
   useSite,
@@ -38,6 +40,7 @@ type Open = { id: string | null; kind: string } | null;
 const ANY = "__any__";
 
 export default function App() {
+  const { t } = useI18n();
   const site = useSite();
   const taxonomies = useTaxonomies();
 
@@ -64,7 +67,9 @@ export default function App() {
     return (
       <Suspense
         fallback={
-          <div className="p-10 text-center text-sm text-muted-foreground">Loading</div>
+          <div className="p-10 text-center text-sm text-muted-foreground">
+            {t("list.loading")}
+          </div>
         }
       >
         <EditorPage
@@ -94,21 +99,23 @@ export default function App() {
   }
   if (section === "taxonomies") {
     return shell(
-      <Page title="Taxonomies" description="Terms are derived from what your content carries.">
+      <Page title={t("taxonomies.title")} description={t("taxonomies.description")}>
         <div className="grid gap-4 sm:grid-cols-2">
-          {taxonomies.data?.items.map((t) => (
-            <div key={t.name} className="rounded-md border p-4">
+          {taxonomies.data?.items.map((item) => (
+            <div key={item.name} className="rounded-md border p-4">
               <div className="flex items-baseline justify-between">
-                <span className="text-sm font-medium">{t.name}</span>
-                <span className="text-xs text-muted-foreground">{t.terms} terms</span>
+                <span className="text-sm font-medium">{item.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("taxonomies.terms", { count: item.terms })}
+                </span>
               </div>
               <a
-                href={t.url}
+                href={item.url}
                 target="_blank"
                 rel="noreferrer"
                 className="mt-1 block truncate font-mono text-xs text-muted-foreground hover:text-primary"
               >
-                {t.url}
+                {item.url}
               </a>
             </div>
           ))}
@@ -117,16 +124,16 @@ export default function App() {
     );
   }
 
-  const label = section === "post" ? "Posts" : "Pages";
-
   return shell(
     <Page
-      title={label}
-      description={total !== undefined ? `${total} in this section` : undefined}
+      title={t(section === "post" ? "nav.posts" : "nav.pages")}
+      description={
+        total !== undefined ? t("list.inSection", { count: total }) : undefined
+      }
       actions={
         <Button size="sm" onClick={() => setOpen({ id: null, kind: section })}>
           <Plus className="size-4" />
-          New
+          {t("list.new")}
         </Button>
       }
     >
@@ -134,7 +141,7 @@ export default function App() {
         <Alert
           tone="warn"
           className="mb-4"
-          title={`${site.data.problems.length} file${site.data.problems.length === 1 ? "" : "s"} could not be indexed`}
+          title={t("problems.notIndexed", { count: site.data.problems.length })}
         >
           <ul className="mt-1 space-y-0.5 font-mono text-xs">
             {site.data.problems.map((p) => (
@@ -150,20 +157,20 @@ export default function App() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title, excerpt and body"
+            placeholder={t("list.search")}
             className="h-8 pl-8"
           />
         </div>
 
         <Filter
-          label="Status"
+          label={t("list.status")}
           value={filters.status}
           onChange={(v) => set({ status: v ?? undefined })}
           options={["published", "draft", "scheduled", "archived"]}
         />
 
         <Filter
-          label="In"
+          label={t("list.filterIn")}
           value={taxonomy}
           onChange={(v) => {
             setTaxonomy(v ?? "");
@@ -174,7 +181,7 @@ export default function App() {
 
         {taxonomy && (
           <Filter
-            label="Term"
+            label={t("list.filterTerm")}
             value={filters.term?.split(":")[1]}
             onChange={(v) => set({ term: v ? `${taxonomy}:${v}` : undefined })}
             options={terms.data?.items.map((t) => t.term) ?? []}
@@ -183,7 +190,7 @@ export default function App() {
       </div>
 
       {contents.error ? (
-        <Alert tone="stop" title="Could not load content">
+        <Alert tone="stop" title={t("list.failed")}>
           {String(contents.error)}
         </Alert>
       ) : (
@@ -219,6 +226,7 @@ function Filter({
   onChange: (value: string | undefined) => void;
   options: string[];
 }) {
+  const { t } = useI18n();
   if (options.length === 0) return null;
   return (
     <Select
@@ -232,13 +240,13 @@ function Filter({
           {(v: string) => (
             <span className="truncate">
               <span className="text-muted-foreground">{label}: </span>
-              {!v || v === ANY ? "any" : v}
+              {!v || v === ANY ? t("list.filterAny") : v}
             </span>
           )}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={ANY}>any</SelectItem>
+        <SelectItem value={ANY}>{t("list.filterAny")}</SelectItem>
         {options.map((o) => (
           <SelectItem key={o} value={o}>
             {o}

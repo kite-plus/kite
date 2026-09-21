@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { api, unwrap, type Settings } from "@/api/client";
+import { useI18n, useProblem, type Key } from "@/i18n";
 import { Alert } from "@/components/Alert";
 import { Page } from "@/components/Shell";
 import { SchemaForm } from "@/components/SchemaForm";
@@ -9,6 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+/** asAlert turns a translated problem into the shape Alert takes. */
+function asAlert({ title, detail }: { title: string; detail?: string }) {
+  return { title, children: detail };
+}
 
 /** sitePaths maps a field of SiteSettings to the config path that holds it. */
 const sitePaths = {
@@ -18,11 +24,11 @@ const sitePaths = {
   language: "site.language",
 } as const;
 
-const labels: Record<keyof typeof sitePaths, string> = {
-  title: "Title",
-  description: "Description",
-  base_url: "Base URL",
-  language: "Language",
+const labels: Record<keyof typeof sitePaths, Key> = {
+  title: "settings.siteTitle",
+  description: "settings.siteDescription",
+  base_url: "settings.siteBaseURL",
+  language: "settings.siteLanguage",
 };
 
 /**
@@ -34,12 +40,14 @@ const labels: Record<keyof typeof sitePaths, string> = {
  * reason configuring one is normally a development task.
  */
 export function SettingsPage() {
+  const { t } = useI18n();
+  const problem = useProblem();
   const queryClient = useQueryClient();
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [site, setSite] = useState<Record<string, unknown>>({});
   const [theme, setTheme] = useState<Record<string, unknown>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ code?: string; detail: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -51,24 +59,22 @@ export function SettingsPage() {
         setSite({ ...data.site });
         setTheme({ ...(data.theme.values ?? {}) });
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError({ detail: err instanceof Error ? err.message : String(err) });
       }
     })();
   }, []);
 
   if (error && !settings) {
     return (
-      <Page title="Settings">
-        <Alert tone="stop" title="Could not load the settings">
-          {error}
-        </Alert>
+      <Page title={t("settings.title")}>
+        <Alert {...asAlert(problem(error.code, error.detail))} tone="stop" />
       </Page>
     );
   }
   if (!settings) {
     return (
-      <Page title="Settings">
-        <p className="text-sm text-muted-foreground">Loading</p>
+      <Page title={t("settings.title")}>
+        <p className="text-sm text-muted-foreground">{t("list.loading")}</p>
       </Page>
     );
   }
@@ -93,7 +99,7 @@ export function SettingsPage() {
     const { data, error } = await api.PUT("/settings", { body: changes() });
     setSaving(false);
     if (error) {
-      setError(error.error.message);
+      setError({ code: error.error.code, detail: error.error.message });
       return;
     }
     setSettings(data);
@@ -105,25 +111,25 @@ export function SettingsPage() {
 
   return (
     <Page
-      title="Settings"
-      description="Written to kite.yaml, leaving everything else in it alone."
+      title={t("settings.title")}
+      description={t("settings.description")}
       actions={
         <Button size="sm" disabled={!dirty || saving} onClick={save}>
-          {saving ? "Saving" : "Save"}
+          {saving ? t("settings.saving") : t("settings.save")}
         </Button>
       }
     >
       <div className="max-w-2xl space-y-4">
-        {error && <Alert tone="stop">{error}</Alert>}
+        {error && <Alert {...asAlert(problem(error.code, error.detail))} tone="stop" />}
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Site</CardTitle>
+            <CardTitle className="text-sm">{t("settings.site")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {(Object.keys(sitePaths) as (keyof typeof sitePaths)[]).map((key) => (
               <div key={key} className="space-y-1.5">
-                <Label htmlFor={key}>{labels[key]}</Label>
+                <Label htmlFor={key}>{t(labels[key])}</Label>
                 <Input
                   id={key}
                   value={String(site[key] ?? "")}
@@ -139,8 +145,10 @@ export function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Theme</CardTitle>
-            <CardDescription>{settings.theme.name} declares these itself.</CardDescription>
+            <CardTitle className="text-sm">{t("settings.theme")}</CardTitle>
+            <CardDescription>
+              {t("settings.themeNote", { theme: settings.theme.name })}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {settings.theme.schema && settings.theme.schema.length > 0 ? (
@@ -153,9 +161,7 @@ export function SettingsPage() {
                 }}
               />
             ) : (
-              <p className="text-sm text-muted-foreground">
-                This theme declares no settings.
-              </p>
+              <p className="text-sm text-muted-foreground">{t("settings.themeEmpty")}</p>
             )}
           </CardContent>
         </Card>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Draft } from "@/api/client";
+import { useI18n } from "@/i18n";
 
 interface Props {
   draft: Draft | null;
@@ -16,6 +17,7 @@ interface Props {
  * page the build would write.
  */
 export function Preview({ draft, id }: Props) {
+  const { t } = useI18n();
   const [html, setHtml] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
   const frame = useRef<HTMLIFrameElement>(null);
@@ -40,7 +42,9 @@ export function Preview({ draft, id }: Props) {
         );
         if (!response.ok) {
           const body = await response.json().catch(() => null);
-          setFailed(body?.error?.message ?? `the preview failed (${response.status})`);
+          setFailed(
+            body?.error?.message ?? t("editor.previewFailed", { status: response.status }),
+          );
           return;
         }
         setFailed(null);
@@ -54,7 +58,7 @@ export function Preview({ draft, id }: Props) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [draft, id]);
+  }, [draft, id, t]);
 
   // The document is written into the frame rather than assigned to srcdoc, so
   // that the scroll position survives a re-render and an author does not lose
