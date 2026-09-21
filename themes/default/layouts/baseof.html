@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ with .Page }}{{ .Title }} · {{ end }}{{ .Site.Title }}</title>
+  <title>{{ with .Page }}{{ with .Title }}{{ . }} · {{ end }}{{ end }}{{ .Site.Title }}</title>
   {{ with .Page }}<meta name="description" content="{{ .Description }}">{{ end }}
   <link rel="alternate" type="application/rss+xml" href="/rss.xml">
   {{ partial "style.html" . }}

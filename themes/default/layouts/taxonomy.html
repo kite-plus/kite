@@ -1,5 +1,5 @@
 {{ define "main" }}
-  <h1>{{ with .Page }}{{ .Title }}{{ end }}</h1>
+  <h1>{{ .Page.Title }}</h1>
   <ul class="terms">
     {{ range .Terms }}
       <li><a href="{{ .RelPermalink }}">{{ .Name }}</a> <span class="count">{{ .Count }}</span></li>

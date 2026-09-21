@@ -1,5 +1,5 @@
 {{ define "main" }}
-  <h1>{{ with .Page }}{{ .Title }}{{ end }}</h1>
+  <h1>{{ .Page.Title }}</h1>
   {{ partial "post-list.html" . }}
   {{ partial "pagination.html" . }}
 {{ end }}

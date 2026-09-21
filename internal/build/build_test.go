@@ -331,3 +331,49 @@ func excerptOf(s, marker string) string {
 	}
 	return s[i:min(i+200, len(s))]
 }
+
+// Titles were derived from whatever was at hand while rendering, which gave
+// the home page a content type's name, left the error page with none, and
+// printed internal taxonomy names as the author never wrote them.
+func TestEveryPageKindIsTitledSensibly(t *testing.T) {
+	f := newFixture(t, 4)
+	_, _ = f.run(t, f.out, nil)
+
+	for _, tc := range []struct {
+		file  string
+		title string
+		why   string
+	}{
+		{"index.html", "Test", "the home page is the site, not one of its content types"},
+		{"posts/index.html", "Posts · Test", "a listing is named after what it lists"},
+		{"tags/index.html", "Tags · Test", "a taxonomy Kite named is presented, not printed raw"},
+		{"tags/go/index.html", "Go · Test", "a term keeps the spelling its author used"},
+		{"404.html", "Not found · Test", "an error page still has to say what it is"},
+	} {
+		got := documentTitle(t, readFile(t, f.out, tc.file))
+		if got != tc.title {
+			t.Errorf("%s: title = %q, want %q\n  (%s)", tc.file, got, tc.title, tc.why)
+		}
+	}
+}
+
+func TestPageWithoutATitleLeavesNoDanglingSeparator(t *testing.T) {
+	f := newFixture(t, 2)
+	_, _ = f.run(t, f.out, nil)
+
+	title := documentTitle(t, readFile(t, f.out, "index.html"))
+	if strings.HasPrefix(title, "·") || strings.Contains(title, " ·  ") {
+		t.Errorf("title = %q, want no separator with nothing in front of it", title)
+	}
+}
+
+func documentTitle(t *testing.T, page string) string {
+	t.Helper()
+	const open, close = "<title>", "</title>"
+	i := strings.Index(page, open)
+	j := strings.Index(page, close)
+	if i < 0 || j < i {
+		t.Fatal("page has no title element")
+	}
+	return strings.TrimSpace(page[i+len(open) : j])
+}

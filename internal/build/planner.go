@@ -3,6 +3,7 @@ package build
 import (
 	"context"
 	"fmt"
+	"unicode"
 
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render"
@@ -74,7 +75,7 @@ func (b *Builder) planSingles(ctx context.Context, p *Plan, all []content.Summar
 
 func (b *Builder) planHome(p *Plan, all []content.Summary) {
 	posts := filterKind(all, "post")
-	b.paginate(p, render.KindHome, "/", "post", "", posts)
+	b.paginate(p, render.KindHome, "/", "post", "", "", posts)
 }
 
 func (b *Builder) planLists(p *Plan, all []content.Summary) {
@@ -87,7 +88,7 @@ func (b *Builder) planLists(p *Plan, all []content.Summary) {
 		if base == "/" {
 			continue // the home page already covers this listing
 		}
-		b.paginate(p, render.KindList, base, string(t.Kind), "", items)
+		b.paginate(p, render.KindList, base, string(t.Kind), "", displayName(t.Dir), items)
 	}
 }
 
@@ -104,10 +105,11 @@ func (b *Builder) planTaxonomies(ctx context.Context, p *Plan) error {
 
 		link := b.opts.Resolver.ForTaxonomy(taxonomy, b.opts.Site.Language)
 		p.Targets = append(p.Targets, Target{
-			Kind: render.KindTaxonomy,
-			URL:  link,
-			Path: b.opts.Resolver.OutputPath(link),
-			Type: taxonomy,
+			Kind:  render.KindTaxonomy,
+			URL:   link,
+			Path:  b.opts.Resolver.OutputPath(link),
+			Type:  taxonomy,
+			Title: displayName(taxonomy),
 		})
 
 		for _, c := range counts {
@@ -116,7 +118,9 @@ func (b *Builder) planTaxonomies(ctx context.Context, p *Plan) error {
 				return err
 			}
 			base := b.opts.Resolver.ForTerm(taxonomy, c.Term, b.opts.Site.Language)
-			b.paginate(p, render.KindTerm, base, taxonomy, c.Term, items)
+			// A term keeps the spelling its author used; only Kite's own
+			// names are presented.
+			b.paginate(p, render.KindTerm, base, taxonomy, c.Term, c.Term, items)
 		}
 	}
 	return nil
@@ -148,9 +152,10 @@ func (b *Builder) planNotFound(p *Plan) {
 		return
 	}
 	p.Targets = append(p.Targets, Target{
-		Kind: render.KindNotFound,
-		URL:  "/404",
-		Path: "404.html",
+		Kind:  render.KindNotFound,
+		URL:   "/404",
+		Path:  "404.html",
+		Title: "Not found",
 	})
 }
 
@@ -159,7 +164,7 @@ func (b *Builder) planNotFound(p *Plan) {
 // Every page of a listing is its own target with its own cache key, rather
 // than a by-product of rendering the first one. That is what makes paginated
 // sections eligible for incremental rebuilds later.
-func (b *Builder) paginate(p *Plan, kind render.Kind, base, typ, term string, items []content.Summary) {
+func (b *Builder) paginate(p *Plan, kind render.Kind, base, typ, term, title string, items []content.Summary) {
 	size := b.opts.PageSize
 	pages := max(1, (len(items)+size-1)/size)
 
@@ -173,11 +178,22 @@ func (b *Builder) paginate(p *Plan, kind render.Kind, base, typ, term string, it
 			Path:       b.opts.Resolver.OutputPath(link),
 			Type:       typ,
 			Term:       term,
+			Title:      title,
 			Page:       n,
 			Items:      items[lo:hi],
 			TotalItems: len(items),
 		})
 	}
+}
+
+// displayName turns an internal name into one fit to print: "posts" becomes
+// "Posts". Only names Kite chose are transformed, never an author's words.
+func displayName(s string) string {
+	if s == "" {
+		return ""
+	}
+	r := []rune(s)
+	return string(unicode.ToUpper(r[0])) + string(r[1:])
 }
 
 func filterKind(all []content.Summary, kind content.Kind) []content.Summary {

@@ -44,6 +44,11 @@ type Target struct {
 
 	// Layout overrides the template base name.
 	Layout string
+
+	// Title is what a listing calls itself. It is set here rather than derived
+	// while rendering, because what a page is called is a question about the
+	// site, not about the template that happens to draw it.
+	Title string
 }
 
 // ID is a stable identifier used for cache keys and logs.

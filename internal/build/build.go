@@ -301,19 +301,11 @@ func (b *Builder) renderBody(ctx context.Context, item *content.Content) (*markd
 // listingPage synthesizes the Page of a listing, so that a theme can write
 // {{ .Page.Title }} on every kind of page.
 func (b *Builder) listingPage(t Target) render.Page {
-	title := t.Term
-	if title == "" {
-		if ct := b.opts.Types.Get(content.Kind(t.Type)); ct != nil {
-			title = ct.Label
-		} else {
-			title = t.Type
-		}
-	}
 	item := &content.Content{
 		ID:    content.ID("listing:" + t.URL),
 		Kind:  content.Kind(t.Type),
 		Slug:  t.URL,
-		Title: title,
+		Title: t.Title,
 	}
 	return render.NewPage(item, render.PageOptions{Kind: t.Kind, Rendered: &markdown.Document{}})
 }
