@@ -93,9 +93,29 @@ are; nothing needs rewriting first.
 | `kite list` | query content from the index |
 | `kite doctor` | check the project, and repair what is safe to repair |
 | `kite publish` | commit content, and push it when asked to |
+| `kite auth` | set the password the studio asks for |
 | `kite openapi` | print the description of the read model API |
 
 Every command takes `--json`, so none of them have to be parsed as prose.
+
+### The studio
+
+`kite run` opens the studio at `/admin/`. On localhost a project with no
+password is open, because there is nobody else on the machine to keep out.
+Anywhere else the studio needs an account, and a server that would put an
+unguarded one on a reachable address refuses to start rather than warning
+about it.
+
+```bash
+kite auth set-password                          # asked for twice, never echoed
+kite serve --admin --write --addr 0.0.0.0:1717
+```
+
+The account is stored in `.kite/secrets/account.json` as an argon2id hash. It
+is never committed, and it has to survive a deployment for the account to. A
+container can supply one from the environment instead -- `KITE_ADMIN_USER` with
+`KITE_ADMIN_PASSWORD`, or `KITE_ADMIN_PASSWORD_HASH` to keep a plaintext
+password out of the process list -- and the environment wins over the file.
 
 ## Design
 

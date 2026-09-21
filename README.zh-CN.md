@@ -84,9 +84,26 @@ kite build --verify     # 构建两次，逐字节比对
 | `kite list` | 从索引里查询内容 |
 | `kite doctor` | 体检，并修复可以安全修复的问题 |
 | `kite publish` | 提交内容，需要时推送到远端 |
+| `kite auth` | 设置后台的登录密码 |
 | `kite openapi` | 打印只读 API 的描述文档 |
 
 所有命令都支持 `--json`，不必把输出当作自然语言去解析。
+
+### 后台
+
+`kite run` 会在 `/admin/` 打开后台。在 localhost 上，没有设置密码的项目是敞开的
+——这台机器上没有别人需要挡。换成任何别的地址，后台就必须有账号：没有账号却要
+把它放到别人能访问的地址上时，服务器会直接拒绝启动，而不是打一行警告了事。
+
+```bash
+kite auth set-password                          # 输入两次，不回显
+kite serve --admin --write --addr 0.0.0.0:1717
+```
+
+账号以 argon2id 哈希的形式存放在 `.kite/secrets/account.json`，永远不会被提交，
+也必须在部署时保留下来，账号才会跟着留下来。容器可以改用环境变量提供账号：
+`KITE_ADMIN_USER` 配 `KITE_ADMIN_PASSWORD`，或者用 `KITE_ADMIN_PASSWORD_HASH`
+以免明文密码出现在进程列表里；环境变量优先于文件。
 
 ## 设计
 
