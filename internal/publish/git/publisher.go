@@ -301,10 +301,22 @@ func (p *Publisher) message(req publish.Request) string {
 	case 0:
 		return "publish"
 	case 1:
-		return "publish: " + path.Base(path.Dir(req.Paths[0]))
+		return "publish: " + itemName(req.Paths[0])
 	default:
 		return fmt.Sprintf("publish: %d files", len(req.Paths))
 	}
+}
+
+// itemName is what to call a path in a commit subject.
+//
+// A bundle and a single file are both named by the item they hold, so
+// content/posts/hello and content/posts/hello.md both come out as "hello".
+func itemName(p string) string {
+	name := path.Base(strings.TrimSuffix(p, "/"))
+	if name == "index.md" {
+		name = path.Base(path.Dir(p))
+	}
+	return strings.TrimSuffix(name, path.Ext(name))
 }
 
 func (p *Publisher) head(ctx context.Context) string {

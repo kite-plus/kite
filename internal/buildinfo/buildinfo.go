@@ -1,6 +1,11 @@
 // Package buildinfo carries values stamped into the binary at link time.
 package buildinfo
 
+import (
+	"runtime"
+	"strings"
+)
+
 // Version is the release version, set via -ldflags at build time.
 var Version = "dev"
 
@@ -23,3 +28,9 @@ const PluginABIVersion = 1
 // BuildABIVersion changes whenever build cache keying changes, invalidating
 // every cached artifact.
 const BuildABIVersion = 1
+
+// GoVersion is the Go release this binary was built with, without the "go"
+// prefix, for a workflow that has to install the same toolchain.
+func GoVersion() string {
+	return strings.TrimPrefix(runtime.Version(), "go")
+}

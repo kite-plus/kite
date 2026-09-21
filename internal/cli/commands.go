@@ -96,11 +96,25 @@ func newInitCmd() *cobra.Command {
 				}
 			}
 
+			// A deploy workflow is written now rather than offered later,
+			// so that the first push already has somewhere to go.
+			workflow, err := writeWorkflow(root, "main")
+			if err != nil {
+				return err
+			}
+			if workflow != "" {
+				dirs = append(dirs, workflow)
+			}
+
 			if jsonOut(cmd) {
 				return writeJSON(cmd.OutOrStdout(), map[string]any{"root": root, "created": dirs})
 			}
 			printf(cmd, "Initialized a Kite project in %s\n", root)
-			printf(cmd, "\nNext:\n  kite new post \"My first post\"\n")
+			printf(cmd, "\nNext:\n  kite new post \"My first post\"\n  kite run\n")
+			if workflow != "" {
+				printf(cmd, "\n%s will build and deploy this site on every push to main.\n", workflow)
+				printf(cmd, "Turn on Pages first: Settings -> Pages -> Source -> GitHub Actions.\n")
+			}
 			return nil
 		},
 	}

@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/kite-plus/kite/internal/buildinfo"
+	"github.com/kite-plus/kite/internal/publish"
 )
 
 // OpenAPIPath is where the description of this API is served.
@@ -140,6 +141,12 @@ func openAPI() *document {
 		out["201"] = response{Description: desc, Content: jsonOf(schema)}
 		return out
 	}
+	// A refused publish carries the plan, so every reason can be shown at
+	// once, and what did happen, since a push can fail after its commit.
+	withRefused := func(schema *jsonSchema, out map[string]response) map[string]response {
+		out["409"] = response{Description: "The publish did not fully happen.", Content: jsonOf(schema)}
+		return out
+	}
 	// A conflict is its own body, not the ordinary error shape: it carries the
 	// version that is now stored so the client can show both.
 	withConflict := func(schema *jsonSchema, out map[string]response) map[string]response {
@@ -166,6 +173,26 @@ func openAPI() *document {
 				OperationID: "listContentTypes",
 				Summary:     "List content types and the field schema forms are generated from.",
 				Responses:   ok(ref(List[ContentType]{}), "The registry."),
+			}},
+			"/publish": {
+				Get: &operation{
+					OperationID: "getDeliveryState",
+					Summary:     "Report how far the content has traveled.",
+					Responses:   ok(ref(publish.DeliveryState{}), "The delivery state."),
+				},
+				Post: &operation{
+					OperationID: "publish",
+					Summary:     "Commit the named content, and push it when asked to.",
+					RequestBody: body(ref(PublishBody{})),
+					Responses: withRefused(ref(PublishRefused{}),
+						ok(ref(publish.Result{}), "What was published.", "400", "404", "405", "501")),
+				},
+			},
+			"/publish/preflight": {Post: &operation{
+				OperationID: "preflightPublish",
+				Summary:     "Report what a publish would do, changing nothing.",
+				RequestBody: body(ref(PublishBody{})),
+				Responses:   ok(ref(publish.Plan{}), "The plan, with everything wrong with it.", "400", "404", "405", "501"),
 			}},
 			"/settings": {
 				Get: &operation{

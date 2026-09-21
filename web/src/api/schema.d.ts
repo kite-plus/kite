@@ -109,6 +109,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report how far the content has traveled. */
+        get: operations["getDeliveryState"];
+        put?: never;
+        /** Commit the named content, and push it when asked to. */
+        post: operations["publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/publish/preflight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report what a publish would do, changing nothing. */
+        post: operations["preflightPublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings": {
         parameters: {
             query?: never;
@@ -207,6 +242,20 @@ export interface components {
             next_cursor?: string;
             total?: number;
         };
+        DeliveryState: {
+            ahead: number;
+            behind: number;
+            branch?: string;
+            /** Format: date-time */
+            checked_at?: string;
+            committed: string;
+            deployed: string;
+            dirty?: string[];
+            last_error?: components["schemas"]["Problem"];
+            local: string;
+            pushed: string;
+            remote?: string;
+        };
         Draft: {
             aliases?: string[];
             body: string;
@@ -289,6 +338,40 @@ export interface components {
         Option: {
             label: string;
             value: string;
+        };
+        Plan: {
+            branch?: string;
+            message: string;
+            paths: string[];
+            problems?: components["schemas"]["Problem"][];
+            publisher: string;
+            push: boolean;
+            remote?: string;
+            warnings?: components["schemas"]["Problem"][];
+        };
+        Problem: {
+            code: string;
+            detail: string;
+            fix?: string;
+        };
+        PublishBody: {
+            force?: boolean;
+            ids?: string[];
+            message?: string;
+            paths?: string[];
+            push: boolean;
+        };
+        PublishRefused: {
+            done?: components["schemas"]["Result"];
+            error: components["schemas"]["ErrorDetail"];
+            plan?: components["schemas"]["Plan"];
+        };
+        Result: {
+            /** Format: date-time */
+            at?: string;
+            commit?: string;
+            committed?: string[];
+            pushed: boolean;
         };
         Settings: {
             site: components["schemas"]["SiteSettings"];
@@ -808,6 +891,155 @@ export interface operations {
             };
             /** @description Failed. */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    getDeliveryState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryState"];
+                };
+            };
+        };
+    };
+    publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishBody"];
+            };
+        };
+        responses: {
+            /** @description What was published. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Result"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The publish did not fully happen. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishRefused"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    preflightPublish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishBody"];
+            };
+        };
+        responses: {
+            /** @description The plan, with everything wrong with it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plan"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

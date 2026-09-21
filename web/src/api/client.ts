@@ -1,5 +1,6 @@
 import createClient from "openapi-fetch";
 import type { paths, components } from "./schema";
+export type { components };
 
 /**
  * The one place a request is made.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/publish"
 	"github.com/kite-plus/kite/internal/render/url"
 	"github.com/kite-plus/kite/internal/schema"
 )
@@ -34,6 +35,11 @@ type View struct {
 	// Preview renders an item that is not on disk, through the same renderer,
 	// theme and resolver a build uses.
 	Preview func(context.Context, *content.Content) ([]byte, error)
+
+	// Publisher moves committed content onward. It is nil when the project
+	// has none configured, which is a perfectly ordinary way to run: an
+	// author may prefer to commit themselves.
+	Publisher publish.Publisher
 
 	// Refresh brings the read model and the routing table up to date after a
 	// write, and is called before the response is sent.

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/publish"
 	"github.com/kite-plus/kite/internal/render/url"
 	"github.com/kite-plus/kite/internal/schema"
 )
@@ -272,4 +273,32 @@ type ThemeSettings struct {
 	Name   string         `json:"name"`
 	Schema schema.Schema  `json:"schema,omitempty"`
 	Values map[string]any `json:"values,omitempty"`
+}
+
+// PublishBody names what to publish.
+type PublishBody struct {
+	// IDs name items; Paths name files directly, for anything that is not an
+	// item, such as the configuration.
+	IDs   []string `json:"ids,omitempty"`
+	Paths []string `json:"paths,omitempty"`
+
+	Message string `json:"message,omitempty"`
+
+	// Push sends the commit onward. Leaving the machine is a decision of its
+	// own, so it is asked for rather than assumed.
+	Push bool `json:"push"`
+
+	// Force proceeds despite warnings that have already been shown.
+	Force bool `json:"force,omitempty"`
+}
+
+// PublishRefused is returned when a publish did not fully happen.
+//
+// It carries the plan, so a client can show every reason at once, and what
+// did happen, because a push can fail after its commit succeeded and an
+// author should not be invited to repeat a commit they already have.
+type PublishRefused struct {
+	Error ErrorDetail     `json:"error"`
+	Plan  *publish.Plan   `json:"plan,omitempty"`
+	Done  *publish.Result `json:"done,omitempty"`
 }

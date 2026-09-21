@@ -386,6 +386,7 @@ func newWritableServer(t *testing.T, root string) (http.Handler, *site.Site) {
 			ThemeValues: current.ThemeSettings(),
 			Problems:    current.Problems,
 			Writer:      current.Project.Writer(),
+			Publisher:   current.Publisher(),
 			Refresh: func(ctx context.Context) error {
 				next, err := current.Reconfigure()
 				if err != nil {

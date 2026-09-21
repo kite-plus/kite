@@ -5,6 +5,7 @@ import { useItem } from "@/hooks/useItem";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { Editor } from "@/components/Editor";
 import { Preview } from "@/components/Preview";
+import { PublishPanel } from "@/components/PublishPanel";
 import { SchemaForm } from "@/components/SchemaForm";
 import { Failure, Select } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -172,6 +173,12 @@ export function EditorPage({ id, kind, onClose, onCreated }: Props) {
                 values={draft.meta ?? {}}
                 onChange={(meta) => item.edit({ meta })}
               />
+            </div>
+          )}
+
+          {id && (
+            <div className="mt-5 border-t border-[var(--border)] pt-4">
+              <PublishPanel ids={[id]} />
             </div>
           )}
 

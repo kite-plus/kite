@@ -19,6 +19,8 @@ import (
 	"github.com/kite-plus/kite/internal/hook/builtin"
 	"github.com/kite-plus/kite/internal/index"
 	"github.com/kite-plus/kite/internal/project"
+	"github.com/kite-plus/kite/internal/publish"
+	gitpub "github.com/kite-plus/kite/internal/publish/git"
 	"github.com/kite-plus/kite/internal/reader"
 	"github.com/kite-plus/kite/internal/render"
 	"github.com/kite-plus/kite/internal/render/markdown"
@@ -140,6 +142,25 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 		}),
 		Hooks: bus,
 	}, nil
+}
+
+// Publisher returns the configured publisher, or nil when the project
+// publishes nothing.
+//
+// A project without one is an ordinary way to run: an author may prefer to
+// commit and push themselves, and "none" says so rather than leaving a button
+// that half works.
+func (s *Site) Publisher() publish.Publisher {
+	switch s.Config.Publish.Publisher {
+	case "", "git":
+		return gitpub.New(gitpub.Options{
+			Root:    s.Project.Root,
+			Branch:  s.Config.Publish.Branch,
+			Message: s.Config.Publish.Message,
+		})
+	default:
+		return nil
+	}
 }
 
 // Close releases the site's resources.

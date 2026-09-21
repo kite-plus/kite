@@ -228,6 +228,7 @@ func (s *Server) view() api.View {
 	if s.opts.Write {
 		v.Writer = current.Project.Writer()
 		v.Refresh = s.refresh
+		v.Publisher = current.Publisher()
 	}
 	v.Preview = s.preview
 	return v

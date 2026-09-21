@@ -18,7 +18,14 @@ const (
 	CodeUnsupportedQuery = "unsupported_query"
 	CodeConflict         = "conflict"
 	CodeReadOnly         = "read_only"
-	CodeInternal         = "internal"
+
+	// A publish can be refused outright, need a warning acknowledged, or
+	// fail partway. They are told apart because the client acts on each
+	// differently.
+	CodePublishRefused           = "publish_refused"
+	CodePublishNeedsConfirmation = "publish_needs_confirmation"
+	CodePublishFailed            = "publish_failed"
+	CodeInternal                 = "internal"
 )
 
 // errNothingWritten reports a store that accepted a write and reported no
