@@ -43,6 +43,10 @@ type Problem struct {
 
 func (p Problem) Error() string { return p.Path + ": " + p.Err.Error() }
 
+// Unwrap exposes the underlying cause, so a caller can tell a duplicate id
+// from a file that would not parse without matching on the message.
+func (p Problem) Unwrap() error { return p.Err }
+
 // Scanner walks the content tree.
 type Scanner struct {
 	root  string

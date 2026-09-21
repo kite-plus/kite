@@ -7,9 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"time"
 
+	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/store/file"
 )
 
@@ -91,6 +94,18 @@ func (ix *Index) Reconcile(ctx context.Context) (Stats, error) {
 			problems = append(problems, file.Problem{
 				Path: st.Path,
 				Err:  errors.New("no id in front matter; run 'kite doctor --fix-ids'"),
+			})
+			return nil
+		}
+		holder, err := ix.idTaken(ctx, tx, entry)
+		if err != nil {
+			return err
+		}
+		if holder != "" {
+			problems = append(problems, file.Problem{
+				Path: st.Path,
+				Err: fmt.Errorf("%w: also claimed by %s; give one of them a new id",
+					content.ErrDuplicateID, holder),
 			})
 			return nil
 		}
@@ -187,8 +202,6 @@ func upsert(ctx context.Context, tx *sql.Tx, e *file.Entry, nowNS int64) error {
 		return err
 	}
 
-	// A file may have been renamed onto an ID that already sits at another
-	// path; clearing both keys first keeps the unique indexes satisfied.
 	if _, err := tx.ExecContext(ctx, `DELETE FROM contents WHERE path = ? OR id = ?`, e.Path, string(item.ID)); err != nil {
 		return fmt.Errorf("index: replace %s: %w", e.Path, err)
 	}
@@ -275,4 +288,31 @@ func orEmptySlice(s []string) []string {
 		return []string{}
 	}
 	return s
+}
+
+// idTaken reports the path of a file that still holds this entry's ID.
+//
+// An ID already sitting at another path means one of two things, and they must
+// not be confused: the file was renamed, in which case the old path is gone
+// and its row should go with it, or a second file now claims an ID that is
+// taken, in which case indexing it would make the first one disappear.
+//
+// Copying a bundle directory is an ordinary thing for an author to do, and it
+// duplicates the ID in the copy. So the incumbent is stat'd rather than
+// assumed gone: that stat is the only thing that tells a rename from a copy,
+// and the two need opposite outcomes.
+func (ix *Index) idTaken(ctx context.Context, tx *sql.Tx, e *file.Entry) (string, error) {
+	var holder string
+	err := tx.QueryRowContext(ctx,
+		`SELECT path FROM contents WHERE id = ? AND path <> ?`, string(e.Item.ID), e.Path).Scan(&holder)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("index: look up %s: %w", e.Item.ID, err)
+	}
+	if _, statErr := os.Stat(filepath.Join(ix.root, filepath.FromSlash(holder))); statErr != nil {
+		return "", nil // the incumbent is gone: this is a rename
+	}
+	return holder, nil
 }

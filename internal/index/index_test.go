@@ -2,6 +2,7 @@ package index_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -310,4 +311,95 @@ func sprint(v any) string {
 		return string(b)
 	}
 	return fmt.Sprint(v)
+}
+
+// Copying a bundle directory is an ordinary thing for an author to do, and it
+// duplicates the id in the copy. Before this was caught here, the second file
+// simply replaced the first: `kite index` reported two files indexed, the
+// index held one, and a page vanished from the built site with nothing said.
+func TestDuplicateIDIsReportedAndNeitherFileIsLost(t *testing.T) {
+	root, types := newProject(t)
+	write(t, root, "content/posts/original/index.md", post(idA, "Original", "original"))
+	write(t, root, "content/posts/copy/index.md", post(idA, "Copy", "copy"))
+
+	ix := openIndex(t, root, types)
+	_, err := ix.Reconcile(t.Context())
+	if err == nil {
+		t.Fatal("a duplicate id was accepted silently")
+	}
+	if !errors.Is(err, content.ErrDuplicateID) {
+		t.Errorf("error = %v, want one wrapping ErrDuplicateID", err)
+	}
+	// Both paths have to appear, or the author cannot tell which two files
+	// are in conflict.
+	for _, want := range []string{"content/posts/original/index.md", "content/posts/copy/index.md"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error does not name %s: %v", want, err)
+		}
+	}
+
+	// The file that got there first keeps its row: reporting must not also
+	// destroy what was already correct.
+	n, err := ix.Count(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("index holds %d items, want the one that was not in conflict", n)
+	}
+}
+
+// A rename is the case a duplicate check must not mistake for a conflict: the
+// same id arrives at a new path, and the old path is gone.
+func TestRenamingAFileKeepsItsIdentity(t *testing.T) {
+	root, types := newProject(t)
+	write(t, root, "content/posts/before/index.md", post(idA, "Moved", "moved"))
+
+	ix := openIndex(t, root, types)
+	if _, err := ix.Reconcile(t.Context()); err != nil {
+		t.Fatalf("first reconcile: %v", err)
+	}
+
+	if err := os.Rename(
+		filepath.Join(root, "content", "posts", "before"),
+		filepath.Join(root, "content", "posts", "after"),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := ix.Reconcile(t.Context()); err != nil {
+		t.Fatalf("a rename was reported as a conflict: %v", err)
+	}
+
+	item, err := reader.New(ix.DB()).Get(t.Context(), content.ID(idA))
+	if err != nil {
+		t.Fatalf("the renamed item lost its id: %v", err)
+	}
+	if got, want := string(item.Locator), "content/posts/after"; got != want {
+		t.Errorf("locator = %q, want %q", got, want)
+	}
+	if n, _ := ix.Count(t.Context()); n != 1 {
+		t.Errorf("index holds %d items, want 1 after a rename", n)
+	}
+}
+
+// A conflict must not stop the rest of the site being indexed: a preview goes
+// on serving what it can, and only a build refuses.
+func TestOtherFilesStillIndexAroundADuplicate(t *testing.T) {
+	root, types := newProject(t)
+	write(t, root, "content/posts/original/index.md", post(idA, "Original", "original"))
+	write(t, root, "content/posts/copy/index.md", post(idA, "Copy", "copy"))
+	write(t, root, "content/posts/unrelated/index.md", post(idB, "Unrelated", "unrelated"))
+
+	ix := openIndex(t, root, types)
+	stats, err := ix.Reconcile(t.Context())
+	if err == nil {
+		t.Fatal("a duplicate id was accepted silently")
+	}
+	if stats.Problems != 1 {
+		t.Errorf("problems = %d, want 1", stats.Problems)
+	}
+	if n, _ := ix.Count(t.Context()); n != 2 {
+		t.Errorf("index holds %d items, want 2: the unrelated file and one of the pair", n)
+	}
 }
