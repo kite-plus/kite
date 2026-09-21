@@ -186,7 +186,12 @@ func (s *Server) requireIfMatch(w http.ResponseWriter, r *http.Request) (content
 }
 
 func (s *Server) decodeDraft(w http.ResponseWriter, r *http.Request) (Draft, bool) {
-	var draft Draft
+	return decodeJSON[Draft](s, w, r)
+}
+
+// decodeJSON reads exactly one JSON document from a request body.
+func decodeJSON[T any](_ *Server, w http.ResponseWriter, r *http.Request) (T, bool) {
+	var out T
 
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody))
 	// An unknown field is refused for the same reason an unknown query
@@ -194,20 +199,20 @@ func (s *Server) decodeDraft(w http.ResponseWriter, r *http.Request) (Draft, boo
 	// sent is being honored.
 	dec.DisallowUnknownFields()
 
-	if err := dec.Decode(&draft); err != nil {
+	if err := dec.Decode(&out); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
 			fail(w, http.StatusRequestEntityTooLarge, CodeInvalidRequest, "the body is too large")
-			return draft, false
+			return out, false
 		}
 		fail(w, http.StatusBadRequest, CodeInvalidRequest, "malformed body: "+err.Error())
-		return draft, false
+		return out, false
 	}
 	if err := dec.Decode(new(struct{})); !errors.Is(err, io.EOF) {
 		fail(w, http.StatusBadRequest, CodeInvalidRequest, "the body carries more than one document")
-		return draft, false
+		return out, false
 	}
-	return draft, true
+	return out, true
 }
 
 // failWrite answers a write that the store refused.

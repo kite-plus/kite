@@ -248,3 +248,28 @@ type Media struct {
 	Size int    `json:"size"`
 	Type string `json:"type,omitempty"`
 }
+
+// Settings is what a project exposes to a configuration form.
+type Settings struct {
+	Site  SiteSettings  `json:"site"`
+	Theme ThemeSettings `json:"theme"`
+
+	// Writable lists the paths this API accepts, so a client can tell what it
+	// may offer rather than discovering it by being refused.
+	Writable []string `json:"writable"`
+}
+
+// SiteSettings is the site's own description.
+type SiteSettings struct {
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	BaseURL     string `json:"base_url"`
+	Language    string `json:"language,omitempty"`
+}
+
+// ThemeSettings carries a theme's declared settings and their current values.
+type ThemeSettings struct {
+	Name   string         `json:"name"`
+	Schema schema.Schema  `json:"schema,omitempty"`
+	Values map[string]any `json:"values,omitempty"`
+}

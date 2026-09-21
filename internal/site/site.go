@@ -68,6 +68,37 @@ func Open(ctx context.Context, dir string) (*Site, error) {
 		problems = strings.Split(err.Error(), "\n")
 	}
 
+	s, err := assemble(p, cfg, ix)
+	if err != nil {
+		_ = ix.Close()
+		return nil, err
+	}
+	s.Problems = problems
+	return s, nil
+}
+
+// Reconfigure re-reads the configuration and rebuilds everything derived from
+// it, returning a new site that shares this one's project and index.
+//
+// A settings change has to take effect without a restart, or the admin would
+// report a title the site is not serving. The index is kept because nothing
+// in it depends on configuration, and swapping it would pull the database out
+// from under requests already in flight.
+func (s *Site) Reconfigure() (*Site, error) {
+	cfg, err := config.Load(s.Project.Root)
+	if err != nil {
+		return nil, err
+	}
+	out, err := assemble(s.Project, cfg, s.Index)
+	if err != nil {
+		return nil, err
+	}
+	out.Problems = s.Problems
+	return out, nil
+}
+
+// assemble builds the half of a site that comes from its configuration.
+func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, error) {
 	resolver, err := kurl.New(kurl.Options{
 		BaseURL:        cfg.Site.BaseURL,
 		Style:          kurl.Style(cfg.Build.URLStyle),
@@ -78,13 +109,11 @@ func Open(ctx context.Context, dir string) (*Site, error) {
 		LocalePrefix:   true,
 	}, p.Types)
 	if err != nil {
-		_ = ix.Close()
 		return nil, err
 	}
 
 	th, sources, err := loadTheme(p.Root, cfg.Theme.Name)
 	if err != nil {
-		_ = ix.Close()
 		return nil, err
 	}
 
@@ -96,7 +125,6 @@ func Open(ctx context.Context, dir string) (*Site, error) {
 	})
 
 	return &Site{
-		Problems: problems,
 		Project:  p,
 		Config:   cfg,
 		Index:    ix,

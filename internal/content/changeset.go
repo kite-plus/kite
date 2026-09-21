@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 )
 
 var (
@@ -56,6 +59,7 @@ const (
 	OpMoveContent   OpKind = "move_content"
 	OpPutMedia      OpKind = "put_media"
 	OpDeleteMedia   OpKind = "delete_media"
+	OpPutSettings   OpKind = "put_settings"
 )
 
 // Op is a single typed operation inside a [ChangeSet].
@@ -116,6 +120,25 @@ type PutMedia struct {
 
 func (o PutMedia) Kind() OpKind     { return OpPutMedia }
 func (o PutMedia) Describe() string { return o.Name }
+
+// PutSettings changes values in the project's configuration.
+//
+// Settings go through a change set like everything else, so that the git
+// publisher stages a settings change the same way it stages a post, and so
+// that one commit can carry both. A configuration edit deserves the commit,
+// the audit record and the undo that a content edit gets.
+type PutSettings struct {
+	// Values maps a dotted path to its new value, such as "site.title" or
+	// "theme.settings.primary_color". Only the named leaves change: the keys
+	// around them, and the comments explaining them, are left alone.
+	Values map[string]any
+}
+
+func (o PutSettings) Kind() OpKind { return OpPutSettings }
+
+func (o PutSettings) Describe() string {
+	return strings.Join(slices.Sorted(maps.Keys(o.Values)), ", ")
+}
 
 // DeleteMedia removes a media file.
 type DeleteMedia struct {

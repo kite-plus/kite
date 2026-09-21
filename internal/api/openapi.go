@@ -167,6 +167,25 @@ func openAPI() *document {
 				Summary:     "List content types and the field schema forms are generated from.",
 				Responses:   ok(ref(List[ContentType]{}), "The registry."),
 			}},
+			"/settings": {
+				Get: &operation{
+					OperationID: "getSettings",
+					Summary:     "Read what can be configured, and what it is set to.",
+					Responses:   ok(ref(Settings{}), "The settings."),
+				},
+				Put: &operation{
+					OperationID: "updateSettings",
+					Summary:     "Change configuration values by dotted path.",
+					RequestBody: &requestBody{
+						Required: true,
+						Content: map[string]mediaType{"application/json": {Schema: &jsonSchema{
+							Type:        "object",
+							Description: "Dotted paths to values, such as site.title.",
+						}}},
+					},
+					Responses: ok(ref(Settings{}), "The settings as stored.", "400", "405"),
+				},
+			},
 			"/contents": {
 				Get: &operation{
 					OperationID: "listContents",

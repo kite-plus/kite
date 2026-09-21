@@ -130,6 +130,8 @@ func (s *Server) routes() []route {
 		{http.MethodGet, OpenAPIPath, s.handleOpenAPI},
 		{http.MethodGet, "/site", s.handleSite},
 		{http.MethodGet, "/content-types", s.handleContentTypes},
+		{http.MethodGet, "/settings", s.handleSettings},
+		{http.MethodPut, "/settings", s.handleUpdateSettings},
 		{http.MethodGet, "/contents", s.handleContents},
 		{http.MethodPost, "/contents", s.handleCreate},
 		{http.MethodGet, "/contents/{id}", s.handleContent},

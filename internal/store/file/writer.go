@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/frontmatter"
 )
 
 // tmpDir holds partially written files. It sits inside the project so that the
@@ -89,6 +91,8 @@ func (w *Writer) Apply(ctx context.Context, cs content.ChangeSet) (content.Resul
 			err = w.putMedia(o, located, &res)
 		case content.DeleteMedia:
 			err = w.deleteMedia(o, located, &res)
+		case content.PutSettings:
+			err = w.putSettings(o, &res)
 		default:
 			err = fmt.Errorf("file store: unsupported operation %q", op.Kind())
 		}
@@ -320,6 +324,47 @@ func (w *Writer) putMedia(op content.PutMedia, located map[content.ID]*Entry, re
 		return err
 	}
 	appendUnique(&res.Written, target)
+	return nil
+}
+
+// putSettings changes values in the project's configuration file.
+func (w *Writer) putSettings(op content.PutSettings, res *content.Result) error {
+	if len(op.Values) == 0 {
+		return nil
+	}
+	current, err := os.ReadFile(abs(w.root, ConfigName))
+	if err != nil {
+		return fmt.Errorf("file store: read %s: %w", ConfigName, err)
+	}
+
+	doc, err := frontmatter.ParseYAML(current)
+	if err != nil {
+		return fmt.Errorf("file store: %s: %w", ConfigName, err)
+	}
+	// Sorted so that one change set always produces the same bytes, whatever
+	// order the caller happened to build its map in.
+	for _, dotted := range slices.Sorted(maps.Keys(op.Values)) {
+		parts := strings.Split(dotted, ".")
+		if len(parts) < 1 || slices.Contains(parts, "") {
+			return fmt.Errorf("%w: setting path %q", content.ErrInvalid, dotted)
+		}
+		if err := doc.SetNested(parts[:len(parts)-1], parts[len(parts)-1], op.Values[dotted]); err != nil {
+			return err
+		}
+	}
+	if !doc.Dirty() {
+		return nil
+	}
+
+	data, err := doc.Bytes()
+	if err != nil {
+		return err
+	}
+	if err := w.write(ConfigName, data); err != nil {
+		return err
+	}
+	res.Revision = RevisionOf(data)
+	appendUnique(&res.Written, ConfigName)
 	return nil
 }
 

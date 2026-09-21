@@ -6,6 +6,7 @@ import (
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render/url"
+	"github.com/kite-plus/kite/internal/schema"
 )
 
 // View is one consistent look at an open project.
@@ -18,6 +19,12 @@ type View struct {
 	Runtime  string
 	Theme    string
 	Version  string
+
+	// ThemeSchema is what the theme declares it can be configured with, and
+	// ThemeValues what it is configured to. A theme author gets a settings
+	// form out of the first without writing any admin code.
+	ThemeSchema schema.Schema
+	ThemeValues map[string]any
 
 	// Writer is nil when this deployment may not be written to, which is the
 	// difference between a preview an author is typing into and a read-only

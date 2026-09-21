@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -367,18 +368,31 @@ func newWritableServer(t *testing.T, root string) (http.Handler, *site.Site) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 
+	// The site is held behind a pointer the refresh can replace, the way a
+	// running server holds it: a settings change rebuilds everything derived
+	// from the configuration.
+	current := s
+
 	srv := api.New(api.Options{Site: func() api.View {
 		return api.View{
-			Reader:   s.Reader,
-			Resolver: s.Resolver,
-			Types:    s.Project.Types,
-			Site:     s.Config.Site,
-			Store:    s.Config.Content.Store,
-			Runtime:  "test",
-			Problems: s.Problems,
-			Writer:   s.Project.Writer(),
+			Reader:      current.Reader,
+			Resolver:    current.Resolver,
+			Types:       current.Project.Types,
+			Site:        current.Config.Site,
+			Store:       current.Config.Content.Store,
+			Runtime:     "test",
+			Theme:       current.Config.Theme.Name,
+			ThemeSchema: current.Theme.Manifest.Settings,
+			ThemeValues: current.ThemeSettings(),
+			Problems:    current.Problems,
+			Writer:      current.Project.Writer(),
 			Refresh: func(ctx context.Context) error {
-				_, err := s.Index.Reconcile(ctx)
+				next, err := current.Reconfigure()
+				if err != nil {
+					return err
+				}
+				current = next
+				_, err = current.Index.Reconcile(ctx)
 				return err
 			},
 		}
@@ -571,5 +585,101 @@ func TestRemovingAFileTakesItOffDisk(t *testing.T) {
 	}
 	if _, err := os.Stat(stored); err == nil {
 		t.Error("the file is still on disk")
+	}
+}
+
+// A settings change goes through a change set like everything else, so the
+// publisher will stage it the same way it stages a post, and so it lands in
+// the file without disturbing what is around it.
+func TestChangingASettingLeavesTheRestOfTheFileAlone(t *testing.T) {
+	root := newProject(t, 1)
+	config := filepath.Join(root, "kite.yaml")
+	write(t, config, `# What visitors see.
+site:
+  title: Field Notes     # shown in the header
+  description: A test project.
+  baseURL: https://example.com
+  language: en
+
+# Rendering.
+build:
+  pageSize: 10
+`)
+
+	h, _ := newWritableServer(t, root)
+
+	rec := send(t, h, http.MethodPut, api.Prefix+"/settings", map[string]any{
+		"site.title":     "Renamed In The Admin",
+		"build.pageSize": 25,
+	}, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body.String())
+	}
+
+	data, err := os.ReadFile(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	for _, want := range []string{
+		"title: Renamed In The Admin",
+		"pageSize: 25",
+		"# What visitors see.",
+		"# shown in the header",
+		"# Rendering.",
+		"description: A test project.",
+		"language: en",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the file lost or never gained %q:\n%s", want, got)
+		}
+	}
+	if strings.Index(got, "site:") > strings.Index(got, "build:") {
+		t.Errorf("the sections were reordered:\n%s", got)
+	}
+
+	// The response reports what is now stored.
+	settings := decode[api.Settings](t, rec)
+	if settings.Site.Title != "Renamed In The Admin" {
+		t.Errorf("the response says %q", settings.Site.Title)
+	}
+}
+
+// The configuration file is the one place where a mistake breaks the whole
+// site, so what may be written is a list rather than a rule.
+func TestASettingNobodyDesignedAControlForIsRefused(t *testing.T) {
+	h, _ := newWritableServer(t, newProject(t, 1))
+
+	for _, path := range []string{
+		"content.store",   // switching the store is not a form control
+		"build.output",    // nor is where the site is written
+		"site.title.evil", // nor is a path that is not a setting
+	} {
+		rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
+			map[string]any{path: "x"}, nil)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", path, rec.Code)
+		}
+		if field := decode[api.ErrorBody](t, rec).Error.Field; field != path {
+			t.Errorf("%s: field = %q", path, field)
+		}
+	}
+}
+
+// A theme declares what it can be configured with, so a theme author gets a
+// settings form without writing any admin code.
+func TestSettingsCarryTheThemesOwnSchema(t *testing.T) {
+	h, _ := newWritableServer(t, newProject(t, 1))
+
+	settings := get[api.Settings](t, h, api.Prefix+"/settings", http.StatusOK)
+	if settings.Theme.Name == "" {
+		t.Error("no theme is named")
+	}
+	if len(settings.Theme.Schema) == 0 {
+		t.Error("the theme declares no settings, so no form can be generated from it")
+	}
+	if !slices.Contains(settings.Writable, "site.title") {
+		t.Errorf("writable does not list site.title: %v", settings.Writable)
 	}
 }

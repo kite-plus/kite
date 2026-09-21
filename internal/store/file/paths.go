@@ -36,6 +36,9 @@ func Slugify(s string) string {
 	return strings.Trim(b.String(), "-")
 }
 
+// ConfigName is the project's configuration file, relative to the root.
+const ConfigName = "kite.yaml"
+
 // LocatorFor returns where a new item's bytes belong.
 //
 // The bundle directory name is derived from the slug once, at creation time,

@@ -567,3 +567,58 @@ func readItem(t *testing.T, h http.Handler, id string) map[string]any {
 	}
 	return out
 }
+
+// Changing a setting has to take effect without a restart, or the admin would
+// report a title the site is not serving.
+func TestAChangedSettingReachesTheServedPages(t *testing.T) {
+	root := newProject(t, 2)
+	srv := newServer(t, root, serve.Options{Admin: true, Write: true})
+	handler := srv.Handler()
+
+	before := renderHome(t, handler)
+	if !strings.Contains(before, "Parity") {
+		t.Fatalf("the home page does not carry the configured title:\n%s", before)
+	}
+
+	// Write the configuration the way anything outside the admin would.
+	config, err := os.ReadFile(filepath.Join(root, "kite.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(config), "title: Parity", "title: Renamed", 1)
+	if updated == string(config) {
+		t.Fatal("the fixture no longer carries the title this test edits")
+	}
+	if err := os.WriteFile(filepath.Join(root, "kite.yaml"), []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := srv.Reload(t.Context()); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+
+	after := renderHome(t, handler)
+	if strings.Contains(after, "Parity") {
+		t.Errorf("the page still carries the old title:\n%s", after)
+	}
+	if !strings.Contains(after, "Renamed") {
+		t.Errorf("the page does not carry the new title:\n%s", after)
+	}
+
+	// And the API agrees with what is being served.
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/site", nil))
+	if !strings.Contains(rec.Body.String(), "Renamed") {
+		t.Errorf("the api still reports the old title: %s", rec.Body.String())
+	}
+}
+
+func renderHome(t *testing.T, h http.Handler) string {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /: %d", rec.Code)
+	}
+	return rec.Body.String()
+}

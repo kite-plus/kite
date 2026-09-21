@@ -10,6 +10,8 @@ package serve
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +30,7 @@ import (
 	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/build"
 	"github.com/kite-plus/kite/internal/buildinfo"
+	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render"
 	"github.com/kite-plus/kite/internal/site"
@@ -72,7 +75,6 @@ type Options struct {
 // Server renders a project over HTTP.
 type Server struct {
 	opts   Options
-	site   *site.Site
 	router *router
 	hub    *reloadHub
 	log    *slog.Logger
@@ -82,9 +84,23 @@ type Server struct {
 	// requires every input to be explicit.
 	now func() time.Time
 
+	// root never changes, so it is read without the lock.
+	root string
+
 	mu       sync.RWMutex
+	site     *site.Site
 	builder  *build.Builder
 	problems []string
+	// configHash detects a settings change, which needs more than a reindex.
+	configHash string
+}
+
+// project is the site as it currently stands. Configuration can be reloaded
+// while requests are in flight, so it is read rather than captured.
+func (s *Server) project() *site.Site {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.site
 }
 
 // New prepares a server over an opened project.
@@ -105,11 +121,13 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 	srv := &Server{
 		opts:   opts,
 		site:   s,
+		root:   s.Project.Root,
 		router: newRouter(),
 		hub:    newReloadHub(),
 		log:    opts.Logger,
 		now:    now,
 	}
+	srv.configHash = srv.readConfigHash()
 	if err := srv.Reload(ctx); err != nil {
 		return nil, err
 	}
@@ -122,18 +140,25 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 // between two changes agrees about what time it is, the way every page in one
 // build does.
 func (s *Server) Reload(ctx context.Context) error {
+	// Configuration first: a changed title or theme has to be in place before
+	// anything derived from it is rebuilt.
+	if err := s.reconfigureIfChanged(); err != nil {
+		return err
+	}
+	current := s.project()
+
 	// A file with no id, or one that will not parse, must not take the server
 	// down: the rest of the site still previews, and the page says what was
 	// skipped.
 	var problems []string
-	if _, err := s.site.Index.Reconcile(ctx); err != nil {
+	if _, err := current.Index.Reconcile(ctx); err != nil {
 		problems = strings.Split(err.Error(), "\n")
 		for _, p := range problems {
 			s.log.Warn("not indexed", "detail", p)
 		}
 	}
 
-	builder, err := s.site.Builder(site.BuildOptions{
+	builder, err := current.Builder(site.BuildOptions{
 		Drafts: s.opts.Drafts,
 		Now:    s.now(),
 	})
@@ -147,7 +172,7 @@ func (s *Server) Reload(ctx context.Context) error {
 	}
 	s.router.load(plan)
 
-	media, err := build.MediaFiles(plan, os.DirFS(s.site.Project.Root))
+	media, err := build.MediaFiles(plan, os.DirFS(s.root))
 	if err != nil {
 		return err
 	}
@@ -183,22 +208,25 @@ func (s *Server) Handler() http.Handler {
 // the startup copy would keep reporting a file the author has since fixed.
 func (s *Server) view() api.View {
 	s.mu.RLock()
-	problems := s.problems
+	problems, current := s.problems, s.site
 	s.mu.RUnlock()
 
 	v := api.View{
-		Reader:   s.site.Reader,
-		Resolver: s.site.Resolver,
-		Types:    s.site.Project.Types,
-		Site:     s.site.Config.Site,
-		Store:    s.site.Config.Content.Store,
+		Reader:   current.Reader,
+		Resolver: current.Resolver,
+		Types:    current.Project.Types,
+		Site:     current.Config.Site,
+		Store:    current.Config.Content.Store,
 		Runtime:  "serve",
-		Theme:    s.site.Config.Theme.Name,
+		Theme:    current.Config.Theme.Name,
 		Version:  buildinfo.Version,
 		Problems: problems,
+
+		ThemeSchema: current.Theme.Manifest.Settings,
+		ThemeValues: current.ThemeSettings(),
 	}
 	if s.opts.Write {
-		v.Writer = s.site.Project.Writer()
+		v.Writer = current.Project.Writer()
 		v.Refresh = s.refresh
 	}
 	v.Preview = s.preview
@@ -212,17 +240,55 @@ func (s *Server) view() api.View {
 // it that happens to live in the admin.
 func (s *Server) preview(ctx context.Context, item *content.Content) ([]byte, error) {
 	s.mu.RLock()
-	builder := s.builder
+	builder, current := s.builder, s.site
 	s.mu.RUnlock()
 
 	target := build.Target{
 		Kind: render.KindSingle,
 		Type: string(item.Kind),
-		URL:  s.site.Resolver.For(item),
+		URL:  current.Resolver.For(item),
 		Item: item,
 	}
 	html, _, err := builder.Render(ctx, target, nil)
 	return html, err
+}
+
+// reconfigureIfChanged rebuilds the configuration-derived half of the site
+// when kite.yaml has changed.
+//
+// The index is kept: nothing in it depends on configuration, and replacing it
+// would pull the database out from under requests already in flight.
+func (s *Server) reconfigureIfChanged() error {
+	hash := s.readConfigHash()
+
+	s.mu.RLock()
+	unchanged := hash == s.configHash
+	current := s.site
+	s.mu.RUnlock()
+	if unchanged {
+		return nil
+	}
+
+	next, err := current.Reconfigure()
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	s.site, s.configHash = next, hash
+	s.mu.Unlock()
+
+	s.log.Info("configuration reloaded")
+	return nil
+}
+
+func (s *Server) readConfigHash() string {
+	data, err := os.ReadFile(filepath.Join(s.root, config.Name))
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 // refresh reindexes, replans and tells open pages to reload.
@@ -246,7 +312,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}
 
 	if s.opts.Watch {
-		w, err := newWatcher(s.site.Project.Root, s.log)
+		w, err := newWatcher(s.root, s.log)
 		if err != nil {
 			return err
 		}
@@ -333,7 +399,7 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 	// A page bundle's own files are looked up first, because they are the
 	// ones whose address depends on where the page went.
 	if src, ok := s.router.bundleFile(rel); ok {
-		if data, modTime, found := readFile(os.DirFS(s.site.Project.Root), src); found {
+		if data, modTime, found := readFile(os.DirFS(s.root), src); found {
 			if ctype := mime.TypeByExtension(path.Ext(rel)); ctype != "" {
 				w.Header().Set("Content-Type", ctype)
 			}
@@ -361,12 +427,14 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
 // staticRoots lists where unprocessed files live, in the order a build copies
 // them: the project's own static directory wins over the theme's.
 func (s *Server) staticRoots() []fs.FS {
-	roots := []fs.FS{os.DirFS(filepath.Join(s.site.Project.Root, "static"))}
-	if s.site.Theme.Static != nil {
-		roots = append(roots, s.site.Theme.Static)
+	current := s.project()
+
+	roots := []fs.FS{os.DirFS(filepath.Join(s.root, "static"))}
+	if current.Theme.Static != nil {
+		roots = append(roots, current.Theme.Static)
 	}
-	if s.site.Theme.Assets != nil {
-		roots = append(roots, prefixed{fsys: s.site.Theme.Assets, prefix: "assets/"})
+	if current.Theme.Assets != nil {
+		roots = append(roots, prefixed{fsys: current.Theme.Assets, prefix: "assets/"})
 	}
 	return roots
 }
