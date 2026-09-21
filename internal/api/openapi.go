@@ -179,8 +179,9 @@ func openAPI() *document {
 					RequestBody: &requestBody{
 						Required: true,
 						Content: map[string]mediaType{"application/json": {Schema: &jsonSchema{
-							Type:        "object",
-							Description: "Dotted paths to values, such as site.title.",
+							Type:                 "object",
+							Description:          "Dotted paths to values, such as site.title.",
+							AdditionalProperties: &jsonSchema{},
 						}}},
 					},
 					Responses: ok(ref(Settings{}), "The settings as stored.", "400", "405"),

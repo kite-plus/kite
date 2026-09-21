@@ -10,6 +10,7 @@ import {
 } from "@/hooks/useContents";
 import { ContentTable } from "@/components/ContentTable";
 import { EditorPage } from "@/components/EditorPage";
+import { SettingsPage } from "@/components/SettingsPage";
 import { Failure, Panel, Select } from "@/components/ui";
 
 /** open is which item the editor holds: nothing, a new one, or an existing id. */
@@ -21,6 +22,7 @@ export default function App() {
   const taxonomies = useTaxonomies();
 
   const [open, setOpen] = useState<Open>(null);
+  const [settings, setSettings] = useState(false);
   const [filters, setFilters] = useState<Filters>({});
   const [search, setSearch] = useState("");
   const [taxonomy, setTaxonomy] = useState("");
@@ -36,6 +38,10 @@ export default function App() {
 
   const set = (patch: Partial<Filters>) =>
     setFilters((current) => ({ ...current, ...patch }));
+
+  if (settings) {
+    return <SettingsPage onClose={() => setSettings(false)} />;
+  }
 
   if (open) {
     return (
@@ -68,6 +74,13 @@ export default function App() {
               {n === 1 ? "" : "s"}
             </span>
           ))}
+          <button
+            type="button"
+            onClick={() => setSettings(true)}
+            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--accent)]"
+          >
+            Settings
+          </button>
           <button
             type="button"
             onClick={() => setOpen({ id: null, kind: filters.kind ?? "post" })}

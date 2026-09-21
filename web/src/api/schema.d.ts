@@ -109,6 +109,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read what can be configured, and what it is set to. */
+        get: operations["getSettings"];
+        /** Change configuration values by dotted path. */
+        put: operations["updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/site": {
         parameters: {
             query?: never;
@@ -272,6 +290,11 @@ export interface components {
             label: string;
             value: string;
         };
+        Settings: {
+            site: components["schemas"]["SiteSettings"];
+            theme: components["schemas"]["ThemeSettings"];
+            writable: string[];
+        };
         SiteInfo: {
             base_url: string;
             counts?: {
@@ -285,6 +308,12 @@ export interface components {
             theme?: string;
             title: string;
             version?: string;
+        };
+        SiteSettings: {
+            base_url: string;
+            description?: string;
+            language?: string;
+            title: string;
         };
         Summary: {
             /** Format: date-time */
@@ -334,6 +363,13 @@ export interface components {
             items: components["schemas"]["TermCount"][];
             next_cursor?: string;
             total?: number;
+        };
+        ThemeSettings: {
+            name: string;
+            schema?: components["schemas"]["Field"][];
+            values?: {
+                [key: string]: unknown;
+            };
         };
     };
     responses: never;
@@ -781,6 +817,70 @@ export interface operations {
             };
             /** @description Failed. */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
+            };
+        };
+    };
+    updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The settings as stored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
