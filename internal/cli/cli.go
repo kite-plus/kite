@@ -35,6 +35,7 @@ func newRootCmd() *cobra.Command {
 		newBuildCmd(),
 		newServeCmd(),
 		newPublishCmd(),
+		newAuthCmd(),
 		newOpenAPICmd(),
 		newRunCmd(),
 	)
