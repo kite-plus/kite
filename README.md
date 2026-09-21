@@ -87,9 +87,12 @@ are; nothing needs rewriting first.
 | `kite init` | create a project |
 | `kite new <kind> <title>` | create content |
 | `kite build` | render the site into `public/` |
+| `kite run` | serve the site, open it, reload on every save |
+| `kite serve` | serve the site, rendering each request from the files |
 | `kite index` | refresh the derived index |
 | `kite list` | query content from the index |
 | `kite doctor` | check the project, and repair what is safe to repair |
+| `kite openapi` | print the description of the read model API |
 
 Every command takes `--json`, so none of them have to be parsed as prose.
 
@@ -124,7 +127,11 @@ Go 1.26 or newer:
 ```bash
 make build      # ./bin/kite
 make check      # format, vet, layering rules, linter, tests
+make web        # the admin, which is embedded into the binary
 ```
+
+`make web` needs Node and pnpm; the rest does not. A binary built without it
+works and says the admin is missing rather than failing to link.
 
 The binary is self-contained. The default theme and the SQLite driver are
 compiled in, nothing needs cgo, and every release target cross-compiles from any
@@ -146,8 +153,8 @@ Verify a download against the `checksums.txt` published with the release.
 | Milestone | Delivers | |
 |---|---|---|
 | M0 | `kite build`: content model, index, markdown, themes, static output | done |
-| M1 | `kite serve`: render per request, watch and reload | |
-| M2 | Read-only admin over an existing repository | |
+| M1 | `kite serve`: render per request, watch and reload | done |
+| M2 | Read-only admin over an existing repository | done |
 | M3 | Editing admin: editor, media, conflict handling | |
 | M4 | Git publisher — **v1.0** | |
 | M5 | Public theme contract | |

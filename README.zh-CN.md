@@ -78,9 +78,12 @@ kite build --verify     # 构建两次，逐字节比对
 | `kite init` | 初始化项目 |
 | `kite new <kind> <title>` | 新建内容 |
 | `kite build` | 构建静态站点到 `public/` |
+| `kite run` | 启动站点、打开浏览器，保存即刷新 |
+| `kite serve` | 启动站点，每个请求都从文件渲染 |
 | `kite index` | 刷新派生索引 |
 | `kite list` | 从索引里查询内容 |
 | `kite doctor` | 体检，并修复可以安全修复的问题 |
+| `kite openapi` | 打印只读 API 的描述文档 |
 
 所有命令都支持 `--json`，不必把输出当作自然语言去解析。
 
@@ -111,7 +114,10 @@ kite build --verify     # 构建两次，逐字节比对
 ```bash
 make build      # ./bin/kite
 make check      # 格式化、vet、分层规则、linter、测试
+make web        # 后台界面，会被嵌入二进制
 ```
+
+`make web` 需要 Node 和 pnpm，其余目标不需要。没有跑过它的二进制照样能用，只是访问后台时会明说后台没有构建。
 
 二进制是自包含的：默认主题和 SQLite 驱动都编译在内，不依赖 cgo，任何平台都能交叉编译出全部发布目标。
 
@@ -130,8 +136,8 @@ GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot 
 | 里程碑 | 交付内容 | |
 |---|---|---|
 | M0 | `kite build`：内容模型、索引、Markdown、主题、静态产出 | 已完成 |
-| M1 | `kite serve`：按请求渲染，文件监听与热重载 | |
-| M2 | 只读后台，能打开现有仓库 | |
+| M1 | `kite serve`：按请求渲染，文件监听与热重载 | 已完成 |
+| M2 | 只读后台，能打开现有仓库 | 已完成 |
 | M3 | 可写后台：编辑器、媒体、冲突处理 | |
 | M4 | Git 发布器 —— **v1.0** | |
 | M5 | 公开主题契约 | |

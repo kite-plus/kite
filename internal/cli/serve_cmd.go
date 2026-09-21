@@ -18,6 +18,7 @@ import (
 	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/serve"
 	"github.com/kite-plus/kite/internal/site"
+	"github.com/kite-plus/kite/web"
 )
 
 func newServeCmd() *cobra.Command {
@@ -121,6 +122,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 				printf(cmd, "  watching for changes\n")
 			}
 			if admin {
+				printf(cmd, "  studio at %s%s/\n", url, web.Path)
 				printf(cmd, "  api at %s%s\n", url, api.Prefix)
 			}
 			printf(cmd, "  press ctrl-c to stop\n\n")
