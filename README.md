@@ -92,6 +92,7 @@ are; nothing needs rewriting first.
 | `kite index` | refresh the derived index |
 | `kite list` | query content from the index |
 | `kite doctor` | check the project, and repair what is safe to repair |
+| `kite publish` | commit content, and push it when asked to |
 | `kite openapi` | print the description of the read model API |
 
 Every command takes `--json`, so none of them have to be parsed as prose.
@@ -156,7 +157,7 @@ Verify a download against the `checksums.txt` published with the release.
 | M1 | `kite serve`: render per request, watch and reload | done |
 | M2 | Read-only admin over an existing repository | done |
 | M3 | Editing admin: editor, media, conflict handling | done |
-| M4 | Git publisher — **v1.0** | |
+| M4 | Git publisher — **v1.0** | done |
 | M5 | Public theme contract | |
 | M6 | `kite.lock` and the `kitew` wrapper | |
 | M7 | Dynamic mode backed by SQLite | |

@@ -83,6 +83,7 @@ kite build --verify     # 构建两次，逐字节比对
 | `kite index` | 刷新派生索引 |
 | `kite list` | 从索引里查询内容 |
 | `kite doctor` | 体检，并修复可以安全修复的问题 |
+| `kite publish` | 提交内容，需要时推送到远端 |
 | `kite openapi` | 打印只读 API 的描述文档 |
 
 所有命令都支持 `--json`，不必把输出当作自然语言去解析。
@@ -139,7 +140,7 @@ GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot 
 | M1 | `kite serve`：按请求渲染，文件监听与热重载 | 已完成 |
 | M2 | 只读后台，能打开现有仓库 | 已完成 |
 | M3 | 可写后台：编辑器、媒体、冲突处理 | 已完成 |
-| M4 | Git 发布器 —— **v1.0** | |
+| M4 | Git 发布器 —— **v1.0** | 已完成 |
 | M5 | 公开主题契约 | |
 | M6 | `kite.lock` 与 `kitew` wrapper | |
 | M7 | 基于 SQLite 的动态模式 | |

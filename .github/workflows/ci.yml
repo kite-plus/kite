@@ -172,6 +172,35 @@ jobs:
           fi
           /tmp/kite index 2>&1 | grep -q "duplicate id"
 
+      - name: Publish only what was asked for
+        run: |
+          set -eu
+          site=$(mktemp -d)
+          cd "$site"
+          git init -q -b main .
+          git config user.name CI
+          git config user.email ci@example.com
+          /tmp/kite init . >/dev/null
+          /tmp/kite new post "First" >/dev/null
+          git add -A && git commit -q -m initial
+
+          /tmp/kite new post "Second" >/dev/null
+          # What the author is in the middle of, in two states.
+          printf 'by hand\n' >> content/posts/first/index.md
+          git add content/posts/first/index.md
+          printf 'scratch\n' > notes.txt
+
+          /tmp/kite publish content/posts/second >/dev/null
+
+          # The commit carries one file.
+          carried=$(git show --name-only --pretty=format: HEAD | grep -c .)
+          test "$carried" = "1" || { echo "the commit carried $carried files"; exit 1; }
+          git show --name-only --pretty=format: HEAD | grep -q "content/posts/second"
+
+          # And nothing of the author's moved.
+          git diff --name-only --cached | grep -q "content/posts/first/index.md"
+          git status --porcelain | grep -q "?? notes.txt"
+
       - name: Build an unmigrated content directory
         run: |
           set -eu

@@ -472,3 +472,36 @@ func TestAPublishReachesTheRemote(t *testing.T) {
 		t.Errorf("ahead = %d, want 0 after a push", state.Ahead)
 	}
 }
+
+// A file the host will refuse is reported before the commit, not after the
+// push that carries it is rejected.
+func TestAFileTooLargeToPushIsReportedBeforeCommitting(t *testing.T) {
+	root := newRepo(t)
+
+	// Sparse, so the test costs a few bytes rather than 101MB.
+	big := filepath.Join(root, "static", "huge.bin")
+	if err := os.MkdirAll(filepath.Dir(big), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Create(big)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Truncate(101 << 20); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	p := plan(t, newPublisher(root), publish.Request{Paths: []string{"static/huge.bin"}})
+	if !slices.Contains(codes(p.Problems), publish.CodeQuotaExceeded) {
+		t.Fatalf("problems = %v, want quota_exceeded", codes(p.Problems))
+	}
+	if p.OK() {
+		t.Error("the plan says it can be applied")
+	}
+	if fix := p.Problems[0].Fix; fix == "" {
+		t.Error("the problem says what is wrong but not what to do about it")
+	}
+}

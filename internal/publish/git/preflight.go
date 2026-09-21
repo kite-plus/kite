@@ -81,6 +81,7 @@ func (p *Publisher) preflight(ctx context.Context, req publish.Request, plan *pu
 
 	p.checkPaths(ctx, req, plan, stop, warn)
 	p.checkLFS(ctx, plan, stop)
+	p.checkSizes(plan, stop, warn)
 	p.checkRemote(ctx, plan, req, warn)
 }
 
@@ -176,6 +177,50 @@ func (p *Publisher) checkLFS(ctx context.Context, plan *publish.Plan, stop func(
 	stop(publish.CodeLFSMissing,
 		"some of these files are tracked by git-lfs, which is not installed",
 		"install git-lfs and run 'git lfs install', or publish these files yourself")
+}
+
+// File sizes the hosting platform cares about.
+//
+// GitHub refuses a push carrying a file over the hard limit outright and
+// warns above the soft one. Finding that out from a rejected push, after the
+// commit is already made, is the failure this check exists to move earlier.
+const (
+	hardFileLimit = 100 << 20
+	softFileLimit = 50 << 20
+)
+
+// checkSizes reports files large enough for the host to object to.
+func (p *Publisher) checkSizes(plan *publish.Plan, stop, warn func(code, detail, fix string)) {
+	for _, rel := range plan.Paths {
+		info, err := os.Stat(filepath.Join(p.opts.Root, filepath.FromSlash(rel)))
+		if err != nil || info.IsDir() {
+			continue // a deletion has nothing to weigh
+		}
+		switch {
+		case info.Size() > hardFileLimit:
+			stop(publish.CodeQuotaExceeded,
+				rel+" is "+humanSize(info.Size())+", over the 100MB a push may carry",
+				"track it with git-lfs, or keep it out of the repository")
+		case info.Size() > softFileLimit:
+			warn(publish.CodeQuotaExceeded,
+				rel+" is "+humanSize(info.Size())+", which most hosts will warn about",
+				"consider git-lfs for files this size")
+		}
+	}
+}
+
+// humanSize is for a sentence a person reads, not for arithmetic.
+func humanSize(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return strconv.FormatFloat(float64(n)/(1<<30), 'f', 1, 64) + "GB"
+	case n >= 1<<20:
+		return strconv.FormatFloat(float64(n)/(1<<20), 'f', 1, 64) + "MB"
+	case n >= 1<<10:
+		return strconv.FormatFloat(float64(n)/(1<<10), 'f', 1, 64) + "KB"
+	default:
+		return strconv.FormatInt(n, 10) + "B"
+	}
 }
 
 // checkRemote reports what stands between this branch and the remote.
