@@ -27,6 +27,16 @@ type Server struct {
 	log *slog.Logger
 }
 
+// Routes lists the endpoints this server registers, for tests that check the
+// published description against what is actually served.
+func (s *Server) Routes() []string {
+	out := make([]string, 0, len(s.routes()))
+	for _, rt := range s.routes() {
+		out = append(out, rt.Method+" "+rt.Path)
+	}
+	return out
+}
+
 // New returns a server reading through src.
 func New(opts Options) *Server {
 	log := opts.Logger
@@ -47,12 +57,9 @@ func (s *Server) Handler() http.Handler {
 
 	// Patterns carry their method, so a write gets 405 from the router rather
 	// than from a handler that remembered to check.
-	mux.HandleFunc("GET /site", s.handleSite)
-	mux.HandleFunc("GET /content-types", s.handleContentTypes)
-	mux.HandleFunc("GET /contents", s.handleContents)
-	mux.HandleFunc("GET /contents/{id}", s.handleContent)
-	mux.HandleFunc("GET /taxonomies", s.handleTaxonomies)
-	mux.HandleFunc("GET /taxonomies/{taxonomy}/terms", s.handleTerms)
+	for _, rt := range s.routes() {
+		mux.HandleFunc(rt.Method+" "+rt.Path, rt.Handler)
+	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// An empty pattern means the router itself matched nothing, so no
@@ -106,4 +113,26 @@ func (w *jsonErrors) Write(b []byte) (int, error) {
 // Mount registers the API under [Prefix] on an existing mux.
 func (s *Server) Mount(mux *http.ServeMux) {
 	mux.Handle(Prefix+"/", http.StripPrefix(Prefix, s.Handler()))
+}
+
+// route is one endpoint.
+type route struct {
+	Method  string
+	Path    string
+	Handler http.HandlerFunc
+}
+
+// routes is the table the router and the OpenAPI document are both built
+// from, so that an endpoint cannot exist without being described or be
+// described without existing.
+func (s *Server) routes() []route {
+	return []route{
+		{http.MethodGet, OpenAPIPath, s.handleOpenAPI},
+		{http.MethodGet, "/site", s.handleSite},
+		{http.MethodGet, "/content-types", s.handleContentTypes},
+		{http.MethodGet, "/contents", s.handleContents},
+		{http.MethodGet, "/contents/{id}", s.handleContent},
+		{http.MethodGet, "/taxonomies", s.handleTaxonomies},
+		{http.MethodGet, "/taxonomies/{taxonomy}/terms", s.handleTerms},
+	}
 }
