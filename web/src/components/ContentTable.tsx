@@ -8,6 +8,7 @@ interface Props {
   sort: string;
   onSort: (sort: string) => void;
   onTerm: (term: string) => void;
+  onOpen: (id: string, kind: string) => void;
   activeTerm?: string;
   loading: boolean;
   fetchingMore: boolean;
@@ -28,6 +29,7 @@ export function ContentTable({
   sort,
   onSort,
   onTerm,
+  onOpen,
   activeTerm,
   loading,
   fetchingMore,
@@ -79,16 +81,25 @@ export function ContentTable({
               className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--accent)]"
             >
               <td className="px-4 py-3">
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium hover:text-brand hover:underline"
+                <button
+                  type="button"
+                  onClick={() => onOpen(item.id, item.kind)}
+                  className="text-left font-medium hover:text-brand hover:underline"
                 >
                   {item.title || item.slug}
-                </a>
-                <div className="mt-0.5 truncate font-mono text-xs text-[var(--muted-foreground)]">
-                  {item.locator}
+                </button>
+                <div className="mt-0.5 flex items-center gap-2">
+                  <span className="truncate font-mono text-xs text-[var(--muted-foreground)]">
+                    {item.locator}
+                  </span>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 text-xs text-[var(--muted-foreground)] hover:text-brand"
+                  >
+                    view
+                  </a>
                 </div>
               </td>
               <td className="hidden px-4 py-3 md:table-cell">

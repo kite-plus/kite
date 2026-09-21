@@ -9,13 +9,18 @@ import {
   type Filters,
 } from "@/hooks/useContents";
 import { ContentTable } from "@/components/ContentTable";
+import { EditorPage } from "@/components/EditorPage";
 import { Failure, Panel, Select } from "@/components/ui";
+
+/** open is which item the editor holds: nothing, a new one, or an existing id. */
+type Open = { id: string | null; kind: string } | null;
 
 export default function App() {
   const site = useSite();
   const types = useContentTypes();
   const taxonomies = useTaxonomies();
 
+  const [open, setOpen] = useState<Open>(null);
   const [filters, setFilters] = useState<Filters>({});
   const [search, setSearch] = useState("");
   const [taxonomy, setTaxonomy] = useState("");
@@ -32,6 +37,17 @@ export default function App() {
   const set = (patch: Partial<Filters>) =>
     setFilters((current) => ({ ...current, ...patch }));
 
+  if (open) {
+    return (
+      <EditorPage
+        id={open.id}
+        kind={open.kind}
+        onClose={() => setOpen(null)}
+        onCreated={(id) => setOpen({ id, kind: open.kind })}
+      />
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
@@ -45,16 +61,21 @@ export default function App() {
               : "connecting"}
           </p>
         </div>
-        {site.data?.counts && (
-          <div className="flex gap-4 text-sm text-[var(--muted-foreground)]">
-            {Object.entries(site.data.counts).map(([kind, n]) => (
-              <span key={kind}>
-                <strong className="text-[var(--foreground)]">{n}</strong> {kind}
-                {n === 1 ? "" : "s"}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="flex items-center gap-4 text-sm text-[var(--muted-foreground)]">
+          {Object.entries(site.data?.counts ?? {}).map(([kind, n]) => (
+            <span key={kind}>
+              <strong className="text-[var(--foreground)]">{n}</strong> {kind}
+              {n === 1 ? "" : "s"}
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => setOpen({ id: null, kind: filters.kind ?? "post" })}
+            className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:opacity-90"
+          >
+            New
+          </button>
+        </div>
       </header>
 
       {site.data?.problems?.length ? (
@@ -150,6 +171,7 @@ export default function App() {
           total={total ?? undefined}
           sort={filters.sort ?? "-published_at"}
           onSort={(sort) => set({ sort })}
+          onOpen={(id, kind) => setOpen({ id, kind })}
           onTerm={(term) => {
             setTaxonomy(term.split(":")[0]);
             set({ term });

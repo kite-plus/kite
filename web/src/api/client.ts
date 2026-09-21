@@ -13,6 +13,7 @@ export const api = createClient<paths>({ baseUrl: "/api/v1" });
 
 export type Summary = components["schemas"]["Summary"];
 export type Item = components["schemas"]["Item"];
+export type Draft = components["schemas"]["Draft"];
 export type SiteInfo = components["schemas"]["SiteInfo"];
 export type ContentType = components["schemas"]["ContentType"];
 export type Taxonomy = components["schemas"]["Taxonomy"];
