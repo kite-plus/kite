@@ -54,7 +54,7 @@ type Body struct {
 type Revision string
 
 // Locator says where an item's bytes live. For the file store it is the bundle
-// directory or single file, relative to the content root, always slash
+// directory or single file, relative to the project root, always slash
 // separated. It is meaningless for SQL stores.
 type Locator string
 

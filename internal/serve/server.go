@@ -25,7 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/build"
+	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/render"
 	"github.com/kite-plus/kite/internal/site"
 )
@@ -47,6 +49,13 @@ type Options struct {
 	// Drafts renders unpublished content, which a preview usually wants and a
 	// deployment never does.
 	Drafts bool
+
+	// Admin mounts the read model API.
+	//
+	// It is off unless asked for. The API reports drafts, paths on the host
+	// and files the index refused, none of which a publicly reachable server
+	// should hand out; local authoring turns it on deliberately.
+	Admin bool
 
 	Logger *slog.Logger
 }
@@ -143,8 +152,34 @@ func (s *Server) Handler() http.Handler {
 	if s.opts.LiveReload {
 		mux.HandleFunc("GET "+ReloadPath, s.hub.handleReload)
 	}
+	if s.opts.Admin {
+		api.New(api.Options{Site: s.view, Logger: s.log}).Mount(mux)
+	}
 	mux.HandleFunc("/", s.handle)
 	return mux
+}
+
+// view is the project as the API should currently see it.
+//
+// It is read per request rather than captured once, because a reconcile
+// replaces the problem list underneath a running server: an admin that held
+// the startup copy would keep reporting a file the author has since fixed.
+func (s *Server) view() api.View {
+	s.mu.RLock()
+	problems := s.problems
+	s.mu.RUnlock()
+
+	return api.View{
+		Reader:   s.site.Reader,
+		Resolver: s.site.Resolver,
+		Types:    s.site.Project.Types,
+		Site:     s.site.Config.Site,
+		Store:    s.site.Config.Content.Store,
+		Runtime:  "serve",
+		Theme:    s.site.Config.Theme.Name,
+		Version:  buildinfo.Version,
+		Problems: problems,
+	}
 }
 
 // ListenAndServe runs until the context is canceled.

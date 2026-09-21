@@ -180,6 +180,12 @@ type Reader interface {
 	Get(ctx context.Context, id ID) (*Content, error)
 	GetBySlug(ctx context.Context, kind Kind, slug string) (*Content, error)
 	Query(ctx context.Context, q Query) (Page[Summary], error)
+
+	// Count reports the size of the set a query selects, disregarding its
+	// cursor and limit. It is a separate call because a caller that only
+	// wants the next page should not pay to count the rest.
+	Count(ctx context.Context, q Query) (int, error)
+
 	CountTerms(ctx context.Context, taxonomy string, q Query) ([]TermCount, error)
 	Caps() Capabilities
 }

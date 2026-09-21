@@ -125,11 +125,34 @@ func (r *Reader) Query(ctx context.Context, q content.Query) (content.Page[conte
 	return page, nil
 }
 
+// Count reports how many items a query selects.
+//
+// It shares buildWhere with Query, so a total can never describe a different
+// set than the rows it is a total of.
+func (r *Reader) Count(ctx context.Context, q content.Query) (int, error) {
+	if err := q.Normalize(); err != nil {
+		return 0, err
+	}
+	q.Cursor = "" // how far paging has got is not part of the question
+
+	where, args, err := buildWhere(q)
+	if err != nil {
+		return 0, err
+	}
+	var n int
+	if err := r.db.QueryRowContext(ctx, `SELECT count(*) FROM contents`+where, args...).Scan(&n); err != nil {
+		return 0, fmt.Errorf("reader: count: %w", err)
+	}
+	return n, nil
+}
+
 // CountTerms aggregates term usage across the items a query selects.
 func (r *Reader) CountTerms(ctx context.Context, taxonomy string, q content.Query) ([]content.TermCount, error) {
 	if err := q.Normalize(); err != nil {
 		return nil, err
 	}
+	q.Cursor = "" // an aggregate is over the whole set, not one page of it
+
 	where, args, err := buildWhere(q)
 	if err != nil {
 		return nil, err

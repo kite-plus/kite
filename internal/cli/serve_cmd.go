@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/serve"
 	"github.com/kite-plus/kite/internal/site"
 )
@@ -41,6 +42,7 @@ func newRunCmd() *cobra.Command {
 		defaultWatch:  true,
 		defaultReload: true,
 		defaultDrafts: true,
+		defaultAdmin:  true,
 		open:          true,
 	})
 }
@@ -50,6 +52,7 @@ type commandShape struct {
 	defaultWatch     bool
 	defaultReload    bool
 	defaultDrafts    bool
+	defaultAdmin     bool
 	open             bool
 }
 
@@ -60,6 +63,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 		watch  bool
 		reload bool
 		drafts bool
+		admin  bool
 		open   bool
 		quiet  bool
 	)
@@ -101,6 +105,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 				LiveReload: reload,
 				Watch:      watch,
 				Drafts:     drafts,
+				Admin:      admin,
 				Logger:     log,
 			})
 			if err != nil {
@@ -114,6 +119,9 @@ func serveCommand(shape commandShape) *cobra.Command {
 			}
 			if watch {
 				printf(cmd, "  watching for changes\n")
+			}
+			if admin {
+				printf(cmd, "  api at %s%s\n", url, api.Prefix)
 			}
 			printf(cmd, "  press ctrl-c to stop\n\n")
 
@@ -129,6 +137,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 	cmd.Flags().BoolVar(&watch, "watch", shape.defaultWatch, "reload when the project changes")
 	cmd.Flags().BoolVar(&reload, "live-reload", shape.defaultReload, "refresh open pages after a change")
 	cmd.Flags().BoolVar(&drafts, "drafts", shape.defaultDrafts, "include unpublished content")
+	cmd.Flags().BoolVar(&admin, "admin", shape.defaultAdmin, "serve the read model API")
 	cmd.Flags().BoolVar(&open, "open", shape.open, "open the site in a browser")
 	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "only log warnings and errors")
 	return cmd
