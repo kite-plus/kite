@@ -5,6 +5,11 @@ project_name: kite
 before:
   hooks:
     - go mod download
+    # The admin is embedded, so it has to exist before the binaries are
+    # built. Without this a release would ship binaries that answer 501 at
+    # /admin, and nothing downstream would notice.
+    - pnpm --dir web install --frozen-lockfile
+    - pnpm --dir web build
 
 builds:
   - id: kite

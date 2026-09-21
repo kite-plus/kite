@@ -30,6 +30,20 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      # The admin is embedded, so goreleaser's before hook builds it and
+      # needs a node toolchain here.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: web/.nvmrc
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Build the admin
+        run: |
+          pnpm --dir web install --frozen-lockfile
+          pnpm --dir web build
+
       - name: Test
         run: go test -race -count=1 ./...
 
@@ -63,6 +77,15 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      # The admin is embedded, so goreleaser's before hook builds it and
+      # needs a node toolchain here.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: web/.nvmrc
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       # go.mod's toolchain directive is a floor, not a pin: the go command
       # switches up to satisfy it but never down. Only GOTOOLCHAIN fixes the

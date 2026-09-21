@@ -156,6 +156,22 @@ jobs:
             exit 1
           fi
 
+      - name: Refuse two files claiming one id
+        run: |
+          set -eu
+          site=$(mktemp -d)
+          cd "$site"
+          /tmp/kite init . >/dev/null
+          /tmp/kite new post "Original" >/dev/null
+          # Copying a bundle is an ordinary thing to do and duplicates the id.
+          # Letting it through makes one of the two disappear from the site.
+          cp -r content/posts/original content/posts/copy
+          if /tmp/kite build 2>/dev/null; then
+            echo "expected the build to refuse a duplicated id"
+            exit 1
+          fi
+          /tmp/kite index 2>&1 | grep -q "duplicate id"
+
       - name: Build an unmigrated content directory
         run: |
           set -eu
@@ -188,3 +204,77 @@ jobs:
           /tmp/kite build --verify
           test -f public/tags/go/index.html
           test -f public/categories/tech/index.html
+
+  admin:
+    name: Admin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: web/.nvmrc
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm --dir web install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm --dir web lint
+
+      - name: Build
+        run: pnpm --dir web build
+
+      # The bundle is embedded, so a binary is only reproducible if the bundle
+      # is. Node and pnpm are pinned exactly for the same reason the Go
+      # toolchain is; this checks that the pinning actually holds.
+      - name: Build the bundle twice and compare every byte
+        run: |
+          set -eu
+          find web/dist -type f ! -name .gitkeep | sort | xargs sha256sum > /tmp/bundle-a
+          rm -rf web/dist
+          pnpm --dir web build
+          find web/dist -type f ! -name .gitkeep | sort | xargs sha256sum > /tmp/bundle-b
+          diff /tmp/bundle-a /tmp/bundle-b
+
+      # The committed client is generated from the server's own description.
+      # If the two can drift, the types the admin compiles against stop being
+      # evidence of anything.
+      - name: Fail if the generated client is out of date
+        run: |
+          set -eu
+          pnpm --dir web gen
+          if ! git diff --quiet -- web/src/api/schema.d.ts; then
+            echo "web/src/api/schema.d.ts is stale; run 'make web-gen' and commit the result"
+            git --no-pager diff -- web/src/api/schema.d.ts
+            exit 1
+          fi
+
+      - name: Serve the admin from the binary
+        run: |
+          set -eu
+          go build -o /tmp/kite ./cmd/kite
+          site=$(mktemp -d)
+          cd "$site"
+          /tmp/kite init . >/dev/null
+          /tmp/kite new post "Hello" >/dev/null
+          /tmp/kite serve --admin --port 1717 --watch=false &
+          server=$!
+          trap 'kill $server' EXIT
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:1717/api/v1/site >/dev/null && break
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:1717/api/v1/site | grep -q '"store":"file"'
+          curl -sf http://127.0.0.1:1717/api/v1/contents | grep -q '"items"'
+          # A build that embedded nothing answers 501 here, which is exactly
+          # what this job exists to catch before a release ships it.
+          curl -sf http://127.0.0.1:1717/admin/ | grep -q '<div id="root">'
