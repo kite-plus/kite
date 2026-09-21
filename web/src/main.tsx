@@ -3,7 +3,12 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import App from "./App";
+import { Gate } from "@/components/Gate";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/i18n";
+// Imported for its effect: it puts the theme on the document before a render.
+import "@/lib/theme";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -18,20 +23,16 @@ const queryClient = new QueryClient({
   },
 });
 
-// shadcn keys dark mode off a class, so the system preference is applied to
-// the document and kept in step with it. A manual switch can be added later
-// without any of the styling changing.
-const dark = window.matchMedia("(prefers-color-scheme: dark)");
-const applyTheme = (matches: boolean) =>
-  document.documentElement.classList.toggle("dark", matches);
-applyTheme(dark.matches);
-dark.addEventListener("change", (e) => applyTheme(e.matches));
-
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        <App />
+        <TooltipProvider delay={300}>
+          <Gate>
+            <App />
+          </Gate>
+        </TooltipProvider>
+        <Toaster position="bottom-right" />
       </I18nProvider>
     </QueryClientProvider>
   </StrictMode>,

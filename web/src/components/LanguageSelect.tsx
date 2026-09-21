@@ -4,6 +4,7 @@ import { useI18n } from "@/i18n";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -75,14 +76,16 @@ export function LanguageSelect({ id, value, onChange }: Props) {
         </SelectValue>
       </SelectTrigger>
       <SelectContent className="max-h-72">
-        {options.map((o) => (
-          <SelectItem key={o.tag} value={o.tag}>
-            <span className="flex w-full items-baseline gap-2">
-              <span className="flex-1">{o.label}</span>
-              <span className="font-mono text-xs text-muted-foreground">{o.tag}</span>
-            </span>
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          {options.map((o) => (
+            <SelectItem key={o.tag} value={o.tag}>
+              <span className="flex w-full items-baseline gap-2">
+                <span className="flex-1">{o.label}</span>
+                <span className="font-mono text-xs text-muted-foreground">{o.tag}</span>
+              </span>
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   );

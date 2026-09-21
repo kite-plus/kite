@@ -1,0 +1,111 @@
+import { useEffect, useState } from "react";
+import { LayoutTemplate } from "lucide-react";
+import { toast } from "sonner";
+
+import { ApiError } from "@/api/client";
+import { useI18n, useProblem } from "@/i18n";
+import { useSaveSettings, useSettings } from "@/hooks/useSettings";
+
+import { SchemaForm } from "@/components/SchemaForm";
+import { SettingsProblem } from "@/components/settings/SettingsProblem";
+import { Page } from "@/components/shell/Page";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+
+/**
+ * The theme in use, and the settings it asks for.
+ *
+ * The form is generated from the schema the theme declares, so configuring a
+ * theme nobody here has seen needs no page written for it.
+ */
+export function ThemePage() {
+  const { t } = useI18n();
+  const problem = useProblem();
+  const settings = useSettings();
+  const save = useSaveSettings();
+
+  const theme = settings.data?.theme;
+  const [values, setValues] = useState<Record<string, unknown>>({});
+
+  useEffect(() => {
+    if (theme) setValues({ ...(theme.values ?? {}) });
+  }, [theme]);
+
+  // Only what changed is sent, so a file is not rewritten for untouched values.
+  const changes = Object.fromEntries(
+    Object.entries(values)
+      .filter(([key, value]) => value !== (theme?.values ?? {})[key])
+      .map(([key, value]) => [`theme.settings.${key}`, value]),
+  );
+  const dirty = Object.keys(changes).length > 0;
+
+  const failure = settings.error ?? save.error;
+  const said = failure
+    ? problem(failure instanceof ApiError ? failure.code : undefined, failure.message)
+    : null;
+
+  return (
+    <Page
+      title={t("theme.title")}
+      description={t("theme.description")}
+      actions={
+        <Button
+          disabled={!dirty || save.isPending}
+          onClick={() => save.mutate(changes, { onSuccess: () => toast.success(t("settings.saved")) })}
+        >
+          {save.isPending && <Spinner data-icon="inline-start" />}
+          {t("settings.save")}
+        </Button>
+      }
+    >
+      <div className="flex max-w-2xl flex-col gap-3.5">
+        {said && <SettingsProblem {...said} />}
+
+        {!theme ? (
+          <Skeleton className="h-16 w-full" />
+        ) : (
+          <Item variant="outline">
+            <ItemMedia variant="icon" className="size-9 rounded-md bg-brand/10 text-brand">
+              <LayoutTemplate />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>{theme.name}</ItemTitle>
+              <ItemDescription>{t("theme.activeNote")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Badge variant="secondary">{t("theme.active")}</Badge>
+            </ItemActions>
+          </Item>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">{t("theme.settings")}</CardTitle>
+            {theme && (
+              <CardDescription>{t("settings.themeNote", { theme: theme.name })}</CardDescription>
+            )}
+          </CardHeader>
+          <CardContent>
+            {!theme ? (
+              <Skeleton className="h-40 w-full" />
+            ) : theme.schema && theme.schema.length > 0 ? (
+              <SchemaForm fields={theme.schema} values={values} onChange={setValues} />
+            ) : (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyTitle>{t("settings.themeEmpty")}</EmptyTitle>
+                  <EmptyDescription>{t("theme.emptyNote")}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </Page>
+  );
+}

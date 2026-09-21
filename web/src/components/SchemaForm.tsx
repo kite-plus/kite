@@ -1,25 +1,48 @@
-import type { components } from "@/api/schema";
+import { useRef, useState } from "react";
+import { ImageUp, X } from "lucide-react";
 import { cn } from "cn";
 
+import type { components } from "@/api/schema";
+import { locales, useI18n, type Key } from "@/i18n";
 import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-type Field = components["schemas"]["Field"];
+/** SchemaField is one declared field; Field is the control it is drawn in. */
+type SchemaField = components["schemas"]["Field"];
+
+/** What an image field needs to take a file: somewhere to put it. */
+export interface Uploads {
+  /** upload stores a file and resolves to the link that reaches it. */
+  upload: (file: File) => Promise<string>;
+  /** base is the address links are relative to, for showing what was chosen. */
+  base?: string;
+}
 
 interface Props {
-  fields: Field[];
+  fields: SchemaField[];
   values: Record<string, unknown>;
   onChange: (values: Record<string, unknown>) => void;
+  uploads?: Uploads;
 }
 
 /**
@@ -30,27 +53,28 @@ interface Props {
  * adding a type a development task; reading the schema is what keeps it a
  * configuration change.
  */
-export function SchemaForm({ fields, values, onChange }: Props) {
+export function SchemaForm({ fields, values, onChange, uploads }: Props) {
   const set = (key: string, value: unknown) => onChange({ ...values, [key]: value });
 
   return (
-    <div className="space-y-3">
+    <FieldGroup>
       {fields.map((field) =>
         visible(field, values) ? (
           <FieldRow
             key={field.key}
             field={field}
             value={values[field.key]}
-            onChange={(v) => set(field.key, v)}
+            onChange={(value) => set(field.key, value)}
+            uploads={uploads}
           />
         ) : null,
       )}
-    </div>
+    </FieldGroup>
   );
 }
 
 /** visible applies a field's showIf, so a form only asks what still applies. */
-function visible(field: Field, values: Record<string, unknown>): boolean {
+function visible(field: SchemaField, values: Record<string, unknown>): boolean {
   if (!field.showIf) return true;
   return Object.entries(field.showIf).every(([key, want]) => values[key] === want);
 }
@@ -59,39 +83,39 @@ function FieldRow({
   field,
   value,
   onChange,
+  uploads,
 }: {
-  field: Field;
+  field: SchemaField;
   value: unknown;
   onChange: (value: unknown) => void;
+  uploads?: Uploads;
 }) {
-  const label = field.label || field.key;
+  const { t } = useI18n();
+  const label = builtinLabel(field, t) ?? (field.label || field.key);
 
-  // A switch reads better beside its label than under it, which is the one
-  // field shape that does not fit the others.
+  // A switch reads better beside its label than under it.
   if (field.type === "boolean") {
     return (
-      <div className="flex items-center justify-between gap-3 py-0.5">
-        <div className="min-w-0">
-          <Label htmlFor={field.key}>{label}</Label>
-          {field.help && (
-            <p className="text-xs text-muted-foreground">{field.help}</p>
-          )}
-        </div>
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel htmlFor={field.key}>{label}</FieldLabel>
+          {field.help && <FieldDescription>{field.help}</FieldDescription>}
+        </FieldContent>
         <Switch
           id={field.key}
           checked={Boolean(value)}
           onCheckedChange={(checked) => onChange(checked)}
         />
-      </div>
+      </Field>
     );
   }
 
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor={field.key}>
+    <Field>
+      <FieldLabel htmlFor={field.key}>
         {label}
         {field.required && <span className="text-destructive">*</span>}
-      </Label>
+      </FieldLabel>
 
       {field.type === "text" || field.type === "code" ? (
         <Textarea
@@ -99,46 +123,66 @@ function FieldRow({
           rows={field.type === "code" ? 6 : 3}
           value={asString(value)}
           placeholder={field.placeholder}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(event) => onChange(event.target.value)}
           className={cn(field.type === "code" && "font-mono text-xs")}
         />
       ) : field.type === "select" ? (
-        <Select value={asString(value)} onValueChange={(v) => v && onChange(v)}>
+        <Select value={asString(value)} onValueChange={(next) => next && onChange(next)}>
           <SelectTrigger id={field.key} className="w-full">
-            <SelectValue placeholder={field.placeholder ?? "Choose"} />
+            <SelectValue placeholder={field.placeholder ?? t("form.choose")}>
+              {(chosen: string) =>
+                field.options?.find((option) => option.value === chosen)?.label || chosen
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {field.options?.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label || o.value}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {field.options?.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label || option.value}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       ) : field.type === "multiselect" ? (
-        <div className="flex flex-wrap gap-1.5">
-          {field.options?.map((o) => {
-            const chosen = Array.isArray(value) && value.includes(o.value);
-            return (
-              <Button
-                key={o.value}
-                type="button"
-                size="sm"
-                variant={chosen ? "default" : "outline"}
-                className="h-7 px-2 text-xs font-normal"
-                onClick={() =>
-                  onChange(
-                    chosen
-                      ? (value as string[]).filter((v) => v !== o.value)
-                      : [...(Array.isArray(value) ? (value as string[]) : []), o.value],
-                  )
-                }
-              >
-                {o.label || o.value}
-              </Button>
-            );
-          })}
-        </div>
+        <ToggleGroup
+          multiple
+          variant="outline"
+          size="sm"
+          className="flex-wrap"
+          value={Array.isArray(value) ? (value as string[]) : []}
+          onValueChange={(chosen) => onChange(chosen)}
+        >
+          {field.options?.map((option) => (
+            <ToggleGroupItem key={option.value} value={option.value}>
+              {option.label || option.value}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      ) : field.type === "color" ? (
+        // The swatch picks and the text says, since a colour is as often
+        // pasted from a brand sheet as it is chosen by eye.
+        <InputGroup>
+          <InputGroupAddon>
+            <input
+              type="color"
+              aria-label={label}
+              value={/^#[0-9a-f]{6}$/i.test(asString(value)) ? asString(value) : "#000000"}
+              onChange={(event) => onChange(event.target.value)}
+              className="size-4.5 cursor-pointer appearance-none rounded-sm border-0 bg-transparent p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border [&::-webkit-color-swatch]:border-border [&::-webkit-color-swatch-wrapper]:p-0"
+            />
+          </InputGroupAddon>
+          <InputGroupInput
+            id={field.key}
+            value={asString(value)}
+            placeholder={field.placeholder ?? "#000000"}
+            className="font-mono"
+            onChange={(event) => onChange(event.target.value)}
+          />
+        </InputGroup>
+      ) : field.type === "image" && uploads ? (
+        <ImageField id={field.key} value={asString(value)} onChange={onChange} uploads={uploads} />
       ) : (
         <Input
           id={field.key}
@@ -147,32 +191,132 @@ function FieldRow({
           placeholder={field.placeholder}
           min={field.min}
           max={field.max}
-          onChange={(e) =>
+          onChange={(event) =>
             onChange(
               field.type === "number"
-                ? e.target.value === ""
+                ? event.target.value === ""
                   ? undefined
-                  : Number(e.target.value)
-                : e.target.value,
+                  : Number(event.target.value)
+                : event.target.value,
             )
           }
-          className={cn(field.type === "color" && "h-9 w-16 p-1")}
         />
       )}
 
-      {field.help && field.type !== "boolean" && (
-        <p className="text-xs text-muted-foreground">{field.help}</p>
-      )}
-    </div>
+      {field.help && <FieldDescription>{field.help}</FieldDescription>}
+    </Field>
   );
+}
+
+/**
+ * builtinLabel translates a field the built-in types declare. A project that
+ * gave the field a label of its own keeps it: only the stock English one is
+ * recognized.
+ */
+function builtinLabel(field: SchemaField, t: (key: Key) => string): string | undefined {
+  const key = `field.${field.key}`;
+  const stock = (locales.en.catalog as Record<string, string>)[key];
+  return stock !== undefined && stock === field.label ? t(key as Key) : undefined;
+}
+
+/** An image is chosen by handing over a file, not by typing where one is. */
+function ImageField({
+  id,
+  value,
+  onChange,
+  uploads,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: unknown) => void;
+  uploads: Uploads;
+}) {
+  const { t } = useI18n();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const take = async (file?: File) => {
+    if (!file) return;
+    setBusy(true);
+    setFailed(null);
+    try {
+      onChange(await uploads.upload(file));
+    } catch (err) {
+      setFailed(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={input}
+        id={id}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(event) => {
+          void take(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+      />
+      {value ? (
+        <div className="relative overflow-hidden rounded-lg border">
+          <img
+            src={resolve(value, uploads.base)}
+            alt=""
+            className="aspect-video w-full bg-muted object-cover"
+          />
+          <div className="flex items-center gap-1 border-t px-2.5 py-1">
+            <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+              {value}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={t("form.removeImage")}
+              onClick={() => onChange(undefined)}
+            >
+              <X />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          variant="outline"
+          disabled={busy}
+          className="h-28 w-full flex-col gap-1.5 border-dashed font-normal text-muted-foreground"
+          onClick={() => input.current?.click()}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            void take(event.dataTransfer.files[0]);
+          }}
+        >
+          {busy ? <Spinner /> : <ImageUp />}
+          <span className="text-xs">{t("form.chooseImage")}</span>
+        </Button>
+      )}
+      {failed && <FieldDescription className="text-destructive">{failed}</FieldDescription>}
+    </>
+  );
+}
+
+/** resolve turns a link written relative to a page into one the admin can load. */
+function resolve(link: string, base?: string): string {
+  try {
+    return new URL(link, new URL(base ?? "/", window.location.origin)).toString();
+  } catch {
+    return link;
+  }
 }
 
 function inputType(type: string): string {
   switch (type) {
     case "date":
       return "datetime-local";
-    case "color":
-      return "color";
     case "number":
       return "number";
     case "url":

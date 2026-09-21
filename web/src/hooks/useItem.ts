@@ -38,6 +38,10 @@ export function useItem(id: string | null, kind: string) {
   const revision = useRef<string>("");
 
   useEffect(() => {
+    // A first save reopens the editor under the id it was given. That item is
+    // already here, and loading it again would tear the editor down under
+    // the author's cursor.
+    if (id && base.current?.id === id) return;
     if (!id) {
       // Nothing to load: a new item starts from an empty draft of its kind,
       // and gets its id from the server when it is first saved.

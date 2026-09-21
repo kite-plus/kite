@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { XCircle } from "lucide-react";
+
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import type { Draft } from "@/api/client";
 import { useI18n } from "@/i18n";
 
@@ -77,9 +80,10 @@ export function Preview({ draft, id }: Props) {
   return (
     <div className="relative h-full">
       {failed && (
-        <div className="absolute inset-x-0 top-0 z-10 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-400">
-          {failed}
-        </div>
+        <Alert variant="destructive" className="absolute inset-x-0 top-0 z-10 rounded-none">
+          <XCircle />
+          <AlertTitle>{failed}</AlertTitle>
+        </Alert>
       )}
       <iframe
         ref={frame}

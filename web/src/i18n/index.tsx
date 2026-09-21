@@ -62,6 +62,8 @@ interface Context {
   t: (key: Key, values?: Values) => string;
   /** date formats an instant the way this locale writes dates. */
   date: (iso: string | undefined, style?: "short" | "long") => string;
+  /** relative says how long ago an instant was, falling back to a date. */
+  relative: (iso: string | undefined) => string;
 }
 
 const I18nContext = createContext<Context | null>(null);
@@ -116,7 +118,25 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       ).format(at);
     };
 
-    return { locale, setLocale, t, date };
+    const ago = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+    const relative = (iso: string | undefined) => {
+      if (!iso) return "—";
+      const seconds = (new Date(iso).getTime() - Date.now()) / 1000;
+      if (Number.isNaN(seconds)) return "—";
+
+      const steps: [Intl.RelativeTimeFormatUnit, number][] = [
+        ["minute", 60],
+        ["hour", 3600],
+        ["day", 86_400],
+      ];
+      // Past a week a date says more than a count of days.
+      if (Math.abs(seconds) >= 7 * 86_400) return date(iso);
+      let [unit, size] = steps[0];
+      for (const step of steps) if (Math.abs(seconds) >= step[1]) [unit, size] = step;
+      return ago.format(Math.round(seconds / size), unit);
+    };
+
+    return { locale, setLocale, t, date, relative };
   }, [locale, setLocale]);
 
   return <I18nContext value={value}>{children}</I18nContext>;

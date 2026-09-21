@@ -10,7 +10,38 @@ export type { components };
  * hand-written fetch would compile happily against an endpoint that no longer
  * exists; this will not.
  */
-export const api = createClient<paths>({ baseUrl: "/api/v1" });
+export const api = createClient<paths>({
+  baseUrl: "/api/v1",
+  // The session is a cookie, so every call carries it. Saying so explicitly
+  // is the only note in this file about how the API knows who is asking.
+  credentials: "same-origin",
+});
+
+/**
+ * Listeners for the moment a request comes back refused.
+ *
+ * A session ends without the page being told: the cookie runs out, the server
+ * is restarted under a new password, somebody signs out in another tab. The
+ * first anybody hears of it is a 401 on whatever was asked for next, so that
+ * is what puts the sign-in form back on screen.
+ */
+const refused = new Set<() => void>();
+
+export function onRefused(listener: () => void): () => void {
+  refused.add(listener);
+  return () => {
+    refused.delete(listener);
+  };
+}
+
+api.use({
+  onResponse({ response }) {
+    if (response.status === 401) {
+      for (const listener of refused) listener();
+    }
+    return response;
+  },
+});
 
 export type Summary = components["schemas"]["Summary"];
 export type Item = components["schemas"]["Item"];
