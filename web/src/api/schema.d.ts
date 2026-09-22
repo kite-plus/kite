@@ -462,14 +462,12 @@ export interface components {
         SetupRequest: {
             password: string;
             site: components["schemas"]["SiteSettings"];
-            token?: string;
             user: string;
         };
         SetupState: {
             min_password_length?: number;
             required: boolean;
             site?: components["schemas"]["SiteSettings"];
-            token_required?: boolean;
             user?: string;
         };
         SiteInfo: {
@@ -1581,15 +1579,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Failed. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
             /** @description The request came from another site. */
             403: {
                 headers: {
@@ -1610,15 +1599,6 @@ export interface operations {
             };
             /** @description Failed. */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description Failed. */
-            429: {
                 headers: {
                     [name: string]: unknown;
                 };

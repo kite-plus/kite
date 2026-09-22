@@ -4,23 +4,19 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/kite-plus/kite/internal/auth"
 	"github.com/kite-plus/kite/internal/setup"
 )
 
-var frozen = time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
-
 func newFlow(t *testing.T) (string, *auth.Guard, *setup.Flow) {
 	t.Helper()
 	root := t.TempDir()
-	guard := auth.NewWithClock(nil, func() time.Time { return frozen })
+	guard := auth.New(nil)
 
-	flow, err := setup.NewWithClock(root, guard, func() time.Time { return frozen })
+	flow, err := setup.New(root, guard)
 	if err != nil {
 		t.Fatalf("setup.New: %v", err)
 	}
@@ -42,45 +38,8 @@ func TestAProjectWithAnAccountHasNothingToSetUp(t *testing.T) {
 	}
 }
 
-// The token is the whole of what keeps an unconfigured server on a public
-// address from belonging to whoever finds the port first.
-func TestOnlyTheTokenTheServerPrintedIsAccepted(t *testing.T) {
-	_, _, flow := newFlow(t)
-
-	for _, wrong := range []string{"", " ", strings.ToUpper(flow.Token()), flow.Token() + "x"} {
-		if err := flow.Check(wrong); !errors.Is(err, setup.ErrBadToken) {
-			t.Errorf("Check(%q) = %v, want ErrBadToken", wrong, err)
-		}
-	}
-	if err := flow.Check(flow.Token()); err != nil {
-		t.Errorf("the printed token was refused: %v", err)
-	}
-}
-
-// A token nobody was given must not be reachable by guessing at machine
-// speed, so failures start costing time.
-func TestRepeatedWrongTokensStartBeingRefusedOutright(t *testing.T) {
-	_, _, flow := newFlow(t)
-
-	var refused *auth.TooManyAttempts
-	for range 20 {
-		if err := flow.Check("wrong"); errors.As(err, &refused) {
-			break
-		}
-	}
-	if refused == nil {
-		t.Fatal("wrong tokens can be tried without limit")
-	}
-	// And the right one is refused too while the wait is on, or the backoff
-	// would be nothing more than a suggestion.
-	if err := flow.Check(flow.Token()); !errors.As(err, &refused) {
-		t.Errorf("Check during a backoff = %v, want TooManyAttempts", err)
-	}
-}
-
-func TestFinishingSetupGuardsTheServerAndSpendsTheToken(t *testing.T) {
+func TestFinishingSetupGuardsTheServerAndClosesTheFlow(t *testing.T) {
 	root, guard, flow := newFlow(t)
-	token := flow.Token()
 
 	if guard.Required() {
 		t.Fatal("the guard wants a password before there is an account")
@@ -100,64 +59,30 @@ func TestFinishingSetupGuardsTheServerAndSpendsTheToken(t *testing.T) {
 		t.Error("setup is still pending after it finished")
 	}
 
-	// A spent token is not left on disk to be found in a backup later.
-	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(setup.TokenFile))); !os.IsNotExist(err) {
-		t.Errorf("the token file survived setup: %v", err)
+	// The account is on disk, so a restart comes back configured rather than
+	// back at setup with the password already taken.
+	stored, err := auth.Load(root)
+	if err != nil {
+		t.Fatalf("the account did not survive: %v", err)
 	}
-	// And a second attempt cannot take the server over.
-	if _, err := flow.Complete("someone", "another password"); !errors.Is(err, setup.ErrDone) {
-		t.Errorf("a second Complete = %v, want ErrDone", err)
+	if stored.User() != "editor" {
+		t.Errorf("stored user = %q, want editor", stored.User())
 	}
-	if err := flow.Check(token); !errors.Is(err, setup.ErrDone) {
-		t.Errorf("Check after setup = %v, want ErrDone", err)
+	if _, err := setup.New(root, auth.New(stored)); !errors.Is(err, auth.ErrAlreadyConfigured) {
+		t.Errorf("a restarted server would offer setup again: %v", err)
 	}
 }
 
-// A container that restarts must not invalidate the link its operator just
-// copied out of the log.
-func TestARestartKeepsTheSameToken(t *testing.T) {
-	root, _, flow := newFlow(t)
+// Setup runs once. Whoever finished it owns the studio, and a second attempt
+// is not a way to take it from them.
+func TestSetupCannotBeRunTwice(t *testing.T) {
+	_, _, flow := newFlow(t)
 
-	again, err := setup.New(root, auth.New(nil))
-	if err != nil {
-		t.Fatalf("setup.New: %v", err)
-	}
-	if again.Token() != flow.Token() {
-		t.Errorf("token changed across a restart: %q then %q", flow.Token(), again.Token())
-	}
-
-	stored, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(setup.TokenFile)))
-	if err != nil {
-		t.Fatalf("read %s: %v", setup.TokenFile, err)
-	}
-	if strings.TrimSpace(string(stored)) != flow.Token() {
-		t.Error("the stored token is not the one being checked against")
-	}
-}
-
-// An operator who would rather not read a token out of a log can name one.
-func TestTheEnvironmentCanNameTheToken(t *testing.T) {
-	t.Setenv(setup.TokenEnv, "  a secret i chose  ")
-
-	root := t.TempDir()
-	flow, err := setup.New(root, auth.New(nil))
-	if err != nil {
+	if _, err := flow.Complete("editor", "correct horse battery"); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := flow.Token(), "a secret i chose"; got != want {
-		t.Errorf("token = %q, want %q", got, want)
-	}
-	// Nothing was written: a token that came from the environment is already
-	// somewhere the operator keeps secrets.
-	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(setup.TokenFile))); !os.IsNotExist(err) {
-		t.Errorf("a token from the environment was also written to disk: %v", err)
-	}
-}
-
-func TestANilFlowIsAServerWithNothingToSetUp(t *testing.T) {
-	var none *setup.Flow
-	if none.Pending() {
-		t.Error("a server that was never waiting reports that it is")
+	if _, err := flow.Complete("someone", "another password"); !errors.Is(err, setup.ErrDone) {
+		t.Errorf("a second Complete = %v, want ErrDone", err)
 	}
 }
 
@@ -194,7 +119,6 @@ func TestOnlyOneOfTwoSimultaneousSetupsWins(t *testing.T) {
 		t.Fatalf("%d of 2 setups succeeded, want exactly 1", won)
 	}
 
-	// And what was stored is a password one of them actually chose.
 	stored, err := auth.Load(root)
 	if err != nil {
 		t.Fatal(err)
@@ -210,5 +134,33 @@ func TestOnlyOneOfTwoSimultaneousSetupsWins(t *testing.T) {
 	}
 	if !guard.Required() {
 		t.Error("the studio is still open after setup finished")
+	}
+}
+
+// Nothing is left in the project but the account: the flow keeps no state of
+// its own on disk to be found later.
+func TestSetupLeavesNothingBehindButTheAccount(t *testing.T) {
+	root, _, flow := newFlow(t)
+	if _, err := flow.Complete("admin", "correct horse battery"); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := os.ReadDir(filepath.Join(root, ".kite", "secrets"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "account.json" {
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Errorf("secrets hold %v, want only account.json", names)
+	}
+}
+
+func TestANilFlowIsAServerWithNothingToSetUp(t *testing.T) {
+	var none *setup.Flow
+	if none.Pending() {
+		t.Error("a server that was never waiting reports that it is")
 	}
 }

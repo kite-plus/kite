@@ -1,11 +1,12 @@
 # A Kite site in one command.
 #
 #   docker compose up -d
-#   docker compose logs kite        # the setup token is in here
 #
 # Then open http://localhost:1717/admin/ and finish the installation in the
-# browser. Until that is done the server answers nothing but the setup page,
-# and the setup page will not act without the token above.
+# browser. Until that is done the server answers nothing but the setup page --
+# and that page is open to whoever reaches it first, because there is no
+# account yet to check anybody against. Set KITE_ADMIN_PASSWORD below to skip
+# setup entirely.
 
 services:
   kite:
@@ -28,10 +29,6 @@ services:
       # setup entirely.
       # KITE_ADMIN_USER: admin
       # KITE_ADMIN_PASSWORD: change me, please
-
-      # The setup token is generated and printed at startup. Naming it here
-      # instead keeps it out of the logs.
-      # KITE_SETUP_TOKEN: a secret you chose
     volumes:
       # A named volume, because the container runs as an unprivileged user
       # and a bind mount would inherit whatever the host directory allows.

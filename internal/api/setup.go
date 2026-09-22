@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/kite-plus/kite/internal/auth"
 	"github.com/kite-plus/kite/internal/content"
@@ -25,11 +24,6 @@ type SetupState struct {
 	// rest of this is absent and the client goes to the studio.
 	Required bool `json:"required"`
 
-	// TokenRequired says a token from the server's console has to be sent
-	// with the form. It is always true today; it is reported rather than
-	// assumed so that a client does not have to know that.
-	TokenRequired bool `json:"token_required,omitempty"`
-
 	// Site is what the project is configured with now, to fill the form in.
 	Site *SiteSettings `json:"site,omitempty"`
 
@@ -44,9 +38,6 @@ type SetupState struct {
 // SetupRequest finishes the first run: it describes the site and creates the
 // one account that will guard it.
 type SetupRequest struct {
-	// Token is what the server printed when it started.
-	Token string `json:"token,omitempty"`
-
 	User     string `json:"user"`
 	Password string `json:"password"`
 
@@ -71,8 +62,7 @@ func (s *Server) handleSetupState(w http.ResponseWriter, _ *http.Request) {
 
 	site := s.src().Site
 	writeJSON(w, http.StatusOK, SetupState{
-		Required:      true,
-		TokenRequired: true,
+		Required: true,
 		Site: &SiteSettings{
 			Title:       site.Title,
 			Description: site.Description,
@@ -98,9 +88,6 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 	req, ok := decodeJSON[SetupRequest](s, w, r)
 	if !ok {
-		return
-	}
-	if !s.checkSetupToken(w, req.Token) {
 		return
 	}
 
@@ -155,16 +142,6 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// checkSetupToken answers the request itself when the token is wrong.
-func (s *Server) checkSetupToken(w http.ResponseWriter, presented string) bool {
-	err := s.setup.Check(strings.TrimSpace(presented))
-	if err == nil {
-		return true
-	}
-	s.failSetup(w, err)
-	return false
-}
-
 // setupSettings turns the form into configuration values, refusing the ones
 // the settings endpoint would refuse and for the same reasons.
 func setupSettings(w http.ResponseWriter, site SiteSettings) (map[string]any, bool) {
@@ -193,24 +170,10 @@ func setupSettings(w http.ResponseWriter, site SiteSettings) (map[string]any, bo
 
 // failSetup maps a refusal from the flow onto a response.
 func (s *Server) failSetup(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, setup.ErrBadToken):
-		// Its own code rather than the sign-in one: what was wrong is the
-		// token, and a client told "incorrect user name or password" would
-		// send somebody looking at the two fields that were right.
-		failField(w, http.StatusUnauthorized, CodeBadSetupToken, "token",
-			"that is not the setup token this server printed when it started")
-	case errors.Is(err, setup.ErrDone), errors.Is(err, auth.ErrAlreadyConfigured):
+	if errors.Is(err, setup.ErrDone) || errors.Is(err, auth.ErrAlreadyConfigured) {
 		fail(w, http.StatusConflict, CodeAlreadySetUp,
 			"this server is already set up; sign in instead")
-	default:
-		if wait, is := errors.AsType[*auth.TooManyAttempts](err); is {
-			retry := max(wait.RetryAfter.Round(time.Second), time.Second)
-			w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())))
-			fail(w, http.StatusTooManyRequests, CodeTooManyAttempts,
-				"too many attempts; try again in "+retry.String())
-			return
-		}
-		s.failErr(w, err)
+		return
 	}
+	s.failErr(w, err)
 }

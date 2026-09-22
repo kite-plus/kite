@@ -109,7 +109,7 @@ type Server struct {
 
 // Setup is the first run this server is waiting on, or nil when it is not
 // waiting on one. The command that started the server prints from it, so that
-// the token reaches the console rather than only the log.
+// whoever ran it is told where to finish.
 func (s *Server) Setup() *setup.Flow { return s.setup }
 
 // project is the site as it currently stands. Configuration can be reloaded
@@ -134,16 +134,16 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 	if opts.Logger == nil {
 		opts.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	// A studio with no account on an address other than localhost is open to
-	// whoever finds the port, which is a mistake that looks exactly like a
-	// working server until somebody else finds it. It is never simply
-	// allowed.
+	// A studio with no account on an address other than localhost used to be
+	// refused outright. A container has no terminal to run
+	// `kite auth set-password` in, so that left whoever deployed it with a
+	// restart loop and a log line to read.
 	//
-	// It is not simply refused either. A container has no terminal to run
-	// `kite auth set-password` in, so refusing to start leaves an operator
-	// with a restart loop and a log line. The server comes up in setup
-	// instead: nothing but the first-run endpoints answers, and they need a
-	// token that was printed on the operator's own console.
+	// It comes up in setup instead. Nothing but the first-run endpoints
+	// answers, so an unconfigured server hands out no content, no drafts and
+	// no settings; the form itself is open, and the first browser to reach it
+	// gets the account. Giving the server an account before it is reachable
+	// is what closes that window -- see [setup] for why it is left open.
 	var flow *setup.Flow
 	if opts.Admin && !opts.Auth.Required() && !auth.Loopback(opts.Addr) {
 		// Setup writes an account and the site's own description, so a

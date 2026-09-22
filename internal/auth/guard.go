@@ -23,7 +23,7 @@ type Guard struct {
 	mu      sync.RWMutex
 	account *Account
 
-	attempts *Throttle
+	attempts *throttle
 
 	// verifying serializes password checks. Argon2id is memory-hard on
 	// purpose, so a server that ran one per request would be handing anyone
@@ -41,7 +41,7 @@ func NewWithClock(account *Account, now func() time.Time) *Guard {
 		csrf:     http.NewCrossOriginProtection(),
 		now:      now,
 		account:  account,
-		attempts: NewThrottle(freeAttempts),
+		attempts: newThrottle(freeAttempts),
 	}
 }
 

@@ -28,12 +28,8 @@ func newUnconfiguredServer(t *testing.T, root string) (http.Handler, *setup.Flow
 	return h, flow, guard
 }
 
-func setupBody(flow *setup.Flow, token string) map[string]any {
-	if token == "" {
-		token = flow.Token()
-	}
+func setupBody() map[string]any {
 	return map[string]any{
-		"token":    token,
 		"user":     "editor",
 		"password": "correct horse battery",
 		"site": map[string]any{
@@ -65,8 +61,8 @@ func TestNothingButSetupAnswersUntilAServerHasAnOwner(t *testing.T) {
 		t.Errorf("GET /setup: status = %d, want 200", rec.Code)
 	}
 	state := get[api.SetupState](t, h, api.Prefix+"/setup", http.StatusOK)
-	if !state.Required || !state.TokenRequired {
-		t.Errorf("state = %+v, want setup and a token to be required", state)
+	if !state.Required {
+		t.Errorf("state = %+v, want setup to be required", state)
 	}
 	// The form starts from what the project already says about itself.
 	if state.Site == nil || state.Site.Title != "Field Notes" {
@@ -74,21 +70,13 @@ func TestNothingButSetupAnswersUntilAServerHasAnOwner(t *testing.T) {
 	}
 }
 
-func TestSetupRefusesTheWrongTokenAndAPasswordTooShortToKeep(t *testing.T) {
+func TestSetupRefusesAPasswordTooShortToKeepAndAnAddressThatIsNotOne(t *testing.T) {
 	root := newProject(t, 1)
 	h, flow, guard := newUnconfiguredServer(t, root)
 
-	rec := send(t, h, http.MethodPost, api.Prefix+"/setup", setupBody(flow, "not the token"), nil)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("wrong token: status = %d, want 401\n%s", rec.Code, rec.Body)
-	}
-	if got := decode[api.ErrorBody](t, rec).Error.Code; got != api.CodeBadSetupToken {
-		t.Errorf("code = %q, want %q", got, api.CodeBadSetupToken)
-	}
-
-	short := setupBody(flow, "")
+	short := setupBody()
 	short["password"] = "short"
-	rec = send(t, h, http.MethodPost, api.Prefix+"/setup", short, nil)
+	rec := send(t, h, http.MethodPost, api.Prefix+"/setup", short, nil)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("short password: status = %d, want 400\n%s", rec.Code, rec.Body)
 	}
@@ -96,7 +84,7 @@ func TestSetupRefusesTheWrongTokenAndAPasswordTooShortToKeep(t *testing.T) {
 		t.Errorf("field = %q, want password", got)
 	}
 
-	bad := setupBody(flow, "")
+	bad := setupBody()
 	bad["site"] = map[string]any{"title": "T", "base_url": "not a url", "language": "en"}
 	rec = send(t, h, http.MethodPost, api.Prefix+"/setup", bad, nil)
 	if rec.Code != http.StatusBadRequest {
@@ -118,7 +106,7 @@ func TestSetupWritesTheSiteCreatesTheAccountAndSignsTheBrowserIn(t *testing.T) {
 	root := newProject(t, 1)
 	h, flow, guard := newUnconfiguredServer(t, root)
 
-	rec := send(t, h, http.MethodPost, api.Prefix+"/setup", setupBody(flow, ""), nil)
+	rec := send(t, h, http.MethodPost, api.Prefix+"/setup", setupBody(), nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body)
 	}
@@ -161,7 +149,7 @@ func TestSetupWritesTheSiteCreatesTheAccountAndSignsTheBrowserIn(t *testing.T) {
 
 	// A second attempt cannot take the server over, and the rest of the API
 	// now wants a session rather than refusing outright.
-	rec = send(t, h, http.MethodPost, api.Prefix+"/setup", setupBody(flow, ""), nil)
+	rec = send(t, h, http.MethodPost, api.Prefix+"/setup", setupBody(), nil)
 	if rec.Code != http.StatusConflict {
 		t.Errorf("a second setup: status = %d, want 409", rec.Code)
 	}
@@ -175,9 +163,9 @@ func TestSetupWritesTheSiteCreatesTheAccountAndSignsTheBrowserIn(t *testing.T) {
 // not become a key in the file that reads like a decision.
 func TestAnEmptyDescriptionIsLeftOutOfTheConfiguration(t *testing.T) {
 	root := newProject(t, 1)
-	h, flow, _ := newUnconfiguredServer(t, root)
+	h, _, _ := newUnconfiguredServer(t, root)
 
-	body := setupBody(flow, "")
+	body := setupBody()
 	body["site"] = map[string]any{
 		"title":    "Notebook",
 		"base_url": "https://notes.example.com",

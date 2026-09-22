@@ -206,7 +206,7 @@ func openAPI() *document {
 					RequestBody: body(ref(SetupRequest{})),
 					Responses: ok(ref(SessionInfo{}),
 						"Set up, and signed in. The cookie is in Set-Cookie.",
-						"400", "401", "405", "409", "429"),
+						"400", "405", "409"),
 				},
 			},
 			"/auth/session": {Get: &operation{

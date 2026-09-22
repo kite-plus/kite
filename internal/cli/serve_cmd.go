@@ -161,14 +161,13 @@ func serveCommand(shape commandShape) *cobra.Command {
 			}
 			printf(cmd, "  press ctrl-c to stop\n\n")
 
-			// The token is printed rather than only logged, and printed last
-			// so that it is the thing still on screen. Whoever started the
-			// server is the only person who can see this, which is the whole
-			// of what makes an unconfigured server on a public address safe.
-			if flow := srv.Setup(); flow.Pending() {
+			// Printed last so that it is the thing still on screen, because
+			// until somebody follows it this server answers nothing else --
+			// and because the first browser to arrive is the one that gets
+			// the account.
+			if srv.Setup().Pending() {
 				printf(cmd, "  Finish installing this site in a browser:\n\n")
-				printf(cmd, "    %s%s/setup\n", url, web.Path)
-				printf(cmd, "    setup token: %s\n\n", flow.Token())
+				printf(cmd, "    %s%s/setup\n\n", url, web.Path)
 			}
 
 			if open {

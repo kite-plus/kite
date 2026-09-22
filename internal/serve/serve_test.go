@@ -690,12 +690,8 @@ func TestAnUnguardedStudioThatCanWriteComesUpInSetupInstead(t *testing.T) {
 	root := newProject(t, 1)
 	srv := newServer(t, root, serve.Options{Addr: "0.0.0.0:1717", Admin: true, Write: true})
 
-	flow := srv.Setup()
-	if !flow.Pending() {
+	if !srv.Setup().Pending() {
 		t.Fatal("a server with no account is not waiting to be set up")
-	}
-	if flow.Token() == "" {
-		t.Error("setup is open with no token to present")
 	}
 
 	h := srv.Handler()

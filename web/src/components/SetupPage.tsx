@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, KeyRound, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, XCircle } from "lucide-react";
 
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
@@ -40,10 +40,9 @@ import { Spinner } from "@/components/ui/spinner";
  * compose file, and whoever did that is looking at a browser. This is the
  * same installation asked for through a form.
  *
- * The token is what makes that safe. A server with no account answers nothing
- * but this page, and this page will not act without a secret that was printed
- * on the console of the machine it runs on -- so being first to find the port
- * is not the same as being the owner.
+ * There is nobody to check a request against yet, so this page is open to
+ * whoever reaches it first. What the server does instead is answer nothing
+ * else until the form is finished, which is why it says so little.
  */
 export function SetupPage({ state }: { state: SetupState }) {
   const { t } = useI18n();
@@ -56,7 +55,6 @@ export function SetupPage({ state }: { state: SetupState }) {
   const [baseURL, setBaseURL] = useState(state.site?.base_url ?? "");
   const [language, setLanguage] = useState(state.site?.language || "en");
 
-  const [token, setToken] = useState("");
   const [user, setUser] = useState(state.user ?? "admin");
   const [password, setPassword] = useState("");
   const [again, setAgain] = useState("");
@@ -74,7 +72,6 @@ export function SetupPage({ state }: { state: SetupState }) {
     }
     if (install.isPending || tooShort || mismatch || !password || !user) return;
     install.mutate({
-      token,
       user,
       password,
       site: { title, base_url: baseURL, language },
@@ -82,9 +79,8 @@ export function SetupPage({ state }: { state: SetupState }) {
   };
 
   const failure = install.error;
-  // The server's own sentence is kept underneath the translated headline: a
-  // refused token and a base URL that is not a URL are both "invalid", and
-  // which field it was only the server knows.
+  // The server's own sentence is kept underneath the translated headline,
+  // because which field was wrong is something only the server knows.
   const refusal =
     failure instanceof ApiError
       ? problem(failure.code, failure.message)
@@ -153,28 +149,6 @@ export function SetupPage({ state }: { state: SetupState }) {
                 </FieldGroup>
               ) : (
                 <FieldGroup>
-                  {state.token_required && (
-                    <Field>
-                      <FieldLabel htmlFor="token">{t("setup.token")}</FieldLabel>
-                      <InputGroup>
-                        <InputGroupAddon>
-                          <KeyRound />
-                        </InputGroupAddon>
-                        <InputGroupInput
-                          id="token"
-                          value={token}
-                          onChange={(e) => setToken(e.target.value.trim())}
-                          className="font-mono"
-                          autoComplete="off"
-                          spellCheck={false}
-                          autoFocus
-                          required
-                        />
-                      </InputGroup>
-                      <FieldDescription>{t("setup.tokenHelp")}</FieldDescription>
-                    </Field>
-                  )}
-
                   <Field>
                     <FieldLabel htmlFor="user">{t("setup.user")}</FieldLabel>
                     <Input
@@ -182,6 +156,7 @@ export function SetupPage({ state }: { state: SetupState }) {
                       value={user}
                       onChange={(e) => setUser(e.target.value)}
                       autoComplete="username"
+                      autoFocus
                       required
                     />
                   </Field>

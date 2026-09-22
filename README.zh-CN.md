@@ -125,10 +125,8 @@ kite build --verify     # 构建两次，逐字节比对
 任何别的地址，后台就必须有账号；没有账号却要放到别人能访问的地址上时，服务器
 不会敞着启动。
 
-它会以**安装模式**启动：除了安装页，什么都不会应答 —— 内容不会、设置不会，
-连站点自己叫什么都不会；而安装页必须拿到启动时打印在控制台上的令牌才能动作。
-启动它的人是唯一能把它装完的人 —— 这就是为什么 `docker compose up` 在一台有公网地址
-的机器上也是安全的。
+它会以**安装模式**启动：除了安装页，什么都不会应答 —— 内容不会、草稿不会、设置不会，
+连站点自己叫什么都不会，所以一个没装好的服务器什么也交不出去。
 
 ```bash
 kite serve --admin --write --addr 0.0.0.0:1717
@@ -137,11 +135,11 @@ kite serve --admin --write --addr 0.0.0.0:1717
   Finish installing this site in a browser:
 
     http://localhost:1717/admin/setup
-    setup token: 4regvbotpo4ov642v23eab2hhc2otkft
 ```
 
-设置 `KITE_SETUP_TOKEN` 可以自己指定这个令牌。想完全跳过安装步骤，就在启动前先给它
-一个账号：
+安装页本身是开放的，这是刻意的：装完之前根本没有账号，也就没有任何东西可以拿来
+校验请求，最先打开表单的那个浏览器就是拿到账号的人。要么尽快装完，要么在它可达
+之前就先给它一个账号，完全跳过安装：
 
 ```bash
 kite auth set-password                          # 输入两次，不回显
@@ -242,7 +240,7 @@ kite publish content/posts/hello --push
 
 ```bash
 docker compose up -d
-docker compose logs kite      # 安装令牌就打印在这里
+docker compose logs kite      # 它会打印去哪里把安装走完
 ```
 
 然后打开 `http://localhost:1717/admin/`，在浏览器里把安装走完。配置就只有
@@ -267,7 +265,7 @@ docker compose run --rm kite auth set-password
 kite serve --admin --write --addr 0.0.0.0:1717
 ```
 
-第一次启动会打印安装令牌并等浏览器，和容器里一模一样 —— 见[登录](#登录)。
+第一次启动会打印一个链接并等浏览器，和容器里一模一样 —— 见[登录](#登录)。
 
 Kite 自己不终结任何 TLS，请把它放在一个能做这件事的东西后面。密码在网络上裸奔，
 并不会因为它到了另一头会被哈希而变得安全。

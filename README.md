@@ -139,10 +139,8 @@ server that would put an unguarded one on a reachable address does not come up
 open.
 
 It comes up in **setup** instead. Nothing but the installer answers — not the
-content, not the settings, not even the site's own title — and the installer
-will not act without a token printed on the console that started the server.
-Whoever started it is the only person who can finish it, which is what makes
-`docker compose up` safe on a machine with a public address.
+content, not the drafts, not the settings, not even the site's own title — so
+a server nobody has configured hands nothing out.
 
 ```bash
 kite serve --admin --write --addr 0.0.0.0:1717
@@ -151,11 +149,13 @@ kite serve --admin --write --addr 0.0.0.0:1717
   Finish installing this site in a browser:
 
     http://localhost:1717/admin/setup
-    setup token: 4regvbotpo4ov642v23eab2hhc2otkft
 ```
 
-Set `KITE_SETUP_TOKEN` to choose that token yourself. To skip setup entirely,
-give the server an account before it starts:
+The installer itself is open, and deliberately so: until it has been finished
+there is no account, so there is nobody a request could be checked against,
+and the first browser to reach the form is the one that gets the account.
+Finish it, or skip it entirely by giving the server an account before it is
+reachable:
 
 ```bash
 kite auth set-password                          # asked for twice, never echoed
@@ -268,7 +268,7 @@ stops.
 
 ```bash
 docker compose up -d
-docker compose logs kite      # the setup token is printed here
+docker compose logs kite      # it prints where to finish installing
 ```
 
 Then open `http://localhost:1717/admin/` and finish the installation in the
@@ -295,7 +295,7 @@ the address that ends up in feeds and sitemaps and it is not the container's.
 kite serve --admin --write --addr 0.0.0.0:1717
 ```
 
-The first start prints a setup token and waits for a browser, exactly as the
+The first start prints a link and waits for a browser, exactly as the
 container does — see [Signing in](#signing-in).
 
 Kite terminates no TLS of its own, so put it behind something that does. A
