@@ -8,6 +8,7 @@ coverage.out
 
 # local tooling
 /node_modules/
+/.claude/
 .DS_Store
 
 # goreleaser output
