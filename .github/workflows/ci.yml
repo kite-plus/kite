@@ -246,6 +246,10 @@ jobs:
           cache: true
 
       - uses: pnpm/action-setup@v4
+        with:
+          # There is no package.json at the repository root, so the
+          # action has to be pointed at the one pinning pnpm.
+          package_json_file: web/package.json
 
       - uses: actions/setup-node@v6
         with:

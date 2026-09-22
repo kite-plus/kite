@@ -33,6 +33,10 @@ jobs:
       # The admin is embedded, so goreleaser's before hook builds it and
       # needs a node toolchain here.
       - uses: pnpm/action-setup@v4
+        with:
+          # There is no package.json at the repository root, so the
+          # action has to be pointed at the one pinning pnpm.
+          package_json_file: web/package.json
       - uses: actions/setup-node@v6
         with:
           node-version-file: web/.nvmrc
@@ -81,6 +85,10 @@ jobs:
       # The admin is embedded, so goreleaser's before hook builds it and
       # needs a node toolchain here.
       - uses: pnpm/action-setup@v4
+        with:
+          # There is no package.json at the repository root, so the
+          # action has to be pointed at the one pinning pnpm.
+          package_json_file: web/package.json
       - uses: actions/setup-node@v6
         with:
           node-version-file: web/.nvmrc
