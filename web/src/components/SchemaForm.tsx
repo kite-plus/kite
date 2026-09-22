@@ -252,12 +252,15 @@ function ImageField({
 
   return (
     <>
+      {/* Hidden, not sr-only: a Field widens an sr-only child back to its
+          intrinsic width, and this input is absolute, so it overflowed the page.
+          The label and the button below both still open the picker. */}
       <input
         ref={input}
         id={id}
         type="file"
         accept="image/*"
-        className="sr-only"
+        className="hidden"
         onChange={(event) => {
           void take(event.target.files?.[0]);
           event.target.value = "";
