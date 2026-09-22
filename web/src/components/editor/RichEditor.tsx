@@ -113,7 +113,11 @@ export function RichEditor({
         return true;
       },
     },
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
+      // A plugin tidying the document on its own is not an edit: StarterKit
+      // appends an empty paragraph to a body that does not end in one on the
+      // first click, and that alone must not mark the item changed.
+      if (!transaction.docChanged) return;
       emitted.current = editor.getMarkdown();
       latest.current.onChange(emitted.current);
     },
