@@ -1085,7 +1085,7 @@ kite/
 | 仓库 | 内容 | 何时建 |
 |---|---|---|
 | **kite-plus/kite** | Go Core + CLI + Build + Serve + API + **React Admin（`web/`）** + 默认主题 | 现在 |
-| kite-plus/explore | 技术预研、原型、设计文档存档 | 现在 |
+| kite-plus/lab | 技术预研、原型、设计文档存档 | 现在 |
 | kite-plus/website | kite.plus 官网 + 文档（**用 Kite 自己搭 —— dogfooding**） | M4 |
 | kite-plus/starters | Starter 模板（blog / docs / portfolio） | M4 |
 | kite-plus/setup-kite | GitHub Action | M4 |
