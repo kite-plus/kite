@@ -142,7 +142,7 @@ It comes up in **setup** instead. Nothing but the installer answers — not the
 content, not the settings, not even the site's own title — and the installer
 will not act without a token printed on the console that started the server.
 Whoever started it is the only person who can finish it, which is what makes
-starting one on a machine with a public address safe.
+`docker compose up` safe on a machine with a public address.
 
 ```bash
 kite serve --admin --write --addr 0.0.0.0:1717
@@ -242,6 +242,12 @@ depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,
 
 ## Deploying
 
+A site can be built into files and hosted anywhere, or run as a server that
+manages itself. It is the same content either way, so this is a decision you
+can change your mind about.
+
+### Static, to GitHub Pages
+
 `kite init` writes a GitHub Pages workflow that builds with `--verify`, so a
 site that would deploy differently on a second run fails before it is
 published. Turn Pages on under **Settings → Pages → Source → GitHub Actions**
@@ -257,6 +263,44 @@ It commits exactly the paths given and nothing else: what you have staged stays
 staged, and every other change stays where it is. `--all` publishes everything
 uncommitted that Kite manages, and `--dry-run` reports what would happen and
 stops.
+
+### With Docker
+
+```bash
+docker compose up -d
+docker compose logs kite      # the setup token is printed here
+```
+
+Then open `http://localhost:1717/admin/` and finish the installation in the
+browser. [`docker-compose.yaml`](docker-compose.yaml) is the whole of the
+configuration.
+
+The image is `ghcr.io/kite-plus/kite`, built for amd64 and arm64. It holds the
+binary, the admin and git, runs as an unprivileged user, and keeps nothing of
+its own: the site lives in a volume at `/data`, and an empty one becomes a new
+project on the first start. Everything else is an ordinary `kite` command:
+
+```bash
+docker compose run --rm kite build
+docker compose run --rm kite publish --all --push
+docker compose run --rm kite auth set-password
+```
+
+`KITE_SITE_BASEURL` is the one setting worth giving it up front, because it is
+the address that ends up in feeds and sitemaps and it is not the container's.
+
+### On a server, without Docker
+
+```bash
+kite serve --admin --write --addr 0.0.0.0:1717
+```
+
+The first start prints a setup token and waits for a browser, exactly as the
+container does — see [Signing in](#signing-in).
+
+Kite terminates no TLS of its own, so put it behind something that does. A
+password crossing the network in the clear is not protected by the fact that
+it was hashed at the other end.
 
 ## Design
 
@@ -293,6 +337,7 @@ make build      # ./bin/kite
 make check      # format, vet, layering rules, tidiness, linter, tests
 make web        # the admin, which is embedded into the binary
 make web-gen    # regenerate the API client from this build's own description
+make docker     # the container image, which compiles both of those itself
 ```
 
 `make web` needs Node and pnpm, both pinned exactly — the versions live in

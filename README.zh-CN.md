@@ -127,8 +127,8 @@ kite build --verify     # 构建两次，逐字节比对
 
 它会以**安装模式**启动：除了安装页，什么都不会应答 —— 内容不会、设置不会，
 连站点自己叫什么都不会；而安装页必须拿到启动时打印在控制台上的令牌才能动作。
-启动它的人是唯一能把它装完的人 —— 这就是为什么在一台有公网地址的机器上
-启动它也是安全的。
+启动它的人是唯一能把它装完的人 —— 这就是为什么 `docker compose up` 在一台有公网地址
+的机器上也是安全的。
 
 ```bash
 kite serve --admin --write --addr 0.0.0.0:1717
@@ -219,6 +219,11 @@ publish:
 
 ## 部署
 
+站点可以构成静态文件托管在任何地方，也可以作为一个自己管自己的服务跑着。两边的内容
+是同一份，所以这是一个可以改主意的决定。
+
+### 静态，发到 GitHub Pages
+
 `kite init` 会写好一个 GitHub Pages 工作流，构建时带 `--verify` —— 跑第二次会得到
 不同产物的站点，会在这里失败，而不是被发布出去。在 **Settings → Pages → Source →
 GitHub Actions** 打开 Pages，之后推送到 `main` 即部署。
@@ -232,6 +237,40 @@ kite publish content/posts/hello --push
 它只提交你给出的那些路径，别的一概不动：你暂存的东西还在暂存区，其余改动留在原
 地。`--all` 会发布 Kite 管理范围内所有未提交的改动，`--dry-run` 则只报告会发生
 什么然后停下。
+
+### 用 Docker
+
+```bash
+docker compose up -d
+docker compose logs kite      # 安装令牌就打印在这里
+```
+
+然后打开 `http://localhost:1717/admin/`，在浏览器里把安装走完。配置就只有
+[`docker-compose.yaml`](docker-compose.yaml) 这一份。
+
+镜像是 `ghcr.io/kite-plus/kite`，提供 amd64 和 arm64 两个架构。里面只有二进制、后台
+和 git，以非 root 用户运行，自己不存任何东西：站点住在 `/data` 卷里，空卷会在第一次
+启动时变成一个新项目。其余都是普通的 `kite` 命令：
+
+```bash
+docker compose run --rm kite build
+docker compose run --rm kite publish --all --push
+docker compose run --rm kite auth set-password
+```
+
+值得提前给好的只有 `KITE_SITE_BASEURL`：它是会进入订阅源和站点地图的那个地址，
+而那不是容器自己的地址。
+
+### 不用 Docker，直接跑在服务器上
+
+```bash
+kite serve --admin --write --addr 0.0.0.0:1717
+```
+
+第一次启动会打印安装令牌并等浏览器，和容器里一模一样 —— 见[登录](#登录)。
+
+Kite 自己不终结任何 TLS，请把它放在一个能做这件事的东西后面。密码在网络上裸奔，
+并不会因为它到了另一头会被哈希而变得安全。
 
 ## 设计
 
@@ -262,6 +301,7 @@ make build      # ./bin/kite
 make check      # 格式化、vet、分层规则、go.mod 整洁性、linter、测试
 make web        # 后台界面，会被嵌入二进制
 make web-gen    # 用这次构建自己的描述重新生成 API 客户端
+make docker     # 容器镜像，上面两样东西它会自己编译
 ```
 
 `make web` 需要 Node 和 pnpm，两者版本都被精确钉死 —— 见 `web/.nvmrc` 和

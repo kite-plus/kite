@@ -8,7 +8,7 @@ LDFLAGS  := -s -w \
 	-X github.com/kite-plus/kite/internal/buildinfo.Commit=$(COMMIT) \
 	-X github.com/kite-plus/kite/internal/buildinfo.Date=$(DATE)
 
-.PHONY: all build install test test-race cover fmt vet lint check-imports check-tidy check clean tidy web web-gen web-check
+.PHONY: all build install test test-race cover fmt vet lint check-imports check-tidy check clean tidy web web-gen web-check docker
 
 all: check build
 
@@ -77,6 +77,18 @@ check: fmt vet check-imports check-tidy lint test
 
 tidy:
 	$(GO) mod tidy
+
+IMAGE ?= kite
+
+# The image compiles the binary and the admin itself, so this needs neither Go
+# nor Node on the machine running it. The version it stamps is this checkout's,
+# the same one `make build` would.
+docker:
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg DATE=$(DATE) \
+		-t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
 
 clean:
 	rm -rf bin coverage.out

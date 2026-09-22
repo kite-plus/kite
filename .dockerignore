@@ -1,0 +1,27 @@
+# The image is built from source, so only source belongs in the context.
+# Everything here is either output, local state, or history: leaving it out
+# keeps the build from depending on what happened to be in a checkout.
+
+.git
+.github
+.claude
+.golangci.yml
+.goreleaser.yaml
+
+# Build output, rebuilt inside the image.
+bin/
+dist/
+public/
+web/dist/
+web/openapi.json
+
+# Derived state and dependencies.
+.kite/
+node_modules/
+web/node_modules/
+
+# Documentation and the data a local container left behind.
+docs/
+*.md
+data/
+.DS_Store

@@ -1,0 +1,50 @@
+# A Kite site in one command.
+#
+#   docker compose up -d
+#   docker compose logs kite        # the setup token is in here
+#
+# Then open http://localhost:1717/admin/ and finish the installation in the
+# browser. Until that is done the server answers nothing but the setup page,
+# and the setup page will not act without the token above.
+
+services:
+  kite:
+    image: ghcr.io/kite-plus/kite:latest
+    # To run a local change instead of the published image, comment the line
+    # above and uncomment this one.
+    # build: .
+    container_name: kite
+    restart: unless-stopped
+    ports:
+      - "1717:1717"
+    environment:
+      # Where the site will be published. Kite writes this into feeds,
+      # sitemaps and canonical links, so it has to be the address people
+      # actually reach, not the container's.
+      KITE_SITE_BASEURL: http://localhost:1717
+
+      # An account can be supplied instead of being created in the browser,
+      # which is what an unattended deployment wants. Setting these skips
+      # setup entirely.
+      # KITE_ADMIN_USER: admin
+      # KITE_ADMIN_PASSWORD: change me, please
+
+      # The setup token is generated and printed at startup. Naming it here
+      # instead keeps it out of the logs.
+      # KITE_SETUP_TOKEN: a secret you chose
+    volumes:
+      # A named volume, because the container runs as an unprivileged user
+      # and a bind mount would inherit whatever the host directory allows.
+      #
+      # To keep the content in a directory you can edit and commit, use a
+      # bind mount and run as yourself instead:
+      #
+      #   volumes:
+      #     - ./data:/data
+      #   user: "${UID:-1000}:${GID:-1000}"
+      #
+      # Create the directory first, or Docker will create it owned by root.
+      - kite-data:/data
+
+volumes:
+  kite-data:
