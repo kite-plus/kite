@@ -130,7 +130,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 				return err
 			}
 
-			url := "http://" + listenAddr
+			url := displayURL(listenAddr)
 			printf(cmd, "\n  %s\n\n", url)
 			if drafts {
 				printf(cmd, "  drafts included\n")
@@ -141,9 +141,12 @@ func serveCommand(shape commandShape) *cobra.Command {
 			if admin {
 				printf(cmd, "  studio at %s%s/\n", url, web.Path)
 				printf(cmd, "  api at %s%s\n", url, api.Prefix)
-				if guard.Required() {
+				switch flow := srv.Setup(); {
+				case flow.Pending():
+					printf(cmd, "  not set up yet: nothing but setup will answer\n")
+				case guard.Required():
 					printf(cmd, "  sign in as %s\n", guard.User())
-				} else {
+				default:
 					printf(cmd, "  no password set (kite auth set-password)\n")
 				}
 				if !write {
@@ -157,6 +160,16 @@ func serveCommand(shape commandShape) *cobra.Command {
 				}
 			}
 			printf(cmd, "  press ctrl-c to stop\n\n")
+
+			// The token is printed rather than only logged, and printed last
+			// so that it is the thing still on screen. Whoever started the
+			// server is the only person who can see this, which is the whole
+			// of what makes an unconfigured server on a public address safe.
+			if flow := srv.Setup(); flow.Pending() {
+				printf(cmd, "  Finish installing this site in a browser:\n\n")
+				printf(cmd, "    %s%s/setup\n", url, web.Path)
+				printf(cmd, "    setup token: %s\n\n", flow.Token())
+			}
 
 			if open {
 				go openBrowser(ctx, url, log)
@@ -198,6 +211,24 @@ func resolveAddr(addr string, port int) (string, error) {
 		return chosen, nil
 	}
 	return fmt.Sprintf("127.0.0.1:%d", port), nil
+}
+
+// displayURL is the address to print, which is not always the one being
+// listened on.
+//
+// 0.0.0.0 and :: mean "every interface", and neither is an address anybody
+// can open. A container listens on one of them by necessity, and the line it
+// prints is the line somebody is about to click.
+func displayURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://" + addr
+	}
+	switch host {
+	case "", "0.0.0.0", "::":
+		host = "localhost"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
 
 // openBrowser waits for the server to answer before opening a window, so the

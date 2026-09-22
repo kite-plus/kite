@@ -24,6 +24,13 @@ const (
 	CodeTooManyAttempts = "too_many_attempts"
 	CodeCrossOrigin     = "cross_origin"
 
+	// Refusals that are about the server: it has not been set up yet, the
+	// caller does not have the token that would let them do it, or it has
+	// been set up already.
+	CodeSetupRequired = "setup_required"
+	CodeBadSetupToken = "bad_setup_token"
+	CodeAlreadySetUp  = "already_set_up"
+
 	// A publish can be refused outright, need a warning acknowledged, or
 	// fail partway. They are told apart because the client acts on each
 	// differently.

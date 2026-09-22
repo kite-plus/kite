@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -15,33 +14,21 @@ import (
 // a page on the internet can post to a server on localhost, and "it is only
 // listening on 127.0.0.1" has never been protection against that.
 type Guard struct {
-	account *Account
-	csrf    *http.CrossOriginProtection
-	now     func() time.Time
+	csrf *http.CrossOriginProtection
+	now  func() time.Time
 
-	mu       sync.Mutex
-	failures int
-	blocked  time.Time
+	// account is read under the lock rather than captured, because the
+	// first-run setup flow installs one into a server that is already
+	// listening. Everywhere else it is written once, at startup.
+	mu      sync.RWMutex
+	account *Account
+
+	attempts *Throttle
 
 	// verifying serializes password checks. Argon2id is memory-hard on
 	// purpose, so a server that ran one per request would be handing anyone
 	// who can open connections a way to exhaust its memory.
 	verifying sync.Mutex
-}
-
-// Attempts are free until there have been this many in a row, after which
-// each one costs the next a doubling delay. Five is well past a typo and far
-// short of anything a person does deliberately.
-const freeAttempts = 5
-
-const maxBackoff = 5 * time.Minute
-
-// TooManyAttempts reports a sign-in refused because of earlier failures. It
-// carries how long is left, which the client shows rather than guessing.
-type TooManyAttempts struct{ RetryAfter time.Duration }
-
-func (e *TooManyAttempts) Error() string {
-	return fmt.Sprintf("auth: too many attempts; try again in %s", e.RetryAfter.Round(time.Second))
 }
 
 // New returns a guard for an account, which may be nil for an open server.
@@ -50,57 +37,93 @@ func New(account *Account) *Guard { return NewWithClock(account, time.Now) }
 // NewWithClock is [New] with the clock supplied, for tests that need to reach
 // an expiry without waiting for one.
 func NewWithClock(account *Account, now func() time.Time) *Guard {
-	return &Guard{account: account, csrf: http.NewCrossOriginProtection(), now: now}
+	return &Guard{
+		csrf:     http.NewCrossOriginProtection(),
+		now:      now,
+		account:  account,
+		attempts: NewThrottle(freeAttempts),
+	}
+}
+
+// current is the account this guard is using, or nil for an open server.
+func (g *Guard) current() *Account {
+	if g == nil {
+		return nil
+	}
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.account
+}
+
+// Adopt installs an account into a running guard, which is how the studio
+// stops being open the moment first-run setup finishes rather than at the
+// next restart.
+//
+// It refuses to replace an existing account: changing a password is a
+// deliberate act with a command of its own, and letting it happen here would
+// turn setup into a way to take a configured server over.
+func (g *Guard) Adopt(account *Account) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.account != nil {
+		return ErrAlreadyConfigured
+	}
+	g.account = account
+	return nil
 }
 
 // Required reports whether requests have to be signed in.
-func (g *Guard) Required() bool { return g != nil && g.account != nil }
+func (g *Guard) Required() bool { return g.current() != nil }
 
 // User is the name that can sign in, or "" when nobody can.
 func (g *Guard) User() string {
-	if !g.Required() {
+	a := g.current()
+	if a == nil {
 		return ""
 	}
-	return g.account.user
+	return a.user
 }
 
 // Source says where the account came from, for a server that has to tell an
 // operator which one it is using.
 func (g *Guard) Source() string {
-	if !g.Required() {
+	a := g.current()
+	if a == nil {
 		return ""
 	}
-	return g.account.source
+	return a.source
 }
 
 // Session reads and checks the session a request carries.
 func (g *Guard) Session(r *http.Request) (Session, error) {
-	if !g.Required() {
+	a := g.current()
+	if a == nil {
 		return Session{}, ErrNoSession
 	}
 	c, err := r.Cookie(CookieName)
 	if err != nil || c.Value == "" {
 		return Session{}, ErrNoSession
 	}
-	return g.account.Parse(c.Value, g.now())
+	return a.Parse(c.Value, g.now())
 }
 
 // SignIn checks credentials and, when they are right, sets the cookie.
 func (g *Guard) SignIn(w http.ResponseWriter, r *http.Request, user, password string, remember bool) (Session, error) {
-	if !g.Required() {
+	account := g.current()
+	if account == nil {
 		return Session{}, ErrNoAccount
 	}
 
 	now := g.now()
-	if wait := g.wait(now); wait > 0 {
-		return Session{}, &TooManyAttempts{RetryAfter: wait}
+	if err := g.attempts.Check(now); err != nil {
+		return Session{}, err
 	}
 
 	g.verifying.Lock()
-	err := g.account.Verify(user, password)
+	err := account.Verify(user, password)
 	g.verifying.Unlock()
 	if err != nil {
-		g.failed(now)
+		g.attempts.Refused(now)
 		return Session{}, err
 	}
 
@@ -108,14 +131,30 @@ func (g *Guard) SignIn(w http.ResponseWriter, r *http.Request, user, password st
 	if remember {
 		lifetime = RememberLifetime
 	}
-	token, expires, err := g.account.Issue(now, lifetime)
+	token, expires, err := account.Issue(now, lifetime)
 	if err != nil {
 		return Session{}, err
 	}
 
-	g.succeeded()
+	g.attempts.Accepted()
 	http.SetCookie(w, cookie(token, expires, remember, secureRequest(r)))
-	return Session{User: g.account.user, Expires: expires}, nil
+	return Session{User: account.user, Expires: expires}, nil
+}
+
+// Start issues a session without checking a password, for a caller that has
+// just proved itself some other way -- today, the first-run setup flow, which
+// created the account it is signing in to a moment earlier.
+func (g *Guard) Start(w http.ResponseWriter, r *http.Request) (Session, error) {
+	account := g.current()
+	if account == nil {
+		return Session{}, ErrNoAccount
+	}
+	token, expires, err := account.Issue(g.now(), SessionLifetime)
+	if err != nil {
+		return Session{}, err
+	}
+	http.SetCookie(w, cookie(token, expires, false, secureRequest(r)))
+	return Session{User: account.user, Expires: expires}, nil
 }
 
 // SignOut clears the cookie. There is nothing else to do: a session is a
@@ -136,33 +175,6 @@ func (g *Guard) SignOut(w http.ResponseWriter, r *http.Request) {
 // -- curl, a deploy script -- are left alone. That is why a session cookie is
 // enough on its own, with no token to plumb through every form.
 func (g *Guard) CheckOrigin(r *http.Request) error { return g.csrf.Check(r) }
-
-// wait reports how long a refused attempt has left.
-func (g *Guard) wait(now time.Time) time.Duration {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if now.Before(g.blocked) {
-		return g.blocked.Sub(now)
-	}
-	return 0
-}
-
-func (g *Guard) failed(now time.Time) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.failures++
-	if over := g.failures - freeAttempts; over > 0 {
-		delay := time.Second << min(over-1, 10)
-		g.blocked = now.Add(min(delay, maxBackoff))
-	}
-}
-
-func (g *Guard) succeeded() {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.failures, g.blocked = 0, time.Time{}
-}
 
 // Loopback reports whether an address is reachable only from this machine.
 //

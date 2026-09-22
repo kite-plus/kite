@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/kite-plus/kite/internal/auth"
+	"github.com/kite-plus/kite/internal/setup"
 )
 
 // Prefix is where the API is mounted. It is versioned in the path so that a
@@ -26,13 +27,19 @@ type Options struct {
 	// open server, which is what a local preview of a project that has never
 	// had a password is.
 	Auth *auth.Guard
+
+	// Setup is the first run this server is in the middle of, and nil for
+	// every server that is not: one with an account, and a local preview
+	// where an open studio is nobody else's business.
+	Setup *setup.Flow
 }
 
 // Server answers API requests.
 type Server struct {
-	src  SiteSource
-	log  *slog.Logger
-	auth *auth.Guard
+	src   SiteSource
+	log   *slog.Logger
+	auth  *auth.Guard
+	setup *setup.Flow
 }
 
 // Routes lists the endpoints this server registers, for tests that check the
@@ -59,7 +66,7 @@ func New(opts Options) *Server {
 		// exactly the one that would do as it was told.
 		guard = auth.New(nil)
 	}
-	return &Server{src: opts.Site, log: log, auth: guard}
+	return &Server{src: opts.Site, log: log, auth: guard, setup: opts.Setup}
 }
 
 // Handler returns the API's own routes, addressed without [Prefix].
@@ -151,6 +158,8 @@ type route struct {
 func (s *Server) routes() []route {
 	return []route{
 		{http.MethodGet, OpenAPIPath, s.handleOpenAPI},
+		{http.MethodGet, "/setup", s.handleSetupState},
+		{http.MethodPost, "/setup", s.handleSetup},
 		{http.MethodGet, "/auth/session", s.handleSession},
 		{http.MethodPost, "/auth/login", s.handleLogin},
 		{http.MethodPost, "/auth/logout", s.handleLogout},

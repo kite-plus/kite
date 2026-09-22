@@ -360,7 +360,7 @@ func TestAReadOnlyServerRefusesEveryWrite(t *testing.T) {
 }
 
 // newWritableServer is newServer with the project open for writing.
-func newWritableServer(t *testing.T, root string) (http.Handler, *site.Site) {
+func newWritableServer(t *testing.T, root string, with ...func(*api.Options)) (http.Handler, *site.Site) {
 	t.Helper()
 	s, err := site.Open(t.Context(), root)
 	if err != nil {
@@ -373,7 +373,7 @@ func newWritableServer(t *testing.T, root string) (http.Handler, *site.Site) {
 	// from the configuration.
 	current := s
 
-	srv := api.New(api.Options{Site: func() api.View {
+	opts := api.Options{Site: func() api.View {
 		return api.View{
 			Reader:      current.Reader,
 			Resolver:    current.Resolver,
@@ -397,7 +397,11 @@ func newWritableServer(t *testing.T, root string) (http.Handler, *site.Site) {
 				return err
 			},
 		}
-	}})
+	}}
+	for _, apply := range with {
+		apply(&opts)
+	}
+	srv := api.New(opts)
 
 	mux := http.NewServeMux()
 	srv.Mount(mux)

@@ -185,11 +185,30 @@ func openAPI() *document {
 			Description: "The read side of a Kite project. " +
 				"Listings are paged by opaque cursor; there is no offset. " +
 				"When the server has an account configured, every endpoint " +
-				"but these three and this description needs a session.",
+				"but setup, sign-in and this description needs a session. " +
+				"A server that has not been set up yet answers nothing else " +
+				"at all until it has.",
 		},
 		Servers:  []server{{URL: Prefix}},
 		Security: []map[string][]string{{"session": {}}},
 		Paths: map[string]pathItem{
+			"/setup": {
+				Get: &operation{
+					OperationID: "getSetupState",
+					Summary:     "Report whether this server still has to be set up.",
+					Security:    &public,
+					Responses:   ok(ref(SetupState{}), "Whether setup is needed, and what to fill the form with."),
+				},
+				Post: &operation{
+					OperationID: "setUp",
+					Summary:     "Describe the site and create the account that guards it.",
+					Security:    &public,
+					RequestBody: body(ref(SetupRequest{})),
+					Responses: ok(ref(SessionInfo{}),
+						"Set up, and signed in. The cookie is in Set-Cookie.",
+						"400", "401", "405", "409", "429"),
+				},
+			},
 			"/auth/session": {Get: &operation{
 				OperationID: "getSession",
 				Summary:     "Report whether this server needs a sign-in, and whether the caller has one.",

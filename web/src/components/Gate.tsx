@@ -3,9 +3,11 @@ import { XCircle } from "lucide-react";
 
 import { useI18n } from "@/i18n";
 import { useSession } from "@/hooks/useSession";
+import { useSetup } from "@/hooks/useSetup";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LoginPage } from "@/components/LoginPage";
+import { SetupPage } from "@/components/SetupPage";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -20,12 +22,18 @@ import { Spinner } from "@/components/ui/spinner";
  * It wraps the studio rather than living inside it so that a signed-out page
  * asks for nothing else. There is no use loading a content list that is about
  * to come back refused.
+ *
+ * Setup is asked about before the session, because a server that has never
+ * been configured has no account for a session to belong to and will refuse
+ * every other question. Answering them in the other order would put an error
+ * on screen where an installer belongs.
  */
 export function Gate({ children }: { children: ReactNode }) {
   const { t } = useI18n();
+  const setup = useSetup();
   const session = useSession();
 
-  if (session.isPending) {
+  if (setup.isPending || session.isPending) {
     return (
       <div className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
         <Spinner />
@@ -34,18 +42,22 @@ export function Gate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (session.isError) {
+  const unreachable = setup.error ?? session.error;
+  if (unreachable) {
     return (
       <div className="flex min-h-svh items-center justify-center p-4">
         <Alert variant="destructive" className="max-w-sm">
           <XCircle />
           <AlertTitle>{t("session.unreachable")}</AlertTitle>
           <AlertDescription>
-            <p className="font-mono text-xs">{String(session.error)}</p>
+            <p className="font-mono text-xs">{String(unreachable)}</p>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => void session.refetch()}
+              onClick={() => {
+                void setup.refetch();
+                void session.refetch();
+              }}
             >
               {t("session.retry")}
             </Button>
@@ -55,7 +67,10 @@ export function Gate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (session.data.required && !session.data.authenticated) {
+  if (setup.data?.required) {
+    return <SetupPage state={setup.data} />;
+  }
+  if (session.data?.required && !session.data.authenticated) {
     return <LoginPage />;
   }
   return <>{children}</>;

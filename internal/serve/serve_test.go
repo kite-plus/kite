@@ -681,3 +681,76 @@ func TestTheStudioItselfLoadsBeforeAnybodyHasSignedIn(t *testing.T) {
 		t.Errorf("GET /api/v1/site without a session: %d, want 401", rec.Code)
 	}
 }
+
+// Refusing to start is the right answer for a server nobody can configure. It
+// is the wrong one for a container: there is no terminal in there to run
+// `kite auth set-password` in, so a writable server comes up in setup and
+// answers nothing else until somebody finishes it.
+func TestAnUnguardedStudioThatCanWriteComesUpInSetupInstead(t *testing.T) {
+	root := newProject(t, 1)
+	srv := newServer(t, root, serve.Options{Addr: "0.0.0.0:1717", Admin: true, Write: true})
+
+	flow := srv.Setup()
+	if !flow.Pending() {
+		t.Fatal("a server with no account is not waiting to be set up")
+	}
+	if flow.Token() == "" {
+		t.Error("setup is open with no token to present")
+	}
+
+	h := srv.Handler()
+	status := func(path string) int {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		return rec.Code
+	}
+
+	// The site is what the public came for, and it is not what setup guards.
+	if got := status("/"); got != http.StatusOK {
+		t.Errorf("GET /: %d, want 200", got)
+	}
+	// The studio's own page loads, because it is how the form is reached.
+	if got := status("/admin/"); got == http.StatusUnauthorized || got == http.StatusForbidden {
+		t.Errorf("GET /admin/: %d, want the installer to be reachable", got)
+	}
+	// What it holds does not.
+	for _, path := range []string{"/api/v1/contents", "/api/v1/site"} {
+		if got := status(path); got != http.StatusForbidden {
+			t.Errorf("GET %s: %d, want 403", path, got)
+		}
+	}
+	if got := status("/api/v1/setup"); got != http.StatusOK {
+		t.Errorf("GET /api/v1/setup: %d, want 200", got)
+	}
+}
+
+// A server with an account, or one on localhost, was never waiting for
+// anything and must not be made to wait now.
+func TestAServerThatNeedsNoSetupHasNoFlow(t *testing.T) {
+	root := newProject(t, 1)
+
+	for _, c := range []struct {
+		name string
+		opts serve.Options
+	}{
+		{"localhost", serve.Options{Addr: "127.0.0.1:1717", Admin: true, Write: true}},
+		{"no studio", serve.Options{Addr: "0.0.0.0:1717"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if srv := newServer(t, root, c.opts); srv.Setup().Pending() {
+				t.Error("this server is waiting to be set up and should not be")
+			}
+		})
+	}
+
+	account, err := auth.SetPassword(root, "admin", "correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := newServer(t, root, serve.Options{
+		Addr: "0.0.0.0:1717", Admin: true, Write: true, Auth: auth.New(account),
+	})
+	if srv.Setup().Pending() {
+		t.Error("a server that already has an account is waiting to be set up")
+	}
+}

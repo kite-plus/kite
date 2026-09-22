@@ -61,6 +61,10 @@ kite new post "你好，Kite"
 kite run
 ```
 
+`kite init` 会逐项问你：站点叫什么、会发布在哪里、用什么语言写、要不要现在设密码、要不要建
+git 仓库。每一项都有对应的参数，`kite init --yes` 则直接取默认值不再询问，
+所以同一条命令在没有终端的脚本里也能用。
+
 `kite run` 会启动站点、打开浏览器，保存即刷新，后台在 `/admin/`。想要文件而不是
 一个服务时：
 
@@ -83,7 +87,7 @@ kite build --verify     # 构建两次，逐字节比对
 
 | | |
 |---|---|
-| `kite init [dir]` | 初始化项目 |
+| `kite init [dir]` | 初始化项目，逐项问清楚要建什么 |
 | `kite new <kind> <title>` | 新建内容 |
 | `kite build` | 构建静态站点到 `public/` |
 | `kite run` | 带后台启动站点、打开浏览器，保存即刷新 |
@@ -118,12 +122,29 @@ kite build --verify     # 构建两次，逐字节比对
 ### 登录
 
 在 localhost 上，没有设置密码的项目是敞开的 —— 这台机器上没有别人需要挡。换成
-任何别的地址，后台就必须有账号：没有账号却要把它放到别人能访问的地址上时，服务
-器会直接拒绝启动，而不是打一行警告了事。
+任何别的地址，后台就必须有账号；没有账号却要放到别人能访问的地址上时，服务器
+不会敞着启动。
+
+它会以**安装模式**启动：除了安装页，什么都不会应答 —— 内容不会、设置不会，
+连站点自己叫什么都不会；而安装页必须拿到启动时打印在控制台上的令牌才能动作。
+启动它的人是唯一能把它装完的人 —— 这就是为什么在一台有公网地址的机器上
+启动它也是安全的。
+
+```bash
+kite serve --admin --write --addr 0.0.0.0:1717
+```
+```
+  Finish installing this site in a browser:
+
+    http://localhost:1717/admin/setup
+    setup token: 4regvbotpo4ov642v23eab2hhc2otkft
+```
+
+设置 `KITE_SETUP_TOKEN` 可以自己指定这个令牌。想完全跳过安装步骤，就在启动前先给它
+一个账号：
 
 ```bash
 kite auth set-password                          # 输入两次，不回显
-kite serve --admin --write --addr 0.0.0.0:1717
 ```
 
 `kite auth status` 会说明当前项目是否需要密码，`kite auth remove` 则把账号去掉。

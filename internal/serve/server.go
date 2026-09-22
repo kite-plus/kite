@@ -34,6 +34,7 @@ import (
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render"
+	"github.com/kite-plus/kite/internal/setup"
 	"github.com/kite-plus/kite/internal/site"
 	"github.com/kite-plus/kite/web"
 )
@@ -65,7 +66,8 @@ type Options struct {
 
 	// Auth is who may use the admin. A nil guard, or one with no account
 	// behind it, is an open server -- which is why a server that would put
-	// one on a public address refuses to start.
+	// one on a public address comes up in setup instead, answering nothing
+	// else until it has an owner.
 	Auth *auth.Guard
 
 	// Write lets the API change the project.
@@ -93,6 +95,10 @@ type Server struct {
 	// root never changes, so it is read without the lock.
 	root string
 
+	// setup is the first run this server is in the middle of, and nil for
+	// every server that is not one.
+	setup *setup.Flow
+
 	mu       sync.RWMutex
 	site     *site.Site
 	builder  *build.Builder
@@ -100,6 +106,11 @@ type Server struct {
 	// configHash detects a settings change, which needs more than a reindex.
 	configHash string
 }
+
+// Setup is the first run this server is waiting on, or nil when it is not
+// waiting on one. The command that started the server prints from it, so that
+// the token reaches the console rather than only the log.
+func (s *Server) Setup() *setup.Flow { return s.setup }
 
 // project is the site as it currently stands. Configuration can be reloaded
 // while requests are in flight, so it is read rather than captured.
@@ -123,20 +134,38 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 	if opts.Logger == nil {
 		opts.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	// Refused here rather than warned about, because the mistake is silent
-	// from the operator's side: an open studio on a public address looks
-	// exactly like a working one until somebody else finds it.
+	// A studio with no account on an address other than localhost is open to
+	// whoever finds the port, which is a mistake that looks exactly like a
+	// working server until somebody else finds it. It is never simply
+	// allowed.
+	//
+	// It is not simply refused either. A container has no terminal to run
+	// `kite auth set-password` in, so refusing to start leaves an operator
+	// with a restart loop and a log line. The server comes up in setup
+	// instead: nothing but the first-run endpoints answers, and they need a
+	// token that was printed on the operator's own console.
+	var flow *setup.Flow
 	if opts.Admin && !opts.Auth.Required() && !auth.Loopback(opts.Addr) {
-		return nil, fmt.Errorf("serve: %s can be reached from outside this machine "+
-			"and this project has no account, so the studio would be open to anyone;\n"+
-			"       set one with `kite auth set-password`, or with KITE_ADMIN_USER "+
-			"and KITE_ADMIN_PASSWORD", opts.Addr)
+		// Setup writes an account and the site's own description, so a
+		// read-only server has no way through it and is still refused.
+		if !opts.Write {
+			return nil, fmt.Errorf("serve: %s can be reached from outside this machine "+
+				"and this project has no account, so the studio would be open to anyone;\n"+
+				"       set one with `kite auth set-password`, with KITE_ADMIN_USER "+
+				"and KITE_ADMIN_PASSWORD,\n"+
+				"       or add --write to be guided through setup in a browser", opts.Addr)
+		}
+		var err error
+		if flow, err = setup.New(s.Project.Root, opts.Auth); err != nil {
+			return nil, err
+		}
 	}
 
 	srv := &Server{
 		opts:   opts,
 		site:   s,
 		root:   s.Project.Root,
+		setup:  flow,
 		router: newRouter(),
 		hub:    newReloadHub(),
 		log:    opts.Logger,
@@ -208,7 +237,12 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET "+ReloadPath, s.hub.handleReload)
 	}
 	if s.opts.Admin {
-		api.New(api.Options{Site: s.view, Logger: s.log, Auth: s.opts.Auth}).Mount(mux)
+		api.New(api.Options{
+			Site:   s.view,
+			Logger: s.log,
+			Auth:   s.opts.Auth,
+			Setup:  s.setup,
+		}).Mount(mux)
 		mux.Handle(web.Path+"/", web.Handler())
 		mux.Handle(web.Path, http.RedirectHandler(web.Path+"/", http.StatusMovedPermanently))
 	}

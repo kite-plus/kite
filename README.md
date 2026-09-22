@@ -68,6 +68,11 @@ kite new post "Hello, Kite"
 kite run
 ```
 
+`kite init` asks what the site is called, where it will live, what language it
+is written in, and whether to set a password and start a repository. Every
+answer has a flag, and `kite init --yes` takes the defaults without asking, so
+the same command works in a script with no terminal.
+
 `kite run` serves the site, opens it, and reloads on every save. The studio is
 at `/admin/`. When you want files instead of a server:
 
@@ -92,7 +97,7 @@ are; nothing needs rewriting first.
 
 | | |
 |---|---|
-| `kite init [dir]` | create a project |
+| `kite init [dir]` | create a project, asking what it should be |
 | `kite new <kind> <title>` | create content |
 | `kite build` | render the site into `public/` |
 | `kite run` | serve the site with the studio, open it, reload on every save |
@@ -130,12 +135,30 @@ overwritten, and the studio says so. Editing is available in English and
 
 On localhost a project with no password is open, because there is nobody else
 on the machine to keep out. Anywhere else the studio needs an account, and a
-server that would put an unguarded one on a reachable address refuses to start
-rather than warning about it.
+server that would put an unguarded one on a reachable address does not come up
+open.
+
+It comes up in **setup** instead. Nothing but the installer answers — not the
+content, not the settings, not even the site's own title — and the installer
+will not act without a token printed on the console that started the server.
+Whoever started it is the only person who can finish it, which is what makes
+starting one on a machine with a public address safe.
+
+```bash
+kite serve --admin --write --addr 0.0.0.0:1717
+```
+```
+  Finish installing this site in a browser:
+
+    http://localhost:1717/admin/setup
+    setup token: 4regvbotpo4ov642v23eab2hhc2otkft
+```
+
+Set `KITE_SETUP_TOKEN` to choose that token yourself. To skip setup entirely,
+give the server an account before it starts:
 
 ```bash
 kite auth set-password                          # asked for twice, never echoed
-kite serve --admin --write --addr 0.0.0.0:1717
 ```
 
 `kite auth status` reports whether a project asks for a password, and

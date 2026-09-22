@@ -43,6 +43,10 @@ var ErrNoAccount = errors.New("auth: no account configured")
 // are deliberately indistinguishable to a caller.
 var ErrBadCredentials = errors.New("auth: incorrect user name or password")
 
+// ErrAlreadyConfigured reports an attempt to create an account where one
+// already exists, which is how first-run setup refuses to run twice.
+var ErrAlreadyConfigured = errors.New("auth: this project already has an account")
+
 // MinPasswordLength is the shortest password this will store. Length is the
 // only property worth enforcing: composition rules push people towards
 // "Passw0rd!" and away from a passphrase.

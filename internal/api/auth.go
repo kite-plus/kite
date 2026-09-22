@@ -39,6 +39,7 @@ type Credentials struct {
 // are how a caller gets a session in the first place.
 var publicPaths = map[string]bool{
 	OpenAPIPath:     true,
+	"/setup":        true,
 	"/auth/session": true,
 	"/auth/login":   true,
 	"/auth/logout":  true,
@@ -53,6 +54,14 @@ func (s *Server) allow(w http.ResponseWriter, r *http.Request) bool {
 	if err := s.auth.CheckOrigin(r); err != nil {
 		fail(w, http.StatusForbidden, CodeCrossOrigin,
 			"this request came from another site and was refused")
+		return false
+	}
+	// A server still waiting to be set up has no account, so there is nobody
+	// a session could belong to and nothing here may be answered on trust.
+	// Only the way through setup responds until it has an owner.
+	if s.setup.Pending() && !setupPaths[r.URL.Path] {
+		fail(w, http.StatusForbidden, CodeSetupRequired,
+			"this server has not been set up yet")
 		return false
 	}
 	if !s.auth.Required() || publicPaths[r.URL.Path] {

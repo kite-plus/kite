@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/project"
-	"github.com/kite-plus/kite/internal/store/file"
 )
 
 func newVersionCmd() *cobra.Command {
@@ -38,83 +36,6 @@ func newVersionCmd() *cobra.Command {
 			printf(cmd, "kite %s (%s, %s) %s %s\n", buildinfo.Version, buildinfo.Commit,
 				buildinfo.Date, runtime.Version(), info["platform"])
 			printf(cmd, "theme api %s, plugin abi %d\n", buildinfo.ThemeAPIVersion, buildinfo.PluginABIVersion)
-			return nil
-		},
-	}
-}
-
-const starterConfig = `site:
-  title: My Site
-  baseURL: http://localhost:1717
-  language: en
-
-content:
-  store: file
-  dir: content
-
-build:
-  output: public
-`
-
-func newInitCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "init [dir]",
-		Short: "Create a new Kite project",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			dir := "."
-			if len(args) == 1 {
-				dir = args[0]
-			}
-			root, err := filepath.Abs(dir)
-			if err != nil {
-				return err
-			}
-			cfg := filepath.Join(root, project.ConfigName)
-			if _, err := os.Stat(cfg); err == nil {
-				return fmt.Errorf("%s already exists", project.ConfigName)
-			}
-
-			types := content.DefaultRegistry()
-			dirs := []string{"static", "layouts", "themes"}
-			for _, t := range types.Types() {
-				dirs = append(dirs, filepath.Join(file.ContentDir, t.Dir))
-			}
-			for _, d := range dirs {
-				if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
-					return err
-				}
-			}
-			if err := os.WriteFile(cfg, []byte(starterConfig), 0o644); err != nil {
-				return err
-			}
-			// Everything under .kite is derived and must never be committed.
-			ignore := filepath.Join(root, ".gitignore")
-			if _, err := os.Stat(ignore); errors.Is(err, os.ErrNotExist) {
-				if err := os.WriteFile(ignore, []byte("/.kite/\n/public/\n"), 0o644); err != nil {
-					return err
-				}
-			}
-
-			// A deploy workflow is written now rather than offered later,
-			// so that the first push already has somewhere to go.
-			workflow, err := writeWorkflow(root, "main")
-			if err != nil {
-				return err
-			}
-			if workflow != "" {
-				dirs = append(dirs, workflow)
-			}
-
-			if jsonOut(cmd) {
-				return writeJSON(cmd.OutOrStdout(), map[string]any{"root": root, "created": dirs})
-			}
-			printf(cmd, "Initialized a Kite project in %s\n", root)
-			printf(cmd, "\nNext:\n  kite new post \"My first post\"\n  kite run\n")
-			if workflow != "" {
-				printf(cmd, "\n%s will build and deploy this site on every push to main.\n", workflow)
-				printf(cmd, "Turn on Pages first: Settings -> Pages -> Source -> GitHub Actions.\n")
-			}
 			return nil
 		},
 	}
