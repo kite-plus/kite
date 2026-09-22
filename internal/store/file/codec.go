@@ -80,7 +80,7 @@ func (c *Codec) Decode(t *content.Type, loc content.Locator, data []byte) (*cont
 		Slug:     doc.String(keySlug),
 		Locale:   doc.String(keyLocale),
 		Aliases:  doc.StringSlice(keyAliases),
-		Body:     content.Body{Format: content.FormatMarkdown, Raw: doc.Body()},
+		Body:     content.Body{Format: content.FormatMarkdown, Raw: strings.Trim(doc.Body(), "\r\n")},
 	}
 
 	if id := doc.String(keyID); id != "" {
@@ -197,8 +197,20 @@ func (c *Codec) Encode(t *content.Type, item *content.Content, existing []byte) 
 		}
 	}
 
-	doc.SetBody(item.Body.Raw)
+	doc.SetBody(layoutBody(item.Body.Raw))
 	return doc.Bytes()
+}
+
+// layoutBody lays a body out the way a hand keeps a markdown file: a blank
+// line after the front matter and a newline at the end. The blank lines are
+// the file's, not the body's; Decode takes them off again, so a body that
+// only travelled through the API and back changes nothing on disk.
+func layoutBody(raw string) string {
+	body := strings.Trim(raw, "\r\n")
+	if body == "" {
+		return ""
+	}
+	return "\n" + body + "\n"
 }
 
 func decodeStatus(doc *frontmatter.Document) content.Status {

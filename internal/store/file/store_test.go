@@ -375,6 +375,53 @@ func TestSinglePageLayout(t *testing.T) {
 	_ = root
 }
 
+func TestBodyLayoutIsTheFiles(t *testing.T) {
+	root, _, w := newTestProject(t)
+	ctx := t.Context()
+
+	// An editor hands over the text alone; the file gets its blank line and
+	// its final newline from the store.
+	item := &content.Content{
+		Kind:   "post",
+		Title:  "Layout",
+		Status: content.StatusDraft,
+		Body:   content.Body{Format: content.FormatMarkdown, Raw: "first\n\nsecond"},
+	}
+	if _, err := w.Apply(ctx, content.ChangeSet{Ops: []content.Op{content.PutContent{Content: item}}}); err != nil {
+		t.Fatal(err)
+	}
+	src := SourcePath(content.DefaultRegistry().Get("post"), item.Locator)
+	first := readFile(t, root, src)
+	if !strings.HasSuffix(first, "---\n\nfirst\n\nsecond\n") {
+		t.Errorf("body not laid out:\n%s", first)
+	}
+
+	// What comes back is the text alone again, so saving it once more moves
+	// nothing but updated_at.
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(src)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, err := NewCodec(content.DefaultRegistry()).Decode(content.DefaultRegistry().Get("post"), item.Locator, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read.Body.Raw != "first\n\nsecond" {
+		t.Errorf("Raw = %q", read.Body.Raw)
+	}
+	read.Kind = "post"
+	if _, err := w.Apply(ctx, content.ChangeSet{Ops: []content.Op{
+		content.PutContent{Content: read, IfRevision: read.Revision},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range diffLines(first, readFile(t, root, src)) {
+		if !strings.Contains(line, "updated_at") {
+			t.Errorf("unexpected change on re-save: %q", line)
+		}
+	}
+}
+
 func TestSlugCollisionGetsSuffix(t *testing.T) {
 	root, _, w := newTestProject(t)
 	ctx := t.Context()
