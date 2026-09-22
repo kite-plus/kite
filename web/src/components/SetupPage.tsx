@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, XCircle } from "lucide-react";
 
 import { ApiError } from "@/api/client";
@@ -61,8 +61,14 @@ export function SetupPage({ state }: { state: SetupState }) {
   const [shown, setShown] = useState(false);
 
   const minimum = state.min_password_length ?? 8;
-  const tooShort = password.length > 0 && password.length < minimum;
+  const missing = minimum - password.length;
+  const longEnough = password.length >= minimum;
+  const tooShort = password.length > 0 && !longEnough;
+  const matches = again.length > 0 && again === password;
   const mismatch = again.length > 0 && again !== password;
+  // What the form needs before it is worth sending, which is also what the
+  // hints under each field are saying one at a time.
+  const ready = Boolean(user) && longEnough && matches;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -70,7 +76,7 @@ export function SetupPage({ state }: { state: SetupState }) {
       setStep("account");
       return;
     }
-    if (install.isPending || tooShort || mismatch || !password || !user) return;
+    if (install.isPending || !ready) return;
     install.mutate({
       user,
       password,
@@ -181,9 +187,13 @@ export function SetupPage({ state }: { state: SetupState }) {
                         </InputGroupButton>
                       </InputGroupAddon>
                     </InputGroup>
-                    <FieldDescription>
-                      {tooShort ? t("setup.passwordShort", { n: minimum }) : t("setup.passwordHelp", { n: minimum })}
-                    </FieldDescription>
+                    {tooShort ? (
+                      <Hint tone="wrong">{t("setup.passwordNeeds", { count: missing })}</Hint>
+                    ) : longEnough ? (
+                      <Hint tone="right">{t("setup.passwordOK")}</Hint>
+                    ) : (
+                      <Hint>{t("setup.passwordHelp", { n: minimum })}</Hint>
+                    )}
                   </Field>
 
                   <Field>
@@ -196,11 +206,11 @@ export function SetupPage({ state }: { state: SetupState }) {
                       autoComplete="new-password"
                       required
                     />
-                    {mismatch && (
-                      <FieldDescription className="text-destructive">
-                        {t("setup.mismatch")}
-                      </FieldDescription>
-                    )}
+                    {mismatch ? (
+                      <Hint tone="wrong">{t("setup.mismatch")}</Hint>
+                    ) : matches ? (
+                      <Hint tone="right">{t("setup.match")}</Hint>
+                    ) : null}
                   </Field>
 
                   {refusal && (
@@ -224,7 +234,7 @@ export function SetupPage({ state }: { state: SetupState }) {
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={install.isPending || tooShort || mismatch}
+                      disabled={install.isPending || !ready}
                     >
                       {install.isPending ? (
                         <Spinner data-icon="inline-start" />
@@ -249,6 +259,29 @@ export function SetupPage({ state }: { state: SetupState }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * One line of feedback under a field.
+ *
+ * It says when an answer is right as well as when it is wrong. A form that
+ * only speaks up to complain leaves somebody staring at a password they
+ * cannot see, wondering whether the two boxes agree.
+ */
+function Hint({ tone, children }: { tone?: "right" | "wrong"; children: ReactNode }) {
+  return (
+    // Polite rather than assertive: this changes on every keystroke, and a
+    // screen reader interrupting each one would be unusable.
+    <FieldDescription
+      aria-live="polite"
+      className={
+        tone === "wrong" ? "text-destructive" : tone === "right" ? "text-success" : undefined
+      }
+    >
+      {tone === "right" && <Check aria-hidden className="mr-1 inline size-3.5 align-[-0.15em]" />}
+      {children}
+    </FieldDescription>
   );
 }
 
