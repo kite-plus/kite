@@ -3,23 +3,13 @@ import type { ChainedCommands, Editor } from "@tiptap/react";
 import {
   ChevronLeft,
   Eye,
-  Heading1,
-  Heading2,
-  Heading3,
-  Image,
   Info,
-  List,
-  ListOrdered,
-  ListTodo,
   Minus,
-  Pilcrow,
   SlidersHorizontal,
-  SquareCode,
   Table,
-  TextQuote,
+  Type,
   Upload,
   XCircle,
-  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
@@ -49,6 +39,16 @@ import { Preview } from "@/components/editor/Preview";
 import { RichEditor } from "@/components/editor/RichEditor";
 import type { SlashItem } from "@/components/editor/SlashMenu";
 import { SourceEditor, type SourceHandle } from "@/components/editor/SourceEditor";
+import { BlockquoteIcon } from "@/components/tiptap-icons/blockquote-icon";
+import { CodeBlockIcon } from "@/components/tiptap-icons/code-block-icon";
+import { HeadingFourIcon } from "@/components/tiptap-icons/heading-four-icon";
+import { HeadingOneIcon } from "@/components/tiptap-icons/heading-one-icon";
+import { HeadingThreeIcon } from "@/components/tiptap-icons/heading-three-icon";
+import { HeadingTwoIcon } from "@/components/tiptap-icons/heading-two-icon";
+import { ImagePlusIcon } from "@/components/tiptap-icons/image-plus-icon";
+import { ListIcon } from "@/components/tiptap-icons/list-icon";
+import { ListOrderedIcon } from "@/components/tiptap-icons/list-ordered-icon";
+import { ListTodoIcon } from "@/components/tiptap-icons/list-todo-icon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Breadcrumb,
@@ -64,9 +64,14 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+// The template's variables and animations, which its own install puts in the
+// app's stylesheet; only this page needs them, so they load with it.
+import "@/styles/_variables.scss";
+import "@/styles/_keyframe-animations.scss";
+import "@/components/editor/editor.scss";
 
 export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const { t, locale } = useI18n();
@@ -184,15 +189,20 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
    * item is saved first, since until then it has no folder to keep it in.
    */
   const upload = useCallback(
-    async (file: File): Promise<string> => {
+    async (
+      file: File,
+      onProgress?: (event: { progress: number }) => void,
+      signal?: AbortSignal,
+    ): Promise<string> => {
       setUploadError(null);
       setUploading((n) => n + 1);
       try {
         const target = id ?? (await save());
         if (!target) throw new Error(t("editor.saveFirst"));
-        return await item.attach(file, target);
+        return await item.attach(file, target, (progress) => onProgress?.({ progress }), signal);
       } catch (err) {
-        setUploadError(err instanceof Error ? err.message : String(err));
+        // A cancelled upload was the author's doing, not a failure to report.
+        if (!signal?.aborted) setUploadError(err instanceof Error ? err.message : String(err));
         throw err;
       } finally {
         setUploading((n) => Math.max(0, n - 1));
@@ -223,53 +233,49 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   );
 
   const slash = useMemo<SlashItem[]>(() => {
-    const block = (
+    const item = (
+      group: string,
       id: string,
       label: string,
-      hint: Key,
       keywords: string,
-      icon: LucideIcon,
+      icon: SlashItem["icon"],
       run: (chain: ChainedCommands) => ChainedCommands,
     ): SlashItem => ({
       id,
       label,
-      hint: t(hint),
+      group,
       keywords,
       icon,
       run: (editor, range) => run(editor.chain().focus().deleteRange(range)).run(),
     });
-    const heading = (level: 1 | 2 | 3, icon: LucideIcon) =>
-      block(
-        `h${level}`,
-        t("editor.headingN", { level }),
-        `editor.slash.heading${level}` as Key,
-        `h${level} heading title 标题`,
-        icon,
-        (chain) => chain.setHeading({ level }),
-      );
+    const style = t("editor.slash.style");
+    const insert = t("editor.slash.insert");
+    const headings = [HeadingOneIcon, HeadingTwoIcon, HeadingThreeIcon, HeadingFourIcon];
     return [
-      block("paragraph", t("editor.paragraph"), "editor.slash.paragraph", "text p 正文 段落", Pilcrow, (chain) => chain.setParagraph()),
-      heading(1, Heading1),
-      heading(2, Heading2),
-      heading(3, Heading3),
-      block("bulletList", t("editor.bulletList"), "editor.slash.bulletList", "ul bullet 列表 无序", List, (chain) => chain.toggleBulletList()),
-      block("orderedList", t("editor.orderedList"), "editor.slash.orderedList", "ol number 编号 有序", ListOrdered, (chain) => chain.toggleOrderedList()),
-      block("taskList", t("editor.taskList"), "editor.slash.taskList", "todo task checkbox 任务 待办", ListTodo, (chain) => chain.toggleTaskList()),
-      block("quote", t("editor.quote"), "editor.slash.quote", "blockquote 引用", TextQuote, (chain) => chain.toggleBlockquote()),
-      block("codeBlock", t("editor.codeBlock"), "editor.slash.codeBlock", "code pre 代码", SquareCode, (chain) => chain.toggleCodeBlock()),
-      {
-        id: "image",
-        label: t("editor.image"),
-        hint: t("editor.slash.image"),
-        keywords: "img picture photo 图片 上传",
-        icon: Image,
-        run: (editor, range) => {
-          editor.chain().focus().deleteRange(range).run();
-          pick();
-        },
-      },
-      block("table", t("editor.table"), "editor.slash.table", "grid 表格", Table, (chain) => chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true })),
-      block("divider", t("editor.divider"), "editor.slash.divider", "hr rule line 分割线 分隔", Minus, (chain) => chain.setHorizontalRule()),
+      item(style, "paragraph", t("editor.paragraph"), "text p 正文 段落", Type, (chain) => chain.setParagraph()),
+      ...headings.map((icon, i) => {
+        const level = (i + 1) as 1 | 2 | 3 | 4;
+        return item(style, `h${level}`, t("editor.headingN", { level }), `h${level} heading title 标题`, icon, (chain) =>
+          chain.setHeading({ level }),
+        );
+      }),
+      item(style, "bulletList", t("editor.bulletList"), "ul bullet 列表 无序", ListIcon, (chain) => chain.toggleBulletList()),
+      item(style, "orderedList", t("editor.orderedList"), "ol number 编号 有序", ListOrderedIcon, (chain) =>
+        chain.toggleOrderedList(),
+      ),
+      item(style, "taskList", t("editor.taskList"), "todo task checkbox 任务 待办", ListTodoIcon, (chain) =>
+        chain.toggleTaskList(),
+      ),
+      item(style, "quote", t("editor.quote"), "blockquote 引用", BlockquoteIcon, (chain) => chain.toggleBlockquote()),
+      item(style, "codeBlock", t("editor.codeBlock"), "code pre 代码", CodeBlockIcon, (chain) => chain.toggleCodeBlock()),
+      // The same drop zone the toolbar's image button puts in.
+      item(insert, "image", t("editor.image"), "img picture photo 图片 上传", ImagePlusIcon, (chain) =>
+        chain.insertContent({ type: "imageUpload" }),
+      ),
+      item(insert, "table", t("editor.table"), "grid 表格", Table, (chain) =>
+        chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
+      ),
+      item(insert, "divider", t("editor.divider"), "hr rule line 分割线 分隔", Minus, (chain) => chain.setHorizontalRule()),
     ];
   }, [t]);
 
@@ -460,12 +466,13 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
       )}
 
       <div className="flex min-h-0 flex-1">
-        <div className={cn("flex min-w-0 flex-1 flex-col", preview && "hidden md:flex")}>
+        <div className={cn("kite-editor flex min-w-0 flex-1 flex-col", preview && "hidden md:flex")}>
           <EditorToolbar
             editor={mode === "visual" ? rich : null}
             mode={mode}
             onMode={switchMode}
             onPickImage={pick}
+            base={item.base?.url}
           />
 
           {mode === "source" && lost.length > 0 && (
@@ -486,9 +493,9 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           )}
 
           <div className="min-h-0 flex-1 overflow-auto">
-            <div className="mx-auto max-w-[760px] px-6 pt-8 sm:px-10">
+            <div className="kite-editor-page">
               {/* A textarea so a long title wraps; it still holds one line of text. */}
-              <Textarea
+              <textarea
                 rows={1}
                 autoFocus={!id}
                 value={draft.title}
@@ -501,7 +508,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                 }}
                 placeholder={t("editor.titlePlaceholder")}
                 aria-label={t("editor.titlePlaceholder")}
-                className="mb-3 min-h-0 resize-none rounded-none border-0 bg-transparent p-0 text-[1.75rem] leading-tight font-bold tracking-tight shadow-none focus-visible:ring-0 md:text-[1.75rem] dark:bg-transparent"
+                className="kite-title"
               />
               {mode === "visual" ? (
                 <RichEditor
@@ -516,6 +523,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                     language: t("editor.language"),
                   }}
                   upload={upload}
+                  onUploadError={setUploadError}
                   onReady={setRich}
                 />
               ) : (

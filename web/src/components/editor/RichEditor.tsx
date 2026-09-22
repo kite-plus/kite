@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useRef } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 
-import { BubbleToolbar } from "@/components/editor/BubbleToolbar";
 import { extensions, type Env } from "@/components/editor/extensions";
+import { ImageBubble } from "@/components/editor/ImageBubble";
 import type { SlashItem } from "@/components/editor/SlashMenu";
+import type { UploadFunction } from "@/components/tiptap-node/image-upload-node";
+
+import "@/components/tiptap-node/blockquote-node/blockquote-node.scss";
+import "@/components/tiptap-node/code-block-node/code-block-node.scss";
+import "@/components/tiptap-node/horizontal-rule-node/horizontal-rule-node.scss";
+import "@/components/tiptap-node/list-node/list-node.scss";
+import "@/components/tiptap-node/image-node/image-node.scss";
+import "@/components/tiptap-node/heading-node/heading-node.scss";
+import "@/components/tiptap-node/paragraph-node/paragraph-node.scss";
 
 interface Props {
   value: string;
@@ -14,8 +23,10 @@ interface Props {
   base?: string;
   slash: SlashItem[];
   labels: { slashEmpty: string; plain: string; language: string };
-  /** upload stores a dropped or pasted file and resolves to the link that reaches it. */
-  upload: (file: File) => Promise<string>;
+  /** upload stores a dropped, pasted or picked file and resolves to the link that reaches it. */
+  upload: UploadFunction;
+  /** onUploadError hears of a file refused before it was sent, too large or one too many. */
+  onUploadError: (message: string) => void;
   onReady?: (editor: Editor | null) => void;
 }
 
@@ -23,7 +34,7 @@ interface Props {
 const altOf = (file: File) => file.name.replace(/\.[^.]+$/, "");
 
 /**
- * The body as formatted text, over Tiptap.
+ * The body as formatted text, over Tiptap and its Simple Editor template.
  *
  * Markdown goes in and markdown comes out: the document model is
  * ProseMirror's, but what is stored is what a build reads. Nothing is
@@ -38,11 +49,12 @@ export function RichEditor({
   slash,
   labels,
   upload,
+  onUploadError,
   onReady,
 }: Props) {
   // Read through a ref so the extensions, built once, always see the latest.
-  const latest = useRef({ placeholder, base, slash, labels, upload, onChange, onReady });
-  latest.current = { placeholder, base, slash, labels, upload, onChange, onReady };
+  const latest = useRef({ placeholder, base, slash, labels, upload, onUploadError, onChange, onReady });
+  latest.current = { placeholder, base, slash, labels, upload, onUploadError, onChange, onReady };
 
   const instance = useRef<Editor | null>(null);
   // The last markdown handed out, which is what a value prop is compared against.
@@ -54,19 +66,25 @@ export function RichEditor({
       placeholder: (kind) => latest.current.placeholder[kind],
       slash: () => latest.current.slash,
       labels: () => latest.current.labels,
+      upload: (file, onProgress, signal) => latest.current.upload(file, onProgress, signal),
+      onUploadError: (error) => latest.current.onUploadError(error.message),
     }),
     [],
   );
 
   const insert = (files: File[], at?: number) => {
     for (const file of files) {
-      void latest.current.upload(file).then((src) => {
-        const editor = instance.current;
-        if (!editor) return;
-        const image = { type: "image", attrs: { src, alt: altOf(file) } };
-        if (at === undefined) editor.chain().focus().insertContent(image).run();
-        else editor.chain().focus().insertContentAt(at, image).run();
-      });
+      latest.current
+        .upload(file)
+        .then((src) => {
+          const editor = instance.current;
+          if (!editor) return;
+          const image = { type: "image", attrs: { src, alt: altOf(file) } };
+          if (at === undefined) editor.chain().focus().insertContent(image).run();
+          else editor.chain().focus().insertContentAt(at, image).run();
+        })
+        // The page has already said what went wrong.
+        .catch(() => undefined);
     }
   };
 
@@ -77,7 +95,7 @@ export function RichEditor({
     immediatelyRender: true,
     shouldRerenderOnTransaction: false,
     editorProps: {
-      attributes: { class: "tiptap prose max-w-none", spellcheck: "true" },
+      attributes: { class: "simple-editor", spellcheck: "true" },
       handleDrop: (view, event, _slice, moved) => {
         const files = Array.from(event.dataTransfer?.files ?? []);
         if (moved || files.length === 0) return false;
@@ -124,9 +142,9 @@ export function RichEditor({
   }, [editor, value]);
 
   return (
-    <div className="relative">
-      <EditorContent editor={editor} />
-      <BubbleToolbar editor={editor} />
-    </div>
+    <>
+      <EditorContent editor={editor} role="presentation" className="simple-editor-content" />
+      <ImageBubble editor={editor} />
+    </>
   );
 }

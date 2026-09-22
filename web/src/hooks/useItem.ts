@@ -165,21 +165,43 @@ export function useItem(id: string | null, kind: string) {
    * before this hook has been rendered with it.
    */
   const attach = useCallback(
-    async (file: File, into: string | null = id): Promise<string> => {
-      if (!into) throw new ApiError("invalid_request", "save this item before adding files");
+    (
+      file: File,
+      into: string | null = id,
+      /** onProgress hears the share of the file sent so far, from 0 to 100. */
+      onProgress?: (percent: number) => void,
+      signal?: AbortSignal,
+    ): Promise<string> => {
+      if (!into) {
+        return Promise.reject(new ApiError("invalid_request", "save this item before adding files"));
+      }
+      // Cancelled while a new item was being saved to make room for the file.
+      if (signal?.aborted) return Promise.reject(new DOMException("upload cancelled", "AbortError"));
 
       const form = new FormData();
       form.append("file", file);
 
-      const response = await fetch(`/api/v1/contents/${into}/media`, {
-        method: "POST",
-        body: form,
+      // XMLHttpRequest rather than fetch: only it reports upload progress.
+      return new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open("POST", `/api/v1/contents/${into}/media`);
+        request.responseType = "json";
+        request.upload.onprogress = (event) => {
+          if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
+        };
+        request.onload = () => {
+          const body = request.response as { link?: string; error?: { code?: string; message?: string } } | null;
+          if (request.status >= 200 && request.status < 300 && body?.link) {
+            resolve(body.link);
+            return;
+          }
+          reject(new ApiError(body?.error?.code ?? "internal", body?.error?.message ?? "upload failed"));
+        };
+        request.onerror = () => reject(new ApiError("internal", "upload failed"));
+        request.onabort = () => reject(new DOMException("upload cancelled", "AbortError"));
+        signal?.addEventListener("abort", () => request.abort(), { once: true });
+        request.send(form);
       });
-      const body = await response.json();
-      if (!response.ok) {
-        throw new ApiError(body.error?.code ?? "internal", body.error?.message ?? "upload failed");
-      }
-      return body.link as string;
     },
     [id],
   );

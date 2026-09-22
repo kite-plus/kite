@@ -1,0 +1,335 @@
+/*
+ * Kite's side of the Simple Editor template: where it sits in the page, and
+ * the blocks markdown has that the template does not style (tables, code
+ * block languages). Colors come from the template's --tt-* variables, so
+ * both follow dark mode together.
+ */
+
+.kite-editor {
+  --tt-toolbar-bg-color: var(--background);
+  --tt-toolbar-border-color: var(--border);
+
+  position: relative;
+  // The toolbar reads the column's width, not the window's.
+  container-type: inline-size;
+}
+
+/* =====================
+     TOOLBAR
+     ===================== */
+.tiptap-toolbar.kite-toolbar[data-variant="fixed"] {
+  flex-shrink: 0;
+
+  // The template docks the toolbar to the bottom of a phone screen, which
+  // assumes it owns the page; here it stays under the header.
+  @media (max-width: 480px) {
+    position: sticky;
+    top: 0;
+    height: auto;
+    border-top: none;
+    border-bottom: 1px solid var(--tt-toolbar-border-color);
+    padding: 0 0.5rem;
+  }
+}
+
+// Search and the mode switch stay in reach when the tools scroll sideways.
+.kite-toolbar-end {
+  position: sticky;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-left: 0.25rem;
+  background: var(--tt-toolbar-bg-color);
+}
+
+@container (max-width: 52rem) {
+  .kite-toolbar-modes .tiptap-button-text {
+    display: none;
+  }
+}
+
+.kite-toolbar-note {
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--tt-gray-light-a-500);
+
+  .dark & {
+    color: var(--tt-gray-dark-a-500);
+  }
+}
+
+.tiptap-search-replace.kite-search {
+  position: absolute;
+  top: calc(var(--tt-toolbar-height) + 0.5rem);
+  right: 0.5rem;
+  z-index: 51;
+  max-height: calc(100% - var(--tt-toolbar-height) - 1rem);
+  overflow-y: auto;
+
+  @media (max-width: 480px) {
+    left: 0.5rem;
+    width: auto;
+  }
+}
+
+/* =====================
+     PAGE
+     ===================== */
+.kite-editor-page {
+  max-width: 648px;
+  margin: 0 auto;
+  padding: 3rem 3rem 0;
+  overflow-wrap: break-word;
+
+  @media (max-width: 480px) {
+    padding: 1.5rem 1.5rem 0;
+  }
+}
+
+.kite-title {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  field-sizing: content;
+  background: transparent;
+  color: inherit;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+
+  &::placeholder {
+    color: var(--tt-gray-light-a-400);
+
+    .dark & {
+      color: var(--tt-gray-dark-a-400);
+    }
+  }
+}
+
+.simple-editor-content .tiptap.ProseMirror.simple-editor {
+  min-height: 40vh;
+  // Room to scroll the last line up to where the eye is.
+  padding-bottom: 30vh;
+}
+
+.tiptap.ProseMirror {
+  code,
+  pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+}
+
+/* =====================
+     TABLES
+     ===================== */
+.tiptap.ProseMirror {
+  --kite-table-border: var(--tt-gray-light-a-200);
+  --kite-table-head-bg: var(--tt-gray-light-a-50);
+
+  .dark & {
+    --kite-table-border: var(--tt-gray-dark-a-200);
+    --kite-table-head-bg: var(--tt-gray-dark-a-50);
+  }
+
+  .tableWrapper {
+    margin: 1.5rem 0;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+
+  .tableWrapper table {
+    margin: 0;
+  }
+
+  td,
+  th {
+    position: relative;
+    min-width: 3em;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--kite-table-border);
+    vertical-align: top;
+    text-align: left;
+
+    > p {
+      margin: 0;
+    }
+  }
+
+  th {
+    background-color: var(--kite-table-head-bg);
+    font-weight: 600;
+  }
+
+  .selectedCell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: var(--tt-selection-color);
+    pointer-events: none;
+  }
+}
+
+/* =====================
+     CODE BLOCKS
+     ===================== */
+.tiptap.ProseMirror .code-block {
+  position: relative;
+
+  // The first line starts under the language, not beside it.
+  pre {
+    padding-top: 2.25rem;
+  }
+
+  // The node view puts a block inside the code element; an inline code would
+  // open an empty line above it.
+  pre > code {
+    display: block;
+    padding: 0;
+  }
+
+  select {
+    field-sizing: content;
+    position: absolute;
+    top: 0.375rem;
+    right: 0.375rem;
+    z-index: 1;
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    appearance: none;
+    border: none;
+    border-radius: var(--tt-radius-md);
+    background: transparent;
+    color: var(--tt-gray-light-a-500);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      outline: none;
+      background-color: var(--tt-gray-light-a-100);
+      color: var(--tt-gray-light-a-700);
+    }
+
+    .dark & {
+      color: var(--tt-gray-dark-a-500);
+
+      &:hover,
+      &:focus-visible {
+        background-color: var(--tt-gray-dark-a-100);
+        color: var(--tt-gray-dark-a-700);
+      }
+    }
+  }
+}
+
+// Highlighting classes from lowlight, in a light and a dark palette.
+.tiptap.ProseMirror {
+  .hljs-comment,
+  .hljs-quote {
+    color: var(--tt-gray-light-a-500);
+    font-style: italic;
+  }
+  :is(.hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-type, .hljs-meta, .hljs-template-tag) {
+    color: oklch(0.52 0.19 25);
+  }
+  :is(.hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute, .hljs-meta .hljs-string) {
+    color: oklch(0.45 0.12 250);
+  }
+  :is(.hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-symbol) {
+    color: oklch(0.5 0.16 262);
+  }
+  :is(.hljs-title, .hljs-section, .hljs-name, .hljs-function .hljs-title, .hljs-title.function_) {
+    color: oklch(0.5 0.19 300);
+  }
+  :is(.hljs-built_in, .hljs-bullet, .hljs-link) {
+    color: oklch(0.5 0.14 60);
+  }
+  .hljs-deletion {
+    color: oklch(0.5 0.19 20);
+  }
+  .hljs-emphasis {
+    font-style: italic;
+  }
+  .hljs-strong {
+    font-weight: 600;
+  }
+
+  .dark & {
+    .hljs-comment,
+    .hljs-quote {
+      color: var(--tt-gray-dark-a-500);
+    }
+    :is(.hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-type, .hljs-meta, .hljs-template-tag) {
+      color: oklch(0.76 0.14 25);
+    }
+    :is(.hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute, .hljs-meta .hljs-string) {
+      color: oklch(0.82 0.09 240);
+    }
+    :is(.hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-symbol) {
+      color: oklch(0.78 0.11 255);
+    }
+    :is(.hljs-title, .hljs-section, .hljs-name, .hljs-function .hljs-title, .hljs-title.function_) {
+      color: oklch(0.8 0.12 300);
+    }
+    :is(.hljs-built_in, .hljs-bullet, .hljs-link) {
+      color: oklch(0.8 0.12 70);
+    }
+  }
+}
+
+/* =====================
+     MENUS
+     ===================== */
+.kite-slash-popup {
+  z-index: 60;
+}
+
+.tiptap-card.kite-slash {
+  align-items: stretch;
+  width: 15rem;
+
+  .tiptap-card-body {
+    max-height: min(22rem, 50vh);
+  }
+
+  .tiptap-button {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.kite-slash-empty {
+  padding: 0.75rem 0.5rem;
+  font-size: 0.875rem;
+  color: var(--tt-gray-light-a-500);
+
+  .dark & {
+    color: var(--tt-gray-dark-a-500);
+  }
+}
+
+.kite-image-bubble {
+  .tiptap-input.kite-alt-input {
+    width: 14rem;
+    border: none;
+    font-size: 0.875rem;
+  }
+}

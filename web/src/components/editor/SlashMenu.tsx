@@ -1,19 +1,21 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ComponentType } from "react";
 import { Extension, type Editor, type Range } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
 import { Suggestion, type SuggestionKeyDownProps, type SuggestionProps } from "@tiptap/suggestion";
-import type { LucideIcon } from "lucide-react";
-import { cn } from "cn";
+
+import { Button } from "@/components/tiptap-ui-primitive/button";
+import { Card, CardBody, CardGroupLabel, CardItemGroup } from "@/components/tiptap-ui-primitive/card";
 
 /** One thing a "/" can insert. */
 export interface SlashItem {
   id: string;
   label: string;
-  hint?: string;
+  /** The heading the item is listed under; items sharing one are listed together. */
+  group: string;
   /** Extra words a search matches, in whatever languages the author may type. */
   keywords?: string;
-  icon: LucideIcon;
+  icon: ComponentType<{ className?: string }>;
   run: (editor: Editor, range: Range) => void;
 }
 
@@ -25,7 +27,7 @@ interface Options {
 
 function matches(item: SlashItem, query: string): boolean {
   const q = query.toLowerCase();
-  return `${item.label} ${item.hint ?? ""} ${item.keywords ?? ""}`.toLowerCase().includes(q);
+  return `${item.label} ${item.keywords ?? ""}`.toLowerCase().includes(q);
 }
 
 /**
@@ -61,6 +63,7 @@ export const Slash = Extension.create<Options>({
               renderer = new ReactRenderer(SlashList, {
                 props: { ...props, empty: options.empty() },
                 editor: props.editor,
+                className: "kite-slash-popup",
               });
               unmount = props.mount(renderer.element);
             },
@@ -99,7 +102,7 @@ const SlashList = forwardRef<ListHandle, ListProps>(function SlashList(
   useEffect(() => setIndex(0), [items]);
   useEffect(() => {
     list.current
-      ?.querySelector("[data-selected=true]")
+      ?.querySelector("[data-highlighted=true]")
       ?.scrollIntoView({ block: "nearest" });
   }, [index]);
 
@@ -127,43 +130,44 @@ const SlashList = forwardRef<ListHandle, ListProps>(function SlashList(
     [items, index, command],
   );
 
+  // Items arrive group by group, so the keyboard walks them as they are drawn.
+  const groups = new Map<string, { item: SlashItem; at: number }[]>();
+  items.forEach((item, at) => {
+    const group = groups.get(item.group) ?? [];
+    group.push({ item, at });
+    groups.set(item.group, group);
+  });
+
   return (
-    <div
-      ref={list}
-      role="listbox"
-      className="z-50 max-h-80 w-64 overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
-    >
-      {items.length === 0 ? (
-        <div className="px-2 py-5 text-center text-sm text-muted-foreground">{empty}</div>
-      ) : (
-        items.map((item, i) => (
-          <button
-            key={item.id}
-            type="button"
-            role="option"
-            aria-selected={i === index}
-            data-selected={i === index}
-            className={cn(
-              "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm outline-none",
-              "data-[selected=true]:bg-muted",
-            )}
-            onMouseEnter={() => setIndex(i)}
-            // Keeps the selection the command is about to act on.
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => command(item)}
-          >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground">
-              <item.icon className="size-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate">{item.label}</span>
-              {item.hint && (
-                <span className="block truncate text-xs text-muted-foreground">{item.hint}</span>
-              )}
-            </span>
-          </button>
-        ))
-      )}
-    </div>
+    <Card ref={list} role="listbox" className="kite-slash">
+      <CardBody>
+        {items.length === 0 ? (
+          <div className="kite-slash-empty">{empty}</div>
+        ) : (
+          [...groups].map(([label, entries]) => (
+            <CardItemGroup key={label}>
+              <CardGroupLabel>{label}</CardGroupLabel>
+              {entries.map(({ item, at }) => (
+                <Button
+                  key={item.id}
+                  type="button"
+                  variant="ghost"
+                  role="option"
+                  aria-selected={at === index}
+                  data-highlighted={at === index}
+                  onMouseEnter={() => setIndex(at)}
+                  // Keeps the selection the command is about to act on.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => command(item)}
+                >
+                  <item.icon className="tiptap-button-icon" />
+                  <span className="tiptap-button-text">{item.label}</span>
+                </Button>
+              ))}
+            </CardItemGroup>
+          ))
+        )}
+      </CardBody>
+    </Card>
   );
 });
