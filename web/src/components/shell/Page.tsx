@@ -15,11 +15,17 @@ interface Props {
 // at it and centered; below it nothing changes.
 const measure = "mx-auto w-full max-w-[1440px]";
 
-/** Page is one screen inside the shell: a fixed header over a scrolling body. */
+/**
+ * Page is one screen inside the shell: a fixed header over a scrolling body.
+ *
+ * The body keeps a little padding above its first child. A card's edge is a
+ * ring drawn just outside its box, and a card flush with the top of a
+ * scrolling container loses that top line to the overflow.
+ */
 export function Page({ title, description, actions, toolbar, children }: Props) {
   return (
     <div className="flex h-svh min-w-0 flex-col">
-      <header className="px-4 pt-5 pb-3.5 sm:px-7">
+      <header className="px-4 pt-5 pb-2.5 sm:px-7">
         {/* The actions drop under a title they would otherwise squeeze. */}
         <div className={`${measure} flex flex-wrap items-start justify-between gap-x-4 gap-y-3`}>
           <div className="flex min-w-0 flex-1 basis-48 items-start gap-2">
@@ -35,11 +41,11 @@ export function Page({ title, description, actions, toolbar, children }: Props) 
         </div>
       </header>
       {toolbar && (
-        <div className="px-4 pb-3.5 sm:px-7">
+        <div className="px-4 pt-1 pb-2.5 sm:px-7">
           <div className={measure}>{toolbar}</div>
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-auto px-4 pb-6 sm:px-7">
+      <div className="min-h-0 flex-1 overflow-auto px-4 pt-1 pb-6 sm:px-7">
         <div className={measure}>{children}</div>
       </div>
     </div>
