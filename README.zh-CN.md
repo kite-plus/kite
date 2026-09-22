@@ -17,9 +17,22 @@
   <img src="docs/assets/screenshot.png" alt="Kite 站点的浅色与深色外观" width="880">
 </p>
 
-Kite 是一个开源内容发布平台，内置可视化 Markdown 编辑器、图片上传、标签分类和深浅色主题。内容保存在自己的文件中，可以直接运行站点，也可以导出静态页面。
+Kite 是一个开源内容发布平台，兼顾 CMS 的写作体验与静态站点生成器的可迁移性。它是一个用 Go 编写的单文件程序，管理后台直接内置其中。
+
+- **浏览器里的后台**：可视化编辑器直接读写 Markdown，一键切换源码，支持图片上传、标签、分类和草稿。
+- **文件始终属于你**：内容就是磁盘上的 Markdown 文件。保存时只改写真正变化的部分，key 的顺序和注释原样保留，改个标题，`git diff` 只有一行。
+- **发布方式由你选**：导出静态页面放到任意托管平台，在自己的服务器上运行站点，或者通过 Git 提交并推送。
+- **无需额外安装**：后台、支持深浅色的默认主题和 SQLite 驱动都已编译进这一个程序。
 
 > 项目仍在早期开发中，目前请从源码安装，包含完整后台的步骤如下。
+
+## 工作方式
+
+<p align="center">
+  <img src="docs/assets/workflow.svg" width="100%" alt="一篇 Markdown 文章经过 kite 产生三种输出：kite build 把静态 HTML 写入 public/，kite run 在 localhost:1717 提供站点和后台，kite publish 通过 Git 提交并推送">
+</p>
+
+Markdown 文件是唯一的真相源。后台直接编辑这些文件，Kite 在 `.kite/` 下维护的索引只是缓存：删掉、重建，得到的数据完全一样。同一份文件，用 `kite build` 生成静态页面，用 `kite run` 运行站点，用 `kite publish` 提交到 Git。
 
 ## 安装并启动
 
@@ -89,8 +102,20 @@ docker cp kite:/data/public ./public
 
 **通过 Git 发布：** 本机站点配置好 Git 远程仓库后，运行 `kite publish --all --push` 提交并推送内容；自动上线还需要托管平台的部署工作流。
 
+## 路线图
+
+- **已完成**：静态构建、实时预览服务、浏览器后台、Git 发布（M0–M4）。
+- **接下来**：公开主题契约、`kite.lock` 与 `kitew` wrapper、基于 SQLite 的动态模式、WebAssembly 插件（M5–M8）。
+
+完整的里程碑列表见[详细使用说明](docs/reference.zh-CN.md#路线图)。
+
+## 参与贡献
+
+- **反馈问题或提出想法**：[提交 Issue](https://github.com/kite-plus/kite/issues)，写明版本、环境和复现步骤。
+- **提交改动**：先阅读[参与贡献说明](docs/reference.zh-CN.md#参与贡献)，提交 PR 前运行 `make check`。与[设计文档](docs/design/)冲突的改动，先改文档，再改代码。
+
 ## 更多
 
 - [详细使用说明](docs/reference.zh-CN.md)：账号、主题、配置、部署与常用开发操作。
-- [反馈问题](https://github.com/kite-plus/kite/issues) · [架构与路线图](docs/design/)
+- [设计文档](docs/design/)：架构、主题系统与插件系统。
 - [Apache License 2.0](LICENSE)

@@ -17,9 +17,22 @@
   <img src="docs/assets/screenshot.png" alt="A Kite site in light and dark mode" width="880">
 </p>
 
-Kite is an open-source publishing platform with a visual Markdown editor, image uploads, tags, categories, and a light/dark theme. Your content stays in your own files. Run a site directly or export static pages.
+Kite is an open-source publishing platform that gives you the writing experience of a CMS and the portability of a static site generator. It is a single Go binary with the admin studio built in.
+
+- **A studio in your browser.** A visual editor that reads and writes Markdown, with the source one click away, image uploads, tags, categories, and drafts.
+- **Files that stay yours.** Content is plain Markdown on disk. Saving rewrites only what changed and keeps your key order and comments, so editing a title is a one-line `git diff`.
+- **Publish your way.** Export static pages for any host, run the site on your own server, or commit and push through Git.
+- **Nothing else to install.** The studio, a default theme with light and dark modes, and the SQLite driver are compiled into the binary.
 
 > Kite is in early development. Install from source using the steps below, which include the full studio.
+
+## How it works
+
+<p align="center">
+  <img src="docs/assets/workflow.svg" width="100%" alt="One Markdown file goes through kite to three outputs: kite build writes static HTML to public/, kite run serves the site and the studio on localhost:1717, and kite publish commits and pushes with Git">
+</p>
+
+Your Markdown files are the source of truth. The studio edits them in place, and the index Kite keeps under `.kite/` is only a cache: delete it, rebuild, and the same data comes back. The same files become static pages with `kite build`, a live site with `kite run`, or a Git commit with `kite publish`.
 
 ## Install and start
 
@@ -89,8 +102,20 @@ docker cp kite:/data/public ./public
 
 **Publish through Git:** With a Git remote configured for your local site, run `kite publish --all --push` to commit and push content. Automatic deployment also needs a hosting workflow.
 
+## Roadmap
+
+- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4).
+- **Next:** a public theme contract, `kite.lock` with the `kitew` wrapper, a dynamic mode backed by SQLite, and WebAssembly plugins (M5–M8).
+
+The [reference guide](docs/reference.md#roadmap) lists every milestone.
+
+## Contributing
+
+- **Report a bug or share an idea:** [open an issue](https://github.com/kite-plus/kite/issues) with your version, environment, and steps to reproduce.
+- **Send a change:** read the [contributing notes](docs/reference.md#contributing) and run `make check` before you open a pull request. If a change conflicts with the [design documents](docs/design/), update the documents first.
+
 ## More
 
 - [Reference guide](docs/reference.md): accounts, themes, configuration, deployment, and development.
-- [Report an issue](https://github.com/kite-plus/kite/issues) · [Architecture and roadmap](docs/design/)
+- [Design documents](docs/design/): architecture, the theme system, and the plugin system, written in Chinese.
 - [Apache License 2.0](LICENSE)

@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="464" viewBox="0 0 1200 464" role="img" aria-labelledby="title desc">
+  <title id="title">How Kite works</title>
+  <desc id="desc">One Markdown file, content/posts/why-your-index-lies/index.md, is read and written by kite. From the same file, kite build writes static HTML to public/, kite run serves the site and the studio on localhost:1717, and kite publish --all --push commits and pushes it with Git.</desc>
+  <style>
+    .canvas { fill: #F6F8FB; stroke: #E3E8F0; }
+    .card { fill: #FFFFFF; stroke: #DAE1EB; }
+    .rule { stroke: #DAE1EB; }
+    .ink { fill: #1F2733; }
+    .muted { fill: #667285; }
+    .faint { fill: #A7B0BF; }
+    .key { fill: #3D68C8; }
+    .mark { fill: #4A77D6; }
+    .line { fill: none; stroke: #4A77D6; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tint { fill: #EBF1FC; }
+    .mono { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace; }
+    .serif { font-family: 'Noto Serif SC', 'Songti SC', Georgia, 'Times New Roman', serif; }
+    @media (prefers-color-scheme: dark) {
+      .canvas { fill: #131A24; stroke: #242E3C; }
+      .card { fill: #18212E; stroke: #2A3546; }
+      .rule { stroke: #2A3546; }
+      .ink { fill: #E6EDF5; }
+      .muted { fill: #98A4B6; }
+      .faint { fill: #566378; }
+      .key { fill: #8FB0F4; }
+      .mark { fill: #6F97EC; }
+      .line { stroke: #6F97EC; }
+      .tint { fill: #1D2A40; }
+    }
+  </style>
+
+  <rect class="canvas" x="0.5" y="0.5" width="1199" height="463" rx="20"/>
+
+  <g id="source">
+    <rect class="card" x="48.5" y="48.5" width="428" height="367" rx="14"/>
+    <path class="rule" d="M49 148.5H476"/>
+    <g class="mono">
+      <text class="muted" x="76" y="92" font-size="17">content/posts/why-your-index-lies/</text>
+      <text class="ink" x="76" y="126" font-size="24" font-weight="600">index.md</text>
+      <g class="ink" font-size="21">
+        <text class="faint" x="76" y="186">---</text>
+        <text x="76" y="218"><tspan class="key">title:</tspan> Why Your Index Lies</text>
+        <text x="76" y="250"><tspan class="key">status:</tspan> published</text>
+        <text x="76" y="282"><tspan class="key">tags:</tspan> [systems, storage]</text>
+        <text class="faint" x="76" y="314">---</text>
+      </g>
+    </g>
+    <g class="serif ink" font-size="22">
+      <text x="76" y="356">A derived index has exactly one</text>
+      <text x="76" y="388">job: be provably rebuildable.</text>
+    </g>
+  </g>
+
+  <g id="read-write" class="line">
+    <path d="M484 223H508M501 216L508 223L501 230"/>
+    <path d="M508 241H484M491 234L484 241L491 248"/>
+  </g>
+
+  <g id="kite">
+    <rect class="tint" x="516" y="184" width="96" height="96" rx="22"/>
+    <g class="mark" transform="translate(564 232) scale(1.25) translate(-32 -32)">
+      <path d="M14.692 15.735L28.632 21.065A2.05 2.05 0 0 1 29.95 22.98L29.95 30.36A2.05 2.05 0 0 1 27.168 32.275L13.228 26.945A2.05 2.05 0 0 1 11.91 25.03L11.91 17.65A2.05 2.05 0 0 1 14.692 15.735Z"/>
+      <path d="M14.692 30.085L28.632 35.415A2.05 2.05 0 0 1 29.95 37.33L29.95 45.94A2.05 2.05 0 0 1 27.168 47.855L13.228 42.525A2.05 2.05 0 0 1 11.91 40.61L11.91 32A2.05 2.05 0 0 1 14.692 30.085Z"/>
+      <path d="M35.368 21.065L49.308 15.735A2.05 2.05 0 0 1 52.09 17.65L52.09 40.61A2.05 2.05 0 0 1 50.772 42.525L36.832 47.855A2.05 2.05 0 0 1 34.05 45.94L34.05 22.98A2.05 2.05 0 0 1 35.368 21.065Z"/>
+    </g>
+    <text class="mono muted" x="564" y="312" text-anchor="middle" font-size="20">kite</text>
+  </g>
+
+  <g id="fan-out" class="line">
+    <path d="M620 232H692"/>
+    <path d="M648 232V126Q648 112 662 112H692"/>
+    <path d="M648 232V338Q648 352 662 352H692"/>
+    <path d="M686 106L692 112L686 118M686 226L692 232L686 238M686 346L692 352L686 358"/>
+  </g>
+
+  <g id="outputs">
+    <rect class="card" x="700.5" y="64.5" width="451" height="95" rx="14"/>
+    <rect class="card" x="700.5" y="184.5" width="451" height="95" rx="14"/>
+    <rect class="card" x="700.5" y="304.5" width="451" height="95" rx="14"/>
+    <rect class="tint" x="724" y="88" width="48" height="48" rx="12"/>
+    <rect class="tint" x="724" y="208" width="48" height="48" rx="12"/>
+    <rect class="tint" x="724" y="328" width="48" height="48" rx="12"/>
+
+    <g class="line">
+      <g id="glyph-pages">
+        <rect x="737" y="102" width="18" height="22" rx="3"/>
+        <path d="M741 98H756Q759 98 759 101V118"/>
+        <path d="M741 109H751M741 115H748"/>
+      </g>
+      <g id="glyph-browser">
+        <rect x="735" y="221" width="26" height="22" rx="4"/>
+        <path d="M735 228H761"/>
+      </g>
+      <g id="glyph-git">
+        <circle cx="742" cy="342" r="3"/>
+        <circle cx="742" cy="362" r="3"/>
+        <circle cx="755" cy="347" r="3"/>
+        <path d="M742 345V359M755 350C755 356 748 355 744.2 359.8"/>
+      </g>
+    </g>
+
+    <g class="mono">
+      <g class="key" font-size="22" font-weight="600">
+        <text x="796" y="105">kite build</text>
+        <text x="796" y="225">kite run</text>
+        <text x="796" y="345">kite publish --all --push</text>
+      </g>
+      <g class="muted" font-size="19">
+        <text x="796" y="137">→ public/posts/…/index.html</text>
+        <text x="796" y="257">→ localhost:1717 · /admin/</text>
+        <text x="796" y="377">→ git commit · git push</text>
+      </g>
+    </g>
+  </g>
+</svg>
