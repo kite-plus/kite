@@ -22,7 +22,9 @@ jobs:
   # the publish step depends on it.
   verify:
     name: Verify
-    runs-on: ubuntu-latest
+    # Pinned for the same reason as in ci.yml: a floating runner image
+    # would make the same tag build differently over time.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -67,7 +69,7 @@ jobs:
   release:
     name: Release
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
