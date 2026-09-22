@@ -84,6 +84,13 @@ type Page interface {
 
 	Params() map[string]any
 	Terms(taxonomy string) []Term
+
+	// Prev and Next are the neighbors of a single page among the items of its
+	// own kind, by publish date: Prev is the older one, Next the newer. Each
+	// is nil at its end of the run, and both are on a page that is listed
+	// rather than rendered. Neighbors carry what a listed page carries.
+	Prev() Page
+	Next() Page
 }
 
 // Heading is one table-of-contents entry.

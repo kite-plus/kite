@@ -265,6 +265,12 @@ func (s *Server) preview(ctx context.Context, item *content.Content) ([]byte, er
 		URL:  current.Resolver.For(item),
 		Item: item,
 	}
+	// A saved item keeps the neighbors the plan gave it. They come from where
+	// it sits among the others, which editing its text does not move; a draft
+	// that changes its date sees the new ones once it is saved.
+	if planned, ok := s.router.planned(item.ID); ok {
+		target.Prev, target.Next = planned.Prev, planned.Next
+	}
 	html, _, err := builder.Render(ctx, target, nil)
 	return html, err
 }

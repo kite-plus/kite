@@ -1,0 +1,13 @@
+{{- /* Runs before the first paint, so a reader who chose dark never sees a
+       flash of light. Without a stored choice the stylesheet follows the
+       system on its own. */ -}}
+<script>
+  (function () {
+    try {
+      var choice = localStorage.getItem("kite-theme");
+      if (choice === "light" || choice === "dark") {
+        document.documentElement.setAttribute("data-theme", choice);
+      }
+    } catch (e) {}
+  })();
+</script>

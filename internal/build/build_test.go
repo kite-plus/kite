@@ -209,6 +209,56 @@ func TestPaginationSplitsListings(t *testing.T) {
 	}
 }
 
+// A post links to the one published before it and the one after, and a page
+// stays out of that run: the neighbors of an essay are essays.
+func TestSinglePagesKnowTheirNeighbors(t *testing.T) {
+	f := newFixture(t, 3) // post-02 is newest, post-00 oldest
+
+	about := filepath.Join(f.root, "content", "pages", "about.md")
+	if err := os.MkdirAll(filepath.Dir(about), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ900\ntitle: About\nslug: about\nstatus: published\npublished_at: 2026-01-10T00:00:00Z\n---\n\nAbout.\n"
+	if err := os.WriteFile(about, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ix, err := index.Open(f.root, f.types)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ix.Close()
+	if _, err := ix.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	f.reader = reader.New(ix.DB())
+
+	f.run(t, f.out, nil)
+
+	for _, tc := range []struct {
+		file       string
+		prev, next string // links the page must and must not carry
+		absent     []string
+	}{
+		{"posts/post-02/index.html", "/posts/post-01/", "", []string{`rel="next"`, "/about/"}},
+		{"posts/post-01/index.html", "/posts/post-00/", "/posts/post-02/", []string{"/about/"}},
+		{"posts/post-00/index.html", "", "/posts/post-01/", []string{`rel="prev"`, "/about/"}},
+		{"about/index.html", "", "", []string{`rel="prev"`, `rel="next"`}},
+	} {
+		page := readFile(t, f.out, tc.file)
+		if tc.prev != "" && !strings.Contains(page, `rel="prev" href="`+tc.prev+`"`) {
+			t.Errorf("%s: does not link to the older post %s", tc.file, tc.prev)
+		}
+		if tc.next != "" && !strings.Contains(page, `rel="next" href="`+tc.next+`"`) {
+			t.Errorf("%s: does not link to the newer post %s", tc.file, tc.next)
+		}
+		for _, no := range tc.absent {
+			if strings.Contains(page, no) {
+				t.Errorf("%s: must not contain %s", tc.file, no)
+			}
+		}
+	}
+}
+
 func TestDraftsAreExcludedUnlessRequested(t *testing.T) {
 	f := newFixture(t, 3)
 	draft := filepath.Join(f.root, "content", "posts", "hidden", "index.md")

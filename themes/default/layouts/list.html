@@ -1,5 +1,41 @@
 {{ define "main" }}
-  <h1>{{ with .Page.Title }}{{ . }}{{ else }}{{ .Site.Title }}{{ end }}</h1>
-  {{ partial "post-list.html" . }}
+  {{- $lang := .Site.Language }}
+  {{- $site := .Site }}
+  {{- $pages := .Pages }}
+  <header class="heading">
+    <h1>{{ partial "t.html" (dict "k" "title" "lang" $lang "page" .Page) }}</h1>
+    {{ with .Paginator }}<span class="count">{{ partial "t.html" (dict "k" "total" "lang" $lang "n" .TotalItems) }}</span>{{ end }}
+    {{- /* A taxonomy with no terms has no page of its own, so one is linked
+           only once an entry listed here is seen to use it. */ -}}
+    <span class="browse">
+      {{- range .Site.Taxonomies }}
+        {{- $taxonomy := . }}
+        {{- $used := false }}
+        {{- range $pages }}{{ if .Terms $taxonomy }}{{ $used = true }}{{ end }}{{ end }}
+        {{- if $used }}
+      <a href="/{{ $taxonomy }}/">{{ partial "t.html" (dict "k" "taxonomy" "lang" $lang "x" $taxonomy) }}</a>
+        {{- end }}
+      {{- end }}
+    </span>
+  </header>
+  <div class="archive">
+    {{- $year := 0 }}
+    {{- range $pages }}
+      {{- $y := time.Year .PublishDate }}
+      {{- if ne $y $year }}
+    <h2>{{ partial "t.html" (dict "k" "year" "lang" $lang "n" $y) }}</h2>
+        {{- $year = $y }}
+      {{- end }}
+    <div class="entry">
+      <time datetime="{{ time.Format "2006-01-02" .PublishDate }}">{{ partial "t.html" (dict "k" "date" "lang" $lang "t" .PublishDate) }}</time>
+      <a class="title" href="{{ .RelPermalink }}">{{ .Title }}</a>
+      {{- with partial "terms.html" (dict "page" . "site" $site) }}
+      <span class="filed-in">{{ . }}</span>
+      {{- end }}
+    </div>
+    {{- else }}
+    <p class="empty">{{ partial "t.html" (dict "k" "empty" "lang" $lang) }}</p>
+    {{- end }}
+  </div>
   {{ partial "pagination.html" . }}
 {{ end }}

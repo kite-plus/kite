@@ -12,9 +12,14 @@ import (
 	"github.com/kite-plus/kite/internal/render/url"
 )
 
-// wordsPerMinute is the reading speed behind Page.ReadingTime. It is a
-// convention, not a measurement.
-const wordsPerMinute = 220
+// wordsPerMinute and cjkPerMinute are the reading speeds behind
+// Page.ReadingTime. They are conventions, not measurements. CJK characters get
+// a pace of their own because each one is counted as a word, and a reader
+// covers far more of them in a minute than spaced words.
+const (
+	wordsPerMinute = 220
+	cjkPerMinute   = 400
+)
 
 // SiteInfo is the static description of a site, supplied once per build or per
 // server start.
@@ -59,11 +64,12 @@ func (h headingModel) ID() string   { return h.h.ID }
 func (h headingModel) Text() string { return h.h.Text }
 
 type pageModel struct {
-	item     *content.Content
-	kind     Kind
-	doc      *markdown.Document
-	resolver *url.Resolver
-	terms    map[string][]Term
+	item       *content.Content
+	kind       Kind
+	doc        *markdown.Document
+	resolver   *url.Resolver
+	terms      map[string][]Term
+	prev, next Page
 }
 
 // PageOptions carries what a page needs beyond the stored item.
@@ -72,6 +78,10 @@ type PageOptions struct {
 	Rendered *markdown.Document
 	Resolver *url.Resolver
 	Terms    map[string][]Term
+
+	// Prev and Next are the neighbors of a single page, nil where there is
+	// none.
+	Prev, Next Page
 }
 
 // NewPage returns the Page view of a stored item.
@@ -85,6 +95,8 @@ func NewPage(item *content.Content, opts PageOptions) Page {
 		doc:      opts.Rendered,
 		resolver: opts.Resolver,
 		terms:    opts.Terms,
+		prev:     opts.Prev,
+		next:     opts.Next,
 	}
 }
 
@@ -151,7 +163,16 @@ func (p *pageModel) WordCount() int {
 }
 
 func (p *pageModel) ReadingTime() time.Duration {
-	minutes := max(1, (p.WordCount()+wordsPerMinute-1)/wordsPerMinute)
+	if p.doc == nil {
+		return time.Minute
+	}
+	cjk := p.doc.CJKCount
+	spaced := p.doc.WordCount - cjk
+
+	// Both paces over one denominator, rounded up, so the sum stays in
+	// integers.
+	const whole = wordsPerMinute * cjkPerMinute
+	minutes := max(1, (spaced*cjkPerMinute+cjk*wordsPerMinute+whole-1)/whole)
 	return time.Duration(minutes) * time.Minute
 }
 
@@ -169,6 +190,11 @@ func (p *pageModel) Draft() bool            { return p.item.Status == content.St
 func (p *pageModel) Params() map[string]any { return maps.Clone(p.item.Meta) }
 
 func (p *pageModel) Terms(taxonomy string) []Term { return p.terms[taxonomy] }
+
+// The fields are interfaces, so a missing neighbor is an untyped nil and
+// {{ with .Page.Next }} skips it.
+func (p *pageModel) Prev() Page { return p.prev }
+func (p *pageModel) Next() Page { return p.next }
 
 type termModel struct {
 	taxonomy string

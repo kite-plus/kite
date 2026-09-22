@@ -1,9 +1,9 @@
 name: default
 title: Kite Default
-version: 0.1.0
+version: 0.2.0
 apiVersion: kite/v1
 requires: ">=0.1.0 <2.0.0"
-description: The theme Kite ships with. Readable, dependency free, dark mode aware.
+description: The theme Kite ships with. Quiet serif typography for personal writing, dependency free, light and dark.
 license: Apache-2.0
 
 capabilities: [static, dynamic]
@@ -14,11 +14,31 @@ settings:
   - key: accent
     type: color
     label: Accent colour
-    default: "#2563eb"
+    help: "Links and marks. The theme was drawn with #7d5c3c; #4f6b52, #a3473b and #46617c sit well beside it."
+    default: "#7d5c3c"
+  - key: show_summary
+    type: boolean
+    label: Show a summary under each title on the home page
+    default: true
   - key: show_toc
     type: boolean
     label: Show a table of contents on posts
     default: true
+  - key: show_word_count
+    type: boolean
+    label: Show the word count and reading time on posts
+    default: true
+  - key: nav
+    type: text
+    label: Extra navigation links
+    help: One per line, written as "Label | /path/". They follow the home page and the archive.
+    placeholder: About | /about/
+    default: ""
+  - key: font_stylesheet
+    type: string
+    label: Web font stylesheet
+    help: Address of a stylesheet that provides Noto Serif SC, from a font service or a copy you host. Left empty, the theme uses the serif fonts already on the reader's device and asks nothing of a third party.
+    default: ""
   - key: footer_text
     type: string
     label: Footer text

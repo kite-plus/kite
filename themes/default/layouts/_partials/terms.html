@@ -1,0 +1,12 @@
+{{- /* The terms of one page across every taxonomy, as links.
+       Called as: partial "terms.html" (dict "page" PAGE "site" .Site). */ -}}
+{{- $page := .page -}}
+{{- $sep := partial "t.html" (dict "k" "sep" "lang" .site.Language) -}}
+{{- $more := false -}}
+{{- range .site.Taxonomies }}
+  {{- range $page.Terms . }}
+    {{- if $more }}{{ $sep }}{{ end -}}
+    <a href="{{ .RelPermalink }}">{{ .Name }}</a>
+    {{- $more = true }}
+  {{- end }}
+{{- end -}}

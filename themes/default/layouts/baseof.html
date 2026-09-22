@@ -3,15 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ with .Page }}{{ with .Title }}{{ . }} · {{ end }}{{ end }}{{ .Site.Title }}</title>
-  {{ with .Page }}<meta name="description" content="{{ .Description }}">{{ end }}
-  <link rel="alternate" type="application/rss+xml" href="/rss.xml">
+  {{- $title := "" }}
+  {{- with .Page }}{{ $title = partial "t.html" (dict "k" "title" "lang" $.Site.Language "page" .) }}{{ end }}
+  <title>{{ with $title }}{{ . }} · {{ end }}{{ .Site.Title }}</title>
+  {{- $description := .Site.Description }}
+  {{- with .Page }}{{ with .Description }}{{ $description = . }}{{ end }}{{ end }}
+  {{ with $description }}<meta name="description" content="{{ . }}">{{ end }}
+  <link rel="alternate" type="application/rss+xml" title="{{ .Site.Title }}" href="/rss.xml">
+  {{ partial "theme-init.html" . }}
   {{ partial "style.html" . }}
+  {{- with .Site.ThemeSettings.font_stylesheet }}
+  <link rel="stylesheet" href="{{ . }}" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="{{ . }}"></noscript>
+  {{- end }}
   {{ block "head" . }}{{ end }}
 </head>
 <body>
+  <a class="skip" href="#main">{{ partial "t.html" (dict "k" "skip" "lang" .Site.Language) }}</a>
   {{ partial "header.html" . }}
-  <main>{{ block "main" . }}{{ end }}</main>
+  <main id="main">{{ block "main" . }}{{ end }}</main>
   {{ partial "footer.html" . }}
+  {{ partial "theme-toggle.html" . }}
 </body>
 </html>

@@ -124,6 +124,27 @@ Second paragraph here.
 	}
 }
 
+// A Chinese paragraph has no spaces, so counting fields called a whole article
+// a handful of words and every post a one minute read.
+func TestWordCountCountsCJKCharacters(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		src        string
+		words, cjk int
+	}{
+		{"chinese", "湖边的桂花开了，比去年早了差不多一周。", 17, 17},
+		{"mixed", "用 kite build 一条命令就能重新发布。", 13, 11},
+		{"japanese", "これはテストです。", 8, 8},
+		{"contraction", "Don't count the apostrophe, or the dash - at all.", 9, 0},
+	} {
+		doc := render(t, tc.src, nil)
+		if doc.WordCount != tc.words || doc.CJKCount != tc.cjk {
+			t.Errorf("%s: WordCount, CJKCount = %d, %d, want %d, %d",
+				tc.name, doc.WordCount, doc.CJKCount, tc.words, tc.cjk)
+		}
+	}
+}
+
 func TestExcerptIsTruncated(t *testing.T) {
 	doc := render(t, strings.Repeat("word ", 200), nil)
 	if len([]rune(doc.Excerpt)) > 201 {

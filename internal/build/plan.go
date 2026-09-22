@@ -26,6 +26,13 @@ type Target struct {
 	// Item is set for single pages.
 	Item *content.Content
 
+	// Prev and Next are a single page's neighbors among the items of its own
+	// kind and locale: the one published before it and the one after. They
+	// are decided here rather than while rendering for the same reason a
+	// listing's items are: a server renders one target at a time and must
+	// arrive at the neighbors a build would.
+	Prev, Next *content.Summary
+
 	// Type is the content type for single and list pages, or the taxonomy name
 	// for taxonomy and term pages.
 	Type string

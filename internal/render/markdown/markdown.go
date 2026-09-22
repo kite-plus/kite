@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"unicode"
 
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/yuin/goldmark"
@@ -66,6 +67,11 @@ type Document struct {
 	Links     []string
 	Images    []string
 	WordCount int
+
+	// CJKCount is how many of the words are single CJK characters. They are
+	// read at a different pace than spaced words, so a reading time needs
+	// the two apart.
+	CJKCount int
 }
 
 // Renderer turns markdown into HTML.
@@ -149,7 +155,9 @@ func collect(root ast.Node, src []byte, doc *Document) error {
 			doc.Images = append(doc.Images, string(node.Destination))
 		case *ast.Paragraph:
 			text := strings.TrimSpace(plainText(node, src))
-			doc.WordCount += len(strings.Fields(text))
+			words, cjk := countWords(text)
+			doc.WordCount += words
+			doc.CJKCount += cjk
 			if doc.Excerpt == "" && text != "" {
 				doc.Excerpt = truncate(text, 200)
 			}
@@ -192,6 +200,32 @@ func plainText(n ast.Node, src []byte) string {
 		return ast.WalkContinue, nil
 	})
 	return b.String()
+}
+
+// countWords counts words, and how many of them are CJK characters.
+//
+// Splitting on spaces alone counts a whole Chinese paragraph as one word,
+// because those scripts put no spaces between words. Each CJK character is
+// counted on its own instead, which is also how their writers measure length.
+// Punctuation neither starts a word nor ends one, so "don't" stays one word
+// and a full-width comma is not counted as one.
+func countWords(s string) (words, cjk int) {
+	inWord := false
+	for _, r := range s {
+		switch {
+		case unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul):
+			cjk++
+			inWord = false
+		case unicode.IsSpace(r):
+			inWord = false
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			if !inWord {
+				words++
+				inWord = true
+			}
+		}
+	}
+	return words + cjk, cjk
 }
 
 func truncate(s string, limit int) string {

@@ -1,4 +1,7 @@
 {{ define "main" }}
-  <h1>Not found</h1>
-  <p>That page does not exist. <a href="/">Back to the start</a>.</p>
+  {{- $lang := .Site.Language }}
+  <header class="heading">
+    <h1>{{ partial "t.html" (dict "k" "notfound" "lang" $lang) }}</h1>
+  </header>
+  <p class="lost">{{ partial "t.html" (dict "k" "notfound_body" "lang" $lang) }} <a href="/">{{ partial "t.html" (dict "k" "back" "lang" $lang) }}</a></p>
 {{ end }}

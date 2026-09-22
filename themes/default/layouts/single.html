@@ -1,12 +1,30 @@
 {{ define "main" }}
+  {{- $lang := .Site.Language }}
+  {{- $site := .Site }}
+  {{- $settings := .Site.ThemeSettings }}
+  {{- with .Page }}
+  <p class="back"><a href="/">← {{ partial "t.html" (dict "k" "back" "lang" $lang) }}</a></p>
   <article>
     <header>
-      <h1>{{ .Page.Title }}</h1>
-      {{ partial "meta.html" .Page }}
+      <h1>{{ .Title }}</h1>
+      <p class="meta">
+        <time datetime="{{ time.Format "2006-01-02" .PublishDate }}">{{ partial "t.html" (dict "k" "date_full" "lang" $lang "t" .PublishDate) }}</time>
+        {{- with partial "terms.html" (dict "page" . "site" $site) }} · <span class="filed-in">{{ . }}</span>{{ end }}
+        {{- if $settings.show_word_count }} · {{ partial "t.html" (dict "k" "words" "lang" $lang "n" .WordCount) }} · {{ partial "t.html" (dict "k" "minutes" "lang" $lang "n" (time.Minutes .ReadingTime)) }}{{ end }}
+      </p>
     </header>
-    {{ if and .Site.ThemeSettings.show_toc .Page.TableOfContents }}
-      {{ partial "toc.html" .Page }}
-    {{ end }}
-    <div class="content">{{ .Page.Content }}</div>
+    {{- if $settings.show_toc }}{{ partial "toc.html" (dict "page" . "site" $site) }}{{ end }}
+    <div class="content">{{ .Content }}</div>
   </article>
+  {{- if or .Prev .Next }}
+  <nav class="neighbors">
+    {{- with .Prev }}
+    <a class="prev" rel="prev" href="{{ .RelPermalink }}"><span class="direction">{{ partial "t.html" (dict "k" "prev" "lang" $lang) }}</span>{{ .Title }}</a>
+    {{- end }}
+    {{- with .Next }}
+    <a class="next" rel="next" href="{{ .RelPermalink }}"><span class="direction">{{ partial "t.html" (dict "k" "next" "lang" $lang) }}</span>{{ .Title }}</a>
+    {{- end }}
+  </nav>
+  {{- end }}
+  {{- end }}
 {{ end }}

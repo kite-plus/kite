@@ -56,7 +56,8 @@ func (b *Builder) loadAll(ctx context.Context) ([]content.Summary, error) {
 }
 
 func (b *Builder) planSingles(ctx context.Context, p *Plan, all []content.Summary) error {
-	for _, s := range all {
+	prev, next := neighbors(all)
+	for i, s := range all {
 		item, err := b.opts.Reader.Get(ctx, s.ID)
 		if err != nil {
 			return fmt.Errorf("build: load %s: %w", s.ID, err)
@@ -67,10 +68,35 @@ func (b *Builder) planSingles(ctx context.Context, p *Plan, all []content.Summar
 			URL:  link,
 			Path: b.opts.Resolver.OutputPath(link),
 			Item: item,
+			Prev: prev[i],
+			Next: next[i],
 			Type: string(item.Kind),
 		})
 	}
 	return nil
+}
+
+// neighbors finds, for every item, the one published before it and the one
+// after it among the items of the same kind and locale. The input is newest
+// first, so the older neighbor is the one that follows.
+func neighbors(all []content.Summary) (prev, next []*content.Summary) {
+	type run struct {
+		kind   content.Kind
+		locale string
+	}
+	prev = make([]*content.Summary, len(all))
+	next = make([]*content.Summary, len(all))
+
+	newer := make(map[run]int)
+	for i, s := range all {
+		key := run{kind: s.Kind, locale: s.Locale}
+		if j, ok := newer[key]; ok {
+			next[i] = &all[j]
+			prev[j] = &all[i]
+		}
+		newer[key] = i
+	}
+	return prev, next
 }
 
 func (b *Builder) planHome(p *Plan, all []content.Summary) {

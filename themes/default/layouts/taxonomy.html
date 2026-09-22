@@ -1,8 +1,11 @@
 {{ define "main" }}
-  <h1>{{ .Page.Title }}</h1>
+  {{- $lang := .Site.Language }}
+  <header class="heading">
+    <h1>{{ partial "t.html" (dict "k" "title" "lang" $lang "page" .Page) }}</h1>
+  </header>
   <ul class="terms">
-    {{ range .Terms }}
-      <li><a href="{{ .RelPermalink }}">{{ .Name }}</a> <span class="count">{{ .Count }}</span></li>
-    {{ end }}
+    {{- range .Terms }}
+    <li><a href="{{ .RelPermalink }}">{{ .Name }}</a><span class="count">{{ .Count }}</span></li>
+    {{- end }}
   </ul>
 {{ end }}

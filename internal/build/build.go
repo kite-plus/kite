@@ -343,30 +343,45 @@ func (b *Builder) pages(ctx context.Context, out *Context, t Target) (render.Pag
 		}
 		out.Read(Node{Kind: NodeContent, ID: string(t.Item.ID)}, string(t.Item.Revision),
 			"title", "slug", "body", "params", "published_at", "updated_at", "taxonomies")
-		page = render.NewPage(t.Item, render.PageOptions{
+		opts := render.PageOptions{
 			Kind:     t.Kind,
 			Rendered: doc,
 			Resolver: b.opts.Resolver,
 			Terms:    b.termsOf(t.Item),
-		})
+		}
+		// Assigned only when present: a nil *Summary stored in the interface
+		// field would not be nil to a template.
+		if t.Prev != nil {
+			opts.Prev = b.listedPage(out, *t.Prev)
+		}
+		if t.Next != nil {
+			opts.Next = b.listedPage(out, *t.Next)
+		}
+		page = render.NewPage(t.Item, opts)
 	} else if t.Kind != render.KindSingle {
 		page = b.listingPage(t)
 	}
 
 	listed := make([]render.Page, 0, len(t.Items))
 	for _, s := range t.Items {
-		// A listing reads only this projection of each item, so editing a body
-		// does not invalidate the pages that merely link to it.
-		out.Read(Node{Kind: NodeContent, ID: string(s.ID)}, string(s.Revision),
-			"title", "slug", "excerpt", "published_at", "taxonomies")
-		listed = append(listed, render.NewPage(summaryToContent(s), render.PageOptions{
-			Kind:     render.KindSingle,
-			Rendered: &markdown.Document{Excerpt: s.Excerpt},
-			Resolver: b.opts.Resolver,
-			Terms:    b.termsOfMap(s.Taxonomies),
-		}))
+		listed = append(listed, b.listedPage(out, s))
 	}
 	return page, listed, nil
+}
+
+// listedPage is the Page of an item that another page links to: an entry in a
+// listing, or a neighbor of a single page.
+func (b *Builder) listedPage(out *Context, s content.Summary) render.Page {
+	// Only this projection of the item is read, so editing a body does not
+	// invalidate the pages that merely link to it.
+	out.Read(Node{Kind: NodeContent, ID: string(s.ID)}, string(s.Revision),
+		"title", "slug", "excerpt", "published_at", "taxonomies")
+	return render.NewPage(summaryToContent(s), render.PageOptions{
+		Kind:     render.KindSingle,
+		Rendered: &markdown.Document{Excerpt: s.Excerpt},
+		Resolver: b.opts.Resolver,
+		Terms:    b.termsOfMap(s.Taxonomies),
+	})
 }
 
 // renderBody runs the markdown pipeline with the markdown hooks around it.

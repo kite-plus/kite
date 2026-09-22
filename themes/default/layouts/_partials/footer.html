@@ -1,4 +1,8 @@
+{{- $lang := .Site.Language -}}
 <footer class="site">
-  {{ with .Site.ThemeSettings.footer_text }}<p>{{ . }}</p>{{ end }}
-  <p class="copyright">{{ with .Site.ThemeSettings.copyright }}{{ . }}{{ else }}&copy; {{ time.Format "2006" .Site.BuildTime }} {{ .Site.Title }}{{ end }}</p>
+  <div class="colophon">
+    {{ with .Site.ThemeSettings.footer_text }}<p class="note">{{ . }}</p>{{ end }}
+    <span class="copyright">{{ with .Site.ThemeSettings.copyright }}{{ . }}{{ else }}&copy; {{ time.Format "2006" .Site.BuildTime }} {{ .Site.Title }}{{ end }}</span>
+    <span class="credit"><a href="/rss.xml">RSS</a> · {{ partial "t.html" (dict "k" "powered_pre" "lang" $lang) }}<a href="https://github.com/kite-plus/kite" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 64 64" aria-hidden="true"><g fill="currentColor" stroke="currentColor" stroke-width="5" stroke-linejoin="round" transform="translate(32 32) scale(0.82) translate(-32 -32)"><path d="M10 14.5 L27 21 L27 30 L10 23.5 Z"/><path d="M10 32 L27 38.5 L27 49 L10 42.5 Z"/><path d="M37 21 L54 14.5 L54 42.5 L37 49 Z"/></g></svg>Kite</a>{{ partial "t.html" (dict "k" "powered_post" "lang" $lang) }}</span>
+  </div>
 </footer>

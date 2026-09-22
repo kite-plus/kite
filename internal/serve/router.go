@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/kite-plus/kite/internal/build"
+	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render"
 )
 
@@ -17,6 +18,7 @@ import (
 type router struct {
 	mu       sync.RWMutex
 	byURL    map[string]build.Target
+	byItem   map[content.ID]build.Target
 	notFound *build.Target
 
 	// media maps an output path to the file inside a page bundle it is read
@@ -46,6 +48,7 @@ func (r *router) bundleFile(p string) (string, bool) {
 // load replaces the routing table from a plan.
 func (r *router) load(p *build.Plan) {
 	byURL := make(map[string]build.Target, p.Len())
+	byItem := make(map[content.ID]build.Target)
 	var notFound *build.Target
 
 	for _, t := range p.Targets {
@@ -55,11 +58,23 @@ func (r *router) load(p *build.Plan) {
 			continue
 		}
 		byURL[normalize(t.URL)] = t
+		if t.Kind == render.KindSingle && t.Item != nil {
+			byItem[t.Item.ID] = t
+		}
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.byURL, r.notFound = byURL, notFound
+	r.byURL, r.byItem, r.notFound = byURL, byItem, notFound
+}
+
+// planned returns the target the plan holds for an item, whatever address a
+// draft of it would now be given.
+func (r *router) planned(id content.ID) (build.Target, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	t, ok := r.byItem[id]
+	return t, ok
 }
 
 // lookup resolves a request path.

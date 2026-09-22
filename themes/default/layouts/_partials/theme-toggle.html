@@ -1,0 +1,19 @@
+{{- /* The button ships hidden and is revealed here, so a reader without
+       scripts is not shown a control that does nothing. */ -}}
+<script>
+  (function () {
+    var root = document.documentElement;
+    var button = document.getElementById("theme-toggle");
+    if (!button) return;
+    button.hidden = false;
+    button.addEventListener("click", function () {
+      var current = root.getAttribute("data-theme");
+      if (!current) {
+        current = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      var next = current === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("kite-theme", next); } catch (e) {}
+    });
+  })();
+</script>

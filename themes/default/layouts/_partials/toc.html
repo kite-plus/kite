@@ -1,7 +1,21 @@
+{{- /* The sections of a post on one line.
+       Called as: partial "toc.html" (dict "page" PAGE "site" .Site).
+
+       Only the top two heading levels are listed, and only when there are at
+       least two of them: a contents line with one entry helps nobody. The
+       count is a float because that is what math.Add returns. */ -}}
+{{- $count := 0.0 -}}
+{{- range .page.TableOfContents }}{{ if and .ID (le .Level 2) }}{{ $count = math.Add $count 1 }}{{ end }}{{ end -}}
+{{- if ge $count 2.0 }}
 <nav class="toc">
-  <ol>
-    {{ range .TableOfContents }}
-      {{ if le .Level 3 }}<li class="lvl{{ .Level }}"><a href="#{{ .ID }}">{{ .Text }}</a></li>{{ end }}
-    {{ end }}
-  </ol>
+  {{- partial "t.html" (dict "k" "toc" "lang" .site.Language) }}
+  {{- $more := false }}
+  {{- range .page.TableOfContents }}
+    {{- if and .ID (le .Level 2) }}
+      {{- if $more }} / {{ end -}}
+      <a href="#{{ .ID }}">{{ .Text }}</a>
+      {{- $more = true }}
+    {{- end }}
+  {{- end }}
 </nav>
+{{- end }}

@@ -1,0 +1,51 @@
+{{- /*
+  Every word the theme itself says, in one place.
+
+  Called as: partial "t.html" (dict "k" KEY "lang" .Site.Language ...), with
+  "n" for a number, "x" for a name, "t" for a time and "page" for a page where
+  a key needs one. A site language starting with "zh" reads Chinese; any other
+  reads English. A site can translate the theme by overriding this one file.
+*/ -}}
+{{- $zh := str.HasPrefix "zh" (str.Lower .lang) -}}
+{{- if eq .k "home" }}{{ if $zh }}首页{{ else }}Home{{ end }}
+{{- else if eq .k "archive" }}{{ if $zh }}归档{{ else }}Posts{{ end }}
+{{- else if eq .k "recent" }}{{ if $zh }}最近文章{{ else }}Recent posts{{ end }}
+{{- else if eq .k "skip" }}{{ if $zh }}跳到正文{{ else }}Skip to content{{ end }}
+{{- else if eq .k "toggle" }}{{ if $zh }}切换深浅色{{ else }}Switch between light and dark{{ end }}
+{{- else if eq .k "back" }}{{ if $zh }}返回首页{{ else }}Back home{{ end }}
+{{- else if eq .k "toc" }}{{ if $zh }}目录：{{ else }}Contents: {{ end }}
+{{- else if eq .k "prev" }}{{ if $zh }}上一篇{{ else }}Previous{{ end }}
+{{- else if eq .k "next" }}{{ if $zh }}下一篇{{ else }}Next{{ end }}
+{{- else if eq .k "newer" }}{{ if $zh }}较新{{ else }}Newer{{ end }}
+{{- else if eq .k "older" }}{{ if $zh }}较旧{{ else }}Older{{ end }}
+{{- else if eq .k "sep" }}{{ if $zh }}、{{ else }}, {{ end }}
+{{- else if eq .k "words" }}{{ if $zh }}{{ .n }} 字{{ else }}{{ .n }} words{{ end }}
+{{- else if eq .k "minutes" }}{{ if $zh }}约 {{ .n }} 分钟{{ else }}{{ .n }} min read{{ end }}
+{{- else if eq .k "total" }}{{ if $zh }}共 {{ .n }} 篇{{ else if eq .n 1 }}1 post{{ else }}{{ .n }} posts{{ end }}
+{{- else if eq .k "year" }}{{ if $zh }}{{ .n }} 年{{ else }}{{ .n }}{{ end }}
+{{- else if eq .k "date" }}{{ if $zh }}{{ time.Format "1 月 2 日" .t }}{{ else }}{{ time.Format "Jan 2" .t }}{{ end }}
+{{- else if eq .k "date_full" }}{{ if $zh }}{{ time.Format "2006 年 1 月 2 日" .t }}{{ else }}{{ time.Format "January 2, 2006" .t }}{{ end }}
+{{- else if eq .k "filed" }}{{ if $zh }}收录于「<span class="term">{{ .x }}</span>」{{ else }}Filed under “<span class="term">{{ .x }}</span>”{{ end }}
+{{- else if eq .k "clear" }}{{ if $zh }}清除{{ else }}Clear{{ end }}
+{{- else if eq .k "empty" }}{{ if $zh }}这里还没有文章。{{ else }}Nothing here yet.{{ end }}
+{{- else if eq .k "notfound" }}{{ if $zh }}页面不存在{{ else }}Not found{{ end }}
+{{- else if eq .k "notfound_body" }}{{ if $zh }}这个地址下没有内容。{{ else }}That page does not exist.{{ end }}
+{{- else if eq .k "powered_pre" }}{{ if $zh }}由 {{ else }}Powered by {{ end }}
+{{- else if eq .k "powered_post" }}{{ if $zh }} 驱动{{ end }}
+{{- else if eq .k "taxonomy" }}
+  {{- if not $zh }}{{ str.Title .x }}
+  {{- else if eq .x "tags" }}标签
+  {{- else if eq .x "categories" }}分类
+  {{- else }}{{ .x }}{{ end }}
+{{- else if eq .k "title" }}
+  {{- /* What a page calls itself. Kite names listings in English, so a
+         Chinese site renames the ones it knows and keeps the rest. */ -}}
+  {{- $kind := printf "%s" .page.Kind -}}
+  {{- if not $zh }}{{ .page.Title }}
+  {{- else if eq $kind "404" }}页面不存在
+  {{- else if and (eq $kind "list") (eq .page.Type "post") }}归档
+  {{- else if and (eq $kind "list") (eq .page.Type "page") }}页面
+  {{- else if and (eq $kind "taxonomy") (eq .page.Type "tags") }}标签
+  {{- else if and (eq $kind "taxonomy") (eq .page.Type "categories") }}分类
+  {{- else }}{{ .page.Title }}{{ end }}
+{{- end -}}

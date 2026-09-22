@@ -1,11 +1,27 @@
-<ul class="posts">
-  {{ range .Pages }}
-    <li>
-      <a class="title" href="{{ .RelPermalink }}">{{ .Title }}</a>
-      {{ partial "meta.html" . }}
-      {{ with .Excerpt }}<p class="excerpt">{{ . }}</p>{{ end }}
-    </li>
-  {{ else }}
-    <li class="empty">Nothing here yet.</li>
-  {{ end }}
-</ul>
+{{- $lang := .Site.Language -}}
+{{- $site := .Site -}}
+{{- $summary := .Site.ThemeSettings.show_summary -}}
+{{- $thisYear := time.Year .Site.BuildTime -}}
+<div class="posts">
+  {{- range .Pages }}
+  <article class="post">
+    <time datetime="{{ time.Format "2006-01-02" .PublishDate }}">
+      {{- partial "t.html" (dict "k" "date" "lang" $lang "t" .PublishDate) }}
+      {{- /* A date with no year reads as this year, so an older one says so. */ -}}
+      {{- $year := time.Year .PublishDate }}
+      {{- if ne $year $thisYear }}<span class="year">{{ $year }}</span>{{ end -}}
+    </time>
+    <div>
+      <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+      {{- if $summary }}{{ with .Excerpt }}
+      <p class="summary">{{ . }}</p>
+      {{- end }}{{ end }}
+      {{- with partial "terms.html" (dict "page" . "site" $site) }}
+      <p class="filed-in">{{ . }}</p>
+      {{- end }}
+    </div>
+  </article>
+  {{- else }}
+  <p class="empty">{{ partial "t.html" (dict "k" "empty" "lang" $lang) }}</p>
+  {{- end }}
+</div>

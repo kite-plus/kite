@@ -1,6 +1,5 @@
 {{ define "main" }}
-  <h1>{{ .Site.Title }}</h1>
-  {{ with .Site.Description }}<p class="lede">{{ . }}</p>{{ end }}
+  <h1 class="label">{{ partial "t.html" (dict "k" "recent" "lang" .Site.Language) }}</h1>
   {{ partial "post-list.html" . }}
   {{ partial "pagination.html" . }}
 {{ end }}
