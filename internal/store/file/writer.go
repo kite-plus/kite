@@ -135,21 +135,8 @@ func (w *Writer) putContent(op content.PutContent, located map[content.ID]*Entry
 	if item.ID == "" {
 		item.ID = content.NewID()
 	}
-	if item.Slug == "" {
-		item.Slug = Slugify(item.Title)
-	}
-	// The ID identifies the item, but the locator is its physical address. Both
-	// are consulted: a known ID wins, and a caller-supplied locator covers the
-	// case of adopting a file that exists but carries no ID yet.
-	if e := located[item.ID]; e != nil {
-		item.Locator = e.Locator
-	}
-	if item.Locator == "" {
-		key, err := w.freeKey(t, item.Slug)
-		if err != nil {
-			return err
-		}
-		item.Locator = LocatorFor(t, key)
+	if err := w.settle(t, item, located); err != nil {
+		return err
 	}
 
 	src := SourcePath(t, item.Locator)
@@ -372,22 +359,17 @@ func (w *Writer) putSettings(op content.PutSettings, res *content.Result) error 
 // base name until one is free.
 func (w *Writer) freeMediaName(dir, name string) (string, error) {
 	ext := path.Ext(name)
-	base := strings.TrimSuffix(name, ext)
-
-	for n := range maxFreeNames {
-		candidate := path.Join(dir, name)
-		if n > 0 {
-			candidate = path.Join(dir, fmt.Sprintf("%s-%d%s", base, n+1, ext))
-		}
-		_, err := os.Stat(abs(w.root, candidate))
+	base, err := firstFree(strings.TrimSuffix(name, ext), func(candidate string) (bool, error) {
+		_, err := os.Stat(abs(w.root, path.Join(dir, candidate+ext)))
 		if errors.Is(err, fs.ErrNotExist) {
-			return candidate, nil
+			return true, nil
 		}
-		if err != nil {
-			return "", err
-		}
+		return false, err
+	})
+	if err != nil {
+		return "", err
 	}
-	return "", fmt.Errorf("file store: no free name for %s in %s", name, dir)
+	return path.Join(dir, base+ext), nil
 }
 
 func (w *Writer) deleteMedia(op content.DeleteMedia, located map[content.ID]*Entry, res *content.Result) error {
@@ -407,23 +389,136 @@ func (w *Writer) deleteMedia(op content.DeleteMedia, located map[content.ID]*Ent
 	return nil
 }
 
-// freeKey picks an unused bundle directory or file name for a new item.
-func (w *Writer) freeKey(t *content.Type, slug string) (string, error) {
+// untitledKey names an item whose title yields no slug at all, such as an
+// empty one or a title made only of punctuation.
+const untitledKey = "untitled"
+
+// slugKey is the uniqueness rule the read model enforces, expressed here so
+// the store can uphold it before it writes rather than after.
+type slugKey struct {
+	kind   content.Kind
+	slug   string
+	locale string
+}
+
+// takenSlugs maps every slug in the tree to the item holding it, skipping the
+// item being written so that saving an item does not collide with itself.
+func takenSlugs(located map[content.ID]*Entry, self content.ID) map[slugKey]*Entry {
+	out := make(map[slugKey]*Entry, len(located))
+	for id, e := range located {
+		if id == self {
+			continue
+		}
+		out[slugKey{e.Item.Kind, e.Item.Slug, e.Item.Locale}] = e
+	}
+	return out
+}
+
+// settle decides where an item's bytes live and what slug they carry.
+//
+// The read model requires (kind, slug, locale) to be unique, so a collision is
+// resolved here, before anything is written. Finding it afterwards would leave
+// a file on disk that the index refuses to load, and the request that wrote it
+// would report the item it had just created as missing.
+//
+// A slug the author typed is their URL, so a collision there is refused rather
+// than quietly altered. A slug Kite derives from the title is Kite's own: it
+// is suffixed until it is free, and a bundle being placed for the first time
+// takes the same suffix, so that folder, slug and URL agree.
+func (w *Writer) settle(t *content.Type, item *content.Content, located map[content.ID]*Entry) error {
+	// The ID identifies the item, but the locator is its physical address.
+	// Both are consulted: a known ID wins, and a caller-supplied locator covers
+	// the case of adopting a file that exists but carries no ID yet.
+	stored := located[item.ID]
+	if stored != nil {
+		item.Locator = stored.Locator
+	}
+
+	taken := takenSlugs(located, item.ID)
+	holder := func(slug string) content.Locator {
+		e, ok := taken[slugKey{item.Kind, slug, item.Locale}]
+		if !ok {
+			return ""
+		}
+		return e.Locator
+	}
+
+	if item.Slug != "" {
+		// A collision this write did not create must not block an unrelated
+		// edit: the file already sits there under that slug, and refusing the
+		// save would leave the author no way to change anything else about it.
+		kept := stored != nil && stored.Item.Slug == item.Slug && stored.Item.Locale == item.Locale
+		if at := holder(item.Slug); at != "" && !kept {
+			return fmt.Errorf("%w: slug %q is already used by %s", content.ErrInvalid, item.Slug, at)
+		}
+		if item.Locator == "" {
+			key, err := w.freeKey(t, item.Slug, nil)
+			if err != nil {
+				return err
+			}
+			item.Locator = LocatorFor(t, key)
+		}
+		return nil
+	}
+
+	base := Slugify(item.Title)
+	if base == "" {
+		base = untitledKey
+	}
+	free := func(slug string) bool { return holder(slug) == "" }
+
+	// An item that already has an address keeps it: slug and path are
+	// independent, and a retitled post must not move (see D2).
+	if item.Locator != "" {
+		slug, err := firstFree(base, func(s string) (bool, error) { return free(s), nil })
+		if err != nil {
+			return err
+		}
+		item.Slug = slug
+		return nil
+	}
+
+	key, err := w.freeKey(t, base, free)
+	if err != nil {
+		return err
+	}
+	item.Slug, item.Locator = key, LocatorFor(t, key)
+	return nil
+}
+
+// freeKey picks an unused bundle directory or file name for a new item. A key
+// is only free when the slug it would yield is free too, when slugFree says so.
+func (w *Writer) freeKey(t *content.Type, slug string, slugFree func(string) bool) (string, error) {
 	base := Slugify(slug)
 	if base == "" {
-		base = "untitled"
+		base = untitledKey
 	}
-	for i := range 1000 {
-		key := base
-		if i > 0 {
-			key = base + "-" + strconv.Itoa(i+1)
+	return firstFree(base, func(key string) (bool, error) {
+		if slugFree != nil && !slugFree(key) {
+			return false, nil
 		}
 		_, err := os.Stat(abs(w.root, string(LocatorFor(t, key))))
 		if errors.Is(err, fs.ErrNotExist) {
-			return key, nil
+			return true, nil
 		}
+		return false, err
+	})
+}
+
+// firstFree walks base, base-2, base-3 and so on, returning the first
+// candidate ok accepts.
+func firstFree(base string, ok func(string) (bool, error)) (string, error) {
+	for i := range maxFreeNames {
+		candidate := base
+		if i > 0 {
+			candidate = base + "-" + strconv.Itoa(i+1)
+		}
+		free, err := ok(candidate)
 		if err != nil {
 			return "", err
+		}
+		if free {
+			return candidate, nil
 		}
 	}
 	return "", fmt.Errorf("file store: no free name for %q", base)

@@ -422,10 +422,15 @@ func TestBodyLayoutIsTheFiles(t *testing.T) {
 	}
 }
 
-func TestSlugCollisionGetsSuffix(t *testing.T) {
+// The folder and the slug come from one key, so they cannot part company. A
+// second item whose folder was same-title-2 while its slug stayed same-title
+// would be written and then refused by the read model, which requires
+// (kind, slug, locale) to be unique -- leaving a file nothing can load.
+func TestSlugCollisionSuffixesFolderAndSlugTogether(t *testing.T) {
 	root, _, w := newTestProject(t)
 	ctx := t.Context()
 	var locators []content.Locator
+	var slugs []string
 	for range 2 {
 		item := &content.Content{
 			Kind:   "post",
@@ -437,15 +442,81 @@ func TestSlugCollisionGetsSuffix(t *testing.T) {
 			t.Fatalf("Apply: %v", err)
 		}
 		locators = append(locators, item.Locator)
+		slugs = append(slugs, item.Slug)
 	}
 	want := []content.Locator{"content/posts/same-title", "content/posts/same-title-2"}
 	if !slices.Equal(locators, want) {
 		t.Errorf("locators = %v, want %v", locators, want)
 	}
+	if wantSlugs := []string{"same-title", "same-title-2"}; !slices.Equal(slugs, wantSlugs) {
+		t.Errorf("slugs = %v, want %v", slugs, wantSlugs)
+	}
 	for _, loc := range want {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(string(loc)), BundleIndex)); err != nil {
 			t.Errorf("%s was not created: %v", loc, err)
 		}
+	}
+	got := readFile(t, root, "content/posts/same-title-2/"+BundleIndex)
+	if !strings.Contains(got, "slug: same-title-2") {
+		t.Errorf("the second file still claims the first one's slug:\n%s", got)
+	}
+}
+
+// A slug the author typed is their URL, so a collision is refused instead of
+// renamed -- and refused before any bytes land, because a file the index will
+// not load is worse than a write that was turned down.
+func TestATakenSlugIsRefusedBeforeAnythingIsWritten(t *testing.T) {
+	root, _, w := newTestProject(t)
+	ctx := t.Context()
+
+	first := &content.Content{Kind: "post", Title: "First", Slug: "notes", Status: content.StatusDraft}
+	if _, err := w.Apply(ctx, content.ChangeSet{Ops: []content.Op{content.PutContent{Content: first}}}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+
+	second := &content.Content{Kind: "post", Title: "Second", Slug: "notes", Status: content.StatusDraft}
+	res, err := w.Apply(ctx, content.ChangeSet{Ops: []content.Op{content.PutContent{Content: second}}})
+	if !errors.Is(err, content.ErrInvalid) {
+		t.Fatalf("err = %v, want one wrapping ErrInvalid", err)
+	}
+	if !strings.Contains(err.Error(), "content/posts/notes") {
+		t.Errorf("the error should name what holds the slug: %v", err)
+	}
+	if len(res.Written) != 0 {
+		t.Errorf("Written = %v, want nothing", res.Written)
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "content", "posts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("%d bundles on disk, want only the first: a refused write must leave no orphan", len(entries))
+	}
+}
+
+// A duplicate that is already on disk, from a merge or a hand edit, must not
+// lock the author out: refusing every save would leave no way to change the
+// slug that is the problem.
+func TestADuplicateAlreadyOnDiskDoesNotBlockAnEdit(t *testing.T) {
+	root, types, w := newTestProject(t)
+	writeFile(t, root, "content/posts/one/index.md",
+		"---\nid: 01J8KQ2P3R4S5T6V7W8X9YZAB1\ntitle: One\nslug: notes\nstatus: draft\n---\n\none\n")
+	writeFile(t, root, "content/posts/two/index.md",
+		"---\nid: 01J8KQ2P3R4S5T6V7W8X9YZAB2\ntitle: Two\nslug: notes\nstatus: draft\n---\n\ntwo\n")
+
+	item := &content.Content{
+		ID:     "01J8KQ2P3R4S5T6V7W8X9YZAB1",
+		Kind:   "post",
+		Title:  "One",
+		Slug:   "notes",
+		Status: content.StatusDraft,
+		Body:   content.Body{Format: content.FormatMarkdown, Raw: "\nedited\n"},
+	}
+	if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.PutContent{Content: item}}}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got := readFile(t, root, SourcePath(types.Get("post"), "content/posts/one")); !strings.Contains(got, "edited") {
+		t.Errorf("the edit did not land:\n%s", got)
 	}
 }
 

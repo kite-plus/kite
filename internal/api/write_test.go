@@ -125,6 +125,63 @@ func TestCreateStoresAnItemAndReportsWhereItLives(t *testing.T) {
 	}
 }
 
+// Posting the same draft twice is an ordinary thing to do, and both items have
+// to come back readable. The second used to be written to a folder of its own
+// while keeping the first one's slug, so the index refused the row and the
+// create answered 404 for the item it had just written.
+func TestCreatingTwoItemsWithOneTitleKeepsBothReadable(t *testing.T) {
+	root := newProject(t, 1)
+	h, _ := newWritableServer(t, root)
+
+	draft := api.Draft{Kind: "post", Title: "tmp roundtrip", Status: "draft", Body: "hi"}
+	first := send(t, h, http.MethodPost, api.Prefix+"/contents", draft, nil)
+	if first.Code != http.StatusCreated {
+		t.Fatalf("first create: status = %d\n%s", first.Code, first.Body.String())
+	}
+	second := send(t, h, http.MethodPost, api.Prefix+"/contents", draft, nil)
+	if second.Code != http.StatusCreated {
+		t.Fatalf("second create: status = %d\n%s", second.Code, second.Body.String())
+	}
+
+	one, two := decode[api.Item](t, first), decode[api.Item](t, second)
+	if one.Slug != "tmp-roundtrip" || two.Slug != "tmp-roundtrip-2" {
+		t.Errorf("slugs = %q and %q, want tmp-roundtrip and tmp-roundtrip-2", one.Slug, two.Slug)
+	}
+	// Folder and slug have to agree, or the URL and the bytes part company.
+	if two.Locator != "content/posts/tmp-roundtrip-2" {
+		t.Errorf("locator = %q, want the folder the slug names", two.Locator)
+	}
+	for _, id := range []string{one.ID, two.ID} {
+		load(t, h, id)
+	}
+}
+
+// A slug the author chose is refused rather than renamed, and the refusal
+// comes before the file is written: an orphan on disk would be reported as
+// missing and would block every later reconcile.
+func TestCreatingWithATakenSlugIsRefusedAndLeavesNoFile(t *testing.T) {
+	root := newProject(t, 2)
+	h, _ := newWritableServer(t, root)
+
+	rec := send(t, h, http.MethodPost, api.Prefix+"/contents", api.Draft{
+		Kind: "post", Title: "Another", Slug: "post-00", Status: "draft", Body: "hi",
+	}, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400\n%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "post-00") {
+		t.Errorf("the error should name the slug it refused: %s", body)
+	}
+
+	entries, err := os.ReadDir(filepath.Join(root, "content", "posts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("%d bundles on disk, want the original 2", len(entries))
+	}
+}
+
 // This is the M3 promise that decides whether anyone will point this at a
 // repository they care about: editing one field changes one field.
 func TestEditingTheTitleRewritesOnlyTheTitleLine(t *testing.T) {
