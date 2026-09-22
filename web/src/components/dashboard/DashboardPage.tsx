@@ -16,6 +16,7 @@ import { cn } from "cn";
 
 import { useI18n, type Key } from "@/i18n";
 import {
+  STATUSES,
   useContentTypes,
   useRecent,
   useSite,
@@ -134,22 +135,20 @@ export function DashboardPage() {
   );
 }
 
-/** One number, and where to go to see what it counts. */
+/** One number, with what it is made of underneath. */
 function Stat({
   label,
   icon: Icon,
   value,
   note,
-  route,
 }: {
   label: string;
   icon: LucideIcon;
   value: ReactNode;
   note: ReactNode;
-  route?: Route;
 }) {
   return (
-    <Card className={cn("relative", route && "transition-colors hover:bg-muted/40")}>
+    <Card>
       <CardContent className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <span className="truncate">{label}</span>
@@ -160,13 +159,6 @@ function Stat({
         </div>
         <div className="truncate text-xs text-muted-foreground">{note}</div>
       </CardContent>
-      {route && (
-        <a
-          {...linkProps(route)}
-          aria-label={label}
-          className="absolute inset-0 rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        />
-      )}
     </Card>
   );
 }
@@ -174,20 +166,22 @@ function Stat({
 const Counting = () => <Skeleton className="h-6 w-10" />;
 
 function KindStat({ kind, total }: { kind: string; total?: number }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const kindLabel = useKindLabel();
-  const counts = useStatusCounts(kind, ["published", "draft"]);
+  const counts = useStatusCounts(kind, STATUSES);
+
+  // Every status that has anything in it, so the parts add up to the total.
+  const parts = STATUSES.filter((status) => counts[status]).map(
+    (status) => `${counts[status]} ${t(`status.${status}`).toLocaleLowerCase(locale)}`,
+  );
+  const counted = STATUSES.every((status) => counts[status] !== undefined);
 
   return (
     <Stat
       label={kindLabel.many(kind)}
       icon={kindIcons[kind] ?? FileText}
-      value={total ?? counts.all ?? <Counting />}
-      note={t("dashboard.statSplit", {
-        published: counts.published ?? "–",
-        draft: counts.draft ?? "–",
-      })}
-      route={{ name: "list", kind }}
+      value={total ?? <Counting />}
+      note={!counted ? "–" : parts.length > 0 ? parts.join(" · ") : t("dashboard.recentEmpty")}
     />
   );
 }
@@ -207,7 +201,6 @@ function TermsStat() {
         items.map((item) => `${item.terms} ${taxonomyLabel(item.name)}`).join(" · ") ||
         t("dashboard.noTaxonomies")
       }
-      route={{ name: "taxonomies" }}
     />
   );
 }

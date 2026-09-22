@@ -81,7 +81,6 @@ export const zhCN: Record<keyof typeof en, string> = {
   "dashboard.night": "夜深了",
   "dashboard.greeting": "{greeting}，{name}",
   "dashboard.healthy": "站点运行正常",
-  "dashboard.statSplit": "{published} 已发布 · {draft} 草稿",
   "dashboard.noTaxonomies": "暂无",
   "dashboard.uncommitted": "未提交更改",
   "dashboard.nothingToPush": "没有待推送的提交",

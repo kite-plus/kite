@@ -86,7 +86,6 @@ export const en = {
   "dashboard.night": "Up late",
   "dashboard.greeting": "{greeting}, {name}",
   "dashboard.healthy": "The site is running normally",
-  "dashboard.statSplit": "{published} published · {draft} drafts",
   "dashboard.noTaxonomies": "None yet",
   "dashboard.uncommitted": "Uncommitted changes",
   "dashboard.nothingToPush": "Nothing waiting to be pushed",
