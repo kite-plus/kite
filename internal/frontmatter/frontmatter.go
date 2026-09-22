@@ -45,6 +45,11 @@ type pendingEdit struct {
 	key   string
 	value *yaml.Node
 	lines []string
+
+	// indent is what editLines added to every line under the header, kept so
+	// that a later edit to the same section can take it back off and carry on
+	// from where this one left it.
+	indent string
 }
 
 // Document is a parsed markdown file: a YAML front matter block plus a body.
@@ -512,7 +517,14 @@ func (d *Document) SetNested(path []string, key string, value any) error {
 		return d.Set(key, value)
 	}
 
-	block, indent, ok := d.block(path[0])
+	// An earlier edit in this batch wins over what is on disk. Two settings
+	// under one section arrive as two calls, and the second has to build on
+	// the first: reading the original block both times would produce two
+	// whole-section replacements, of which only the last one survives.
+	block, indent, ok := d.pendingBlock(path[0])
+	if !ok {
+		block, indent, ok = d.block(path[0])
+	}
 	if !ok {
 		// Nothing is there to preserve, so building the section whole costs
 		// nothing.
@@ -545,8 +557,30 @@ func (d *Document) SetNested(path []string, key string, value any) error {
 		}
 		lines = append(lines, indent+l)
 	}
-	d.edits = append(d.edits, pendingEdit{kind: editLines, key: path[0], lines: lines})
+	d.edits = append(d.edits, pendingEdit{kind: editLines, key: path[0], lines: lines, indent: indent})
 	return nil
+}
+
+// pendingBlock returns a section as an edit already made in this batch left
+// it, undoing the indent that edit added.
+func (d *Document) pendingBlock(key string) ([]string, string, bool) {
+	for i := len(d.edits) - 1; i >= 0; i-- {
+		e := d.edits[i]
+		if e.key != key {
+			continue
+		}
+		// Only lines can be taken apart again. Any other edit to this key is
+		// left for applyEdits to resolve, as it always has.
+		if e.kind != editLines || len(e.lines) < 2 {
+			return nil, "", false
+		}
+		out := make([]string, 0, len(e.lines)-1)
+		for _, l := range e.lines[1:] {
+			out = append(out, strings.TrimPrefix(l, e.indent))
+		}
+		return out, e.indent, true
+	}
+	return nil, "", false
 }
 
 // block returns the indented lines under a key, with their common indent

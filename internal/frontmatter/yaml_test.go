@@ -182,3 +182,86 @@ func TestSettingTheSameValueChangesNothing(t *testing.T) {
 		t.Errorf("the file changed:\n%s", out)
 	}
 }
+
+// Settings arrive a change set at a time, and a form that changed four fields
+// sends four paths. Each one used to be computed from the file as it was
+// loaded, so the last one rewrote the section and silently discarded the rest.
+func TestSeveralKeysInOneSectionAllSurviveOneEdit(t *testing.T) {
+	const src = `site:
+  title: My Blog        # shown in the header
+  description: Notes
+  baseURL: https://example.com
+  language: en
+
+theme:
+  name: default
+  settings:
+    accent: "#4a77d6"
+    show_toc: true
+
+build:
+  pageSize: 10
+`
+	doc, err := frontmatter.ParseYAML([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, set := range []struct {
+		key   string
+		value any
+	}{
+		{"title", "Renamed"},
+		{"description", "Field notes"},
+		{"baseURL", "https://notes.example.com"},
+		{"language", "zh-CN"},
+	} {
+		if err := doc.SetNested([]string{"site"}, set.key, set.value); err != nil {
+			t.Fatalf("SetNested(site.%s): %v", set.key, err)
+		}
+	}
+	// A second section is edited too, because the edits are keyed by section
+	// and one must not reach into another.
+	if err := doc.SetNested([]string{"build"}, "pageSize", 25); err != nil {
+		t.Fatal(err)
+	}
+	// And a section two levels down, which a theme's settings form writes a
+	// whole page of at once.
+	for _, set := range []struct {
+		key   string
+		value any
+	}{{"accent", "#ff0000"}, {"show_toc", false}} {
+		if err := doc.SetNested([]string{"theme", "settings"}, set.key, set.value); err != nil {
+			t.Fatalf("SetNested(theme.settings.%s): %v", set.key, err)
+		}
+	}
+
+	out, err := doc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(out)
+
+	for _, want := range []string{
+		"title: Renamed",
+		"description: Field notes",
+		"baseURL: https://notes.example.com",
+		"language: zh-CN",
+		"pageSize: 25",
+		"show_toc: false",
+		// The comment on a line that was rewritten around still belongs to it.
+		"# shown in the header",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+	for _, gone := range []string{
+		"My Blog", "https://example.com", "language: en", "pageSize: 10",
+		"#4a77d6", "show_toc: true",
+	} {
+		if strings.Contains(got, gone) {
+			t.Errorf("%q was not replaced:\n%s", gone, got)
+		}
+	}
+}
