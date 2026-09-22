@@ -33,8 +33,9 @@
 Kite manages your content. Where it is deployed is a property of the content,
 not a different product.
 
-> **Status: early development.** The static path works end to end. The admin
-> interface and the dynamic runtime are not built yet — see [Roadmap](#roadmap).
+> **Status: early development.** Writing, the studio and Git publishing work
+> end to end. Dynamic mode and plugins are not built yet — see
+> [Roadmap](#roadmap).
 
 <p align="center">
   <img src="docs/assets/screenshot.png" alt="A site built with Kite, in light and dark" width="880">
@@ -64,6 +65,13 @@ go install github.com/kite-plus/kite/cmd/kite@latest
 ```bash
 kite init blog && cd blog
 kite new post "Hello, Kite"
+kite run
+```
+
+`kite run` serves the site, opens it, and reloads on every save. The studio is
+at `/admin/`. When you want files instead of a server:
+
+```bash
 kite build
 ```
 
@@ -84,38 +92,148 @@ are; nothing needs rewriting first.
 
 | | |
 |---|---|
-| `kite init` | create a project |
+| `kite init [dir]` | create a project |
 | `kite new <kind> <title>` | create content |
 | `kite build` | render the site into `public/` |
-| `kite run` | serve the site, open it, reload on every save |
+| `kite run` | serve the site with the studio, open it, reload on every save |
 | `kite serve` | serve the site, rendering each request from the files |
 | `kite index` | refresh the derived index |
 | `kite list` | query content from the index |
 | `kite doctor` | check the project, and repair what is safe to repair |
 | `kite publish` | commit content, and push it when asked to |
-| `kite auth` | set the password the studio asks for |
-| `kite openapi` | print the description of the read model API |
+| `kite auth` | manage the account that guards the studio |
+| `kite openapi` | print the API description |
+| `kite version` | print the version, commit and build date |
 
 Every command takes `--json`, so none of them have to be parsed as prose.
 
-### The studio
+## The studio
 
-`kite run` opens the studio at `/admin/`. On localhost a project with no
-password is open, because there is nobody else on the machine to keep out.
-Anywhere else the studio needs an account, and a server that would put an
-unguarded one on a reachable address refuses to start rather than warning
-about it.
+`kite run` opens the studio at `/admin/`. It is a React application compiled
+into the binary, so there is nothing to install and nothing to keep in sync
+with the server.
+
+| | |
+|---|---|
+| **Dashboard** | what is published, what is still a draft, what is uncommitted, and a publishing trend by month |
+| **Content** | posts and pages, filtered and searched through the index rather than the filesystem |
+| **Editor** | Markdown with a live preview, front matter as a form, terms, slug, word count, and files dropped straight into the bundle |
+| **Taxonomies** | tags and categories as they actually exist across the content |
+| **Theme** | the settings the active theme declares in its `theme.yaml`, rendered as a form |
+| **Settings** | title, description, base URL and language |
+
+An item that changed on disk since it was loaded is refused rather than
+overwritten, and the studio says so. Editing is available in English and
+简体中文, chosen from the browser.
+
+### Signing in
+
+On localhost a project with no password is open, because there is nobody else
+on the machine to keep out. Anywhere else the studio needs an account, and a
+server that would put an unguarded one on a reachable address refuses to start
+rather than warning about it.
 
 ```bash
 kite auth set-password                          # asked for twice, never echoed
 kite serve --admin --write --addr 0.0.0.0:1717
 ```
 
+`kite auth status` reports whether a project asks for a password, and
+`kite auth remove` takes the account away again.
+
 The account is stored in `.kite/secrets/account.json` as an argon2id hash. It
 is never committed, and it has to survive a deployment for the account to. A
-container can supply one from the environment instead -- `KITE_ADMIN_USER` with
+container can supply one from the environment instead — `KITE_ADMIN_USER` with
 `KITE_ADMIN_PASSWORD`, or `KITE_ADMIN_PASSWORD_HASH` to keep a plaintext
-password out of the process list -- and the environment wins over the file.
+password out of the process list — and the environment wins over the file.
+
+### The API
+
+Everything the studio does, it does over one HTTP API under `/api/v1`, which
+the binary describes itself:
+
+```bash
+kite openapi > openapi.json
+```
+
+`--admin` serves it and `--write` allows it to change the project; without
+`--write` the same API is read-only. The studio's typed client is generated
+from that description and checked in CI, so the types it compiles against
+cannot describe an API the server does not serve.
+
+## Themes
+
+Kite ships with one theme, compiled into the binary: quiet serif typography for
+personal writing, light and dark, and no web fonts unless you ask for them, so
+a page asks nothing of a third party.
+
+A theme declares its own settings in `theme.yaml`, and the studio renders them
+as a form — an option is a declaration rather than a documentation problem.
+Templates live under `layouts/` in a theme and in a site alike, and the same
+relative path in the site wins, so a single template can be replaced without
+forking the theme.
+
+The theme contract is not frozen yet; it freezes at M5, after a second theme
+has been written against it.
+
+## Configuration
+
+`kite.yaml` sits at the root of a project. Everything except `site` is
+optional, and the values below are the defaults.
+
+```yaml
+site:
+  title: My Site
+  baseURL: https://example.com
+  language: en
+
+content:
+  store: file          # where content lives
+  dir: content
+
+theme:
+  name: default
+  settings:            # whatever the theme declares in theme.yaml
+    accent: "#7d5c3c"
+
+markdown:
+  highlightTheme: github
+
+build:
+  output: public
+  urlStyle: directory  # or extension, for /posts/hello.html
+  pageSize: 10
+  sitemap: true
+  feed: true
+  feedLimit: 20
+
+publish:
+  publisher: git
+  branch: main
+```
+
+A few keys can be overridden from the environment, for a build whose output
+depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,
+`KITE_SITE_LANGUAGE`, `KITE_THEME`, `KITE_BUILD_OUTPUT`,
+`KITE_BUILD_URLSTYLE` and `KITE_BUILD_PAGESIZE`.
+
+## Deploying
+
+`kite init` writes a GitHub Pages workflow that builds with `--verify`, so a
+site that would deploy differently on a second run fails before it is
+published. Turn Pages on under **Settings → Pages → Source → GitHub Actions**
+and a push to `main` deploys.
+
+Publishing from a machine instead goes through Git:
+
+```bash
+kite publish content/posts/hello --push
+```
+
+It commits exactly the paths given and nothing else: what you have staged stays
+staged, and every other change stays where it is. `--all` publishes everything
+uncommitted that Kite manages, and `--dry-run` reports what would happen and
+stops.
 
 ## Design
 
@@ -141,18 +259,23 @@ The full reasoning, including the parts deliberately left unbuilt, is in
 | [theme-system.md](docs/design/theme-system.md) | Template lookup, data contract, `theme.yaml` |
 | [plugin-system.md](docs/design/plugin-system.md) | WebAssembly runtime, host ABI, capabilities |
 
+> The design documents are written in Chinese; terms of art stay in English.
+
 ## Build from source
 
 Go 1.26 or newer:
 
 ```bash
 make build      # ./bin/kite
-make check      # format, vet, layering rules, linter, tests
+make check      # format, vet, layering rules, tidiness, linter, tests
 make web        # the admin, which is embedded into the binary
+make web-gen    # regenerate the API client from this build's own description
 ```
 
-`make web` needs Node and pnpm; the rest does not. A binary built without it
-works and says the admin is missing rather than failing to link.
+`make web` needs Node and pnpm, both pinned exactly — the versions live in
+`web/.nvmrc` and `web/package.json`. The rest of the build needs neither. A
+binary built without it works and says the admin is missing rather than failing
+to link.
 
 The binary is self-contained. The default theme and the SQLite driver are
 compiled in, nothing needs cgo, and every release target cross-compiles from any
@@ -194,6 +317,9 @@ Before opening a pull request:
 ```bash
 make check
 ```
+
+If you touched the admin, `make web-check` type checks it and `make web` builds
+the bundle CI compares against.
 
 ## License
 
