@@ -1,349 +1,96 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" alt="" width="84" height="84">
+  <img src="docs/assets/logo.svg" alt="Kite" width="84" height="84">
 </p>
 
 <h1 align="center">Kite</h1>
 
 <p align="center">
-  <strong>现代开源内容发布平台</strong><br>
-  One Content, Multiple Destinations.
+  用 Markdown 写作，在浏览器里管理内容，把站点发布到你想去的地方。
 </p>
 
 <p align="center">
-  <a href="https://github.com/kite-plus/kite/actions/workflows/ci.yml"><img
-    alt="CI"
-    src="https://img.shields.io/github/actions/workflow/status/kite-plus/kite/ci.yml?branch=main&style=flat-square&logo=github&logoColor=white&label=CI&labelColor=1f2328"></a>
-  <a href="go.mod"><img
-    alt="Go"
-    src="https://img.shields.io/github/go-mod/go-version/kite-plus/kite?style=flat-square&logo=go&logoColor=white&label=Go&labelColor=1f2328&color=4A77D6"></a>
-  <a href="LICENSE"><img
-    alt="License"
-    src="https://img.shields.io/github/license/kite-plus/kite?style=flat-square&label=License&labelColor=1f2328&color=4A77D6"></a>
-  <a href="docs/design/"><img
-    alt="设计文档"
-    src="https://img.shields.io/badge/design-docs-4A77D6?style=flat-square&labelColor=1f2328"></a>
-</p>
-
-<p align="center">
+  <a href="https://www.kite.plus">官网</a> ·
   <a href="README.md">English</a> · 简体中文
 </p>
 
----
-
-Kite 负责管理你的内容。至于部署到哪里，那是内容的一个属性，而不是另一个产品。
-
-> **状态：早期开发中。** 写作、后台与 Git 发布已经端到端跑通；动态模式和插件
-> 还没开始 —— 见 [路线图](#路线图)。
-
 <p align="center">
-  <img src="docs/assets/screenshot.png" alt="用 Kite 构建的站点，深浅两种配色" width="880">
+  <img src="docs/assets/screenshot.png" alt="Kite 站点的浅色与深色外观" width="880">
 </p>
 
-## 为什么做这个
+Kite 是一个开源内容发布平台，内置可视化 Markdown 编辑器、图片上传、标签分类和深浅色主题。内容保存在自己的文件中，可以直接运行站点，也可以导出静态页面。
 
-内容发布工具长期分成两个阵营，而且一旦选定就很难反悔。
+> 项目仍在早期开发中，目前请从源码安装，包含完整后台的步骤如下。
 
-**静态站点生成器**（Hugo、Hexo）给了你 Markdown、Git 和廉价托管，但没有真正的内容管理：写文章就是编辑文件，没有媒体库，没有分类浏览，也没有一个"发布"按钮。
+## 安装并启动
 
-**内容管理系统**（WordPress、Halo）把这些都给了你，但它们默认存在一台服务器和一个数据库。Git、Markdown 和静态托管塞进去总是别扭。
+### Docker（推荐）
 
-Kite 拒绝这道选择题。同一份内容、同一个后台、同一套主题，无论站点是构建成静态文件、由数据库驱动，还是作为 API 被消费，都照常工作。**换部署方式从此是改一行配置，而不是一次迁移。**
-
-## 上手
+安装 Git 和 Docker 后，运行：
 
 ```bash
-go install github.com/kite-plus/kite/cmd/kite@latest
+git clone https://github.com/kite-plus/kite.git
+cd kite
+docker build -t kite .
+docker run -d --name kite --restart unless-stopped -p 127.0.0.1:1717:1717 -v kite-data:/data kite
 ```
 
+打开 [管理后台](http://localhost:1717/admin/)，按提示设置站点和管理员账号，即可开始写作。站点地址是 [localhost:1717](http://localhost:1717)。首次构建需要下载依赖，请稍等。
+
+内容和账号保存在 `kite-data` 数据卷中。停止或重新启动：
+
 ```bash
-kite init blog && cd blog
+docker stop kite
+docker start kite
+```
+
+<details>
+<summary>不用 Docker：安装到本机</summary>
+
+需要 Git、Make、Go 1.26.4+、Node.js 22.19.0 和 pnpm 10.11.1（构建会使用项目指定的 Go 工具链）。
+
+```bash
+git clone https://github.com/kite-plus/kite.git
+cd kite
+make web
+make install
+```
+
+将 Go 的二进制安装目录（默认 `~/go/bin`）加入 `PATH`，然后创建站点：
+
+```bash
+kite init blog
+cd blog
 kite new post "你好，Kite"
 kite run
 ```
 
-`kite init` 会逐项问你：站点叫什么、会发布在哪里、用什么语言写、要不要现在设密码、要不要建
-git 仓库。每一项都有对应的参数，`kite init --yes` 则直接取默认值不再询问，
-所以同一条命令在没有终端的脚本里也能用。
+打开 [管理后台](http://localhost:1717/admin/) 开始编辑。后续只需在 `blog` 目录运行 `kite run`。
 
-`kite run` 会启动站点、打开浏览器，保存即刷新，后台在 `/admin/`。想要文件而不是
-一个服务时：
+</details>
 
-```bash
-kite build
-```
+## 写作与使用
 
-`public/` 下会得到一个完整站点：文章页、列表页、分页、分类页与标签页、404、`sitemap.xml` 和 `rss.xml`。
+1. 在后台新建文章或页面，用可视化编辑器写作，也可以切换到 Markdown 源码。
+2. 拖入图片，设置分类、标签和文章地址；写作期间保留为草稿，准备好后取消草稿状态并保存。
+3. 在「设置」里修改站点名称、网址和语言，在「主题」里调整外观。
 
-**已经有为别的生成器写的内容？直接指给 Kite 就行。**
+本机使用 `kite run` 时会显示草稿，方便预览；正常运行站点和静态构建会排除草稿。
 
-```bash
-kite doctor --fix-ids   # 给还没有 id 的文件补上
-kite build --verify     # 构建两次，逐字节比对
-```
+## 发布站点
 
-`draft: true`、`date`、`lastmod`、`tags`、`categories` 都能原样读懂，不需要先改写任何文件。
-
-### 命令
-
-| | |
-|---|---|
-| `kite init [dir]` | 初始化项目，逐项问清楚要建什么 |
-| `kite new <kind> <title>` | 新建内容 |
-| `kite build` | 构建静态站点到 `public/` |
-| `kite run` | 带后台启动站点、打开浏览器，保存即刷新 |
-| `kite serve` | 启动站点，每个请求都从文件渲染 |
-| `kite index` | 刷新派生索引 |
-| `kite list` | 从索引里查询内容 |
-| `kite doctor` | 体检，并修复可以安全修复的问题 |
-| `kite publish` | 提交内容，需要时推送到远端 |
-| `kite auth` | 管理守卫后台的账号 |
-| `kite openapi` | 打印 API 描述文档 |
-| `kite version` | 打印版本、commit 和构建时间 |
-
-所有命令都支持 `--json`，不必把输出当作自然语言去解析。
-
-## 后台
-
-`kite run` 会在 `/admin/` 打开后台。它是一个编译进二进制的 React 应用，没有东西
-要装，也没有东西需要和服务端对版本。
-
-| | |
-|---|---|
-| **仪表盘** | 已发布多少、还有多少草稿、有哪些没提交，以及按月的发布趋势 |
-| **内容** | 文章和页面，通过索引而不是文件系统来过滤和搜索 |
-| **编辑器** | 可视化编辑，读写的都是 Markdown，一键切到源码；实时预览、front matter 表单、分类标签、slug、字数，图片直接拖进 bundle |
-| **分类法** | 标签和分类在全部内容里的真实分布 |
-| **主题** | 当前主题在 `theme.yaml` 里声明的设置项，渲染成表单 |
-| **设置** | 标题、描述、baseURL 和语言 |
-
-加载之后又在磁盘上变过的内容，会被拒绝写入而不是覆盖，后台会明说这件事。后台
-界面支持 English 和简体中文，按浏览器语言选择。
-
-### 登录
-
-在 localhost 上，没有设置密码的项目是敞开的 —— 这台机器上没有别人需要挡。换成
-任何别的地址，后台就必须有账号；没有账号却要放到别人能访问的地址上时，服务器
-不会敞着启动。
-
-它会以**安装模式**启动：除了安装页，什么都不会应答 —— 内容不会、草稿不会、设置不会，
-连站点自己叫什么都不会，所以一个没装好的服务器什么也交不出去。
+**导出静态页面：** 在本机站点目录运行 `kite build`，将生成的 `public/` 目录上传到静态托管服务即可。Docker 用户运行：
 
 ```bash
-kite serve --admin --write --addr 0.0.0.0:1717
-```
-```
-  Finish installing this site in a browser:
-
-    http://localhost:1717/admin/setup
+docker exec kite kite build
+docker cp kite:/data/public ./public
 ```
 
-安装页本身是开放的，这是刻意的：装完之前根本没有账号，也就没有任何东西可以拿来
-校验请求，最先打开表单的那个浏览器就是拿到账号的人。要么尽快装完，要么在它可达
-之前就先给它一个账号，完全跳过安装：
+**部署到服务器：** 查看[部署说明](docs/reference.zh-CN.md#部署)，设置自己的站点域名并通过 HTTPS 对外提供访问。
 
-```bash
-kite auth set-password                          # 输入两次，不回显
-```
+**通过 Git 发布：** 本机站点配置好 Git 远程仓库后，运行 `kite publish --all --push` 提交并推送内容；自动上线还需要托管平台的部署工作流。
 
-`kite auth status` 会说明当前项目是否需要密码，`kite auth remove` 则把账号去掉。
+## 更多
 
-账号以 argon2id 哈希的形式存放在 `.kite/secrets/account.json`，永远不会被提交，
-也必须在部署时保留下来，账号才会跟着留下来。容器可以改用环境变量提供账号：
-`KITE_ADMIN_USER` 配 `KITE_ADMIN_PASSWORD`，或者用 `KITE_ADMIN_PASSWORD_HASH`
-以免明文密码出现在进程列表里；环境变量优先于文件。
-
-### API
-
-后台做的每一件事，都走 `/api/v1` 下的同一套 HTTP API，而这套 API 由二进制自己
-描述：
-
-```bash
-kite openapi > openapi.json
-```
-
-`--admin` 提供这套 API，`--write` 允许它改动项目；不加 `--write` 时同一套 API
-是只读的。后台的类型化客户端由这份描述生成，并在 CI 里校验，所以它编译时依赖的
-类型不可能描述一个服务端并不提供的 API。
-
-## 主题
-
-Kite 自带一套主题，编译进二进制：为个人写作准备的安静衬线排版，深浅两色，不主动
-引入任何 Web 字体 —— 除非你自己指定，否则页面不向第三方请求任何东西。
-
-主题在 `theme.yaml` 里声明自己的设置项，后台把它们渲染成表单 —— 一个选项是一处
-声明，而不是一个文档问题。主题和站点的模板都放在 `layouts/` 下，同名相对路径以
-站点的为准，所以替换单个模板不需要 fork 整套主题。
-
-主题契约尚未冻结；它会在 M5、也就是有了第二套按它写出来的主题之后再冻结。
-
-## 配置
-
-`kite.yaml` 放在项目根目录。除 `site` 外全部可选，下面写的就是默认值。
-
-```yaml
-site:
-  title: My Site
-  baseURL: https://example.com
-  language: en
-
-content:
-  store: file          # 内容存在哪里
-  dir: content
-
-theme:
-  name: default
-  settings:            # 主题在 theme.yaml 里声明的那些
-    accent: "#7d5c3c"
-
-markdown:
-  highlightTheme: github
-
-build:
-  output: public
-  urlStyle: directory  # 或 extension，产出 /posts/hello.html
-  pageSize: 10
-  sitemap: true
-  feed: true
-  feedLimit: 20
-
-publish:
-  publisher: git
-  branch: main
-```
-
-少数几个键可以用环境变量覆盖，供产出依赖运行环境的构建使用：`KITE_SITE_TITLE`、
-`KITE_SITE_BASEURL`、`KITE_SITE_LANGUAGE`、`KITE_THEME`、`KITE_BUILD_OUTPUT`、
-`KITE_BUILD_URLSTYLE` 和 `KITE_BUILD_PAGESIZE`。
-
-## 部署
-
-站点可以构成静态文件托管在任何地方，也可以作为一个自己管自己的服务跑着。两边的内容
-是同一份，所以这是一个可以改主意的决定。
-
-### 静态，发到 GitHub Pages
-
-`kite init` 会写好一个 GitHub Pages 工作流，构建时带 `--verify` —— 跑第二次会得到
-不同产物的站点，会在这里失败，而不是被发布出去。在 **Settings → Pages → Source →
-GitHub Actions** 打开 Pages，之后推送到 `main` 即部署。
-
-从本机发布则走 Git：
-
-```bash
-kite publish content/posts/hello --push
-```
-
-它只提交你给出的那些路径，别的一概不动：你暂存的东西还在暂存区，其余改动留在原
-地。`--all` 会发布 Kite 管理范围内所有未提交的改动，`--dry-run` 则只报告会发生
-什么然后停下。
-
-### 用 Docker
-
-```bash
-docker compose up -d
-docker compose logs kite      # 它会打印去哪里把安装走完
-```
-
-然后打开 `http://localhost:1717/admin/`，在浏览器里把安装走完。配置就只有
-[`docker-compose.yaml`](docker-compose.yaml) 这一份。
-
-镜像是 `ghcr.io/kite-plus/kite`，提供 amd64 和 arm64 两个架构。里面只有二进制、后台
-和 git，以非 root 用户运行，自己不存任何东西：站点住在 `/data` 卷里，空卷会在第一次
-启动时变成一个新项目。其余都是普通的 `kite` 命令：
-
-```bash
-docker compose run --rm kite build
-docker compose run --rm kite publish --all --push
-docker compose run --rm kite auth set-password
-```
-
-值得提前给好的只有 `KITE_SITE_BASEURL`：它是会进入订阅源和站点地图的那个地址，
-而那不是容器自己的地址。
-
-### 不用 Docker，直接跑在服务器上
-
-```bash
-kite serve --admin --write --addr 0.0.0.0:1717
-```
-
-第一次启动会打印一个链接并等浏览器，和容器里一模一样 —— 见[登录](#登录)。
-
-Kite 自己不终结任何 TLS，请把它放在一个能做这件事的东西后面。密码在网络上裸奔，
-并不会因为它到了另一头会被哈希而变得安全。
-
-## 设计
-
-三条决策决定了其余的一切。
-
-**Markdown 文件是唯一的真相源。** 静态模式下，数据库里不存在任何无法从文件推导出来的东西。`.kite/` 下的索引是缓存：删掉、重建，得到的行完全一样。
-
-**是编辑你的文件，不是重写它。** 保存一篇内容时，只有真正变化的 key 会被改写。key 的顺序、注释、`[a, b]` 这样的行内列表全都原样保留 —— 改个标题，`git diff` 就只有一行。
-
-**存储与运行时相互独立。** 内容存在哪里、以什么方式交付，是两个分开的选择，它们的每一种组合都成立。
-
-完整的推理过程（包括哪些东西是**刻意没做**的）在 [docs/design](docs/design/)。
-
-| 文档 | 内容 |
-|---|---|
-| [architecture.md](docs/design/architecture.md) | 内容模型、存储、构建引擎、发布器、路线图 |
-| [theme-system.md](docs/design/theme-system.md) | 模板查找顺序、数据契约、`theme.yaml` |
-| [plugin-system.md](docs/design/plugin-system.md) | WebAssembly 运行时、Host ABI、Capability |
-
-> 设计文档为中文撰写，专有名词保留英文。
-
-## 从源码构建
-
-需要 Go 1.26 或更新版本：
-
-```bash
-make build      # ./bin/kite
-make check      # 格式化、vet、分层规则、go.mod 整洁性、linter、测试
-make web        # 后台界面，会被嵌入二进制
-make web-gen    # 用这次构建自己的描述重新生成 API 客户端
-make docker     # 容器镜像，上面两样东西它会自己编译
-```
-
-`make web` 需要 Node 和 pnpm，两者版本都被精确钉死 —— 见 `web/.nvmrc` 和
-`web/package.json`；其余目标两者都不需要。没有跑过它的二进制照样能用，只是访问
-后台时会明说后台没有构建。
-
-二进制是自包含的：默认主题和 SQLite 驱动都编译在内，不依赖 cgo，任何平台都能交叉编译出全部发布目标。
-
-## 发布产物
-
-Release 的二进制是可重现的：同一个 commit，用 `go.mod` 里钉死的工具链构建，在任何机器上都编译出相同的字节。
-
-```bash
-GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot --clean
-```
-
-下载后请对照 release 附带的 `checksums.txt` 校验。
-
-## 路线图
-
-| 里程碑 | 交付内容 | |
-|---|---|---|
-| M0 | `kite build`：内容模型、索引、Markdown、主题、静态产出 | 已完成 |
-| M1 | `kite serve`：按请求渲染，文件监听与热重载 | 已完成 |
-| M2 | 只读后台，能打开现有仓库 | 已完成 |
-| M3 | 可写后台：编辑器、媒体、冲突处理 | 已完成 |
-| M4 | Git 发布器 —— **v1.0** | 已完成 |
-| M5 | 公开主题契约 | |
-| M6 | `kite.lock` 与 `kitew` wrapper | |
-| M7 | 基于 SQLite 的动态模式 | |
-| M8 | WebAssembly 插件 | |
-
-## 参与贡献
-
-`scripts/check-imports.sh` 里的分层规则由 CI 强制执行：领域核心不得 import 存储、渲染或运行时包。提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/v1.0.0/)。
-
-提 PR 之前请先跑：
-
-```bash
-make check
-```
-
-如果动过后台，`make web-check` 做类型检查，`make web` 构建 CI 会拿来比对的产物。
-
-## 许可证
-
-[Apache License 2.0](LICENSE)。
+- [详细使用说明](docs/reference.zh-CN.md)：账号、主题、配置、部署与常用开发操作。
+- [反馈问题](https://github.com/kite-plus/kite/issues) · [架构与路线图](docs/design/)
+- [Apache License 2.0](LICENSE)
