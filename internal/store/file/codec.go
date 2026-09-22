@@ -204,7 +204,7 @@ func (c *Codec) Encode(t *content.Type, item *content.Content, existing []byte) 
 // layoutBody lays a body out the way a hand keeps a markdown file: a blank
 // line after the front matter and a newline at the end. The blank lines are
 // the file's, not the body's; Decode takes them off again, so a body that
-// only travelled through the API and back changes nothing on disk.
+// only traveled through the API and back changes nothing on disk.
 func layoutBody(raw string) string {
 	body := strings.Trim(raw, "\r\n")
 	if body == "" {
