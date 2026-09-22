@@ -115,6 +115,8 @@ export const zhCN: Record<keyof typeof en, string> = {
   "list.updated": "更新于",
   "list.published": "发布时间",
   "list.empty": "没有符合条件的内容",
+  "list.emptyKind": "还没有{kind}",
+  "list.emptyNote": "写下的内容都会出现在这里。",
   "list.open": "在站点上打开",
   "list.edit": "编辑",
   "list.actions": "操作",

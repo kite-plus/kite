@@ -121,6 +121,8 @@ export const en = {
   "list.updated": "Updated",
   "list.published": "Published",
   "list.empty": "Nothing matches these filters",
+  "list.emptyKind": "No {kind} yet",
+  "list.emptyNote": "Everything you write appears here.",
   "list.open": "Open on the site",
   "list.edit": "Edit",
   "list.actions": "Actions",

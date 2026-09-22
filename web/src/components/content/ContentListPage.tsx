@@ -97,6 +97,9 @@ export function ContentListPage({ kind }: { kind: string }) {
 
   const remove = useDeleteItems();
   const chosen = items.filter((item) => selected.has(item.id));
+  const unfiltered =
+    state.status === "all" && !state.q && Object.keys(state.terms).length === 0;
+  const create = () => navigate({ name: "edit", kind, id: null });
 
   const turn = (next: string[]) => {
     setPaging({ key: filterKey, cursors: next });
@@ -129,7 +132,7 @@ export function ContentListPage({ kind }: { kind: string }) {
       title={kindLabel.many(kind)}
       description={t("list.description", { kind: kindLabel.many(kind) })}
       actions={
-        <Button onClick={() => navigate({ name: "edit", kind, id: null })}>
+        <Button onClick={create}>
           <Plus data-icon="inline-start" />
           {t("list.newKind", { kind: kindLabel.one(kind) })}
         </Button>
@@ -242,6 +245,7 @@ export function ContentListPage({ kind }: { kind: string }) {
             activeTerms={state.terms}
             onTerm={(taxonomy, term) => set({ terms: { ...state.terms, [taxonomy]: term } })}
             onDelete={(item) => setConfirming([item])}
+            onCreate={unfiltered ? create : undefined}
             total={total}
             page={cursors.length + 1}
             pages={pages}

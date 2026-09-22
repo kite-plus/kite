@@ -1,4 +1,4 @@
-import { ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 
 import type { Summary } from "@/api/client";
 import { useI18n } from "@/i18n";
@@ -17,7 +17,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -39,6 +45,8 @@ interface Props {
   activeTerms: Record<string, string>;
   onTerm: (taxonomy: string, term: string) => void;
   onDelete: (item: Summary) => void;
+  /** onCreate is offered on an empty listing that no filter is narrowing. */
+  onCreate?: () => void;
   total: number;
   page: number;
   pages: number;
@@ -56,6 +64,7 @@ export function ContentTable({
   activeTerms,
   onTerm,
   onDelete,
+  onCreate,
   total,
   page,
   pages,
@@ -214,8 +223,19 @@ export function ContentTable({
       {!loading && items.length === 0 && (
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>{t("list.empty")}</EmptyTitle>
+            <EmptyTitle>
+              {onCreate ? t("list.emptyKind", { kind: kindLabel.many(kind) }) : t("list.empty")}
+            </EmptyTitle>
+            {onCreate && <EmptyDescription>{t("list.emptyNote")}</EmptyDescription>}
           </EmptyHeader>
+          {onCreate && (
+            <EmptyContent>
+              <Button onClick={onCreate}>
+                <Plus data-icon="inline-start" />
+                {t("list.newKind", { kind: kindLabel.one(kind) })}
+              </Button>
+            </EmptyContent>
+          )}
         </Empty>
       )}
 
