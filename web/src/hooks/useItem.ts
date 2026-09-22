@@ -159,15 +159,19 @@ export function useItem(id: string | null, kind: string) {
     return true;
   }, [id, queryClient]);
 
-  /** attach uploads a file into this item's bundle and returns its link. */
+  /**
+   * attach uploads a file into an item's bundle and returns its link. The
+   * item is this one unless said otherwise: a first save hands out an id
+   * before this hook has been rendered with it.
+   */
   const attach = useCallback(
-    async (file: File): Promise<string> => {
-      if (!id) throw new ApiError("invalid_request", "save this item before adding files");
+    async (file: File, into: string | null = id): Promise<string> => {
+      if (!into) throw new ApiError("invalid_request", "save this item before adding files");
 
       const form = new FormData();
       form.append("file", file);
 
-      const response = await fetch(`/api/v1/contents/${id}/media`, {
+      const response = await fetch(`/api/v1/contents/${into}/media`, {
         method: "POST",
         body: form,
       });

@@ -30,10 +30,10 @@ export function StatusDot({ status, className }: { status: string; className?: s
   );
 }
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, className }: { status: string; className?: string }) {
   const { t } = useI18n();
   return (
-    <Badge variant="outline" className="font-normal">
+    <Badge variant="outline" className={cn("font-normal", className)}>
       <Dot status={status} />
       {t(`status.${status}` as Key)}
     </Badge>

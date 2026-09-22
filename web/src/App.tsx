@@ -14,8 +14,8 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empt
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
 
-// The editor carries CodeMirror, the heaviest thing in the admin, and is one
-// screen of several. Loading it when it opens keeps the rest light.
+// The editor carries Tiptap and CodeMirror, the heaviest things in the admin,
+// and is one screen of several. Loading it when it opens keeps the rest light.
 const EditorPage = lazy(() =>
   import("@/components/editor/EditorPage").then((module) => ({ default: module.EditorPage })),
 );

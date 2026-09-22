@@ -8,6 +8,8 @@ import { useI18n } from "@/i18n";
 interface Props {
   draft: Draft | null;
   id: string | null;
+  /** base is the item's own address, which its images are linked relative to. */
+  base?: string;
 }
 
 /**
@@ -19,7 +21,7 @@ interface Props {
  * match the site" would be a complaint with no end. What is shown here is the
  * page the build would write.
  */
-export function Preview({ draft, id }: Props) {
+export function Preview({ draft, id, base }: Props) {
   const { t } = useI18n();
   const [html, setHtml] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
@@ -65,17 +67,21 @@ export function Preview({ draft, id }: Props) {
 
   // The document is written into the frame rather than assigned to srcdoc, so
   // that the scroll position survives a re-render and an author does not lose
-  // their place on every keystroke.
+  // their place on every keystroke. The page links its images by name, as
+  // the build will publish them beside it, so it is told where it lives.
   useEffect(() => {
     const doc = frame.current?.contentDocument;
     if (!doc || !html) return;
 
+    const located = base
+      ? html.replace(/<head([^>]*)>/i, `<head$1><base href="${new URL(base, window.location.origin)}">`)
+      : html;
     const scroll = doc.documentElement.scrollTop;
     doc.open();
-    doc.write(html);
+    doc.write(located);
     doc.close();
     doc.documentElement.scrollTop = scroll;
-  }, [html]);
+  }, [html, base]);
 
   return (
     <div className="relative h-full">

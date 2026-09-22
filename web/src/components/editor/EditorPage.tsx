@@ -1,9 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Eye, SlidersHorizontal, Upload, XCircle } from "lucide-react";
+import type { ChainedCommands, Editor } from "@tiptap/react";
+import {
+  ChevronLeft,
+  Eye,
+  Heading1,
+  Heading2,
+  Heading3,
+  Image,
+  Info,
+  List,
+  ListOrdered,
+  ListTodo,
+  Minus,
+  Pilcrow,
+  SlidersHorizontal,
+  SquareCode,
+  Table,
+  TextQuote,
+  Upload,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
 
-import { useI18n, useProblem } from "@/i18n";
+import { useI18n, useProblem, type Key } from "@/i18n";
 import { useContentTypes } from "@/hooks/useContents";
 import { useItem } from "@/hooks/useItem";
 import { useKindLabel } from "@/hooks/useKindLabel";
@@ -14,10 +35,20 @@ import { linkProps, navigate, setGuard } from "@/lib/router";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { StatusBadge } from "@/components/StatusDot";
 import { ConflictDialog } from "@/components/editor/ConflictDialog";
-import { Editor, type EditorHandle } from "@/components/editor/Editor";
 import { EditorAside } from "@/components/editor/EditorAside";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
+import {
+  countWords,
+  losses,
+  preferredMode,
+  rememberMode,
+  type Loss,
+  type Mode,
+} from "@/components/editor/markdown";
 import { Preview } from "@/components/editor/Preview";
+import { RichEditor } from "@/components/editor/RichEditor";
+import type { SlashItem } from "@/components/editor/SlashMenu";
+import { SourceEditor, type SourceHandle } from "@/components/editor/SourceEditor";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Breadcrumb,
@@ -35,6 +66,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const { t, locale } = useI18n();
@@ -64,7 +96,16 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const [removing, setRemoving] = useState(false);
   const [leaving, setLeaving] = useState<(() => void) | null>(null);
 
-  const editor = useRef<EditorHandle | null>(null);
+  const [mode, setMode] = useState<Mode>(preferredMode);
+  // What the source view is protecting, when a document opened in it for a reason.
+  const [lost, setLost] = useState<Loss[]>([]);
+  const [switching, setSwitching] = useState<Loss[] | null>(null);
+
+  // State rather than a ref: the toolbar draws from it, and must redraw when
+  // one editor is torn down and the other comes up.
+  const [rich, setRich] = useState<Editor | null>(null);
+  const source = useRef<SourceHandle | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const dirty = useRef(false);
   dirty.current = item.dirty;
 
@@ -86,6 +127,26 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
 
   const draft = item.draft;
   const type = types.data?.items.find((entry) => entry.kind === (draft?.kind ?? kind));
+
+  // A document that uses what the visual editor would damage opens as
+  // source, whatever this browser prefers. Decided once per document.
+  const opened = useRef<string | null>(null);
+  const body = useRef("");
+  body.current = draft?.body ?? "";
+  useEffect(() => {
+    if (item.status === "loading" || item.status === "error") return;
+    const key = id ?? "new";
+    if (opened.current === key) return;
+    // A first save gives a new item its id without reopening anything.
+    if (opened.current === "new" && id) {
+      opened.current = key;
+      return;
+    }
+    opened.current = key;
+    const found = losses(body.current);
+    setLost(found);
+    setMode(found.length > 0 ? "source" : preferredMode());
+  }, [id, item.status]);
 
   const save = useCallback(async () => {
     const saved = await item.save();
@@ -118,35 +179,118 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     if (target) await publish.run([target]);
   };
 
-  const attach = useCallback(
-    async (files: File[]) => {
+  /**
+   * upload stores one file beside the item and resolves to its link. A new
+   * item is saved first, since until then it has no folder to keep it in.
+   */
+  const upload = useCallback(
+    async (file: File): Promise<string> => {
       setUploadError(null);
-      setUploading((n) => n + files.length);
+      setUploading((n) => n + 1);
       try {
-        for (const file of files) {
-          const link = await item.attach(file);
-          const alt = file.name.replace(/\.[^.]+$/, "");
-          editor.current?.insert(`\n![${alt}](${link})\n`);
-        }
+        const target = id ?? (await save());
+        if (!target) throw new Error(t("editor.saveFirst"));
+        return await item.attach(file, target);
       } catch (err) {
         setUploadError(err instanceof Error ? err.message : String(err));
+        throw err;
       } finally {
-        setUploading(0);
+        setUploading((n) => Math.max(0, n - 1));
       }
     },
-    [item],
+    [id, save, item, t],
   );
 
+  // Files chosen from the toolbar or dropped on the source view.
+  const attach = async (files: File[]) => {
+    for (const file of files) {
+      let link: string;
+      try {
+        link = await upload(file);
+      } catch {
+        return;
+      }
+      const alt = file.name.replace(/\.[^.]+$/, "");
+      if (rich) rich.chain().focus().setImage({ src: link, alt }).run();
+      else source.current?.insert(`\n![${alt}](${link})\n`);
+    }
+  };
+  const pick = () => picker.current?.click();
+
   const uploads = useMemo(
-    () => ({
-      upload: async (file: File) => {
-        if (!id) throw new Error(t("editor.saveFirst"));
-        return item.attach(file);
-      },
-      base: item.base?.url,
-    }),
-    [id, item, t],
+    () => ({ upload, base: item.base?.url }),
+    [upload, item.base?.url],
   );
+
+  const slash = useMemo<SlashItem[]>(() => {
+    const block = (
+      id: string,
+      label: string,
+      hint: Key,
+      keywords: string,
+      icon: LucideIcon,
+      run: (chain: ChainedCommands) => ChainedCommands,
+    ): SlashItem => ({
+      id,
+      label,
+      hint: t(hint),
+      keywords,
+      icon,
+      run: (editor, range) => run(editor.chain().focus().deleteRange(range)).run(),
+    });
+    const heading = (level: 1 | 2 | 3, icon: LucideIcon) =>
+      block(
+        `h${level}`,
+        t("editor.headingN", { level }),
+        `editor.slash.heading${level}` as Key,
+        `h${level} heading title 标题`,
+        icon,
+        (chain) => chain.setHeading({ level }),
+      );
+    return [
+      block("paragraph", t("editor.paragraph"), "editor.slash.paragraph", "text p 正文 段落", Pilcrow, (chain) => chain.setParagraph()),
+      heading(1, Heading1),
+      heading(2, Heading2),
+      heading(3, Heading3),
+      block("bulletList", t("editor.bulletList"), "editor.slash.bulletList", "ul bullet 列表 无序", List, (chain) => chain.toggleBulletList()),
+      block("orderedList", t("editor.orderedList"), "editor.slash.orderedList", "ol number 编号 有序", ListOrdered, (chain) => chain.toggleOrderedList()),
+      block("taskList", t("editor.taskList"), "editor.slash.taskList", "todo task checkbox 任务 待办", ListTodo, (chain) => chain.toggleTaskList()),
+      block("quote", t("editor.quote"), "editor.slash.quote", "blockquote 引用", TextQuote, (chain) => chain.toggleBlockquote()),
+      block("codeBlock", t("editor.codeBlock"), "editor.slash.codeBlock", "code pre 代码", SquareCode, (chain) => chain.toggleCodeBlock()),
+      {
+        id: "image",
+        label: t("editor.image"),
+        hint: t("editor.slash.image"),
+        keywords: "img picture photo 图片 上传",
+        icon: Image,
+        run: (editor, range) => {
+          editor.chain().focus().deleteRange(range).run();
+          pick();
+        },
+      },
+      block("table", t("editor.table"), "editor.slash.table", "grid 表格", Table, (chain) => chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true })),
+      block("divider", t("editor.divider"), "editor.slash.divider", "hr rule line 分割线 分隔", Minus, (chain) => chain.setHorizontalRule()),
+    ];
+  }, [t]);
+
+  const listOf = (found: Loss[]) =>
+    new Intl.ListFormat(locale, { type: "conjunction" }).format(
+      found.map((loss) => t(`editor.loss.${loss}` as Key)),
+    );
+
+  const switchMode = (next: Mode) => {
+    if (next === mode) return;
+    if (next === "visual") {
+      const found = losses(body.current);
+      if (found.length > 0) {
+        setSwitching(found);
+        return;
+      }
+    }
+    rememberMode(next);
+    setMode(next);
+    setLost([]);
+  };
 
   if (item.status === "loading") {
     return (
@@ -189,6 +333,12 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           : savedAt
             ? t("editor.savedAt", { time: clock.format(savedAt) })
             : t("editor.saved");
+  const settled = uploading === 0 && !saving && !item.dirty;
+
+  const focusBody = () => {
+    if (rich) rich.commands.focus("start");
+    else source.current?.focus();
+  };
 
   const aside = (
     <EditorAside
@@ -204,46 +354,52 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
 
   return (
     <div className="flex h-svh min-w-0 flex-col">
-      <header className="flex items-center gap-2.5 border-b px-3 py-2">
+      <header className="flex h-12 shrink-0 items-center gap-1.5 border-b px-2 sm:px-3">
         <SidebarTrigger className="md:hidden" />
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("editor.back")}
-          onClick={() => navigate({ name: "list", kind })}
-        >
-          <ChevronLeft />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("editor.back")}
+                onClick={() => navigate({ name: "list", kind })}
+              />
+            }
+          >
+            <ChevronLeft />
+          </TooltipTrigger>
+          <TooltipContent>{t("editor.back")}</TooltipContent>
+        </Tooltip>
 
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">
-            {draft.title || t("editor.untitled")}
-          </div>
-          <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
-            <Breadcrumb>
-              <BreadcrumbList className="gap-1 text-xs sm:gap-1">
-                <BreadcrumbItem>
-                  <BreadcrumbLink render={<a {...linkProps({ name: "list", kind })} />}>
-                    {kindLabel.many(kind)}
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator>/</BreadcrumbSeparator>
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="text-muted-foreground">
-                    {id ? t("editor.editing") : t("editor.creating")}
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <span aria-hidden>·</span>
-            <span className="truncate">{state}</span>
-          </div>
-        </div>
+        <Breadcrumb className="min-w-0 flex-1">
+          <BreadcrumbList className="flex-nowrap gap-1 sm:gap-1.5">
+            <BreadcrumbItem className="shrink-0">
+              <BreadcrumbLink render={<a {...linkProps({ name: "list", kind })} />}>
+                {kindLabel.many(kind)}
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="min-w-0">
+              <BreadcrumbPage className="truncate font-medium">
+                {draft.title || t("editor.untitled")}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-        <div className="hidden items-center gap-2.5 sm:flex">
-          <StatusBadge status={draft.status} />
-          <Separator orientation="vertical" className="data-vertical:h-4 data-vertical:self-center" />
+        <div className="hidden min-w-0 items-center gap-1.5 text-xs text-muted-foreground md:flex">
+          <span
+            aria-hidden
+            className={cn("size-1.5 shrink-0 rounded-full", settled ? "bg-success" : "bg-warning")}
+          />
+          <span className="truncate">{state}</span>
         </div>
+        <StatusBadge status={draft.status} className="hidden sm:inline-flex" />
+        <Separator
+          orientation="vertical"
+          className="mx-1 hidden data-vertical:h-4 data-vertical:self-center sm:block"
+        />
 
         <Toggle
           variant="outline"
@@ -306,49 +462,105 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
       <div className="flex min-h-0 flex-1">
         <div className={cn("flex min-w-0 flex-1 flex-col", preview && "hidden md:flex")}>
           <EditorToolbar
-            editor={() => editor.current}
-            format={item.base?.body_format ?? "markdown"}
-            onFiles={id ? attach : undefined}
+            editor={mode === "visual" ? rich : null}
+            mode={mode}
+            onMode={switchMode}
+            onPickImage={pick}
           />
+
+          {mode === "source" && lost.length > 0 && (
+            <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-1.5 text-xs text-muted-foreground">
+              <Info className="size-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">
+                {t("editor.lossNote", { what: listOf(lost) })}
+              </span>
+              <Button
+                variant="link"
+                size="xs"
+                className="h-auto p-0 text-brand"
+                onClick={() => switchMode("visual")}
+              >
+                {t("editor.switchAnyway")}
+              </Button>
+            </div>
+          )}
+
           <div className="min-h-0 flex-1 overflow-auto">
-            <div className="mx-auto max-w-[780px] px-6 pt-8 sm:px-10">
+            <div className="mx-auto max-w-[760px] px-6 pt-8 sm:px-10">
               {/* A textarea so a long title wraps; it still holds one line of text. */}
               <Textarea
                 rows={1}
+                autoFocus={!id}
                 value={draft.title}
                 onChange={(event) => item.edit({ title: event.target.value.replace(/\n/g, " ") })}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") event.preventDefault();
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    focusBody();
+                  }
                 }}
                 placeholder={t("editor.titlePlaceholder")}
                 aria-label={t("editor.titlePlaceholder")}
-                className="mb-4 min-h-0 resize-none rounded-none border-0 bg-transparent p-0 text-2xl font-bold tracking-tight shadow-none focus-visible:ring-0 md:text-2xl dark:bg-transparent"
+                className="mb-3 min-h-0 resize-none rounded-none border-0 bg-transparent p-0 text-[1.75rem] leading-tight font-bold tracking-tight shadow-none focus-visible:ring-0 md:text-[1.75rem] dark:bg-transparent"
               />
-              <Editor
-                value={draft.body}
-                onChange={(body) => item.edit({ body })}
-                placeholder={t("editor.bodyPlaceholder")}
-                onDropFiles={id ? attach : undefined}
-                onReady={(handle) => {
-                  editor.current = handle;
-                }}
-              />
+              {mode === "visual" ? (
+                <RichEditor
+                  value={draft.body}
+                  onChange={(body) => item.edit({ body })}
+                  placeholder={{ empty: t("editor.bodyPlaceholder"), line: t("editor.slashHint") }}
+                  base={item.base?.url}
+                  slash={slash}
+                  labels={{
+                    slashEmpty: t("editor.slashEmpty"),
+                    plain: t("editor.plainText"),
+                    language: t("editor.language"),
+                  }}
+                  upload={upload}
+                  onReady={setRich}
+                />
+              ) : (
+                <SourceEditor
+                  value={draft.body}
+                  onChange={(body) => item.edit({ body })}
+                  placeholder={t("editor.bodyPlaceholder")}
+                  onDropFiles={attach}
+                  onReady={(handle) => {
+                    source.current = handle;
+                  }}
+                />
+              )}
             </div>
           </div>
-          <footer className="flex items-center justify-between border-t px-4 py-1.5 text-xs text-muted-foreground">
+
+          <footer className="flex h-8 shrink-0 items-center justify-between border-t px-4 text-xs text-muted-foreground">
             <span>{t("editor.words", { count: countWords(draft.body) })}</span>
-            <span>{state}</span>
+            <span className="md:hidden">{state}</span>
+            <span className="hidden md:inline">Markdown</span>
           </footer>
         </div>
 
         {preview && (
           <div className="min-w-0 flex-1 md:border-l">
-            <Preview draft={draft} id={id} />
+            <Preview draft={draft} id={id} base={item.base?.url} />
           </div>
         )}
 
         {docked && <aside className="w-73 shrink-0 overflow-auto border-l">{aside}</aside>}
       </div>
+
+      <input
+        ref={picker}
+        type="file"
+        accept="image/*"
+        multiple
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          if (files.length > 0) void attach(files);
+          event.target.value = "";
+        }}
+      />
 
       <Sheet open={panel && !docked} onOpenChange={setPanel}>
         <SheetContent className="overflow-auto">
@@ -369,6 +581,20 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           onCancel={() => item.edit({})}
         />
       )}
+
+      <ConfirmDialog
+        open={switching !== null}
+        onOpenChange={(open) => !open && setSwitching(null)}
+        title={t("editor.switchTitle")}
+        description={t("editor.switchNote", { what: listOf(switching ?? []) })}
+        confirmLabel={t("editor.switchAnyway")}
+        onConfirm={() => {
+          setSwitching(null);
+          rememberMode("visual");
+          setMode("visual");
+          setLost([]);
+        }}
+      />
 
       <ConfirmDialog
         open={removing}
@@ -403,12 +629,4 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
       />
     </div>
   );
-}
-
-/** countWords counts a CJK character as a word, and a run of letters as one. */
-function countWords(text: string): number {
-  const cjk = /[぀-ヿ㐀-鿿가-힯]/g;
-  const characters = text.match(cjk)?.length ?? 0;
-  const words = text.replace(cjk, " ").match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
-  return characters + words;
 }

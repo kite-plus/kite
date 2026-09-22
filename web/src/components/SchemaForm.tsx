@@ -4,6 +4,7 @@ import { cn } from "cn";
 
 import type { components } from "@/api/schema";
 import { locales, useI18n, type Key } from "@/i18n";
+import { resolveLink } from "@/lib/links";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -265,7 +266,7 @@ function ImageField({
       {value ? (
         <div className="relative overflow-hidden rounded-lg border">
           <img
-            src={resolve(value, uploads.base)}
+            src={resolveLink(value, uploads.base)}
             alt=""
             className="aspect-video w-full bg-muted object-cover"
           />
@@ -302,15 +303,6 @@ function ImageField({
       {failed && <FieldDescription className="text-destructive">{failed}</FieldDescription>}
     </>
   );
-}
-
-/** resolve turns a link written relative to a page into one the admin can load. */
-function resolve(link: string, base?: string): string {
-  try {
-    return new URL(link, new URL(base ?? "/", window.location.origin)).toString();
-  } catch {
-    return link;
-  }
 }
 
 function inputType(type: string): string {
