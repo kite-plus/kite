@@ -77,66 +77,21 @@ export function useStatusCounts(kind: string, keys: readonly CountKey[] = everyC
 }
 
 /** useRecent lists what was touched last, which is where an author resumes. */
-export function useRecent(limit: number) {
+export function useRecent(limit: number, options: { kind?: string } = {}) {
   return useQuery({
-    queryKey: ["contents", "recent", limit],
+    queryKey: ["contents", "recent", limit, options.kind ?? ""],
     queryFn: async () =>
       unwrap(
         await api.GET("/contents", {
-          params: { query: { limit, sort: "-updated_at" } },
+          params: {
+            query: {
+              limit,
+              kind: options.kind ? [options.kind] : undefined,
+              sort: "-updated_at",
+            },
+          },
         }),
       ),
-  });
-}
-
-export interface TrendBucket {
-  /** The first instant of the month, as an ISO string. */
-  month: string;
-  count: number;
-}
-
-/** useTrend counts what was published in each of the last few months. */
-export function useTrend(kind: string, months: number) {
-  return useQuery({
-    queryKey: ["contents", "trend", kind, months],
-    staleTime: 60_000,
-    queryFn: async (): Promise<TrendBucket[]> => {
-      const now = new Date();
-      const starts = Array.from(
-        { length: months },
-        (_, i) => new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1),
-      );
-      const counts = new Array<number>(months).fill(0);
-
-      let cursor: string | undefined;
-      do {
-        const page = unwrap(
-          await api.GET("/contents", {
-            params: {
-              query: {
-                kind: [kind],
-                status: ["published"],
-                published_from: starts[0].toISOString(),
-                limit: 500,
-                cursor,
-              },
-            },
-          }),
-        );
-        for (const item of page.items) {
-          if (!item.published_at) continue;
-          const at = new Date(item.published_at);
-          const index =
-            (at.getFullYear() - starts[0].getFullYear()) * 12 +
-            at.getMonth() -
-            starts[0].getMonth();
-          if (index >= 0 && index < months) counts[index] += 1;
-        }
-        cursor = page.has_more ? page.next_cursor : undefined;
-      } while (cursor);
-
-      return starts.map((start, i) => ({ month: start.toISOString(), count: counts[i] }));
-    },
   });
 }
 
