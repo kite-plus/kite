@@ -122,7 +122,7 @@ with the server.
 |---|---|
 | **Dashboard** | what is published, what is still a draft, what is uncommitted, and a publishing trend by month |
 | **Content** | posts and pages, filtered and searched through the index rather than the filesystem |
-| **Editor** | Markdown with a live preview, front matter as a form, terms, slug, word count, and files dropped straight into the bundle |
+| **Editor** | A visual editor that reads and writes Markdown, with the source one click away, a live preview, front matter as a form, terms, slug, word count, and files dropped straight into the bundle |
 | **Taxonomies** | tags and categories as they actually exist across the content |
 | **Theme** | the settings the active theme declares in its `theme.yaml`, rendered as a form |
 | **Settings** | title, description, base URL and language |

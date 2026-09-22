@@ -518,7 +518,7 @@ my-blog/
 Studio (SPA)
  ├── API Client（由 OpenAPI 生成，禁止手写请求）
  ├── SchemaForm 渲染器  ← Theme Settings / ContentType Fields / Plugin Settings 共用
- ├── Editor（CodeMirror 6 + Markdown 扩展）
+ ├── Editor（Tiptap 可视化编辑 + CodeMirror 源码模式；存储始终是 Markdown）
  ├── Preview（iframe → serve runtime 的预览路由）
  ├── Media Library
  └── Publish Panel（DeliveryState 可视化）
@@ -541,7 +541,7 @@ Vite dev server + proxy 到 `kite run`；Release 模式读 embed FS。用构建 
 
 ### A4. 编辑器路线
 
-V1 只做 Markdown + 实时预览 + 图片拖拽上传 + 斜杠命令。**Block Editor 不是 V1 阻塞项**（[§32](#32-现在不要设计的东西)）。
+V1 的编辑器是 Tiptap 的可视化编辑（Markdown 进、Markdown 出，经 `@tiptap/markdown`），配一键切换的 CodeMirror 源码模式、服务端实时预览、图片拖拽上传和斜杠命令。存储格式始终是 Markdown，并且只有作者改动过正文才会重新序列化，"打开再保存"不动文件一个字节。用到脚注、内嵌 HTML 或 HTML 实体的文档默认以源码模式打开，因为可视化编辑器无法保留它们，切换前会明确提示。**Block Editor 不是 V1 阻塞项**（[§32](#32-现在不要设计的东西)）。
 
 ---
 
@@ -1299,7 +1299,7 @@ Hugo 在 v0.146 不得不重写整个模板系统并打断主题生态 `[EV]`。
 
 20. 写侧 API：`PUT` + `If-Match` → `Apply(ChangeSet)`
 21. SchemaForm 渲染器（三处复用）
-22. CodeMirror 编辑器 + **服务端**实时预览
+22. Tiptap 可视化编辑器 + CodeMirror 源码模式 + **服务端**实时预览
 23. 409 三方冲突 UI
 24. 拖图 → 拷进 page bundle → 插入相对路径
 25. 站点设置 + 主题设置页（由 `theme.yaml` 自动生成）
