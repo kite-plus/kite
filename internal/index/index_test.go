@@ -351,6 +351,55 @@ func TestDuplicateIDIsReportedAndNeitherFileIsLost(t *testing.T) {
 
 // A rename is the case a duplicate check must not mistake for a conflict: the
 // same id arrives at a new path, and the old path is gone.
+// A file the database refuses must cost only itself.
+//
+// Every file in a pass shares one transaction, so before each one was wrapped
+// in a savepoint a single unindexable file rolled the whole pass back: a post
+// deleted from disk went on appearing in the index, and a second delete of it
+// answered "not found" while the list still showed it.
+func TestARefusedFileDoesNotRollBackTheRestOfThePass(t *testing.T) {
+	root, types := newProject(t)
+	write(t, root, "content/posts/a/index.md", post(idA, "Alpha", "alpha"))
+	write(t, root, "content/posts/b/index.md", post(idB, "Beta", "beta"))
+
+	ix := openIndex(t, root, types)
+	if _, err := ix.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	// A second file claiming a slug that is taken: the read model requires
+	// (kind, slug, locale) to be unique and will not hold both.
+	write(t, root, "content/posts/clash/index.md", post(idC, "Clash", "alpha"))
+	if err := os.RemoveAll(filepath.Join(root, "content", "posts", "b")); err != nil {
+		t.Fatal(err)
+	}
+
+	stats, err := ix.Reconcile(t.Context())
+	if err == nil {
+		t.Fatal("the duplicate slug was accepted silently")
+	}
+	if !strings.Contains(err.Error(), "content/posts/clash/index.md") {
+		t.Errorf("the error should name the file it refused: %v", err)
+	}
+	if stats.Problems != 1 {
+		t.Errorf("problems = %d, want 1", stats.Problems)
+	}
+	if stats.Removed != 1 {
+		t.Errorf("removed = %d, want the deletion to reach the index anyway", stats.Removed)
+	}
+	if n, _ := ix.Count(t.Context()); n != 1 {
+		t.Errorf("count = %d, want 1: alpha stays, beta is gone, clash was refused", n)
+	}
+
+	r := reader.New(ix.DB())
+	if _, err := r.Get(t.Context(), idB); !errors.Is(err, content.ErrNotFound) {
+		t.Errorf("Get(beta) = %v, want not found: its folder is gone", err)
+	}
+	if _, err := r.Get(t.Context(), idA); err != nil {
+		t.Errorf("Get(alpha) = %v, want the unrelated post still indexed", err)
+	}
+}
+
 func TestRenamingAFileKeepsItsIdentity(t *testing.T) {
 	root, types := newProject(t)
 	write(t, root, "content/posts/before/index.md", post(idA, "Moved", "moved"))

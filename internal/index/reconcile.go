@@ -109,8 +109,13 @@ func (ix *Index) Reconcile(ctx context.Context) (Stats, error) {
 			})
 			return nil
 		}
-		if err := upsert(ctx, tx, entry, now); err != nil {
+		refused, err := indexOne(ctx, tx, entry, now)
+		if err != nil {
 			return err
+		}
+		if refused != nil {
+			problems = append(problems, file.Problem{Path: st.Path, Err: refused})
+			return nil
 		}
 		stats.Indexed++
 		return nil
@@ -188,6 +193,32 @@ func (ix *Index) knownFiles(ctx context.Context) (map[string]fileRow, error) {
 		out[path] = r
 	}
 	return out, rows.Err()
+}
+
+// indexOne records one file inside a savepoint.
+//
+// A row the database refuses comes back as refused, with that one file's
+// statements rolled back and the rest of the transaction intact. Letting the
+// refusal reach the transaction instead would discard every other change in
+// the pass -- including deletions -- so a single unindexable file would stop
+// the index tracking the tree at all, silently and for as long as it sat
+// there. err means the transaction itself is unusable.
+func indexOne(ctx context.Context, tx *sql.Tx, e *file.Entry, nowNS int64) (refused, err error) {
+	if _, err := tx.ExecContext(ctx, `SAVEPOINT file`); err != nil {
+		return nil, fmt.Errorf("index: savepoint for %s: %w", e.Path, err)
+	}
+	refused = upsert(ctx, tx, e, nowNS)
+	if refused != nil {
+		// ROLLBACK TO undoes the statements but leaves the savepoint on the
+		// stack; the RELEASE below is what pops it.
+		if _, err := tx.ExecContext(ctx, `ROLLBACK TO file`); err != nil {
+			return nil, fmt.Errorf("index: roll back %s: %w", e.Path, err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `RELEASE file`); err != nil {
+		return nil, fmt.Errorf("index: release savepoint for %s: %w", e.Path, err)
+	}
+	return refused, nil
 }
 
 func upsert(ctx context.Context, tx *sql.Tx, e *file.Entry, nowNS int64) error {
