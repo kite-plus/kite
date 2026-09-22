@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,12 @@ func TestTheStoredAccountHoldsNoPasswordAndIsReadableOnlyByItsOwner(t *testing.T
 		t.Errorf("the file holds no argon2id hash:\n%s", data)
 	}
 
+	// Windows has no permission bits to read back: the mode a file reports
+	// there is not what the file was created with, and says nothing about
+	// who can open it.
+	if runtime.GOOS == "windows" {
+		return
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
