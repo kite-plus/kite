@@ -1,10 +1,14 @@
 import { Suspense, lazy, useState, type ReactNode } from "react";
 import {
+  ChevronRight,
   ExternalLink,
+  FileText,
+  GitBranch,
   LayoutTemplate,
   PanelsTopLeft,
   Plus,
   Settings2,
+  Tags,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,7 +42,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -46,6 +49,11 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 const TrendChart = lazy(() => import("@/components/dashboard/TrendChart"));
 
 const ranges = [6, 12, 24];
+
+const kindIcons: Record<string, LucideIcon> = {
+  post: FileText,
+  page: PanelsTopLeft,
+};
 
 export function DashboardPage() {
   const { t, locale } = useI18n();
@@ -55,6 +63,7 @@ export function DashboardPage() {
   const kindLabel = useKindLabel();
 
   const kinds = types.data?.items.map((type) => type.kind) ?? ["post", "page"];
+  const shown = kinds.slice(0, 2);
   const primary = kinds[0] ?? "post";
   const problems = site.data?.problems?.length ?? 0;
 
@@ -104,42 +113,65 @@ export function DashboardPage() {
       <div className="flex flex-col gap-3.5">
         <IndexProblems />
 
-        <Card className="py-0">
-          <div className="grid grid-cols-2 gap-px bg-border lg:grid-cols-4">
-            {kinds.slice(0, 2).map((kind) => (
-              <KindStat key={kind} kind={kind} total={site.data?.counts?.[kind]} />
-            ))}
-            <TermsStat />
-            <DeliveryStat />
-          </div>
-        </Card>
+        {/* One four column grid for every row, so the gutters of one row
+            fall on those of the next whatever the width. */}
+        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+          {shown.map((kind) => (
+            <KindStat key={kind} kind={kind} total={site.data?.counts?.[kind]} />
+          ))}
+          <TermsStat />
+          <DeliveryStat />
 
-        <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          <TrendCard kind={primary} />
-          <div className="flex min-w-0 flex-col gap-3.5">
-            <QuickActions kinds={kinds.slice(0, 2)} />
-            <SystemCard kind={primary} />
-          </div>
-        </div>
+          <TrendCard kind={primary} className="sm:col-span-2 xl:col-span-3 xl:row-span-2" />
+          <QuickActions kinds={shown} />
+          <SystemCard kind={primary} />
 
-        <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <DeliveryCard />
-          <RecentCard kind={primary} />
+          <DeliveryCard className="sm:col-span-2 xl:col-span-1" />
+          <RecentCard kind={primary} className="sm:col-span-2 xl:col-span-3" />
         </div>
       </div>
     </Page>
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: ReactNode; note: ReactNode }) {
+/** One number, and where to go to see what it counts. */
+function Stat({
+  label,
+  icon: Icon,
+  value,
+  note,
+  route,
+}: {
+  label: string;
+  icon: LucideIcon;
+  value: ReactNode;
+  note: ReactNode;
+  route?: Route;
+}) {
   return (
-    <div className="bg-card px-5 py-4">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</div>
-      <div className="mt-1 truncate text-xs text-muted-foreground">{note}</div>
-    </div>
+    <Card className={cn("relative", route && "transition-colors hover:bg-muted/40")}>
+      <CardContent className="flex flex-col gap-2.5">
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span className="truncate">{label}</span>
+          <Icon className="size-3.5 shrink-0" />
+        </div>
+        <div className="text-2xl leading-none font-semibold tracking-tight tabular-nums">
+          {value}
+        </div>
+        <div className="truncate text-xs text-muted-foreground">{note}</div>
+      </CardContent>
+      {route && (
+        <a
+          {...linkProps(route)}
+          aria-label={label}
+          className="absolute inset-0 rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
+      )}
+    </Card>
   );
 }
+
+const Counting = () => <Skeleton className="h-6 w-10" />;
 
 function KindStat({ kind, total }: { kind: string; total?: number }) {
   const { t } = useI18n();
@@ -149,11 +181,13 @@ function KindStat({ kind, total }: { kind: string; total?: number }) {
   return (
     <Stat
       label={kindLabel.many(kind)}
-      value={total ?? counts.all ?? <Skeleton className="h-8 w-10" />}
+      icon={kindIcons[kind] ?? FileText}
+      value={total ?? counts.all ?? <Counting />}
       note={t("dashboard.statSplit", {
         published: counts.published ?? "–",
         draft: counts.draft ?? "–",
       })}
+      route={{ name: "list", kind }}
     />
   );
 }
@@ -167,17 +201,13 @@ function TermsStat() {
   return (
     <Stat
       label={t("nav.taxonomies")}
-      value={
-        taxonomies.data ? (
-          items.reduce((sum, item) => sum + item.terms, 0)
-        ) : (
-          <Skeleton className="h-8 w-10" />
-        )
-      }
+      icon={Tags}
+      value={taxonomies.data ? items.reduce((sum, item) => sum + item.terms, 0) : <Counting />}
       note={
         items.map((item) => `${item.terms} ${taxonomyLabel(item.name)}`).join(" · ") ||
         t("dashboard.noTaxonomies")
       }
+      route={{ name: "taxonomies" }}
     />
   );
 }
@@ -188,13 +218,19 @@ function DeliveryStat() {
 
   if (delivery.data && !canPublish(delivery.data)) {
     return (
-      <Stat label={t("dashboard.uncommitted")} value="–" note={t("dashboard.noPublisher")} />
+      <Stat
+        label={t("dashboard.uncommitted")}
+        icon={GitBranch}
+        value="–"
+        note={t("dashboard.noPublisher")}
+      />
     );
   }
   return (
     <Stat
       label={t("dashboard.uncommitted")}
-      value={delivery.data ? (delivery.data.dirty?.length ?? 0) : <Skeleton className="h-8 w-10" />}
+      icon={GitBranch}
+      value={delivery.data ? (delivery.data.dirty?.length ?? 0) : <Counting />}
       note={
         delivery.data?.ahead
           ? t("publish.toPush", { count: delivery.data.ahead })
@@ -204,17 +240,21 @@ function DeliveryStat() {
   );
 }
 
-function TrendCard({ kind }: { kind: string }) {
+function TrendCard({ kind, className }: { kind: string; className?: string }) {
   const { t } = useI18n();
+  const kindLabel = useKindLabel();
   const [months, setMonths] = useState(12);
   const trend = useTrend(kind, months);
   const empty = trend.data?.every((bucket) => bucket.count === 0);
 
   return (
-    <Card className="min-w-0">
+    <Card className={cn("min-w-0", className)}>
       <CardHeader>
-        <CardTitle className="text-sm">{t("dashboard.trend")}</CardTitle>
-        <CardAction>
+        <CardTitle className="text-sm font-semibold">{t("dashboard.trend")}</CardTitle>
+        <CardDescription className="text-xs">
+          {t("dashboard.trendNote", { kind: kindLabel.many(kind) })}
+        </CardDescription>
+        <CardAction className="self-center">
           <ToggleGroup
             size="sm"
             variant="outline"
@@ -230,7 +270,7 @@ function TrendCard({ kind }: { kind: string }) {
         </CardAction>
       </CardHeader>
       {/* The plot takes whatever height the row gives the card. */}
-      <CardContent className="relative min-h-48 flex-1">
+      <CardContent className="relative min-h-56 flex-1">
         <div className="absolute inset-0 px-(--card-spacing)">
           {!trend.data ? (
             <Skeleton className="size-full" />
@@ -257,9 +297,9 @@ function QuickActions({ kinds }: { kinds: string[] }) {
   const kindLabel = useKindLabel();
 
   const actions: { label: string; icon: LucideIcon; route: Route }[] = [
-    ...kinds.map((kind, i) => ({
+    ...kinds.map((kind) => ({
       label: t("list.newKind", { kind: kindLabel.one(kind) }),
-      icon: i === 0 ? Plus : PanelsTopLeft,
+      icon: kindIcons[kind] ?? FileText,
       route: { name: "edit", kind, id: null } as Route,
     })),
     { label: t("dashboard.manageTheme"), icon: LayoutTemplate, route: { name: "theme" } },
@@ -269,21 +309,21 @@ function QuickActions({ kinds }: { kinds: string[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">{t("dashboard.quickActions")}</CardTitle>
+        <CardTitle className="text-sm font-semibold">{t("dashboard.quickActions")}</CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-2">
+      <CardContent className="flex flex-col gap-0.5 px-2">
         {actions.map((action) => (
-          <Button
+          <a
             key={action.label}
-            variant="outline"
-            className="h-auto flex-col items-start gap-2 p-3"
-            onClick={() => navigate(action.route)}
+            {...linkProps(action.route)}
+            className="flex h-9 items-center gap-3 rounded-lg px-2 text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            <span className="flex size-7 items-center justify-center rounded-md bg-brand/10 text-brand">
-              <action.icon />
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand">
+              <action.icon className="size-4" />
             </span>
-            <span className="text-xs">{action.label}</span>
-          </Button>
+            <span className="min-w-0 flex-1 truncate">{action.label}</span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </a>
         ))}
       </CardContent>
     </Card>
@@ -308,20 +348,22 @@ function SystemCard({ kind }: { kind: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">{t("dashboard.system")}</CardTitle>
+        <CardTitle className="text-sm font-semibold">{t("dashboard.system")}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2.5 text-xs">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">{label}</span>
-            <span className="truncate font-mono">{value || "–"}</span>
-          </div>
-        ))}
+      <CardContent className="flex flex-col gap-3">
+        <dl className="divide-y text-xs">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex h-8 items-center justify-between gap-3">
+              <dt className="shrink-0 text-muted-foreground">{label}</dt>
+              <dd className="truncate font-mono">{value || "–"}</dd>
+            </div>
+          ))}
+        </dl>
         <Progress value={total ? (published / total) * 100 : 0} className="gap-2">
           <ProgressLabel className="text-xs font-normal text-muted-foreground">
             {t("dashboard.publishedShare", { kind: kindLabel.many(kind) })}
           </ProgressLabel>
-          <ProgressValue className="text-xs text-foreground">
+          <ProgressValue className="text-xs text-foreground tabular-nums">
             {() => `${published} / ${total}`}
           </ProgressValue>
         </Progress>
@@ -330,24 +372,33 @@ function SystemCard({ kind }: { kind: string }) {
   );
 }
 
-function DeliveryCard() {
+function DeliveryCard({ className }: { className?: string }) {
   const { t } = useI18n();
   const delivery = useDelivery();
   const dirty = delivery.data?.dirty ?? [];
+  const publisher = !delivery.data || canPublish(delivery.data);
 
   return (
-    <Card className="min-w-0">
+    <Card className={cn("min-w-0", className)}>
       <CardHeader>
-        <CardTitle className="text-sm">{t("publish.delivery")}</CardTitle>
+        <CardTitle className="text-sm font-semibold">{t("publish.delivery")}</CardTitle>
         {delivery.data?.branch && (
-          <CardDescription className="font-mono text-xs">
+          <CardDescription className="truncate font-mono text-xs">
             {delivery.data.branch}
             {delivery.data.remote ? ` → ${delivery.data.remote}` : ""}
           </CardDescription>
         )}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <DeliveryStages delivery={delivery.data} />
+        {publisher ? (
+          <DeliveryStages delivery={delivery.data} />
+        ) : (
+          <Empty className="py-6">
+            <EmptyHeader>
+              <EmptyTitle>{t("dashboard.noPublisher")}</EmptyTitle>
+            </EmptyHeader>
+          </Empty>
+        )}
         {dirty.length > 0 && (
           <ul className="flex flex-col gap-1 border-t pt-3 font-mono text-xs text-muted-foreground">
             {dirty.slice(0, 4).map((path) => (
@@ -363,14 +414,14 @@ function DeliveryCard() {
   );
 }
 
-function RecentCard({ kind }: { kind: string }) {
+function RecentCard({ kind, className }: { kind: string; className?: string }) {
   const { t, relative } = useI18n();
   const recent = useRecent(6);
 
   return (
-    <Card className="min-w-0">
+    <Card className={cn("min-w-0", className)}>
       <CardHeader>
-        <CardTitle className="text-sm">{t("dashboard.recent")}</CardTitle>
+        <CardTitle className="text-sm font-semibold">{t("dashboard.recent")}</CardTitle>
         <CardAction>
           <Button
             variant="link"
@@ -383,41 +434,40 @@ function RecentCard({ kind }: { kind: string }) {
           </Button>
         </CardAction>
       </CardHeader>
-      <CardContent className="px-1.5">
+      <CardContent>
         {!recent.data ? (
-          <div className="flex flex-col gap-2 px-2.5">
+          <div className="flex flex-col divide-y">
             {Array.from({ length: 4 }, (_, i) => (
-              <Skeleton key={i} className="h-8 w-full" />
+              <div key={i} className="flex h-10 items-center">
+                <Skeleton className="h-4 w-2/3" />
+              </div>
             ))}
           </div>
         ) : recent.data.items.length === 0 ? (
-          <Empty>
+          <Empty className="py-6">
             <EmptyHeader>
               <EmptyTitle>{t("dashboard.recentEmpty")}</EmptyTitle>
             </EmptyHeader>
           </Empty>
         ) : (
-          <ItemGroup className="gap-0">
+          // Fixed columns for the status and the time, so neither drifts
+          // with the width of the word beside it.
+          <ul className="divide-y">
             {recent.data.items.map((item) => (
-              <Item
-                key={item.id}
-                size="xs"
-                render={<a {...linkProps({ name: "edit", kind: item.kind, id: item.id })} />}
-              >
-                <ItemContent className="min-w-0">
-                  <ItemTitle className="w-full">
-                    <span className="truncate">{item.title || item.slug}</span>
-                  </ItemTitle>
-                </ItemContent>
-                <ItemActions className="gap-4 text-xs text-muted-foreground">
-                  <StatusDot status={item.status} className="hidden sm:inline-flex" />
-                  <span className="w-24 text-right whitespace-nowrap">
+              <li key={item.id}>
+                <a
+                  {...linkProps({ name: "edit", kind: item.kind, id: item.id })}
+                  className="grid h-10 grid-cols-[minmax(0,1fr)_6.5rem] items-center gap-3 text-sm outline-none transition-colors hover:text-brand focus-visible:text-brand sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem]"
+                >
+                  <span className="truncate font-medium">{item.title || item.slug}</span>
+                  <StatusDot status={item.status} className="hidden text-xs sm:inline-flex" />
+                  <span className="truncate text-right text-xs text-muted-foreground tabular-nums">
                     {relative(item.updated_at)}
                   </span>
-                </ItemActions>
-              </Item>
+                </a>
+              </li>
             ))}
-          </ItemGroup>
+          </ul>
         )}
       </CardContent>
     </Card>

@@ -92,6 +92,7 @@ export const en = {
   "dashboard.nothingToPush": "Nothing waiting to be pushed",
   "dashboard.noPublisher": "No publisher is configured",
   "dashboard.trend": "Publishing trend",
+  "dashboard.trendNote": "{kind} published, by month",
   "dashboard.trendSeries": "Published",
   "dashboard.months_one": "{count} month",
   "dashboard.months_other": "{count} months",

@@ -50,7 +50,7 @@ export default function TrendChart({ data }: { data: TrendBucket[] }) {
               />
             }
           />
-          <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} maxBarSize={24} />
+          <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} maxBarSize={36} />
         </BarChart>
       </ChartContainer>
 

@@ -87,6 +87,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "dashboard.nothingToPush": "没有待推送的提交",
   "dashboard.noPublisher": "没有配置发布器",
   "dashboard.trend": "发布趋势",
+  "dashboard.trendNote": "按月统计已发布的{kind}",
   "dashboard.trendSeries": "发布数",
   "dashboard.months_one": "{count} 个月",
   "dashboard.months_other": "{count} 个月",
