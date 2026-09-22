@@ -76,20 +76,14 @@ export function useStatusCounts(kind: string, keys: readonly CountKey[] = everyC
   >;
 }
 
-/** useRecent lists what was touched last, which is where an author resumes. */
-export function useRecent(limit: number, options: { kind?: string } = {}) {
+/** useLatest lists what went out last: published items, newest first. */
+export function useLatest(kind: string, limit: number, sort: string) {
   return useQuery({
-    queryKey: ["contents", "recent", limit, options.kind ?? ""],
+    queryKey: ["contents", "latest", kind, limit, sort],
     queryFn: async () =>
       unwrap(
         await api.GET("/contents", {
-          params: {
-            query: {
-              limit,
-              kind: options.kind ? [options.kind] : undefined,
-              sort: "-updated_at",
-            },
-          },
+          params: { query: { limit, kind: [kind], status: ["published"], sort } },
         }),
       ),
   });

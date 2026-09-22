@@ -5,6 +5,7 @@ import { cn } from "cn";
 import type { components } from "@/api/schema";
 import { locales, useI18n, type Key } from "@/i18n";
 import { resolveLink } from "@/lib/links";
+import { IconImage } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -220,17 +221,22 @@ function builtinLabel(field: SchemaField, t: (key: Key) => string): string | und
   return stock !== undefined && stock === field.label ? t(key as Key) : undefined;
 }
 
-/** An image is chosen by handing over a file, not by typing where one is. */
-function ImageField({
+/**
+ * An image is chosen by handing over a file, not by typing where one is.
+ * As a cover it waits in the admin design's striped drop zone.
+ */
+export function ImageField({
   id,
   value,
   onChange,
   uploads,
+  cover = false,
 }: {
   id: string;
   value: string;
   onChange: (value: unknown) => void;
   uploads: Uploads;
+  cover?: boolean;
 }) {
   const { t } = useI18n();
   const input = useRef<HTMLInputElement>(null);
@@ -267,7 +273,7 @@ function ImageField({
         }}
       />
       {value ? (
-        <div className="relative overflow-hidden rounded-lg border">
+        <div className={cn("relative overflow-hidden border", cover ? "rounded-[9px]" : "rounded-lg")}>
           <img
             src={resolveLink(value, uploads.base)}
             alt=""
@@ -287,6 +293,21 @@ function ImageField({
             </Button>
           </div>
         </div>
+      ) : cover ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => input.current?.click()}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            void take(event.dataTransfer.files[0]);
+          }}
+          className="flex h-[118px] w-full flex-col items-center justify-center gap-1.5 rounded-[9px] border border-dashed border-border-strong bg-[repeating-linear-gradient(45deg,#fafafa,#fafafa_6px,#f2f2f3_6px,#f2f2f3_12px)] text-subtle outline-none transition-colors hover:border-brand hover:text-brand focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_6px,rgb(255_255_255/0.03)_6px,rgb(255_255_255/0.03)_12px)]"
+        >
+          {busy ? <Spinner /> : <IconImage className="size-[18px]" strokeWidth={1.6} />}
+          <span className="font-mono text-[11px]">{t("editor.coverPrompt")}</span>
+        </button>
       ) : (
         <Button
           variant="outline"

@@ -1,13 +1,14 @@
 /*
- * Kite's side of the Simple Editor template: where it sits in the page, and
- * the blocks markdown has that the template does not style (tables, code
- * block languages). Colors come from the template's --tt-* variables, so
- * both follow dark mode together.
+ * Kite's side of the Simple Editor template: where it sits in the page, the
+ * admin design's toolbar and article styles, and the blocks markdown has that
+ * the template does not style (tables, code block languages). Colors come
+ * from the admin's tokens or the template's --tt-* variables, so both follow
+ * dark mode together.
  */
 
 .kite-editor {
   --tt-toolbar-bg-color: var(--background);
-  --tt-toolbar-border-color: var(--border);
+  --tt-toolbar-border-color: var(--divider);
 
   position: relative;
   // The toolbar reads the column's width, not the window's.
@@ -17,8 +18,43 @@
 /* =====================
      TOOLBAR
      ===================== */
+// Sized as the admin design draws its toolbar: 28px buttons on a 43px bar,
+// in the grey of the rest of its chrome.
 .tiptap-toolbar.kite-toolbar[data-variant="fixed"] {
   flex-shrink: 0;
+  min-height: 0;
+  gap: 2px;
+  padding: 7px 14px;
+
+  .tiptap-toolbar-group {
+    gap: 2px;
+  }
+
+  .tiptap-separator[data-orientation="vertical"] {
+    height: 16px;
+    margin: 0 5px;
+    background-color: var(--border);
+  }
+
+  .tiptap-button {
+    --tt-button-default-icon-color: var(--foreground-3);
+    --tt-button-default-text-color: var(--foreground-3);
+    --tt-button-default-dropdown-arrows-color: var(--foreground-3);
+    --tt-button-hover-bg-color: var(--muted);
+    --tt-button-hover-icon-color: var(--foreground);
+    --tt-button-hover-text-color: var(--foreground);
+
+    height: 28px;
+    min-width: 28px;
+    padding: 0 6px;
+    border-radius: 6px;
+    font-size: 12px;
+
+    .tiptap-button-icon {
+      width: 15px;
+      height: 15px;
+    }
+  }
 
   // The template docks the toolbar to the bottom of a phone screen, which
   // assumes it owns the page; here it stays under the header.
@@ -41,12 +77,6 @@
   gap: 0.25rem;
   padding-left: 0.25rem;
   background: var(--tt-toolbar-bg-color);
-}
-
-@container (max-width: 52rem) {
-  .kite-toolbar-modes .tiptap-button-text {
-    display: none;
-  }
 }
 
 .kite-toolbar-note {
@@ -78,9 +108,9 @@
      PAGE
      ===================== */
 .kite-editor-page {
-  max-width: 648px;
+  max-width: 780px;
   margin: 0 auto;
-  padding: 3rem 3rem 0;
+  padding: 1.875rem 2.5rem 0;
   overflow-wrap: break-word;
 
   @media (max-width: 480px) {
@@ -92,7 +122,7 @@
   display: block;
   width: 100%;
   min-height: 0;
-  margin: 0 0 1.5rem;
+  margin: 0 0 1.125rem;
   padding: 0;
   border: 0;
   outline: none;
@@ -100,10 +130,10 @@
   field-sizing: content;
   background: transparent;
   color: inherit;
-  font-size: 2rem;
+  font-size: 1.4375rem;
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  line-height: normal;
+  letter-spacing: -0.3px;
 
   &::placeholder {
     color: var(--tt-gray-light-a-400);
@@ -114,8 +144,61 @@
   }
 }
 
+// The design's article: 13.5px on 1.9, 14px between blocks, 26px above a
+// heading and 10px below it.
 .simple-editor-content .tiptap.ProseMirror.simple-editor {
   min-height: 40vh;
+  color: var(--prose);
+  font-size: 0.84375rem;
+  line-height: 1.9;
+
+  p:not(td p):not(th p) {
+    font-size: inherit;
+    line-height: inherit;
+    margin-top: 14px;
+  }
+
+  h2, h3, h4 {
+    margin-top: 26px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  h2 {
+    font-size: 17px;
+    line-height: 1.9;
+    letter-spacing: -0.2px;
+  }
+
+  :is(h2, h3, h4) + p:not(td p):not(th p) {
+    margin-top: 0;
+  }
+
+  blockquote {
+    margin: 14px 0;
+    border-left: 3px solid var(--brand);
+    padding: 2px 0 2px 14px;
+    color: var(--foreground-3);
+
+    // The template's own bar; the border above is the design's.
+    &::before {
+      display: none;
+    }
+
+    p:not(td p):not(th p):first-child {
+      margin-top: 0;
+    }
+  }
+
+  pre {
+    margin: 14px 0;
+  }
+
+  li p:not(td p):not(th p) {
+    margin-top: 0.25rem;
+  }
+
   // Room to scroll the last line up to where the eye is.
   padding-bottom: 30vh;
 }
@@ -123,7 +206,38 @@
 .tiptap.ProseMirror {
   code,
   pre {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+
+  code {
+    border-color: var(--border);
+    border-radius: 5px;
+    background-color: var(--muted);
+    color: inherit;
+    padding: 1px 6px;
+    font-size: 12px;
+  }
+
+  // Dark in both themes, as the design draws it.
+  pre {
+    border: none;
+    border-radius: 9px;
+    background-color: #18181b;
+    color: #e4e4e7;
+    padding: 14px 16px;
+    font-size: 12px;
+    line-height: 1.7;
+
+    code {
+      padding: 0;
+      font-size: inherit;
+      line-height: inherit;
+    }
+
+    .dark & {
+      background-color: #0c0c0e;
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
   }
 }
 
@@ -191,11 +305,6 @@
 .tiptap.ProseMirror .code-block {
   position: relative;
 
-  // The first line starts under the language, not beside it.
-  pre {
-    padding-top: 2.25rem;
-  }
-
   // The node view puts a block inside the code element; an inline code would
   // open an empty line above it.
   pre > code {
@@ -203,95 +312,71 @@
     padding: 0;
   }
 
+  // The language sits over the corner and shows when the block is in use,
+  // so the block itself keeps the design's padding.
   select {
     field-sizing: content;
     position: absolute;
     top: 0.375rem;
     right: 0.375rem;
     z-index: 1;
-    height: 1.5rem;
+    height: 1.375rem;
     padding: 0 0.5rem;
     appearance: none;
     border: none;
-    border-radius: var(--tt-radius-md);
+    border-radius: 5px;
     background: transparent;
-    color: var(--tt-gray-light-a-500);
-    font-size: 0.75rem;
-    font-weight: 500;
+    color: #a1a1aa;
+    font-size: 11px;
     line-height: 1;
     cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
 
     &:hover,
     &:focus-visible {
       outline: none;
-      background-color: var(--tt-gray-light-a-100);
-      color: var(--tt-gray-light-a-700);
+      background-color: rgb(255 255 255 / 0.1);
+      color: #e4e4e7;
     }
+  }
 
-    .dark & {
-      color: var(--tt-gray-dark-a-500);
-
-      &:hover,
-      &:focus-visible {
-        background-color: var(--tt-gray-dark-a-100);
-        color: var(--tt-gray-dark-a-700);
-      }
-    }
+  &:hover select,
+  &:focus-within select {
+    opacity: 1;
   }
 }
 
-// Highlighting classes from lowlight, in a light and a dark palette.
-.tiptap.ProseMirror {
+// Highlighting classes from lowlight, for the dark code block.
+.tiptap.ProseMirror pre {
   .hljs-comment,
   .hljs-quote {
-    color: var(--tt-gray-light-a-500);
+    color: #71717a;
     font-style: italic;
   }
   :is(.hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-type, .hljs-meta, .hljs-template-tag) {
-    color: oklch(0.52 0.19 25);
+    color: oklch(0.76 0.14 25);
   }
   :is(.hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute, .hljs-meta .hljs-string) {
-    color: oklch(0.45 0.12 250);
+    color: oklch(0.82 0.09 240);
   }
   :is(.hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-symbol) {
-    color: oklch(0.5 0.16 262);
+    color: oklch(0.78 0.11 255);
   }
   :is(.hljs-title, .hljs-section, .hljs-name, .hljs-function .hljs-title, .hljs-title.function_) {
-    color: oklch(0.5 0.19 300);
+    color: oklch(0.8 0.12 300);
   }
   :is(.hljs-built_in, .hljs-bullet, .hljs-link) {
-    color: oklch(0.5 0.14 60);
+    color: oklch(0.8 0.12 70);
   }
   .hljs-deletion {
-    color: oklch(0.5 0.19 20);
+    color: oklch(0.72 0.17 20);
   }
   .hljs-emphasis {
     font-style: italic;
   }
   .hljs-strong {
     font-weight: 600;
-  }
-
-  .dark & {
-    .hljs-comment,
-    .hljs-quote {
-      color: var(--tt-gray-dark-a-500);
-    }
-    :is(.hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-type, .hljs-meta, .hljs-template-tag) {
-      color: oklch(0.76 0.14 25);
-    }
-    :is(.hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute, .hljs-meta .hljs-string) {
-      color: oklch(0.82 0.09 240);
-    }
-    :is(.hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-symbol) {
-      color: oklch(0.78 0.11 255);
-    }
-    :is(.hljs-title, .hljs-section, .hljs-name, .hljs-function .hljs-title, .hljs-title.function_) {
-      color: oklch(0.8 0.12 300);
-    }
-    :is(.hljs-built_in, .hljs-bullet, .hljs-link) {
-      color: oklch(0.8 0.12 70);
-    }
   }
 }
 

@@ -1,8 +1,11 @@
 import { Fragment, useMemo, useState } from "react";
+import { Combobox as ComboboxPrimitive } from "@base-ui/react";
 import { Plus } from "lucide-react";
+import { cn } from "cn";
 
 import { useI18n } from "@/i18n";
 import { useTerms } from "@/hooks/useContents";
+import { IconChevronDown } from "@/components/icons";
 import {
   Combobox,
   ComboboxChip,
@@ -17,9 +20,17 @@ import {
 
 interface Props {
   id?: string;
+  /** label names the field for a screen reader, since the design shows none. */
+  label: string;
   taxonomy: string;
   value: string[];
   onChange: (value: string[]) => void;
+  /**
+   * select draws the field as the design draws a category: a dropdown box
+   * with the chosen terms as plain words. chips draws it as its tag box.
+   */
+  variant?: "chips" | "select";
+  placeholder?: string;
 }
 
 /**
@@ -28,7 +39,15 @@ interface Props {
  * Terms the project already uses are offered, since a tag typed slightly
  * differently is a second tag. Anything else typed becomes a new one.
  */
-export function TermsInput({ id, taxonomy, value, onChange }: Props) {
+export function TermsInput({
+  id,
+  label,
+  taxonomy,
+  value,
+  onChange,
+  variant = "chips",
+  placeholder,
+}: Props) {
   const { t } = useI18n();
   const anchor = useComboboxAnchor();
   const terms = useTerms(taxonomy);
@@ -45,6 +64,7 @@ export function TermsInput({ id, taxonomy, value, onChange }: Props) {
     () => (typed && !known.has(typed) ? [...known, typed] : [...known]),
     [known, typed],
   );
+  const select = variant === "select";
 
   return (
     <Combobox
@@ -67,17 +87,57 @@ export function TermsInput({ id, taxonomy, value, onChange }: Props) {
       inputValue={query}
       onInputValueChange={setQuery}
     >
-      <ComboboxChips ref={anchor}>
+      <ComboboxChips
+        ref={anchor}
+        className={cn(
+          "rounded-[7px] border-input bg-background text-xs",
+          select
+            ? "h-[30px] min-h-0 flex-nowrap gap-0 px-2.5 py-0 has-data-[slot=combobox-chip]:px-2.5"
+            : "min-h-9 gap-1.5 px-2 py-[5px] has-data-[slot=combobox-chip]:px-2",
+        )}
+      >
         <ComboboxValue>
           {(chosen: string[]) => (
             <Fragment>
-              {chosen.map((term) => (
-                <ComboboxChip key={term}>{term}</ComboboxChip>
-              ))}
+              {chosen.map((term, i) =>
+                select ? (
+                  <ComboboxChip
+                    key={term}
+                    showRemove={false}
+                    className="h-auto shrink-0 rounded-none bg-transparent p-0 text-xs font-normal"
+                  >
+                    {i < chosen.length - 1 ? `${term}、` : term}
+                  </ComboboxChip>
+                ) : (
+                  <ComboboxChip
+                    key={term}
+                    showRemove={false}
+                    className="h-auto gap-[5px] rounded-[5px] bg-muted px-[7px] py-0.5 text-[11.5px] font-normal text-foreground-2"
+                  >
+                    {term}
+                    <ComboboxPrimitive.ChipRemove
+                      aria-label={t("editor.removeTerm", { term })}
+                      className="cursor-pointer text-subtle transition-colors hover:text-foreground"
+                    >
+                      ×
+                    </ComboboxPrimitive.ChipRemove>
+                  </ComboboxChip>
+                ),
+              )}
               <ComboboxChipsInput
                 id={id}
-                placeholder={chosen.length === 0 ? t("editor.addTerm") : ""}
+                aria-label={label}
+                placeholder={select && chosen.length > 0 ? "" : placeholder}
+                className="min-w-[60px] bg-transparent text-xs placeholder:text-subtle"
               />
+              {select && (
+                <ComboboxPrimitive.Trigger
+                  aria-label={label}
+                  className="ml-auto flex shrink-0 items-center text-muted-foreground outline-none"
+                >
+                  <IconChevronDown className="size-3" />
+                </ComboboxPrimitive.Trigger>
+              )}
             </Fragment>
           )}
         </ComboboxValue>

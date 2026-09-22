@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { EditorContext, type Editor } from "@tiptap/react";
-import { FileCode2, PenLine } from "lucide-react";
 
 import { useI18n } from "@/i18n";
 import { resolveLink } from "@/lib/links";
@@ -18,7 +17,6 @@ import { LinkButton, LinkContent, LinkPopover } from "@/components/tiptap-ui/lin
 import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu";
 import { MarkButton } from "@/components/tiptap-ui/mark-button";
 import { SearchAndReplace, SearchAndReplaceButton } from "@/components/tiptap-ui/search-and-replace";
-import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button";
 import { Button } from "@/components/tiptap-ui-primitive/button";
 import { Spacer } from "@/components/tiptap-ui-primitive/spacer";
 import { Toolbar, ToolbarGroup, ToolbarSeparator } from "@/components/tiptap-ui-primitive/toolbar";
@@ -39,9 +37,10 @@ const searchScroll: ScrollIntoViewOptions = { block: "center" };
 /**
  * The Simple Editor template's toolbar, holding only what markdown can say.
  *
- * The groups are the template's; its alignment, highlight, underline and
- * super/subscript buttons are gone, and a table menu and the switch between
- * the visual editor and the markdown take their place.
+ * It is laid out as the admin design draws it: left-aligned, the design's
+ * buttons first and in its order, then the tools it leaves out, and the
+ * markdown switch at the far end. Undo and redo are left to the keyboard, as
+ * the design has no buttons for them.
  */
 export function EditorToolbar({ editor, mode, onMode, onPickImage, base }: Props) {
   const { t } = useI18n();
@@ -68,41 +67,19 @@ export function EditorToolbar({ editor, mode, onMode, onPickImage, base }: Props
     searchButton.current?.focus();
   }, []);
 
-  // The end of the bar stays in reach when the tools scroll sideways.
+  // The end of the bar stays in reach when the tools scroll sideways. The
+  // switch is one toggle, pressed while the markdown itself is showing.
   const end = (search?: ReactNode) => (
     <div className="kite-toolbar-end">
-      {search && (
-        <>
-          <ToolbarGroup>{search}</ToolbarGroup>
-          <ToolbarSeparator />
-        </>
-      )}
-      <ToolbarGroup className="kite-toolbar-modes">
-        {(["visual", "source"] as const).map((each) => (
-          <Button
-            key={each}
-            type="button"
-            variant="ghost"
-            role="button"
-            tabIndex={-1}
-            data-active-state={mode === each ? "on" : "off"}
-            aria-pressed={mode === each}
-            aria-label={t(each === "visual" ? "editor.visual" : "editor.source")}
-            tooltip={t(each === "visual" ? "editor.visual" : "editor.source")}
-            onClick={() => onMode(each)}
-          >
-            {each === "visual" ? (
-              <PenLine className="tiptap-button-icon" />
-            ) : (
-              <FileCode2 className="tiptap-button-icon" />
-            )}
-            {/* Hidden by editor.scss when the column is too narrow for it. */}
-            <span className="tiptap-button-text">
-              {t(each === "visual" ? "editor.visual" : "editor.source")}
-            </span>
-          </Button>
-        ))}
-      </ToolbarGroup>
+      {search && <ToolbarGroup>{search}</ToolbarGroup>}
+      <button
+        type="button"
+        aria-pressed={mode === "source"}
+        onClick={() => onMode(mode === "source" ? "visual" : "source")}
+        className="h-[26px] shrink-0 rounded-[6px] bg-muted px-2.5 text-[11.5px] whitespace-nowrap text-foreground-3 outline-none transition-colors hover:bg-border focus-visible:ring-2 focus-visible:ring-ring/50 aria-pressed:bg-input aria-pressed:font-medium aria-pressed:text-foreground"
+      >
+        {t("editor.source")}
+      </button>
     </div>
   );
 
@@ -147,40 +124,31 @@ export function EditorToolbar({ editor, mode, onMode, onPickImage, base }: Props
   } else {
     content = (
       <>
-        <Spacer />
-
-        <ToolbarGroup>
-          <UndoRedoButton action="undo" />
-          <UndoRedoButton action="redo" />
-        </ToolbarGroup>
-
-        <ToolbarSeparator />
-
-        <ToolbarGroup>
-          <HeadingDropdownMenu modal={false} levels={[1, 2, 3, 4]} />
-          <ListDropdownMenu modal={false} types={["bulletList", "orderedList", "taskList"]} />
-          <BlockquoteButton />
-          <CodeBlockButton />
-        </ToolbarGroup>
-
-        <ToolbarSeparator />
-
         <ToolbarGroup>
           <MarkButton type="bold" />
           <MarkButton type="italic" />
-          <MarkButton type="strike" />
-          <MarkButton type="code" />
+          <HeadingDropdownMenu modal={false} levels={[1, 2, 3, 4]} />
+        </ToolbarGroup>
+
+        <ToolbarSeparator />
+
+        <ToolbarGroup>
           {isMobile ? (
             <LinkButton onClick={() => setLinking(true)} />
           ) : (
             <LinkPopover resolveUrl={resolveUrl} />
           )}
+          <ImageUploadButton />
+          <CodeBlockButton />
+          <ListDropdownMenu modal={false} types={["bulletList", "orderedList", "taskList"]} />
         </ToolbarGroup>
 
         <ToolbarSeparator />
 
         <ToolbarGroup>
-          <ImageUploadButton />
+          <BlockquoteButton />
+          <MarkButton type="strike" />
+          <MarkButton type="code" />
           <TableMenu />
         </ToolbarGroup>
 

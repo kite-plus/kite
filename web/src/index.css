@@ -11,7 +11,7 @@
   --foreground: oklch(0.141 0.005 285.823);
   --muted: oklch(0.967 0.001 286.375);
   --muted-foreground: oklch(0.552 0.016 285.938);
-  --border: oklch(0.92 0.004 286.32);
+  --border: #ececee;
   --accent: oklch(0.967 0.001 286.375);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
@@ -26,7 +26,7 @@
   --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.705 0.015 286.067);
   /* The mark's blue, #4A77D6: links, charts and accents, never buttons. */
-  --brand: oklch(0.573 0.143 262.5);
+  --brand: #4a77d6;
   --brand-foreground: oklch(0.985 0 0);
   --success: oklch(0.627 0.194 149.214);
   --warning: oklch(0.666 0.179 58.318);
@@ -36,13 +36,27 @@
   --chart-4: oklch(0.37 0.013 285.805);
   --chart-5: oklch(0.274 0.006 286.033);
   --radius: 0.625rem;
+  /* The design's zinc steps between foreground and muted-foreground, and the
+     two below it: chip and row text, secondary chrome, then dates and counts,
+     then row numbers and chevrons. */
+  --foreground-2: #3f3f46;
+  --foreground-3: #52525b;
+  --subtle: #a1a1aa;
+  --faint: #c9c9cf;
+  --prose: #27272a;
+  --surface: #fcfcfc;
+  --hover: #fafafa;
+  --divider: #f0f0f1;
+  --border-strong: #d4d4d8;
+  --brand-soft: #eef2fb;
+  --control-radius: 0.4375rem;
   --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
   --sidebar-primary: oklch(0.21 0.006 285.885);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.967 0.001 286.375);
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
+  --sidebar-border: var(--border);
   --sidebar-ring: oklch(0.705 0.015 286.067);
 }
 
@@ -62,10 +76,13 @@
  */
 @theme inline {
   --font-heading: var(--font-sans);
+  /* The design's stack, unchanged. Chrome does not know -apple-system, so
+     there Latin text falls through to PingFang SC as it does in the design;
+     adding BlinkMacSystemFont would switch it to SF and change every word. */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, Menlo, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -79,6 +96,25 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-foreground-2: var(--foreground-2);
+  --color-foreground-3: var(--foreground-3);
+  --color-subtle: var(--subtle);
+  --color-faint: var(--faint);
+  --color-prose: var(--prose);
+  --color-surface: var(--surface);
+  --color-hover: var(--hover);
+  --color-divider: var(--divider);
+  --color-border-strong: var(--border-strong);
+  --color-brand-soft: var(--brand-soft);
+  /* The design sets no line-height anywhere, so every line is the font's own
+     normal height; a fixed ratio drifts a pixel per line against it. */
+  --text-xs--line-height: normal;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: normal;
+  --text-base--line-height: normal;
+  --text-lg--line-height: normal;
+  --text-xl--line-height: normal;
+  --text-2xl--line-height: normal;
   --color-warning: var(--warning);
   --color-success: var(--success);
   --color-brand-foreground: var(--brand-foreground);
@@ -104,7 +140,7 @@
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-xl: calc(var(--radius) * 1.2);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
@@ -113,6 +149,16 @@
  ---break---
  */
 .dark {
+  --foreground-2: #d4d4d8;
+  --foreground-3: #b4b4bc;
+  --subtle: #92929c;
+  --faint: #5d5d66;
+  --prose: #e4e4e7;
+  --surface: #202023;
+  --hover: oklch(1 0 0 / 4%);
+  --divider: oklch(1 0 0 / 7%);
+  --border-strong: oklch(1 0 0 / 22%);
+  --brand-soft: color-mix(in oklab, var(--brand) 16%, transparent);
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -148,4 +194,31 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
+}
+
+@layer base {
+  html {
+    line-height: normal;
+  }
+
+  body {
+    font-size: 0.8125rem;
+  }
+
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 18%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }

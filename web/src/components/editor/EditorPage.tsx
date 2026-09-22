@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChainedCommands, Editor } from "@tiptap/react";
-import {
-  ChevronLeft,
-  Eye,
-  Info,
-  Minus,
-  SlidersHorizontal,
-  Table,
-  Type,
-  Upload,
-  XCircle,
-} from "lucide-react";
+import { ChevronLeft, Info, Minus, SlidersHorizontal, Table, Type, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
 
@@ -20,10 +10,11 @@ import { useItem } from "@/hooks/useItem";
 import { useKindLabel } from "@/hooks/useKindLabel";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { canPublish, useDelivery, usePublish } from "@/hooks/usePublish";
+import { isoDate } from "@/lib/dates";
 import { linkProps, navigate, setGuard } from "@/lib/router";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { StatusBadge } from "@/components/StatusDot";
+import { StatusPill } from "@/components/StatusDot";
 import { ConflictDialog } from "@/components/editor/ConflictDialog";
 import { EditorAside } from "@/components/editor/EditorAside";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
@@ -39,6 +30,7 @@ import { Preview } from "@/components/editor/Preview";
 import { RichEditor } from "@/components/editor/RichEditor";
 import type { SlashItem } from "@/components/editor/SlashMenu";
 import { SourceEditor, type SourceHandle } from "@/components/editor/SourceEditor";
+import { IconChevronLeft } from "@/components/icons";
 import { BlockquoteIcon } from "@/components/tiptap-icons/blockquote-icon";
 import { CodeBlockIcon } from "@/components/tiptap-icons/code-block-icon";
 import { HeadingFourIcon } from "@/components/tiptap-icons/heading-four-icon";
@@ -50,21 +42,11 @@ import { ListIcon } from "@/components/tiptap-icons/list-icon";
 import { ListOrderedIcon } from "@/components/tiptap-icons/list-ordered-icon";
 import { ListTodoIcon } from "@/components/tiptap-icons/list-todo-icon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
-import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // The template's variables and animations, which its own install puts in the
@@ -72,6 +54,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import "@/styles/_variables.scss";
 import "@/styles/_keyframe-animations.scss";
 import "@/components/editor/editor.scss";
+
+// The header's buttons are the design's smaller ones: 32px high, 12.5px.
+const headButton = "h-8 px-3 text-[12.5px] font-normal text-foreground-2";
+const primaryButton = "h-8 px-3.5 text-[12.5px] font-medium";
 
 export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const { t, locale } = useI18n();
@@ -341,6 +327,15 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             : t("editor.saved");
   const settled = uploading === 0 && !saving && !item.dirty;
 
+  const words = countWords(draft.body);
+  // A save from today reads as a time; an older one needs its date too.
+  const stamp = (at: Date) =>
+    at.toDateString() === new Date().toDateString()
+      ? clock.format(at)
+      : `${isoDate(at.toISOString())} ${clock.format(at)}`;
+  const saved = savedAt ?? (item.base?.updated_at ? new Date(item.base.updated_at) : null);
+  const lastSaved = saved ? t("editor.lastSaved", { time: stamp(saved) }) : "";
+
   const focusBody = () => {
     if (rich) rich.commands.focus("start");
     else source.current?.focus();
@@ -360,92 +355,85 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
 
   return (
     <div className="flex h-svh min-w-0 flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-1.5 border-b px-2 sm:px-3">
+      <header className="flex shrink-0 items-center gap-3 border-b bg-background px-2 py-2.5 sm:px-4">
         <SidebarTrigger className="md:hidden" />
         <Tooltip>
           <TooltipTrigger
             render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
+              <button
+                type="button"
                 aria-label={t("editor.back")}
                 onClick={() => navigate({ name: "list", kind })}
+                className="flex size-[30px] shrink-0 items-center justify-center rounded-[7px] text-foreground-3 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
               />
             }
           >
-            <ChevronLeft />
+            <IconChevronLeft className="size-4" />
           </TooltipTrigger>
           <TooltipContent>{t("editor.back")}</TooltipContent>
         </Tooltip>
 
-        <Breadcrumb className="min-w-0 flex-1">
-          <BreadcrumbList className="flex-nowrap gap-1 sm:gap-1.5">
-            <BreadcrumbItem className="shrink-0">
-              <BreadcrumbLink render={<a {...linkProps({ name: "list", kind })} />}>
-                {kindLabel.many(kind)}
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage className="truncate font-medium">
-                {draft.title || t("editor.untitled")}
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        <div className="hidden min-w-0 items-center gap-1.5 text-xs text-muted-foreground md:flex">
-          <span
-            aria-hidden
-            className={cn("size-1.5 shrink-0 rounded-full", settled ? "bg-success" : "bg-warning")}
-          />
-          <span className="truncate">{state}</span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13.5px] font-semibold">
+            {draft.title || t("editor.untitled")}
+          </div>
+          <div className="mt-px truncate text-[11px] text-subtle">
+            <a {...linkProps({ name: "list", kind })} className="transition-colors hover:text-foreground-3">
+              {kindLabel.many(kind)}
+            </a>
+            {" / "}
+            {id ? t("editor.editing") : t("editor.creating")}
+            {" · "}
+            <span className={cn(!settled && "text-warning")}>{state}</span>
+          </div>
         </div>
-        <StatusBadge status={draft.status} className="hidden sm:inline-flex" />
-        <Separator
-          orientation="vertical"
-          className="mx-1 hidden data-vertical:h-4 data-vertical:self-center sm:block"
-        />
 
-        <Toggle
+        <StatusPill status={draft.status} className="hidden sm:inline-flex" />
+        <span aria-hidden className="hidden h-[18px] w-px shrink-0 bg-border sm:block" />
+
+        <Button
           variant="outline"
-          size="sm"
-          pressed={preview}
-          onPressedChange={setPreview}
-          className="hidden sm:inline-flex"
+          aria-pressed={preview}
+          onClick={() => setPreview(!preview)}
+          className={cn(headButton, "hidden sm:inline-flex aria-pressed:bg-muted aria-pressed:text-foreground")}
         >
-          <Eye />
           {t("editor.preview")}
-        </Toggle>
+        </Button>
         {!docked && (
           <Button
             variant="outline"
-            size="icon-sm"
+            size="icon"
             aria-label={t("editor.panel")}
             onClick={() => setPanel(true)}
+            className="size-8 shrink-0 text-foreground-2"
           >
-            <SlidersHorizontal />
+            <SlidersHorizontal className="size-3.5" />
           </Button>
         )}
 
         {canPublish(delivery.data) ? (
           <>
-            <Button variant="outline" size="sm" disabled={!item.dirty || busy} onClick={() => void save()}>
-              {saving && <Spinner data-icon="inline-start" />}
+            <Button
+              variant="outline"
+              className={headButton}
+              disabled={!item.dirty || busy}
+              onClick={() => void save()}
+            >
+              {saving && <Spinner />}
               {t("editor.save")}
             </Button>
-            <Button size="sm" disabled={busy} onClick={() => void ship()}>
-              {publish.pending ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <Upload data-icon="inline-start" />
-              )}
-              {publish.needsConfirmation ? t("publish.anyway") : t("publish.action")}
+            <Button className={primaryButton} disabled={busy} onClick={() => void ship()}>
+              {publish.pending && <Spinner />}
+              {publish.needsConfirmation
+                ? t("publish.anyway")
+                : draft.status === "published"
+                  ? t("publish.update")
+                  : t("publish.action")}
             </Button>
           </>
         ) : (
-          <Button size="sm" disabled={!item.dirty || busy} onClick={() => void save()}>
-            {saving && <Spinner data-icon="inline-start" />}
+          <Button className={primaryButton} disabled={!item.dirty || busy} onClick={() => void save()}>
+            {saving && <Spinner />}
             {t("editor.save")}
           </Button>
         )}
@@ -540,10 +528,12 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             </div>
           </div>
 
-          <footer className="flex h-8 shrink-0 items-center justify-between border-t px-4 text-xs text-muted-foreground">
-            <span>{t("editor.words", { count: countWords(draft.body) })}</span>
-            <span className="md:hidden">{state}</span>
-            <span className="hidden md:inline">Markdown</span>
+          <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-divider px-4 py-1.5 text-[11.5px] text-subtle">
+            <span className="truncate">
+              {t("editor.words", { count: words, n: new Intl.NumberFormat(locale).format(words) })}
+              {" · Markdown"}
+            </span>
+            <span className="shrink-0">{lastSaved}</span>
           </footer>
         </div>
 
