@@ -1,27 +1,43 @@
 import {
+  ChevronsUpDown,
+  ExternalLink,
   File,
   FileText,
+  Languages,
   LayoutDashboard,
   LayoutTemplate,
   LogOut,
   PanelsTopLeft,
   Search,
   Settings2,
+  SunMoon,
   Tags,
   type LucideIcon,
 } from "lucide-react";
 
-import { useI18n, type Key } from "@/i18n";
+import { locales, useI18n, type Key, type Locale } from "@/i18n";
 import { useContentTypes, useSite } from "@/hooks/useContents";
 import { useKindLabel } from "@/hooks/useKindLabel";
 import { useSession, useSignOut } from "@/hooks/useSession";
 import { linkProps, type Route } from "@/lib/router";
+import { useTheme, type Theme } from "@/lib/theme";
 
 import { KiteMark } from "@/components/KiteMark";
-import { LanguagePicker } from "@/components/LanguagePicker";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
 import {
   Sidebar,
@@ -34,15 +50,20 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
+  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const kindIcons: Record<string, LucideIcon> = {
   post: FileText,
   page: PanelsTopLeft,
 };
+
+const appearances: { value: Theme; label: Key }[] = [
+  { value: "light", label: "settings.light" },
+  { value: "dark", label: "settings.dark" },
+  { value: "system", label: "settings.system" },
+];
 
 interface Entry {
   route: Route;
@@ -116,30 +137,44 @@ export function AppSidebar({ route, onSearch }: { route: Route; onSearch: () => 
 
   return (
     // The rail is chrome: a stray drag should not highlight the navigation.
-    <Sidebar className="select-none">
-      <SidebarHeader className="gap-3 p-3">
-        <a
-          {...linkProps({ name: "dashboard" })}
-          className="flex items-center gap-2 px-1.5 pt-0.5 text-foreground"
-        >
-          <KiteMark className="size-6.5" />
-          <span className="text-lg font-bold tracking-tight">Kite</span>
-          {site.data?.version && (
-            <Badge variant="outline" className="mt-0.5 max-w-24 font-normal text-muted-foreground">
-              <span className="truncate">{site.data.version}</span>
-            </Badge>
-          )}
-        </a>
-
-        <Button
-          variant="outline"
-          className="w-full justify-start font-normal text-muted-foreground"
-          onClick={onSearch}
-        >
-          <Search data-icon="inline-start" />
-          {t("nav.search")}
-          <Kbd className="ml-auto">⌘K</Kbd>
-        </Button>
+    // It folds to a strip of icons, so every button also carries its name.
+    <Sidebar collapsible="icon" className="select-none">
+      <SidebarHeader className="gap-1 p-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="Kite"
+              className="h-10 gap-2.5 text-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-1!"
+              render={<a {...linkProps({ name: "dashboard" })} />}
+            >
+              <KiteMark className="size-6! shrink-0" />
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="text-lg font-bold tracking-tight">Kite</span>
+                {site.data?.version && (
+                  <Badge
+                    variant="outline"
+                    className="mt-0.5 max-w-24 font-normal text-muted-foreground"
+                  >
+                    <span className="truncate">{site.data.version}</span>
+                  </Badge>
+                )}
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip={t("nav.search")}
+              onClick={onSearch}
+              className="border border-border bg-background text-muted-foreground shadow-xs hover:bg-muted group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:shadow-none dark:border-input dark:bg-input/30"
+            >
+              <Search />
+              <span>{t("nav.search")}</span>
+              <Kbd className="ml-auto group-data-[collapsible=icon]:hidden">⌘K</Kbd>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent>
@@ -158,9 +193,9 @@ export function AppSidebar({ route, onSearch }: { route: Route; onSearch: () => 
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarSeparator className="mx-0" />
         <Account />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
@@ -173,6 +208,7 @@ function NavItem({ entry }: { entry: Entry }) {
     <SidebarMenuItem>
       <SidebarMenuButton
         isActive={entry.active}
+        tooltip={entry.label}
         render={
           <a
             href={link.href}
@@ -190,9 +226,14 @@ function NavItem({ entry }: { entry: Entry }) {
   );
 }
 
-/** Who is signed in. A server with no account says so instead. */
+/**
+ * Who is signed in, and the things that are theirs rather than the site's:
+ * the language the studio speaks, its appearance, and the way out.
+ */
 function Account() {
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
+  const { isMobile } = useSidebar();
+  const { theme, setTheme } = useTheme();
   const session = useSession();
   const signOut = useSignOut();
 
@@ -200,37 +241,98 @@ function Account() {
   const name = user ?? t("session.local");
 
   return (
-    <div className="flex items-center gap-2 px-1 pb-1">
-      <Avatar>
-        <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
-          {name.slice(0, 1).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-      <div className="min-w-0 flex-1 leading-tight">
-        <div className="truncate text-sm font-medium text-foreground">{name}</div>
-        <div className="truncate text-xs text-muted-foreground">
-          {user ? t("session.role") : t("session.localNote")}
-        </div>
-      </div>
-      <LanguagePicker />
-      {user && (
-        <Tooltip>
-          <TooltipTrigger
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger
             render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t("session.signOut")}
-                disabled={signOut.isPending}
-                onClick={() => signOut.mutate()}
+              <SidebarMenuButton
+                size="lg"
+                tooltip={name}
+                className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
               />
             }
           >
-            <LogOut />
-          </TooltipTrigger>
-          <TooltipContent>{t("session.signOut")}</TooltipContent>
-        </Tooltip>
-      )}
-    </div>
+            <Avatar className="size-8 rounded-lg">
+              <AvatarFallback className="rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
+                {name.slice(0, 1).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <span className="grid min-w-0 flex-1 text-left leading-tight">
+              <span className="truncate text-sm font-medium">{name}</span>
+              <span className="truncate text-xs text-muted-foreground">
+                {user ? t("session.role") : t("session.localNote")}
+              </span>
+            </span>
+            <ChevronsUpDown className="ml-auto text-muted-foreground" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side={isMobile ? "bottom" : "right"}
+            align="end"
+            sideOffset={8}
+            className="min-w-52"
+          >
+            <DropdownMenuGroup>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Languages />
+                  {t("nav.language")}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {/* A radio group rather than a list of commands: one of
+                      these is already true, and the menu should say which. */}
+                  <DropdownMenuRadioGroup
+                    value={locale}
+                    onValueChange={(next) => setLocale(next as Locale)}
+                  >
+                    {(Object.keys(locales) as Locale[]).map((code) => (
+                      <DropdownMenuRadioItem key={code} value={code}>
+                        {locales[code].label}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <SunMoon />
+                  {t("settings.appearance")}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup
+                    value={theme}
+                    onValueChange={(next) => setTheme(next as Theme)}
+                  >
+                    {appearances.map((item) => (
+                      <DropdownMenuRadioItem key={item.value} value={item.value}>
+                        {t(item.label)}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem render={<a href="/" target="_blank" rel="noreferrer" />}>
+                <ExternalLink />
+                {t("nav.viewSite")}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            {user && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem disabled={signOut.isPending} onClick={() => signOut.mutate()}>
+                    <LogOut />
+                    {t("session.signOut")}
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }
