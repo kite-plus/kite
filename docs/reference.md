@@ -248,7 +248,9 @@ cache: delete it, rebuild, and the same rows come back.
 
 **Your files are edited, not rewritten.** Saving a document rewrites only the
 keys that changed. Key order, comments and flow-style lists survive untouched,
-so changing a title produces a one-line diff.
+so changing a title produces a one-line diff. Front matter can be YAML between
+`---` lines or TOML between `+++` lines, as Hugo writes it; a TOML file stays
+TOML.
 
 **Store and runtime are independent.** Where content lives and how it is
 delivered are separate choices, and every combination of them is legal.

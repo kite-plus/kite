@@ -2,6 +2,7 @@ package file
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -552,4 +553,126 @@ func diffLines(before, after string) []string {
 		}
 	}
 	return out
+}
+
+// A Hugo site written in TOML has to open like one written in YAML: the same
+// front matter in either language is the same item.
+func TestATOMLPostReadsLikeItsYAMLTwin(t *testing.T) {
+	root, types, _ := newTestProject(t)
+	writeFile(t, root, "content/posts/in-yaml/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZAAA
+title: The Same Post
+date: 2024-03-05T09:30:00+08:00
+lastmod: 2024-04-01
+draft: true
+tags:
+  - Go
+  - Hugo
+categories: Tech
+weight: 3
+description: Written twice.
+---
+The same body.
+`)
+	writeFile(t, root, "content/posts/in-toml/index.md", `+++
+id = "01J8KQ2P3R4S5T6V7W8X9YZBBB"
+title = "The Same Post"
+date = 2024-03-05T09:30:00+08:00
+lastmod = 2024-04-01
+draft = true
+tags = ["Go", "Hugo"]
+categories = "Tech"
+weight = 3
+description = "Written twice."
++++
+The same body.
+`)
+
+	scan, err := NewScanner(root, types).Scan()
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	if len(scan.Entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d (%v)", len(scan.Entries), scan.Problems)
+	}
+	items := map[string]*content.Content{}
+	for _, e := range scan.Entries {
+		items[e.Item.Slug] = e.Item
+	}
+	yml, tml := items["in-yaml"], items["in-toml"]
+	if yml == nil || tml == nil {
+		t.Fatalf("items = %v", items)
+	}
+
+	if tml.Title != yml.Title || tml.Status != yml.Status || tml.Body.Raw != yml.Body.Raw {
+		t.Errorf("title, status or body differ:\n toml %q %q %q\n yaml %q %q %q",
+			tml.Title, tml.Status, tml.Body.Raw, yml.Title, yml.Status, yml.Body.Raw)
+	}
+	if !tml.PublishedAt.Equal(*yml.PublishedAt) || !tml.UpdatedAt.Equal(yml.UpdatedAt) {
+		t.Errorf("dates differ: toml %v %v, yaml %v %v", tml.PublishedAt, tml.UpdatedAt, yml.PublishedAt, yml.UpdatedAt)
+	}
+	for _, taxonomy := range []string{"tags", "categories"} {
+		if !slices.Equal(tml.Terms(taxonomy), yml.Terms(taxonomy)) {
+			t.Errorf("%s: toml %v, yaml %v", taxonomy, tml.Terms(taxonomy), yml.Terms(taxonomy))
+		}
+	}
+	if fmt.Sprint(tml.Meta["weight"]) != fmt.Sprint(yml.Meta["weight"]) || tml.Meta["description"] != yml.Meta["description"] {
+		t.Errorf("meta differs: toml %v, yaml %v", tml.Meta, yml.Meta)
+	}
+}
+
+// Saving a TOML post keeps it TOML, and renaming it rewrites the title line
+// and nothing the author wrote around it.
+func TestEditingATOMLTitleRewritesOnlyTheTitleLine(t *testing.T) {
+	root, types, w := newTestProject(t)
+	const src = `+++
+id = "01J8KQ2P3R4S5T6V7W8X9YZABC"
+title = "Original Title" # shown in the feed too
+slug = "original"
+status = "published"
+created_at = 2026-01-01T00:00:00Z
+updated_at = 2026-01-01T00:00:00Z
+tags = ["Go", "CMS"]
+
+# for the docs site
+[params]
+  custom_key = "keep me"
++++
+
+Body stays put.
+`
+	writeFile(t, root, "content/posts/original/index.md", src)
+
+	scan, err := NewScanner(root, types).Scan()
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	item := scan.Entries[0].Item
+	item.Title = "Renamed Title"
+	if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{
+		content.PutContent{Content: item, IfRevision: item.Revision},
+	}}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+
+	got := readFile(t, root, "content/posts/original/index.md")
+	for _, line := range diffLines(src, got) {
+		if !strings.Contains(line, "title = ") && !strings.Contains(line, "updated_at = ") {
+			t.Errorf("unexpected line changed: %q", line)
+		}
+	}
+	for _, must := range []string{
+		`title = "Renamed Title" # shown in the feed too`,
+		`tags = ["Go", "CMS"]`,
+		"# for the docs site",
+		`  custom_key = "keep me"`,
+		"Body stays put.",
+	} {
+		if !strings.Contains(got, must) {
+			t.Errorf("lost %q:\n%s", must, got)
+		}
+	}
+	if !strings.HasPrefix(got, "+++\n") {
+		t.Errorf("the file is no longer TOML:\n%s", got)
+	}
 }

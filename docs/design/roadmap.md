@@ -45,7 +45,7 @@
 
 | 里程碑 | 标准 | 结果 | 依据 |
 |---|---|---|---|
-| M0 | 在真实的 Hugo 内容仓库上产出可用站点 | 部分 | 只支持 YAML front matter，用 TOML（`+++`）写的 Hugo 站点打不开 |
+| M0 | 在真实的 Hugo 内容仓库上产出可用站点 | 部分 | YAML 和 TOML（`+++`）front matter 都能读写（`TestATOMLPostReadsLikeItsYAMLTwin`）。还差 Hugo 的 shortcode：`{{< >}}` 会原样输出，语法要等 [theme-system.md §14](theme-system.md) 的开放问题定下来 |
 | M0 | 2000 篇全量构建小于 2 秒 | 通过 | `make perf`：没有任何缓存时约 1.5 秒（其中建索引约 0.7 秒），索引已在时约 0.9 秒 |
 | M0 | `kite build --verify` 在 CI 通过 | 通过 | CI 的可重现性步骤；`TestBuildIsReproducible` |
 | M0 | `internal/content` 的 import 边界检查 | 通过 | `scripts/check-imports.sh`，由 CI 执行 |
@@ -73,7 +73,7 @@
 | 4 | 「已部署」这一步永远不会完成 | **已解决。** 远端在 github.com、并且部署到 `github-pages` 环境的仓库，「已部署」按推送的那个提交的部署状态显示：成功、失败或进行中，成功后给出站点链接；被后来的提交取代的部署也算上线。其他托管平台、私有仓库、从不部署到 Pages 的仓库显示「托管平台不回报」，不再一直等待。查询在后台进行，不阻塞面板；匿名调用每小时只有 60 次，所以进行中的部署会逐步拉长查询间隔，上线后不再查询，剩余次数不到 10 次时暂停。测试：`internal/publish/git/deploy_internal_test.go`、`TestAPushToGitHubPagesIsReportedDeployedWhenItIs`、`TestAnyOtherHostLeavesDeploymentNotApplicable`，并对真实的 GitHub API 核对过一次。[architecture.md §17](architecture.md#17-cicd) 原先写的是 V1「不做任何 API 集成」，已改为「不做需要凭据的 API 集成」 | P1 |
 | 5 | 性能没有验收 | **已解决。** `make perf`（`internal/perf`）生成 2000 篇的站点，用真实的服务器、文件监听和热重载通道测量 §3 的五项时延，达不到目标就失败，结果见 §3。第一次测量时构建 3.7 秒、改文件到页面 564ms，都没有达标，为此做了四处优化：全量构建按目标并行渲染（输出与顺序无关，observer 仍按计划顺序收到页面）；规划时一次批量取出所有条目（`Reader.GetMany`），不再每篇查两次；分类和标签的列表直接从已经取出的条目分组，不再每个标签查一次；建索引时每个文件的语句只准备一次。没有放进 CI：GitHub 的机器比作者的电脑慢，速度也不稳定，发布前在本机跑 | P1 |
 | 6 | `kite theme verify` 命令没有实现 | **已解决。** `kite theme verify [dir]` 用内置的 fixture 站点（`internal/themecheck`：七篇文章分三页、一个页面、带图片的 page bundle、标签和分类及其 term 页、404，还有不该出现的草稿和定时文章）以 build 和 serve 各渲染一遍，逐字节比较 23 个页面，指出每页第一处不同的行。不给目录时检查当前项目的主题，项目之外检查内置主题。还没做的：fixture 没有覆盖多语言（i18n 在 M5 才定）；`--strict` 要等引擎有了废弃告警再加。测试：`internal/themecheck/themecheck_test.go` | P2 |
-| 7 | 只支持 YAML front matter | `internal/frontmatter` 需要支持 TOML，保真要求和 YAML 一样 | P2 |
+| 7 | 只支持 YAML front matter | **已解决。** `internal/frontmatter` 支持 Hugo 写在 `+++` 之间的 TOML，保真和 YAML 一样：没改动的文件逐字节不变；只改标题时只动标题那一行，值后面的注释保留；新 key 写在第一个表之前，否则会落进那个表里；多行字符串和多行数组整体替换；日期保持原来的写法（带不带时区）；改动过的表移到末尾重写，其余的表原样不动。值由 `github.com/pelletier/go-toml/v2` 解析，这是新增的依赖；哪一段属于哪个 key 由这里自己判断，遇到判断不了的写法时仍能读取，只是拒绝改写。测试：`internal/frontmatter/toml_test.go`、`TestATOMLPostReadsLikeItsYAMLTwin`、`TestEditingATOMLTitleRewritesOnlyTheTitleLine` | P2 |
 | 8 | 主题的 `requires` 只读取、不检查 | **已解决。** 每次加载主题（打开站点、构建、serve）都检查 `requires`：支持 `>=`、`>`、`<=`、`<`、`=`，空格隔开表示同时满足，`||` 表示任一满足，按 semver 比较，预发布版本排在正式版之前。不满足就拒绝加载，并说明主题要求的范围和正在运行的 Kite 版本。从源码构建的版本（`dev` 或提交哈希）不参与比较；`git describe` 生成的「tag 之后又有提交」按那个 tag 比较。测试：`internal/render/theme/requires_test.go` | P2 |
 | 9 | 文章列表不显示「置顶」 | **已解决。** 列表摘要带上 `pinned`，在 SQL 里从存储的 meta 取出（`json_type(meta_json, '$.pinned') = 'true'`），列表仍然不需要逐行解析 meta；只有真正的 `true` 才算置顶，和条目本身的判断一致。文章列表在标题后按设计稿画出琥珀色的「置顶」标记，深色模式有对应的配色。测试：`TestSummariesSayWhichItemsArePinned` | P2 |
 | 10 | 发布的备用路径没有实现 | **已解决。** 按 [architecture.md §16.3](architecture.md#16-git-workflow最高危模块) 的逃生舱实现：在临时 index 里从 HEAD 出发 `git add` 这次发布的路径（clean filter 和 LFS 照常生效），`commit-tree` 生成提交，`update-ref` 以旧值做 CAS 移动分支，最后只更新真实 index 里这几个路径，失败时把分支移回原处。用在 hook 拒绝发布之后：拒绝会报成 `hook_refused` 并带上 hook 的输出，后台提供「跳过 hooks 发布」，命令行是 `kite publish --no-verify`。测试：`internal/publish/git/escape_test.go`、`TestAPublishAHookRefusedCanGoAheadWithoutTheHooks` | P2 |
@@ -89,7 +89,7 @@
 | **1. v1.0 收尾** | v1.0 | §4 的 P0 和 P1 项；另外可以顺手做两个低成本占位：「存储空间」（统计内容目录大小）、版本号旁的「最新」（查询 GitHub Releases）；最后打 `v1.0.0` 标签 | — |
 | **2. M5 主题契约** | v1.1 | 写第二套风格完全不同的主题，并用 `kite theme verify`（已有）检查它；`kite theme list/add/new`；检查 `requires`；菜单（`.Site.Menus`）写入契约；冻结之前要把 [theme-system.md](theme-system.md) §12 i18n 的三件事（尤其是多语言 URL 策略）和 §14 的开放问题定下来；发布 `kite/v1`，建 themes 仓库和主题开发文档 | 查找顺序、带方法的 RenderContext、命名空间函数、`apiVersion` 校验、由 settings schema 生成的配置页都已经有了 |
 | **3. M6 可重现构建** | v1.2 | `kite.lock`、`kitew`、Cloudflare Pages 部署模板；启用增量构建里的跳过判断 | 依赖记录和缓存键已经有了 |
-| **4. 媒体库**（新增） | v1.5 | 在现有索引上汇总所有 page bundle 里的文件：媒体列表、跨文章复用、找出没人引用的文件、上传入口。顺带支持 TOML front matter，提高 Hugo 兼容性 | 单篇的附件上传和删除 API 已经有了 |
+| **4. 媒体库**（新增） | v1.5 | 在现有索引上汇总所有 page bundle 里的文件：媒体列表、跨文章复用、找出没人引用的文件、上传入口 | 单篇的附件上传和删除 API 已经有了 |
 | **5. M7 动态模式** | v2.0 | SQLite 作为真相源，写入同一套读模型；`kite migrate` 在文件和数据库之间互转；多用户和角色；私密文章；数据库备份和 `kite export`；Kite 自己存储的评论 | 读模型、单账号认证、Docker 都已经有了 |
 | **6. M8 插件** | v3.0 | 基于 wazero 的 WebAssembly 插件、Host ABI、能力和权限声明、`kite plugin`、插件 SDK | HookBus 已经被内置功能使用 |
 

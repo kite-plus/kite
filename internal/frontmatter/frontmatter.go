@@ -1,5 +1,6 @@
-// Package frontmatter reads and writes YAML front matter while preserving
-// everything it was not asked to change.
+// Package frontmatter reads and writes front matter while preserving
+// everything it was not asked to change. YAML is what Kite writes; TOML, as
+// Hugo writes it between +++ lines, is read and edited with the same care.
 //
 // A naive unmarshal/marshal round trip reorders keys, drops comments and
 // rewrites "tags: [a, b]" as a block list, which turns a one word edit into a
@@ -68,6 +69,9 @@ type Document struct {
 
 	root *yaml.Node // mapping node, nil when there is no front matter
 
+	// toml is set instead of root for TOML front matter.
+	toml *tomlFront
+
 	edits       []pendingEdit
 	bodyChanged bool
 	newBody     []byte
@@ -88,6 +92,9 @@ func Parse(data []byte) (*Document, error) {
 	}
 
 	lines, terminated := splitLines(rest)
+	if len(lines) > 0 && strings.TrimRight(lines[0], "\r") == tomlDelim {
+		return d.parseTOMLBlock(lines, terminated)
+	}
 	if len(lines) == 0 || strings.TrimRight(lines[0], "\r") != openDelim {
 		d.body = bytes.Clone(rest)
 		d.root = newMapping()
@@ -117,6 +124,28 @@ func Parse(data []byte) (*Document, error) {
 		return nil, fmt.Errorf("frontmatter: %w", err)
 	}
 	d.root = root
+	return d, nil
+}
+
+func (d *Document) parseTOMLBlock(lines []string, terminated bool) (*Document, error) {
+	closeAt := slices.IndexFunc(lines[1:], func(l string) bool { return strings.TrimRight(l, "\r") == tomlDelim })
+	if closeAt < 0 {
+		return nil, fmt.Errorf("frontmatter: opening %q has no closing delimiter", tomlDelim)
+	}
+	closeAt++ // compensate for the lines[1:] offset
+
+	d.hasFM = true
+	d.fmLines = make([]string, 0, closeAt-1)
+	for _, l := range lines[1:closeAt] {
+		d.fmLines = append(d.fmLines, strings.TrimRight(l, "\r"))
+	}
+	d.body = joinLines(lines[closeAt+1:], d.eol, terminated)
+
+	front, err := parseTOML(d.fmLines)
+	if err != nil {
+		return nil, err
+	}
+	d.toml = front
 	return d, nil
 }
 
@@ -200,6 +229,9 @@ func (d *Document) SetBody(s string) {
 
 // Keys returns the top level keys in document order.
 func (d *Document) Keys() []string {
+	if d.toml != nil {
+		return slices.Clone(d.toml.keys)
+	}
 	pairs := d.pairs()
 	out := make([]string, 0, len(pairs))
 	for _, p := range pairs {
@@ -210,6 +242,9 @@ func (d *Document) Keys() []string {
 
 // Get decodes the value of a top level key.
 func (d *Document) Get(key string) (any, bool) {
+	if d.toml != nil {
+		return d.toml.get(key)
+	}
 	for _, p := range d.pairs() {
 		if p.key != key {
 			continue
@@ -264,6 +299,10 @@ func (d *Document) Bool(key string) bool {
 // is already stored the call is a no-op, so that saving an unchanged document
 // produces no diff at all.
 func (d *Document) Set(key string, value any) error {
+	if d.toml != nil {
+		d.toml.set(key, value)
+		return nil
+	}
 	node := new(yaml.Node)
 	if err := node.Encode(value); err != nil {
 		return fmt.Errorf("frontmatter: encode %q: %w", key, err)
@@ -301,6 +340,10 @@ func (d *Document) SetAll(keys []string, values map[string]any) error {
 
 // Delete schedules removal of a key. Deleting an absent key is a no-op.
 func (d *Document) Delete(key string) {
+	if d.toml != nil {
+		d.toml.delete(key)
+		return
+	}
 	if d.effectiveValue(key) == nil {
 		return
 	}
@@ -308,7 +351,9 @@ func (d *Document) Delete(key string) {
 }
 
 // Dirty reports whether encoding would produce different bytes.
-func (d *Document) Dirty() bool { return len(d.edits) > 0 || d.bodyChanged }
+func (d *Document) Dirty() bool {
+	return len(d.edits) > 0 || d.bodyChanged || (d.toml != nil && len(d.toml.edits) > 0)
+}
 
 // Bytes renders the document.
 //
@@ -319,7 +364,15 @@ func (d *Document) Bytes() ([]byte, error) {
 		return bytes.Clone(d.raw), nil
 	}
 
-	lines, err := d.applyEdits()
+	delim := openDelim
+	var lines []string
+	var err error
+	if d.toml != nil {
+		delim = tomlDelim
+		lines, err = d.toml.apply()
+	} else {
+		lines, err = d.applyEdits()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -341,13 +394,13 @@ func (d *Document) Bytes() ([]byte, error) {
 	}
 
 	if len(lines) > 0 || d.hasFM {
-		buf.WriteString(openDelim)
+		buf.WriteString(delim)
 		buf.WriteString(d.eol)
 		for _, l := range lines {
 			buf.WriteString(l)
 			buf.WriteString(d.eol)
 		}
-		buf.WriteString(openDelim)
+		buf.WriteString(delim)
 		buf.WriteString(d.eol)
 	}
 	buf.Write(body)
@@ -513,6 +566,9 @@ func (d *Document) applyEdits() ([]string, error) {
 // reorder its keys and drop the comments inside it, which is the one thing
 // this package exists to prevent.
 func (d *Document) SetNested(path []string, key string, value any) error {
+	if d.toml != nil {
+		return fmt.Errorf("frontmatter: nested keys in TOML are not edited")
+	}
 	if len(path) == 0 {
 		return d.Set(key, value)
 	}
