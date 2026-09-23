@@ -74,7 +74,7 @@
 | 5 | 性能没有验收 | **已解决。** `make perf`（`internal/perf`）生成 2000 篇的站点，用真实的服务器、文件监听和热重载通道测量 §3 的五项时延，达不到目标就失败，结果见 §3。第一次测量时构建 3.7 秒、改文件到页面 564ms，都没有达标，为此做了四处优化：全量构建按目标并行渲染（输出与顺序无关，observer 仍按计划顺序收到页面）；规划时一次批量取出所有条目（`Reader.GetMany`），不再每篇查两次；分类和标签的列表直接从已经取出的条目分组，不再每个标签查一次；建索引时每个文件的语句只准备一次。没有放进 CI：GitHub 的机器比作者的电脑慢，速度也不稳定，发布前在本机跑 | P1 |
 | 6 | `kite theme verify` 命令没有实现 | **已解决。** `kite theme verify [dir]` 用内置的 fixture 站点（`internal/themecheck`：七篇文章分三页、一个页面、带图片的 page bundle、标签和分类及其 term 页、404，还有不该出现的草稿和定时文章）以 build 和 serve 各渲染一遍，逐字节比较 23 个页面，指出每页第一处不同的行。不给目录时检查当前项目的主题，项目之外检查内置主题。还没做的：fixture 没有覆盖多语言（i18n 在 M5 才定）；`--strict` 要等引擎有了废弃告警再加。测试：`internal/themecheck/themecheck_test.go` | P2 |
 | 7 | 只支持 YAML front matter | `internal/frontmatter` 需要支持 TOML，保真要求和 YAML 一样 | P2 |
-| 8 | 主题的 `requires` 只读取、不检查 | `internal/render/theme/theme.go` 读取了 `requires`，但没有和实际运行的 Kite 版本比较。可以并入 M5 | P2 |
+| 8 | 主题的 `requires` 只读取、不检查 | **已解决。** 每次加载主题（打开站点、构建、serve）都检查 `requires`：支持 `>=`、`>`、`<=`、`<`、`=`，空格隔开表示同时满足，`||` 表示任一满足，按 semver 比较，预发布版本排在正式版之前。不满足就拒绝加载，并说明主题要求的范围和正在运行的 Kite 版本。从源码构建的版本（`dev` 或提交哈希）不参与比较；`git describe` 生成的「tag 之后又有提交」按那个 tag 比较。测试：`internal/render/theme/requires_test.go` | P2 |
 | 9 | 文章列表不显示「置顶」 | `internal/api/wire.go` 的 `Summary` 不带 meta。返回 `pinned`，或者一小组列表要用的字段即可 | P2 |
 | 10 | 发布的备用路径没有实现 | 设计里的「临时 index + `commit-tree` + `update-ref` CAS」备用路径还没做（[architecture.md §16.3](architecture.md#16-git-workflow最高危模块)），现在只有主路径 | P2 |
 | 11 | 周边仓库和文档站没有建 | 组织下现在有 `kite`、`.github`，以及另一个产品 Explore（内容发现平台）用的 `explore`。官网文档站 `website`（用 Kite 自己搭）、`starters`、`setup-kite`，以及存放预研和设计存档的 `lab` 都还没有 | P2 |

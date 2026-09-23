@@ -14,6 +14,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/schema"
 )
 
@@ -129,6 +130,9 @@ func Load(fsys fs.FS) (*Theme, error) {
 		return nil, fmt.Errorf("theme: parse %s: %w", ManifestName, err)
 	}
 	if err := m.Validate(); err != nil {
+		return nil, err
+	}
+	if err := m.Satisfied(buildinfo.Version); err != nil {
 		return nil, err
 	}
 
