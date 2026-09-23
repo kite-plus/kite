@@ -46,9 +46,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "@@GO@@"
 
@@ -66,15 +66,17 @@ jobs:
       # Tells scheduled.yml when there is next something to publish.
       - name: Record the next scheduled post
         run: jq -r '.next_due // "none"' build.json > .kite-next-due
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v6
         with:
           path: .kite-next-due
           key: kite-next-due-${{ github.run_id }}-${{ github.run_attempt }}
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: public
+          # A site's static/.well-known is published like any other file.
+          include-hidden-files: true
 
   deploy:
     needs: build
@@ -84,7 +86,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 `
 
 // scheduledWorkflow publishes scheduled posts once their time has come.
@@ -116,7 +118,7 @@ jobs:
     outputs:
       build: ${{ steps.check.outputs.build }}
     steps:
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: .kite-next-due
           key: kite-next-due
