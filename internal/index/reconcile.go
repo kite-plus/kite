@@ -71,6 +71,12 @@ func (ix *Index) Reconcile(ctx context.Context) (Stats, error) {
 	}
 	defer tx.Rollback() //nolint:errcheck // committed below on the happy path
 
+	stmts, err := prepare(ctx, tx)
+	if err != nil {
+		return stats, err
+	}
+	defer stmts.close()
+
 	walkErr := ix.scanner.Walk(func(st file.Stat) error {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -97,7 +103,7 @@ func (ix *Index) Reconcile(ctx context.Context) (Stats, error) {
 			})
 			return nil
 		}
-		holder, err := ix.idTaken(ctx, tx, entry)
+		holder, err := ix.idTaken(ctx, stmts, entry)
 		if err != nil {
 			return err
 		}
@@ -109,7 +115,7 @@ func (ix *Index) Reconcile(ctx context.Context) (Stats, error) {
 			})
 			return nil
 		}
-		refused, err := indexOne(ctx, tx, entry, now)
+		refused, err := indexOne(ctx, stmts, entry, now)
 		if err != nil {
 			return err
 		}
@@ -203,25 +209,77 @@ func (ix *Index) knownFiles(ctx context.Context) (map[string]fileRow, error) {
 // the pass -- including deletions -- so a single unindexable file would stop
 // the index tracking the tree at all, silently and for as long as it sat
 // there. err means the transaction itself is unusable.
-func indexOne(ctx context.Context, tx *sql.Tx, e *file.Entry, nowNS int64) (refused, err error) {
-	if _, err := tx.ExecContext(ctx, `SAVEPOINT file`); err != nil {
+func indexOne(ctx context.Context, s *statements, e *file.Entry, nowNS int64) (refused, err error) {
+	if _, err := s.savepoint.ExecContext(ctx); err != nil {
 		return nil, fmt.Errorf("index: savepoint for %s: %w", e.Path, err)
 	}
-	refused = upsert(ctx, tx, e, nowNS)
+	refused = upsert(ctx, s, e, nowNS)
 	if refused != nil {
 		// ROLLBACK TO undoes the statements but leaves the savepoint on the
 		// stack; the RELEASE below is what pops it.
-		if _, err := tx.ExecContext(ctx, `ROLLBACK TO file`); err != nil {
+		if _, err := s.rollback.ExecContext(ctx); err != nil {
 			return nil, fmt.Errorf("index: roll back %s: %w", e.Path, err)
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `RELEASE file`); err != nil {
+	if _, err := s.release.ExecContext(ctx); err != nil {
 		return nil, fmt.Errorf("index: release savepoint for %s: %w", e.Path, err)
 	}
 	return refused, nil
 }
 
-func upsert(ctx context.Context, tx *sql.Tx, e *file.Entry, nowNS int64) error {
+// statements are the ones a reconcile runs for every file it reads. They are
+// prepared once per pass: parsing and planning the same SQL again for each of
+// thousands of files was most of what indexing a large site cost.
+type statements struct {
+	savepoint, rollback, release *sql.Stmt
+	holder, replace, insert      *sql.Stmt
+	term, file                   *sql.Stmt
+}
+
+func prepare(ctx context.Context, tx *sql.Tx) (*statements, error) {
+	s := &statements{}
+	for _, p := range []struct {
+		into **sql.Stmt
+		sql  string
+	}{
+		{&s.savepoint, `SAVEPOINT file`},
+		{&s.rollback, `ROLLBACK TO file`},
+		{&s.release, `RELEASE file`},
+		{&s.holder, `SELECT path FROM contents WHERE id = ? AND path <> ?`},
+		{&s.replace, `DELETE FROM contents WHERE path = ? OR id = ?`},
+		{&s.insert, `
+			INSERT INTO contents (
+				id, kind, slug, title, status, locale, locator, path, revision,
+				body, body_format, excerpt, meta_json, aliases_json,
+				created_at, updated_at, published_at, deleted_at
+			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`},
+		{&s.term, `INSERT OR REPLACE INTO terms (content_id, taxonomy, term, position) VALUES (?,?,?,?)`},
+		{&s.file, `
+			INSERT INTO files (path, size, mtime_ns, content_sha256, indexed_at_ns)
+			VALUES (?,?,?,?,?)
+			ON CONFLICT (path) DO UPDATE SET
+				size = excluded.size, mtime_ns = excluded.mtime_ns,
+				content_sha256 = excluded.content_sha256, indexed_at_ns = excluded.indexed_at_ns`},
+	} {
+		stmt, err := tx.PrepareContext(ctx, p.sql)
+		if err != nil {
+			s.close()
+			return nil, fmt.Errorf("index: prepare: %w", err)
+		}
+		*p.into = stmt
+	}
+	return s, nil
+}
+
+func (s *statements) close() {
+	for _, stmt := range []*sql.Stmt{s.savepoint, s.rollback, s.release, s.holder, s.replace, s.insert, s.term, s.file} {
+		if stmt != nil {
+			_ = stmt.Close()
+		}
+	}
+}
+
+func upsert(ctx context.Context, s *statements, e *file.Entry, nowNS int64) error {
 	item := e.Item
 
 	meta, err := json.Marshal(orEmptyMap(item.Meta))
@@ -233,16 +291,11 @@ func upsert(ctx context.Context, tx *sql.Tx, e *file.Entry, nowNS int64) error {
 		return err
 	}
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM contents WHERE path = ? OR id = ?`, e.Path, string(item.ID)); err != nil {
+	if _, err := s.replace.ExecContext(ctx, e.Path, string(item.ID)); err != nil {
 		return fmt.Errorf("index: replace %s: %w", e.Path, err)
 	}
 
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO contents (
-			id, kind, slug, title, status, locale, locator, path, revision,
-			body, body_format, excerpt, meta_json, aliases_json,
-			created_at, updated_at, published_at, deleted_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	_, err = s.insert.ExecContext(ctx,
 		string(item.ID), string(item.Kind), item.Slug, item.Title, string(item.Status),
 		item.Locale, string(item.Locator), e.Path, string(item.Revision),
 		item.Body.Raw, string(item.Body.Format), summarize(description(item.Meta), item.Body.Raw),
@@ -256,21 +309,13 @@ func upsert(ctx context.Context, tx *sql.Tx, e *file.Entry, nowNS int64) error {
 
 	for _, taxonomy := range slices.Sorted(maps.Keys(item.Taxonomies)) {
 		for i, term := range item.Taxonomies[taxonomy] {
-			if _, err := tx.ExecContext(ctx,
-				`INSERT OR REPLACE INTO terms (content_id, taxonomy, term, position) VALUES (?,?,?,?)`,
-				string(item.ID), taxonomy, term, i); err != nil {
+			if _, err := s.term.ExecContext(ctx, string(item.ID), taxonomy, term, i); err != nil {
 				return fmt.Errorf("index: insert term %s/%s: %w", taxonomy, term, err)
 			}
 		}
 	}
 
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO files (path, size, mtime_ns, content_sha256, indexed_at_ns)
-		VALUES (?,?,?,?,?)
-		ON CONFLICT (path) DO UPDATE SET
-			size = excluded.size, mtime_ns = excluded.mtime_ns,
-			content_sha256 = excluded.content_sha256, indexed_at_ns = excluded.indexed_at_ns`,
-		e.Path, e.Size, e.ModTime, string(e.Hash), nowNS)
+	_, err = s.file.ExecContext(ctx, e.Path, e.Size, e.ModTime, string(e.Hash), nowNS)
 	if err != nil {
 		return fmt.Errorf("index: record file %s: %w", e.Path, err)
 	}
@@ -332,10 +377,9 @@ func orEmptySlice(s []string) []string {
 // duplicates the ID in the copy. So the incumbent is stat'd rather than
 // assumed gone: that stat is the only thing that tells a rename from a copy,
 // and the two need opposite outcomes.
-func (ix *Index) idTaken(ctx context.Context, tx *sql.Tx, e *file.Entry) (string, error) {
+func (ix *Index) idTaken(ctx context.Context, s *statements, e *file.Entry) (string, error) {
 	var holder string
-	err := tx.QueryRowContext(ctx,
-		`SELECT path FROM contents WHERE id = ? AND path <> ?`, string(e.Item.ID), e.Path).Scan(&holder)
+	err := s.holder.QueryRowContext(ctx, string(e.Item.ID), e.Path).Scan(&holder)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}

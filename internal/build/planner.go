@@ -1,8 +1,11 @@
 package build
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"unicode"
 
 	"github.com/kite-plus/kite/internal/content"
@@ -25,9 +28,7 @@ func (b *Builder) plan(ctx context.Context, c *Context) (*Plan, error) {
 	}
 	b.planHome(p, all)
 	b.planLists(p, all)
-	if err := b.planTaxonomies(ctx, p); err != nil {
-		return nil, err
-	}
+	b.planTaxonomies(p, all)
 	b.planNotFound(p)
 
 	p.sort()
@@ -54,11 +55,18 @@ func (b *Builder) loadAll(ctx context.Context) ([]content.Summary, error) {
 
 func (b *Builder) planSingles(ctx context.Context, p *Plan, all []content.Summary) error {
 	prev, next := neighbors(all)
+	ids := make([]content.ID, len(all))
 	for i, s := range all {
-		item, err := b.opts.Reader.Get(ctx, s.ID)
-		if err != nil {
-			return fmt.Errorf("build: load %s: %w", s.ID, err)
-		}
+		ids[i] = s.ID
+	}
+	items, err := b.opts.Reader.GetMany(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("build: load content: %w", err)
+	}
+	if len(items) != len(all) {
+		return fmt.Errorf("build: %d item(s) disappeared while the site was being planned", len(all)-len(items))
+	}
+	for i, item := range items {
 		link := b.opts.Resolver.For(item)
 		p.Targets = append(p.Targets, Target{
 			Kind: render.KindSingle,
@@ -116,13 +124,23 @@ func (b *Builder) planLists(p *Plan, all []content.Summary) {
 }
 
 // planTaxonomies adds one listing per taxonomy and one per term.
-func (b *Builder) planTaxonomies(ctx context.Context, p *Plan) error {
+//
+// Every item the build includes is already loaded, newest first and with its
+// terms, which is exactly what a query per term would return. Grouping them
+// here rather than asking again term by term took a server's replan after an
+// edit on a site with many tags from most of half a second to a fraction.
+func (b *Builder) planTaxonomies(p *Plan, all []content.Summary) {
 	for _, taxonomy := range b.opts.Types.TaxonomyNames() {
-		counts, err := b.opts.Reader.CountTerms(ctx, taxonomy, b.scope())
-		if err != nil {
-			return fmt.Errorf("build: count %s terms: %w", taxonomy, err)
+		byTerm := make(map[string][]content.Summary)
+		for _, s := range all {
+			for _, term := range s.Taxonomies[taxonomy] {
+				if listed := byTerm[term]; len(listed) > 0 && listed[len(listed)-1].ID == s.ID {
+					continue // named twice by the same item
+				}
+				byTerm[term] = append(byTerm[term], s)
+			}
 		}
-		if len(counts) == 0 {
+		if len(byTerm) == 0 {
 			continue
 		}
 
@@ -135,35 +153,16 @@ func (b *Builder) planTaxonomies(ctx context.Context, p *Plan) error {
 			Title: displayName(taxonomy),
 		})
 
-		for _, c := range counts {
-			items, err := b.itemsWithTerm(ctx, taxonomy, c.Term)
-			if err != nil {
-				return err
-			}
-			base := b.opts.Resolver.ForTerm(taxonomy, c.Term, b.opts.Site.Language)
+		// Most used first, then by name, the order the index counts them in.
+		terms := slices.SortedFunc(maps.Keys(byTerm), func(x, y string) int {
+			return cmp.Or(cmp.Compare(len(byTerm[y]), len(byTerm[x])), cmp.Compare(x, y))
+		})
+		for _, term := range terms {
+			base := b.opts.Resolver.ForTerm(taxonomy, term, b.opts.Site.Language)
 			// A term keeps the spelling its author used; only Kite's own
 			// names are presented.
-			b.paginate(p, render.KindTerm, base, taxonomy, c.Term, c.Term, items)
+			b.paginate(p, render.KindTerm, base, taxonomy, term, term, byTerm[term])
 		}
-	}
-	return nil
-}
-
-func (b *Builder) itemsWithTerm(ctx context.Context, taxonomy, term string) ([]content.Summary, error) {
-	var out []content.Summary
-	q := b.scope()
-	q.TermsAny = map[string][]string{taxonomy: {term}}
-	q.Limit = content.MaxLimit
-	for {
-		page, err := b.opts.Reader.Query(ctx, q)
-		if err != nil {
-			return nil, fmt.Errorf("build: load %s/%s: %w", taxonomy, term, err)
-		}
-		out = append(out, page.Items...)
-		if !page.HasMore {
-			return out, nil
-		}
-		q.Cursor = page.NextCursor
 	}
 }
 

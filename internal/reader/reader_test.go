@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -367,5 +368,42 @@ func TestPublicAtAgreesWithIsPublic(t *testing.T) {
 	}
 	if count != len(want) {
 		t.Errorf("Count = %d, want %d", count, len(want))
+	}
+}
+
+// A build loads every item through GetMany, so what it returns has to be
+// what Get would have, item for item.
+func TestGetManyReturnsWhatGetDoesInTheOrderAsked(t *testing.T) {
+	r := fixture(t, 7, func(i int) string {
+		if i%2 == 0 {
+			return "tags: [Go, Notes]\n"
+		}
+		return ""
+	})
+
+	ids := []content.ID{
+		"01J8KQ2P3R4S5T6V7W8X9YZ005", "01J8KQ2P3R4S5T6V7W8X9YZ000",
+		"01J8KQ2P3R4S5T6V7W8X9YZ999", "01J8KQ2P3R4S5T6V7W8X9YZ002",
+	}
+	items, err := r.GetMany(t.Context(), ids)
+	if err != nil {
+		t.Fatalf("GetMany: %v", err)
+	}
+	var got []content.ID
+	for _, item := range items {
+		got = append(got, item.ID)
+	}
+	if want := []content.ID{ids[0], ids[1], ids[3]}; !slices.Equal(got, want) {
+		t.Fatalf("ids = %v, want %v: in the order asked, without the one that does not exist", got, want)
+	}
+
+	for _, item := range items {
+		one, err := r.Get(t.Context(), item.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(item, one) {
+			t.Errorf("%s differs from Get:\n got %+v\nwant %+v", item.ID, item, one)
+		}
 	}
 }

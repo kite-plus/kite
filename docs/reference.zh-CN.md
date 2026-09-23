@@ -222,6 +222,7 @@ make check      # 格式化、vet、分层规则、go.mod 整洁性、linter、�
 make web        # 后台界面，会被嵌入二进制
 make web-gen    # 用这次构建自己的描述重新生成 API 客户端
 make docker     # 容器镜像，上面两样东西它会自己编译
+make perf       # 用 2000 篇的站点对照设计里的时延目标计时
 ```
 
 `make web` 需要 Node 和 pnpm，两者版本都被精确钉死 —— 见 `web/.nvmrc` 和

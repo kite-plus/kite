@@ -389,6 +389,63 @@ Not yet.
 	}
 }
 
+// Term listings are grouped from the items the plan has already loaded
+// rather than asked of the index one term at a time. What they list, and in
+// what order, has to be exactly what the index would have said.
+func TestTermListingsAgreeWithTheIndex(t *testing.T) {
+	f := newFixture(t, 9)
+	f.add(t, "content/posts/tagged/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZ901
+title: Tagged
+slug: tagged
+status: published
+published_at: 2026-02-01T00:00:00Z
+tags: [Go, Notes, Go]
+categories: [Tech]
+---
+
+Body.
+`)
+	plan, err := f.builder(t, nil, nil).Plan(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var checked int
+	for _, target := range plan.Targets {
+		if target.Kind != render.KindTerm {
+			continue
+		}
+		page, err := f.reader.Query(t.Context(), content.Query{
+			PublicAt: &fixtureNow,
+			TermsAny: map[string][]string{target.Type: {target.Term}},
+			Limit:    content.MaxLimit,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var want []content.ID
+		for _, s := range page.Items {
+			want = append(want, s.ID)
+		}
+		lo := (target.Page - 1) * 3 // the fixture's page size
+		want = want[lo:min(lo+3, len(want))]
+
+		var got []content.ID
+		for _, s := range target.Items {
+			got = append(got, s.ID)
+		}
+		if !slices.Equal(got, want) || target.TotalItems != len(page.Items) {
+			t.Errorf("%s/%s page %d lists %v of %d, the index says %v of %d",
+				target.Type, target.Term, target.Page, got, target.TotalItems, want, len(page.Items))
+		}
+		checked++
+	}
+	if checked < 3 {
+		t.Fatalf("only %d term pages were planned", checked)
+	}
+}
+
 // A failed build must leave the previous site in place rather than a mixture.
 func TestFailedBuildLeavesPreviousOutputIntact(t *testing.T) {
 	f := newFixture(t, 2)

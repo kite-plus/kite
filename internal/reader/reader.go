@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,49 @@ func (r *Reader) Get(ctx context.Context, id content.ID) (*content.Content, erro
 		return nil, err
 	}
 	return r.withTerms(ctx, item)
+}
+
+// GetMany returns many items by ID, in the order given.
+func (r *Reader) GetMany(ctx context.Context, ids []content.ID) ([]*content.Content, error) {
+	byID := make(map[content.ID]*content.Content, len(ids))
+	for chunk := range slices.Chunk(ids, content.MaxLimit) {
+		rows, err := r.db.QueryContext(ctx,
+			`SELECT`+selectColumns+` FROM contents WHERE id IN (`+placeholders(len(chunk))+`)`, toAny(chunk)...)
+		if err != nil {
+			return nil, fmt.Errorf("reader: load: %w", err)
+		}
+		var found []string
+		for rows.Next() {
+			item, err := scanContent(rows)
+			if err != nil {
+				_ = rows.Close()
+				return nil, err
+			}
+			byID[item.ID] = item
+			found = append(found, string(item.ID))
+		}
+		err = rows.Err()
+		_ = rows.Close()
+		if err != nil {
+			return nil, err
+		}
+
+		terms, err := r.termsFor(ctx, found)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range found {
+			byID[content.ID(id)].Taxonomies = terms[id]
+		}
+	}
+
+	out := make([]*content.Content, 0, len(ids))
+	for _, id := range ids {
+		if item, ok := byID[id]; ok {
+			out = append(out, item)
+		}
+	}
+	return out, nil
 }
 
 // GetBySlug returns one item by kind and slug.

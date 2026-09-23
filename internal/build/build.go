@@ -2,12 +2,15 @@ package build
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
 	"path"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kite-plus/kite/internal/content"
@@ -129,33 +132,17 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 	}
 	stats.Targets = plan.Len()
 
-	var pages []hook.PageInfo
+	pages, err := b.renderAll(ctx, plan)
+	if err != nil {
+		return stats, err
+	}
+	stats.Rendered = len(pages)
+	stats.Skipped = plan.Len() - len(pages)
 
-	// The loop is per output target, with the skip check in place from the
-	// start. v1 never skips; making that decision real later is a change to
-	// one condition rather than to the shape of the build.
-	for _, target := range plan.Targets {
-		if err := ctx.Err(); err != nil {
-			return stats, err
-		}
-
-		out := b.buildCtx.ForOutput()
-		if b.cached(out, target) {
-			stats.Skipped++
-			continue
-		}
-
-		html, info, err := b.renderTarget(ctx, out, target, nil)
-		if err != nil {
-			return stats, err
-		}
-		if err := b.opts.Emitter.Write(target.Path, html); err != nil {
-			return stats, err
-		}
-		stats.Rendered++
-		pages = append(pages, info)
-
-		if err := b.opts.Hooks.PageRendered(ctx, &info); err != nil {
+	// Observers hear about every page in plan order, one at a time, however
+	// the rendering was spread out.
+	for i := range pages {
+		if err := b.opts.Hooks.PageRendered(ctx, &pages[i]); err != nil {
 			return stats, err
 		}
 	}
@@ -190,6 +177,80 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 	}
 	stats.Duration = time.Since(start)
 	return stats, nil
+}
+
+// renderAll renders and writes every target, on as many cores as there are,
+// and returns what was rendered in plan order.
+//
+// A target's bytes depend on the plan and the frozen clock alone, which is
+// also what lets a server render requests concurrently through this code, so
+// the order targets finish in changes nothing that is written. A failure
+// reports the first failing target in plan order, whichever worker met it.
+//
+// The loop is per output target, with the skip check in place from the start.
+// v1 never skips; making that decision real later is a change to one
+// condition rather than to the shape of the build.
+func (b *Builder) renderAll(ctx context.Context, plan *Plan) ([]hook.PageInfo, error) {
+	infos := make([]hook.PageInfo, plan.Len())
+	rendered := make([]bool, plan.Len())
+	errs := make([]error, plan.Len())
+
+	work, stop := context.WithCancel(ctx)
+	defer stop()
+	next := make(chan int)
+	var wg sync.WaitGroup
+	for range min(runtime.GOMAXPROCS(0), plan.Len()) {
+		wg.Go(func() {
+			for i := range next {
+				target := plan.Targets[i]
+				out := b.buildCtx.ForOutput()
+				if b.cached(out, target) {
+					continue
+				}
+				html, info, err := b.renderTarget(work, out, target, nil)
+				if err == nil {
+					err = b.opts.Emitter.Write(target.Path, html)
+				}
+				if err != nil {
+					// Once one target has failed the rest are stopped, and a
+					// target stopped that way is not the failure to report.
+					if ctx.Err() == nil && work.Err() != nil && errors.Is(err, context.Canceled) {
+						continue
+					}
+					errs[i] = err
+					stop()
+					continue
+				}
+				infos[i], rendered[i] = info, true
+			}
+		})
+	}
+feed:
+	for i := range plan.Targets {
+		select {
+		case next <- i:
+		case <-work.Done():
+			break feed
+		}
+	}
+	close(next)
+	wg.Wait()
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	for _, err := range errs {
+		if err != nil {
+			return nil, err
+		}
+	}
+	pages := make([]hook.PageInfo, 0, plan.Len())
+	for i, info := range infos {
+		if rendered[i] {
+			pages = append(pages, info)
+		}
+	}
+	return pages, nil
 }
 
 // MediaFiles lists what a page bundle contributes to the output, mapping the

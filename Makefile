@@ -8,7 +8,7 @@ LDFLAGS  := -s -w \
 	-X github.com/kite-plus/kite/internal/buildinfo.Commit=$(COMMIT) \
 	-X github.com/kite-plus/kite/internal/buildinfo.Date=$(DATE)
 
-.PHONY: all build install test test-race cover fmt vet lint check-imports check-tidy check clean tidy web web-gen web-check docker
+.PHONY: all build install test test-race cover fmt vet lint check-imports check-tidy check clean tidy web web-gen web-check docker perf
 
 all: check build
 
@@ -28,6 +28,12 @@ web-gen:
 
 web-check:
 	cd web && $(PNPM) lint
+
+# perf times Kite against the latency targets in docs/design/architecture.md
+# §29 on a generated site of 2000 posts. It takes a while and depends on the
+# machine, so it is run before a release rather than as part of check.
+perf:
+	KITE_PERF=1 $(GO) test -count=1 -v ./internal/perf/
 
 build:
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o bin/$(BINARY) ./cmd/kite

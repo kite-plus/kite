@@ -258,6 +258,7 @@ make check      # format, vet, layering rules, tidiness, linter, tests
 make web        # the admin, which is embedded into the binary
 make web-gen    # regenerate the API client from this build's own description
 make docker     # the container image, which compiles both of those itself
+make perf       # time a 2000-post site against the design's latency targets
 ```
 
 `make web` needs Node and pnpm, both pinned exactly — the versions live in

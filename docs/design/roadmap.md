@@ -13,7 +13,7 @@
   - front matter 保真：只改标题时，文件的 diff 只有标题这一行；
   - build 和 serve 的输出逐字节一致，预览和最终页面也逐字节一致；
   - 发布只提交本次涉及的文件，不动用户暂存区里的其他改动。
-- **打 v1.0 标签前还有收尾项**：几处没做完的发布和验收工作，见 §4。两个 P0 项（定时文章提前上线、静态站点的定时发布没有触发）已经解决。
+- **§4 的 P0 和 P1 收尾项都已解决**：定时文章提前上线、静态站点的定时发布、远端有新提交时的处理、「已部署」一步，以及性能验收。剩下的是 P2 的兼容和扩展项，和 M4 在真实仓库上的端到端验收（§3）。
 - **M5–M8 都还没开始**，其中 M5 有一部分已经提前做了。后台按设计稿画出的「即将推出」占位功能，各自归到哪个阶段见 §6。
 
 ## 2. 各里程碑完成情况
@@ -24,7 +24,7 @@
 | **M1** serve | 完成 | 按请求从文件渲染；fsnotify 文件监听；热重载 |
 | **M2** 只读后台 | 完成 | REST API，并从代码生成 OpenAPI；前端请求一律用生成的客户端；React 后台嵌入二进制；列表的筛选、排序、游标分页和搜索；索引一致性的三层机制：文件监听、stat 全树扫描、Git HEAD 哨兵（切分支时只重新索引变化的路径） |
 | **M3** 可写后台 | 完成 | `PUT` + `If-Match` 走 `Apply(ChangeSet)`；在旧版本上保存时返回 409，并给出三方对比；由 schema 驱动的表单，内容字段、主题设置、站点设置共用；可视化编辑器（Tiptap）加 Markdown 源码模式（CodeMirror）；服务端渲染的预览；拖图进 page bundle；站点设置和主题设置页（改 `kite.yaml` 时保留注释和顺序）；`kite doctor --fix-ids` |
-| **M4** Git 发布 | 基本完成，收尾见 §4 | 发布前检查：不是仓库、子模块、游离 HEAD、有进行中的 merge/rebase/cherry-pick、缺 git-lfs、文件超出托管平台限制；`git commit --only` 只提交指定路径；`GIT_TERMINAL_PROMPT=0` 加空的 `GIT_ASKPASS`，缺凭据时立刻报错；`.kite/publish.lock` 加 `index.lock` 退避重试；从不强推；DeliveryState 和发布面板；`kite publish` 命令行；`kite init` 生成 GitHub Pages 部署 workflow |
+| **M4** Git 发布 | 基本完成，只差 §3 的端到端验收 | 发布前检查：不是仓库、子模块、游离 HEAD、有进行中的 merge/rebase/cherry-pick、缺 git-lfs、文件超出托管平台限制；`git commit --only` 只提交指定路径；`GIT_TERMINAL_PROMPT=0` 加空的 `GIT_ASKPASS`，缺凭据时立刻报错；`.kite/publish.lock` 加 `index.lock` 退避重试；从不强推；DeliveryState 和发布面板；`kite publish` 命令行；`kite init` 生成 GitHub Pages 部署 workflow |
 | **M5** 主题契约 | 部分提前完成 | `apiVersion` 硬校验；命名空间化的函数；由 `theme.yaml` 生成的主题设置页。其余见 §5 |
 | **M6** | 未开始 | 构建时已经按 OutputTarget 记录依赖和缓存键，只是跳过判断还没启用 |
 | **M7** | 未开始 | 读模型已按双 Store 设计；单账号认证和 Docker 已提前完成 |
@@ -41,21 +41,21 @@
 
 ## 3. 验收标准核对
 
-对照 [architecture.md §29](architecture.md#29-每阶段验收标准)。「未验证」表示机制已经实现，但没有测试或测量证明它达标。
+对照 [architecture.md §29](architecture.md#29-每阶段验收标准)。「未验证」表示机制已经实现，但没有测试或测量证明它达标。时延一项用 `make perf` 在 Apple M1 Pro（8 核）上测得，站点是生成的 2000 篇文章，每篇约 800 字，带代码块和 3 个标签。
 
 | 里程碑 | 标准 | 结果 | 依据 |
 |---|---|---|---|
 | M0 | 在真实的 Hugo 内容仓库上产出可用站点 | 部分 | 只支持 YAML front matter，用 TOML（`+++`）写的 Hugo 站点打不开 |
-| M0 | 2000 篇全量构建小于 2 秒 | 未验证 | 没有基准测试 |
+| M0 | 2000 篇全量构建小于 2 秒 | 通过 | `make perf`：没有任何缓存时约 1.5 秒（其中建索引约 0.7 秒），索引已在时约 0.9 秒 |
 | M0 | `kite build --verify` 在 CI 通过 | 通过 | CI 的可重现性步骤；`TestBuildIsReproducible` |
 | M0 | `internal/content` 的 import 边界检查 | 通过 | `scripts/check-imports.sh`，由 CI 执行 |
-| M1 | 改文件后，浏览器 500ms 内看到变化 | 未验证 | 有监听和热重载，没有测量时延 |
+| M1 | 改文件后，浏览器 500ms 内看到变化 | 通过 | `make perf`：从写文件到重新加载的页面显示新内容，三次中最慢约 390ms |
 | M1 | build 和 serve 的 HTML 逐字节一致 | 通过 | `TestServedPagesAreByteIdenticalToBuiltFiles` |
-| M2 | 2000 篇的仓库，列表首屏小于 300ms | 未验证 | 没有基准测试 |
+| M2 | 2000 篇的仓库，列表首屏小于 300ms | 通过 | `make perf`：首屏的 6 个请求同时发出，约 25ms |
 | M2 | 删掉缓存重建索引，结果逐字节一致 | 通过 | `TestRebuildProducesIdenticalRows` |
-| M2 | 切分支后 3 秒内列表更新，且只重新索引变化的路径 | 未验证 | `internal/index/git.go` 的 HEAD 哨兵已实现，没有测试 |
+| M2 | 切分支后 3 秒内列表更新，且只重新索引变化的路径 | 通过 | `make perf`：约 380ms；改了 11 个文件、删了 1 个的分支，重读 11 个、删除 1 个、其余 1990 个不动 |
 | M3 | 预览和最终渲染逐字节一致 | 通过 | `TestPreviewOfSavedContentIsByteIdenticalToTheBuiltPage` |
-| M3 | 用 VS Code 改文件后，后台 3 秒内更新 | 未验证 | 没有端到端测试 |
+| M3 | 用 VS Code 改文件后，后台 3 秒内更新 | 通过 | `make perf`：约 200ms |
 | M3 | 在旧版本上保存得到 409 和三方对比 | 通过 | `TestSavingAgainstAReplacedVersionIsRefusedWithWhatIsStored`；后台的冲突对话框 |
 | M3 | 只改标题时，`git diff` 只有标题一行 | 通过 | `TestChangingTitleTouchesOnlyTitleLine`、`TestEditingTheTitleRewritesOnlyTheTitleLine` |
 | M4 | 点「发布」后 5 分钟内在 GitHub Pages 上可见 | 未验证 | 没做过端到端验收 |
@@ -71,7 +71,7 @@
 | 2 | **静态站点的定时发布没有东西去触发** | **已解决。** `kite init` 另外生成一个 `scheduled.yml`，每小时运行一次（`17 * * * *`，避开整点的排队高峰）。每次构建在报告里给出下一篇定时文章的时间（`kite build --json` 的 `next_due`），`deploy.yml` 把它存进 Actions 缓存；`scheduled.yml` 只在这个时间已过、或者找不到记录时才调用 `deploy.yml` 构建和部署，其余情况一个很短的检查 job 就结束。定时触发单独放一个文件，是因为公开仓库 60 天没有提交时，GitHub 会把带 `schedule` 的 workflow 整个关掉，push 触发也一起失效。测试：`TestBuildReportsWhenTheNextScheduledPostIsDue`、`TestTheScheduleNeverSitsInTheDeployWorkflow`、`TestTheScheduledWorkflowReadsTheDueTimeTheBuildReports`，生成的两个 workflow 都通过 actionlint。`kite init` 不会改写已有的 workflow，之前建的站点需要从新生成的项目里复制这两个文件 | P0 |
 | 3 | 远端有新提交时只会拒绝 | **已解决。** push 因非快进被拒后先 fetch，再判断三件事：远端的新提交有没有改到这次发布的文件，这次发布是不是唯一没推送的提交，远端改过的文件在本地有没有未提交的改动。都没有问题时，后台显示「接在后面推送」（命令行是 `kite publish --push --rebase`），把提交接到远端之后再推送；做法见 [architecture.md §16.6](architecture.md#16-git-workflow最高危模块)，工作区里的其他改动不受影响。有重叠时展示远端那一侧的 diff，交还作者处理。另外新增 `POST /publish/push` 和 `kite publish --push`，推送失败后可以单独重试。测试：`internal/publish/git/remote_test.go` 的 6 个用例和 `TestAPushRefusedByAMovedRemoteCanBeReplayedOnIt` | P1 |
 | 4 | 「已部署」这一步永远不会完成 | **已解决。** 远端在 github.com、并且部署到 `github-pages` 环境的仓库，「已部署」按推送的那个提交的部署状态显示：成功、失败或进行中，成功后给出站点链接；被后来的提交取代的部署也算上线。其他托管平台、私有仓库、从不部署到 Pages 的仓库显示「托管平台不回报」，不再一直等待。查询在后台进行，不阻塞面板；匿名调用每小时只有 60 次，所以进行中的部署会逐步拉长查询间隔，上线后不再查询，剩余次数不到 10 次时暂停。测试：`internal/publish/git/deploy_internal_test.go`、`TestAPushToGitHubPagesIsReportedDeployedWhenItIs`、`TestAnyOtherHostLeavesDeploymentNotApplicable`，并对真实的 GitHub API 核对过一次。[architecture.md §17](architecture.md#17-cicd) 原先写的是 V1「不做任何 API 集成」，已改为「不做需要凭据的 API 集成」 | P1 |
-| 5 | 性能没有验收 | 做一个 2000 篇的 fixture，测量 §3 里四项时延（构建、列表首屏、预览、切分支），放进 `make` 目标或 CI | P1 |
+| 5 | 性能没有验收 | **已解决。** `make perf`（`internal/perf`）生成 2000 篇的站点，用真实的服务器、文件监听和热重载通道测量 §3 的五项时延，达不到目标就失败，结果见 §3。第一次测量时构建 3.7 秒、改文件到页面 564ms，都没有达标，为此做了四处优化：全量构建按目标并行渲染（输出与顺序无关，observer 仍按计划顺序收到页面）；规划时一次批量取出所有条目（`Reader.GetMany`），不再每篇查两次；分类和标签的列表直接从已经取出的条目分组，不再每个标签查一次；建索引时每个文件的语句只准备一次。没有放进 CI：GitHub 的机器比作者的电脑慢，速度也不稳定，发布前在本机跑 | P1 |
 | 6 | `kite theme verify` 命令没有实现 | [theme-system.md §11.2](theme-system.md) 要求 M0 就提供；现在只有针对内置主题的 build/serve 一致性测试。可以并入 M5 | P2 |
 | 7 | 只支持 YAML front matter | `internal/frontmatter` 需要支持 TOML，保真要求和 YAML 一样 | P2 |
 | 8 | 主题的 `requires` 只读取、不检查 | `internal/render/theme/theme.go` 读取了 `requires`，但没有和实际运行的 Kite 版本比较。可以并入 M5 | P2 |
@@ -114,7 +114,7 @@
 1. **静态站点的定时发布怎么触发**：已定。每小时检查一次，下一篇的时间由构建算出，只在有文章到点时才构建和部署（§4 第 2 项）。私有仓库每小时的检查仍按 1 分钟计费，大约每月 720 分钟。
 2. **评论**：先接 Giscus 或 Waline 这类现成组件，还是等 Kite 自己实现？
 3. **访问统计**：接哪一家第三方服务，还是先不做？
-4. **v1.0 标签的时机**：建议至少修完 §4 的 P0 项再打。
+4. **v1.0 标签的时机**：§4 的 P0 和 P1 已经修完。打标签前建议再做一次 §3 里 M4 的端到端验收：在真实仓库里发布一篇，看 5 分钟内是否出现在 GitHub Pages 上。
 
 ## 8. 维护本文
 

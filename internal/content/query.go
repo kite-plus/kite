@@ -183,6 +183,13 @@ type TermCount struct {
 // one read model is what keeps static and dynamic rendering from diverging.
 type Reader interface {
 	Get(ctx context.Context, id ID) (*Content, error)
+
+	// GetMany returns the items with the given ids in the order asked for,
+	// leaving out any that do not exist. It is Get for a caller that needs
+	// every item at once, such as a build, which would otherwise ask once per
+	// item and spend most of its time asking.
+	GetMany(ctx context.Context, ids []ID) ([]*Content, error)
+
 	GetBySlug(ctx context.Context, kind Kind, slug string) (*Content, error)
 	Query(ctx context.Context, q Query) (Page[Summary], error)
 
