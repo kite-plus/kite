@@ -28,6 +28,8 @@ on:
   push:
     branches: [@@BRANCH@@]
   workflow_dispatch:
+  # scheduled.yml calls this once a scheduled post has fallen due.
+  workflow_call:
 
 permissions:
   contents: read
@@ -58,7 +60,16 @@ jobs:
       # --verify builds twice and compares every byte, so a site that would
       # deploy differently on a second run fails here instead.
       - name: Build
-        run: kite build --verify
+        shell: bash # with pipefail, so a failed build is not hidden by tee
+        run: kite build --verify --json | tee build.json
+
+      # Tells scheduled.yml when there is next something to publish.
+      - name: Record the next scheduled post
+        run: jq -r '.next_due // "none"' build.json > .kite-next-due
+      - uses: actions/cache/save@v4
+        with:
+          path: .kite-next-due
+          key: kite-next-due-${{ github.run_id }}-${{ github.run_attempt }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
@@ -76,33 +87,109 @@ jobs:
         uses: actions/deploy-pages@v4
 `
 
-// WorkflowPath is where the deploy workflow lives.
-var WorkflowPath = filepath.Join(".github", "workflows", "deploy.yml")
+// scheduledWorkflow publishes scheduled posts once their time has come.
+//
+// It is a workflow of its own because GitHub turns off a workflow with a
+// schedule in a public repository that has had no commits for 60 days, and
+// turns it off for every trigger. A schedule inside the deploy workflow would
+// stop a quiet blog from deploying even when it next pushes a post.
+const scheduledWorkflow = `# Publishes scheduled posts once their time has come.
+#
+# Every hour it reads when the next scheduled post falls due, as the last
+# build recorded it, and runs the deploy workflow only once that time has
+# passed. A run with nothing due ends after that check.
+#
+# GitHub can delay these runs, and turns them off in a public repository with
+# no commits for 60 days; turn them back on under the Actions tab. Deploying
+# on push is a separate workflow and keeps working either way.
+name: Publish scheduled posts
 
-// writeWorkflow puts the deploy workflow in place, leaving an existing one
-// alone: it belongs to the repository, and an author may have edited it.
-func writeWorkflow(root, branch string) (string, error) {
-	target := filepath.Join(root, WorkflowPath)
-	if _, err := os.Stat(target); err == nil {
-		return "", nil
-	}
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return "", err
-	}
+on:
+  schedule:
+    - cron: "17 * * * *"
 
+permissions: {}
+
+jobs:
+  due:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - uses: actions/cache/restore@v4
+        with:
+          path: .kite-next-due
+          key: kite-next-due
+          restore-keys: kite-next-due-
+
+      # With no record, or one that cannot be read, it builds to find out.
+      - id: check
+        run: |
+          due=$(cat .kite-next-due 2>/dev/null || echo unknown)
+          echo "next scheduled post: $due"
+          case "$due" in
+            none) build=false ;;
+            unknown) build=true ;;
+            *)
+              at=$(date -u -d "$due" +%s 2>/dev/null) || at=0
+              if [ "$(date -u +%s)" -ge "$at" ]; then build=true; else build=false; fi
+              ;;
+          esac
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: due
+    if: needs.due.outputs.build == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+`
+
+// WorkflowPath is where the deploy workflow lives, and SchedulePath the one
+// that publishes scheduled posts.
+var (
+	WorkflowPath = filepath.Join(".github", "workflows", "deploy.yml")
+	SchedulePath = filepath.Join(".github", "workflows", "scheduled.yml")
+)
+
+// writeWorkflow puts the workflows in place and returns what it wrote.
+//
+// An existing deploy workflow is left alone, and the scheduled one with it:
+// the file belongs to the repository, an author may have edited it, and the
+// scheduled workflow only works with a deploy workflow it can call.
+func writeWorkflow(root, branch string) ([]string, error) {
+	if _, err := os.Stat(filepath.Join(root, WorkflowPath)); err == nil {
+		return nil, nil
+	}
 	if branch == "" {
 		branch = "main"
 	}
-	body := strings.NewReplacer(
+	fill := strings.NewReplacer(
 		"@@BRANCH@@", branch,
 		"@@GO@@", buildinfo.GoVersion(),
 		"@@VERSION@@", installVersion(),
-	).Replace(deployWorkflow)
+	)
 
-	if err := os.WriteFile(target, []byte(body), 0o644); err != nil {
-		return "", err
+	var written []string
+	for _, w := range []struct{ path, body string }{
+		{WorkflowPath, deployWorkflow},
+		{SchedulePath, scheduledWorkflow},
+	} {
+		target := filepath.Join(root, w.path)
+		if _, err := os.Stat(target); err == nil {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return written, err
+		}
+		if err := os.WriteFile(target, []byte(fill.Replace(w.body)), 0o644); err != nil {
+			return written, err
+		}
+		written = append(written, w.path)
 	}
-	return WorkflowPath, nil
+	return written, nil
 }
 
 // installVersion is what `go install` should be pinned to.

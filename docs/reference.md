@@ -143,6 +143,21 @@ site that would deploy differently on a second run fails before it is
 published. Turn Pages on under **Settings → Pages → Source → GitHub Actions**
 and a push to `main` deploys.
 
+A second workflow, `scheduled.yml`, publishes posts scheduled for later. Each
+build records when the next scheduled post falls due, and once an hour the
+workflow checks that time and deploys only if it has passed, so a post goes
+live within the hour after its time and an hour with nothing due costs one
+short job. In a private repository each check is billed as a minute of
+Actions time; change its `cron` line to check less often.
+
+GitHub turns scheduled workflows off in a public repository with no commits
+for 60 days. Turn it back on under the **Actions** tab. Deploying on push is
+a separate workflow for exactly this reason, and keeps working either way.
+
+`kite build` prints when the next scheduled post falls due. On any other host
+that is when the site has to be built again, because a static site only shows
+a scheduled post once it has been built after the post's time.
+
 Publishing from a machine instead goes through Git:
 
 ```bash

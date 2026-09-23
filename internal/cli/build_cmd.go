@@ -24,6 +24,10 @@ type buildReport struct {
 	Took     string   `json:"took"`
 	Verified bool     `json:"verified,omitempty"`
 	Diverged []string `json:"diverged,omitempty"`
+
+	// NextDue is when a scheduled post falls due and the site has to be
+	// built again to publish it. The deploy workflow reads it.
+	NextDue string `json:"next_due,omitempty"`
 }
 
 func newBuildCmd() *cobra.Command {
@@ -69,6 +73,9 @@ func newBuildCmd() *cobra.Command {
 				Output:   outDir,
 				Took:     stats.Duration.Round(100000).String(),
 			}
+			if !stats.NextDue.IsZero() {
+				report.NextDue = stats.NextDue.UTC().Format(time.RFC3339)
+			}
 
 			if verify {
 				diverged, err := verifyBuild(cmd, s, opts)
@@ -101,6 +108,9 @@ func newBuildCmd() *cobra.Command {
 func printBuild(cmd *cobra.Command, r buildReport) {
 	printf(cmd, "%d target(s), %d rendered, %d extra file(s) (%s)\n", r.Targets, r.Rendered, r.Extra, r.Took)
 	printf(cmd, "%d file(s) written to %s\n", r.Files, r.Output)
+	if r.NextDue != "" {
+		printf(cmd, "next scheduled post is due %s; build again then to publish it\n", r.NextDue)
+	}
 	if !r.Verified {
 		return
 	}

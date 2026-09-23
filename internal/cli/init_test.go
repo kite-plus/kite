@@ -138,7 +138,7 @@ func TestCreateWritesAProjectTheRestOfKiteCanOpen(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 
-	for _, want := range []string{project.ConfigName, ".gitignore", WorkflowPath} {
+	for _, want := range []string{project.ConfigName, ".gitignore", WorkflowPath, SchedulePath} {
 		if !slices.Contains(created, want) {
 			t.Errorf("%s was not reported as created: %v", want, created)
 		}

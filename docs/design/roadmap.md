@@ -13,7 +13,7 @@
   - front matter 保真：只改标题时，文件的 diff 只有标题这一行；
   - build 和 serve 的输出逐字节一致，预览和最终页面也逐字节一致；
   - 发布只提交本次涉及的文件，不动用户暂存区里的其他改动。
-- **打 v1.0 标签前还有收尾项**：静态站点的定时发布还没有东西去触发，以及几处没做完的发布和验收工作，见 §4。定时文章提前上线的 bug 已经修复。
+- **打 v1.0 标签前还有收尾项**：几处没做完的发布和验收工作，见 §4。两个 P0 项（定时文章提前上线、静态站点的定时发布没有触发）已经解决。
 - **M5–M8 都还没开始**，其中 M5 有一部分已经提前做了。后台按设计稿画出的「即将推出」占位功能，各自归到哪个阶段见 §6。
 
 ## 2. 各里程碑完成情况
@@ -68,7 +68,7 @@
 | # | 问题 | 现状与位置 | 优先级 |
 |---|---|---|---|
 | 1 | **定时文章会提前上线（bug）** | **已修复。** 构建只收录构建时刻已经公开的内容：`published`，以及 `published_at` 不晚于构建时刻的 `scheduled`。规则和 `Content.IsPublic` 相同，过滤在 SQL 里完成（`content.Query.PublicAt`），首页、列表、分类、RSS、sitemap 和文章页一起生效。serve 记下下一篇定时文章的时间，到点后的第一个请求先重新规划页面再应答。`kite build --verify` 的两次构建共用同一时刻。测试：`TestPublicAtAgreesWithIsPublic`、`TestScheduledContentWaitsForItsTime`、`TestAScheduledPostIsServedOnceItsTimeComes` | P0 |
-| 2 | **静态站点的定时发布没有东西去触发** | `internal/cli/starter.go` 生成的 workflow 只在 push 和手动运行时触发。需要加 `schedule`，频率待定（见 §7） | **P0** |
+| 2 | **静态站点的定时发布没有东西去触发** | **已解决。** `kite init` 另外生成一个 `scheduled.yml`，每小时运行一次（`17 * * * *`，避开整点的排队高峰）。每次构建在报告里给出下一篇定时文章的时间（`kite build --json` 的 `next_due`），`deploy.yml` 把它存进 Actions 缓存；`scheduled.yml` 只在这个时间已过、或者找不到记录时才调用 `deploy.yml` 构建和部署，其余情况一个很短的检查 job 就结束。定时触发单独放一个文件，是因为公开仓库 60 天没有提交时，GitHub 会把带 `schedule` 的 workflow 整个关掉，push 触发也一起失效。测试：`TestBuildReportsWhenTheNextScheduledPostIsDue`、`TestTheScheduleNeverSitsInTheDeployWorkflow`、`TestTheScheduledWorkflowReadsTheDueTimeTheBuildReports`，生成的两个 workflow 都通过 actionlint。`kite init` 不会改写已有的 workflow，之前建的站点需要从新生成的项目里复制这两个文件 | P0 |
 | 3 | 远端有新提交时只会拒绝 | `internal/publish/git/publisher.go` 的 `push` 识别出非快进后只返回 `remote_moved`。设计要求（[architecture.md §16.6](architecture.md#16-git-workflow最高危模块)）：先 fetch，判断远端改动是否碰到本次发布的路径；没碰到就提供一键 `rebase --onto`，碰到了就展示 diff，交给用户处理 | P1 |
 | 4 | 「已部署」这一步永远不会完成 | `publisher.go` 的 `State` 固定返回 pending。要么对接 GitHub Pages 的部署状态，要么在拿不到时在界面上隐藏这一步 | P1 |
 | 5 | 性能没有验收 | 做一个 2000 篇的 fixture，测量 §3 里四项时延（构建、列表首屏、预览、切分支），放进 `make` 目标或 CI | P1 |
@@ -111,7 +111,7 @@
 
 ## 7. 待定事项 `[待定]`
 
-1. **静态站点的定时发布怎么触发**：workflow 多久构建一次（例如每小时一次，会占用 Actions 额度），还是由发布器算出下一个发布时间再触发。
+1. **静态站点的定时发布怎么触发**：已定。每小时检查一次，下一篇的时间由构建算出，只在有文章到点时才构建和部署（§4 第 2 项）。私有仓库每小时的检查仍按 1 分钟计费，大约每月 720 分钟。
 2. **评论**：先接 Giscus 或 Waline 这类现成组件，还是等 Kite 自己实现？
 3. **访问统计**：接哪一家第三方服务，还是先不做？
 4. **v1.0 标签的时机**：建议至少修完 §4 的 P0 项再打。

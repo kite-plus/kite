@@ -231,13 +231,11 @@ func create(ctx context.Context, p plan) ([]string, error) {
 	if p.Workflow {
 		// Written now rather than offered later, so that the first push
 		// already has somewhere to go.
-		workflow, err := writeWorkflow(p.Root, "main")
+		workflows, err := writeWorkflow(p.Root, "main")
 		if err != nil {
 			return nil, err
 		}
-		if workflow != "" {
-			created = append(created, workflow)
-		}
+		created = append(created, workflows...)
 	}
 	if p.Git {
 		if err := gitInit(ctx, p.Root); err != nil {
@@ -307,6 +305,9 @@ func reportInit(cmd *cobra.Command, p plan, created []string) {
 
 	if slices.Contains(created, WorkflowPath) {
 		printf(cmd, "\n%s will build and deploy this site on every push to main.\n", WorkflowPath)
+		if slices.Contains(created, SchedulePath) {
+			printf(cmd, "%s publishes scheduled posts once their time has come.\n", SchedulePath)
+		}
 		printf(cmd, "Turn on Pages first: Settings -> Pages -> Source -> GitHub Actions.\n")
 	}
 }

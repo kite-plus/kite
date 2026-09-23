@@ -339,7 +339,10 @@ tags: [Go, Soon]
 Not yet.
 `)
 
-	_, early := f.run(t, f.out, nil)
+	stats, early := f.run(t, f.out, nil)
+	if !stats.NextDue.Equal(due) {
+		t.Errorf("Stats.NextDue = %v, want %v", stats.NextDue, due)
+	}
 	for _, file := range []string{"posts/launch-day/index.html", "tags/soon/index.html"} {
 		if slices.Contains(early, file) {
 			t.Errorf("%s was built before its time", file)

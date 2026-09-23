@@ -54,6 +54,10 @@ type Stats struct {
 	Skipped  int           `json:"skipped"`
 	Extra    int           `json:"extra"`
 	Duration time.Duration `json:"-"`
+
+	// NextDue is when the output stops being current because a scheduled
+	// item falls due; zero when nothing is waiting. See [Builder.NextDue].
+	NextDue time.Time `json:"-"`
 }
 
 // Builder renders a site.
@@ -176,6 +180,10 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 		return stats, err
 	}
 	stats.Extra += extra
+
+	if stats.NextDue, err = b.NextDue(ctx); err != nil {
+		return stats, err
+	}
 
 	if err := b.opts.Emitter.Commit(); err != nil {
 		return stats, err
