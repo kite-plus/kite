@@ -104,6 +104,10 @@ type Summary struct {
 	UpdatedAt   time.Time
 	PublishedAt *time.Time
 	Excerpt     string
+
+	// Pinned is the one field a listing reads from an item's metadata: an
+	// author who pins a post expects to see which one it is in a list.
+	Pinned bool
 }
 
 // Summarize projects a full item into a [Summary].
@@ -121,6 +125,7 @@ func (c *Content) Summarize() Summary {
 		CreatedAt:   c.CreatedAt,
 		UpdatedAt:   c.UpdatedAt,
 		PublishedAt: c.PublishedAt,
+		Pinned:      c.Meta["pinned"] == true,
 	}
 }
 

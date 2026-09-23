@@ -75,7 +75,7 @@
 | 6 | `kite theme verify` 命令没有实现 | **已解决。** `kite theme verify [dir]` 用内置的 fixture 站点（`internal/themecheck`：七篇文章分三页、一个页面、带图片的 page bundle、标签和分类及其 term 页、404，还有不该出现的草稿和定时文章）以 build 和 serve 各渲染一遍，逐字节比较 23 个页面，指出每页第一处不同的行。不给目录时检查当前项目的主题，项目之外检查内置主题。还没做的：fixture 没有覆盖多语言（i18n 在 M5 才定）；`--strict` 要等引擎有了废弃告警再加。测试：`internal/themecheck/themecheck_test.go` | P2 |
 | 7 | 只支持 YAML front matter | `internal/frontmatter` 需要支持 TOML，保真要求和 YAML 一样 | P2 |
 | 8 | 主题的 `requires` 只读取、不检查 | **已解决。** 每次加载主题（打开站点、构建、serve）都检查 `requires`：支持 `>=`、`>`、`<=`、`<`、`=`，空格隔开表示同时满足，`||` 表示任一满足，按 semver 比较，预发布版本排在正式版之前。不满足就拒绝加载，并说明主题要求的范围和正在运行的 Kite 版本。从源码构建的版本（`dev` 或提交哈希）不参与比较；`git describe` 生成的「tag 之后又有提交」按那个 tag 比较。测试：`internal/render/theme/requires_test.go` | P2 |
-| 9 | 文章列表不显示「置顶」 | `internal/api/wire.go` 的 `Summary` 不带 meta。返回 `pinned`，或者一小组列表要用的字段即可 | P2 |
+| 9 | 文章列表不显示「置顶」 | **已解决。** 列表摘要带上 `pinned`，在 SQL 里从存储的 meta 取出（`json_type(meta_json, '$.pinned') = 'true'`），列表仍然不需要逐行解析 meta；只有真正的 `true` 才算置顶，和条目本身的判断一致。文章列表在标题后按设计稿画出琥珀色的「置顶」标记，深色模式有对应的配色。测试：`TestSummariesSayWhichItemsArePinned` | P2 |
 | 10 | 发布的备用路径没有实现 | 设计里的「临时 index + `commit-tree` + `update-ref` CAS」备用路径还没做（[architecture.md §16.3](architecture.md#16-git-workflow最高危模块)），现在只有主路径 | P2 |
 | 11 | 周边仓库和文档站没有建 | 组织下现在有 `kite`、`.github`，以及另一个产品 Explore（内容发现平台）用的 `explore`。官网文档站 `website`（用 Kite 自己搭）、`starters`、`setup-kite`，以及存放预研和设计存档的 `lab` 都还没有 | P2 |
 | 12 | Hugo 里日期在未来的文章会立即公开 | Hugo 默认不构建 `date` 在未来的内容，但 Kite 把没有 `status` 的文件读成 `published`，而 `published` 不看日期（`Content.IsPublic`）。从 Hugo 迁过来的站点，原本排在未来的文章会马上上线。可以让日期在未来的 `published` 也等到时间，也可以只在 `kite doctor` 里提示，需要先定规则 | P2 |
@@ -107,7 +107,7 @@
 | 存储空间 | 统计内容目录和上传文件的大小 | 阶段 1 可做 |
 | 版本号旁的「最新」 | 查询 GitHub Releases | 阶段 1 可做 |
 | 总访问量、访问量列、RSS 订阅数 | 纯静态站点自己无法统计。要么接第三方统计服务（如 Umami、Plausible），要么等动态模式按请求统计；RSS 订阅数基本拿不到 | 待定 |
-| 文章列表里的「置顶」 | 列表接口返回 `pinned` | 阶段 1（§4 第 9 项） |
+| 文章列表里的「置顶」 | 列表接口返回 `pinned` | 已完成（§4 第 9 项） |
 
 ## 7. 待定事项 `[待定]`
 

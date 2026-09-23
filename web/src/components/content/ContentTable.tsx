@@ -150,12 +150,19 @@ export function ContentTable({
                 </td>
 
                 <td className="py-3 pr-3.5">
-                  <a
-                    {...linkProps({ name: "edit", kind: item.kind, id: item.id })}
-                    className="block truncate text-[13px] font-medium transition-colors hover:text-brand"
-                  >
-                    {item.title || item.slug}
-                  </a>
+                  <div className="flex min-w-0 items-center gap-[7px]">
+                    <a
+                      {...linkProps({ name: "edit", kind: item.kind, id: item.id })}
+                      className="truncate text-[13px] font-medium transition-colors hover:text-brand"
+                    >
+                      {item.title || item.slug}
+                    </a>
+                    {item.pinned && (
+                      <span className="flex-none rounded-[5px] border border-pin-line bg-pin-soft px-1.5 py-px text-[10.5px] whitespace-nowrap text-pin">
+                        {t("field.pinned")}
+                      </span>
+                    )}
+                  </div>
                   {tags.length > 0 && (
                     <div className="mt-[3px] truncate text-[11.5px] text-subtle">
                       {tags.map((tag, i) => (

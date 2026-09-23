@@ -413,6 +413,7 @@ export interface components {
             meta?: {
                 [key: string]: unknown;
             };
+            pinned?: boolean;
             /** Format: date-time */
             published_at?: string;
             revision: string;
@@ -538,6 +539,7 @@ export interface components {
             kind: string;
             locale?: string;
             locator?: string;
+            pinned?: boolean;
             /** Format: date-time */
             published_at?: string;
             revision: string;

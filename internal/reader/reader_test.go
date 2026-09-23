@@ -407,3 +407,31 @@ func TestGetManyReturnsWhatGetDoesInTheOrderAsked(t *testing.T) {
 		}
 	}
 }
+
+// A list shows which posts are pinned. Only a real true pins one, and the
+// index has to say so exactly when the item itself does.
+func TestSummariesSayWhichItemsArePinned(t *testing.T) {
+	pins := []string{"pinned: true\n", "pinned: false\n", "pinned: \"yes\"\n", "pinned: 1\n", ""}
+	r := fixture(t, len(pins), func(i int) string { return pins[i] })
+
+	page, err := r.Query(t.Context(), content.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pinned []string
+	for _, s := range page.Items {
+		item, err := r.Get(t.Context(), s.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s.Pinned != item.Summarize().Pinned {
+			t.Errorf("%s: the list says pinned=%v, the item says %v", s.Title, s.Pinned, item.Summarize().Pinned)
+		}
+		if s.Pinned {
+			pinned = append(pinned, s.Title)
+		}
+	}
+	if want := []string{"Post 00"}; !slices.Equal(pinned, want) {
+		t.Errorf("pinned = %v, want %v", pinned, want)
+	}
+}

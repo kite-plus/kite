@@ -49,6 +49,10 @@
   --divider: #f0f0f1;
   --border-strong: #d4d4d8;
   --brand-soft: #eef2fb;
+  /* The pinned badge's amber, from the design. */
+  --pin: #b45309;
+  --pin-soft: #fffbeb;
+  --pin-line: #fde68a;
   --control-radius: 0.4375rem;
   --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
@@ -106,6 +110,9 @@
   --color-divider: var(--divider);
   --color-border-strong: var(--border-strong);
   --color-brand-soft: var(--brand-soft);
+  --color-pin: var(--pin);
+  --color-pin-soft: var(--pin-soft);
+  --color-pin-line: var(--pin-line);
   /* The design sets no line-height anywhere, so every line is the font's own
      normal height; a fixed ratio drifts a pixel per line against it. */
   --text-xs--line-height: normal;
@@ -159,6 +166,9 @@
   --divider: oklch(1 0 0 / 7%);
   --border-strong: oklch(1 0 0 / 22%);
   --brand-soft: color-mix(in oklab, var(--brand) 16%, transparent);
+  --pin: #fbbf24;
+  --pin-soft: color-mix(in oklab, #f59e0b 12%, transparent);
+  --pin-line: color-mix(in oklab, #f59e0b 35%, transparent);
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);

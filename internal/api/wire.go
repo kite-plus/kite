@@ -40,6 +40,9 @@ type Summary struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	PublishedAt time.Time `json:"published_at,omitzero"`
+
+	// Pinned marks an item its author pinned, for a list to show as such.
+	Pinned bool `json:"pinned,omitempty"`
 }
 
 // Item is one content item in full.
@@ -136,6 +139,7 @@ func summaryOf(s content.Summary, r *url.Resolver) Summary {
 		Revision:   string(s.Revision),
 		CreatedAt:  s.CreatedAt,
 		UpdatedAt:  s.UpdatedAt,
+		Pinned:     s.Pinned,
 	}
 	if s.PublishedAt != nil {
 		out.PublishedAt = *s.PublishedAt
