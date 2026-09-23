@@ -104,10 +104,10 @@ docker cp kite:/data/public ./public
 
 ## 路线图
 
-- **已完成**：静态构建、实时预览服务、浏览器后台、Git 发布（M0–M4）。
+- **已完成**：静态构建、实时预览服务、浏览器后台、Git 发布（M0–M4），打 v1.0 标签前还有少量收尾。
 - **接下来**：公开主题契约、`kite.lock` 与 `kitew` wrapper、基于 SQLite 的动态模式、WebAssembly 插件（M5–M8）。
 
-完整的里程碑列表见[详细使用说明](docs/reference.zh-CN.md#路线图)。
+完整的里程碑列表见[详细使用说明](docs/reference.zh-CN.md#路线图)，逐项进度见[路线图与实现现状](docs/design/roadmap.md)。
 
 ## 参与贡献
 

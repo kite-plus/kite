@@ -259,11 +259,13 @@ Verify a download against the `checksums.txt` published with the release.
 | M1 | `kite serve`: render per request, watch and reload | done |
 | M2 | Read-only admin over an existing repository | done |
 | M3 | Editing admin: editor, media, conflict handling | done |
-| M4 | Git publisher — **v1.0** | done |
+| M4 | Git publisher — **v1.0** | done, wrapping up before the tag |
 | M5 | Public theme contract | |
 | M6 | `kite.lock` and the `kitew` wrapper | |
 | M7 | Dynamic mode backed by SQLite | |
 | M8 | WebAssembly plugins | |
+
+The [roadmap](design/roadmap.md) (in Chinese) records what has been verified as done, what remains before v1.0 is tagged, and the plan after it.
 
 ## Contributing
 

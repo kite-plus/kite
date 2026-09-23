@@ -104,10 +104,10 @@ docker cp kite:/data/public ./public
 
 ## Roadmap
 
-- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4).
+- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4). A few items remain before v1.0 is tagged.
 - **Next:** a public theme contract, `kite.lock` with the `kitew` wrapper, a dynamic mode backed by SQLite, and WebAssembly plugins (M5–M8).
 
-The [reference guide](docs/reference.md#roadmap) lists every milestone.
+The [reference guide](docs/reference.md#roadmap) lists every milestone, and the [roadmap](docs/design/roadmap.md) tracks progress item by item.
 
 ## Contributing
 

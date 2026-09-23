@@ -227,11 +227,13 @@ GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot 
 | M1 | `kite serve`：按请求渲染，文件监听与热重载 | 已完成 |
 | M2 | 只读后台，能打开现有仓库 | 已完成 |
 | M3 | 可写后台：编辑器、媒体、冲突处理 | 已完成 |
-| M4 | Git 发布器 —— **v1.0** | 已完成 |
+| M4 | Git 发布器 —— **v1.0** | 已完成，打标签前收尾中 |
 | M5 | 公开主题契约 | |
 | M6 | `kite.lock` 与 `kitew` wrapper | |
 | M7 | 基于 SQLite 的动态模式 | |
 | M8 | WebAssembly 插件 | |
+
+[路线图与实现现状](design/roadmap.md)记录了逐项核实过的完成情况、打 v1.0 标签前的收尾清单，以及之后的计划。
 
 ## 参与贡献
 

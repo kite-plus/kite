@@ -9,6 +9,7 @@ Kite 的产品与技术总体设计。这些文档是**开发期的约束来源*
 | [architecture.md](architecture.md) | 总体架构：产品定位、Content Model、Storage Model、Build Engine、Publisher、Git Workflow、API、Roadmap、架构决策 | 所有贡献者，**先读这篇** |
 | [theme-system.md](theme-system.md) | 主题系统：引擎选型、模板查找顺序、RenderContext 数据契约、函数命名空间、`theme.yaml`、Asset Pipeline、契约冻结流程 | 主题开发者、渲染层贡献者 |
 | [plugin-system.md](plugin-system.md) | 插件系统：WASM 运行时、Host ABI、Hook 目录、Capability、Permission、`plugin.yaml`、SDK | 插件开发者、扩展层贡献者 |
+| [roadmap.md](roadmap.md) | 路线图与实现现状：逐项核实的完成情况、验收标准核对、v1.0 收尾清单、分阶段计划、后台占位功能的归属 | 所有贡献者，排期前读 |
 
 ## 阅读顺序
 
@@ -31,5 +32,6 @@ Kite 的产品与技术总体设计。这些文档是**开发期的约束来源*
 | architecture.md | 设计中（M0 开工前的基线） | 2026-09-21 |
 | theme-system.md | 设计中，契约计划于 **M5** 冻结 | 2026-09-21 |
 | plugin-system.md | 设计中，实现计划于 **M8** | 2026-09-21 |
+| roadmap.md | 持续更新 | 2026-09-23 |
 
-里程碑定义见 [architecture.md §28 Roadmap](architecture.md#28-roadmap)。
+里程碑定义见 [architecture.md §28 Roadmap](architecture.md#28-roadmap)，实际进度见 [roadmap.md](roadmap.md)。
