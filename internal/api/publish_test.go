@@ -186,3 +186,72 @@ func TestPublishingWithoutARepositoryIsReportedPlainly(t *testing.T) {
 		t.Errorf("problems = %v, want not_a_repository", body.Plan)
 	}
 }
+
+// A push refused because the remote moved on says what the remote has, and
+// when none of it touches the published post, asking for a rebase pushes the
+// post on top of it.
+func TestAPushRefusedByAMovedRemoteCanBeReplayedOnIt(t *testing.T) {
+	root := newRepoProject(t, 2)
+	origin := t.TempDir()
+	git(t, origin, "init", "-q", "--bare", "-b", "main", origin)
+	git(t, root, "remote", "add", "origin", origin)
+	git(t, root, "push", "-q", "--set-upstream", "origin", "main")
+
+	other := t.TempDir()
+	git(t, other, "clone", "-q", origin, other)
+	git(t, other, "config", "commit.gpgsign", "false")
+	write(t, filepath.Join(other, "content", "posts", "theirs", "index.md"),
+		"---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ990\ntitle: Theirs\nslug: theirs\nstatus: published\n---\n\nFrom elsewhere.\n")
+	git(t, other, "add", "-A")
+	git(t, other, "commit", "-q", "-m", "add theirs")
+	git(t, other, "push", "-q")
+
+	h, _ := newWritableServer(t, root)
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
+	item, tag := load(t, h, list.Items[0].ID)
+	draft := draftOf(item)
+	draft.Body = "Edited in the admin.\n"
+	if rec := send(t, h, http.MethodPut, api.Prefix+"/contents/"+item.ID, draft,
+		map[string]string{"If-Match": tag}); rec.Code != http.StatusOK {
+		t.Fatalf("save: %d\n%s", rec.Code, rec.Body.String())
+	}
+
+	rec := send(t, h, http.MethodPost, api.Prefix+"/publish",
+		api.PublishBody{IDs: []string{item.ID}, Push: true}, nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("publish: %d, want 409\n%s", rec.Code, rec.Body.String())
+	}
+	refused := decode[api.PublishRefused](t, rec)
+	if refused.Problem == nil || refused.Problem.Code != publish.CodeRemoteMoved {
+		t.Fatalf("problem = %+v, want remote_moved", refused.Problem)
+	}
+	if refused.Done == nil || refused.Done.Commit == "" {
+		t.Fatal("the commit that was made is not reported")
+	}
+	if remote := refused.Done.Remote; remote == nil || !remote.Rebase || remote.Behind != 1 {
+		t.Fatalf("remote = %+v, want one commit and a rebase on offer", remote)
+	}
+
+	rec = send(t, h, http.MethodPost, api.Prefix+"/publish/push", api.PushBody{Rebase: true}, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("push: %d\n%s", rec.Code, rec.Body.String())
+	}
+	if result := decode[publish.Result](t, rec); !result.Pushed || !result.Rebased {
+		t.Errorf("result = %+v, want rebased and pushed", result)
+	}
+	if subjects := git(t, origin, "log", "--format=%s", "main"); !strings.HasPrefix(subjects,
+		"publish: "+item.Title+"\nadd theirs\n") {
+		t.Errorf("remote history:\n%s", subjects)
+	}
+
+	// Their post came with the rebase, and is there to read straight away.
+	get[api.Item](t, h, api.Prefix+"/contents/01J8KQ2P3R4S5T6V7W8X9YZ990", http.StatusOK)
+
+	rec = send(t, h, http.MethodPost, api.Prefix+"/publish/push", api.PushBody{}, nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("second push: %d, want 409\n%s", rec.Code, rec.Body.String())
+	}
+	if again := decode[api.PublishRefused](t, rec); again.Problem == nil || again.Problem.Code != publish.CodeNothingToPush {
+		t.Errorf("problem = %+v, want nothing_to_push", again.Problem)
+	}
+}

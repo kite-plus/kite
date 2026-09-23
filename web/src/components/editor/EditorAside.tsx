@@ -190,7 +190,7 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
 
       {canPublish(delivery) && (
         <Section title={t("publish.delivery")}>
-          <DeliveryStages delivery={delivery} />
+          <DeliveryStages delivery={delivery} publish={publish} />
         </Section>
       )}
 

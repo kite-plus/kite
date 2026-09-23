@@ -99,13 +99,12 @@ func (p *Publisher) Apply(ctx context.Context, plan *publish.Plan) (*publish.Res
 		return result, nil
 	}
 
-	if err := p.push(ctx, plan, commit); err != nil {
+	if err := p.send(ctx, result, plan.Remote, plan.Branch); err != nil {
 		// The commit stands: it is on the branch and nothing is lost. Saying
 		// the publish failed outright would invite an author to repeat a
 		// commit they already have.
 		return result, err
 	}
-	result.Pushed = true
 	return result, nil
 }
 
@@ -185,8 +184,8 @@ func (p *Publisher) forget(ctx context.Context, paths []string) {
 // of force, and even that is not used here: a push that would overwrite
 // something is refused and handed back to the author. What was rejected is
 // still committed locally, so nothing is lost by stopping.
-func (p *Publisher) push(ctx context.Context, plan *publish.Plan, commit string) error {
-	if plan.Remote == "" || plan.Branch == "" {
+func (p *Publisher) push(ctx context.Context, remote, branch, commit string) error {
+	if remote == "" || branch == "" {
 		return publish.Problem{
 			Code:   publish.CodeNoRemote,
 			Detail: "no remote to push to",
@@ -194,11 +193,11 @@ func (p *Publisher) push(ctx context.Context, plan *publish.Plan, commit string)
 		}
 	}
 
-	args := []string{"push", plan.Remote, plan.Branch}
+	args := []string{"push", remote, branch}
 	// An upstream is set on the first push so later ones need no arguments,
 	// and so the branch reports ahead and behind counts.
 	if _, err := p.git.read(ctx, "rev-parse", "--abbrev-ref", "@{upstream}"); err != nil {
-		args = []string{"push", "--set-upstream", plan.Remote, plan.Branch}
+		args = []string{"push", "--set-upstream", remote, branch}
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -210,8 +209,8 @@ func (p *Publisher) push(ctx context.Context, plan *publish.Plan, commit string)
 				Code: publish.CodeRemoteMoved,
 				Detail: "the remote has commits this branch does not: " +
 					firstLine(detail),
-				Fix: "pull and try again. Your commit " + short(commit) +
-					" is safe on this branch; nothing was overwritten.",
+				Fix: "your commit " + short(commit) +
+					" is safe on this branch; nothing was overwritten",
 			}
 		}
 		return p.git.wrap(err, args, &stderr)

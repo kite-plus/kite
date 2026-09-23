@@ -14,6 +14,7 @@ func newPublishCmd() *cobra.Command {
 	var (
 		message string
 		push    bool
+		rebase  bool
 		dryRun  bool
 		force   bool
 		all     bool
@@ -25,7 +26,11 @@ func newPublishCmd() *cobra.Command {
 		Long: "Commits exactly the paths given and nothing else: what you have\n" +
 			"staged stays staged, and every other change stays where it is.\n\n" +
 			"With no paths, --all publishes everything Kite can see is\n" +
-			"uncommitted under content, static and kite.yaml.",
+			"uncommitted under content, static and kite.yaml, and --push alone\n" +
+			"pushes what is already committed.\n\n" +
+			"A remote that has moved on is never overwritten. When nothing it\n" +
+			"changed is anything you published, --rebase puts your commit on top\n" +
+			"of its commits and pushes.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -51,7 +56,10 @@ func newPublishCmd() *cobra.Command {
 				paths = append(paths, state.Dirty...)
 			}
 			if len(paths) == 0 {
-				return fmt.Errorf("publish: name what to publish, or pass --all")
+				if !push {
+					return fmt.Errorf("publish: name what to publish, pass --all, or pass --push to push what is committed")
+				}
+				return pushCommitted(cmd, publisher, rebase)
 			}
 
 			plan, err := publisher.Preflight(cmd.Context(), publish.Request{
@@ -80,12 +88,20 @@ func newPublishCmd() *cobra.Command {
 			}
 
 			result, err := publisher.Apply(cmd.Context(), plan)
+			// Asked for up front, a push refused only because the remote moved
+			// on elsewhere is a step rather than a stop.
+			if err != nil && rebase && result != nil && result.Remote != nil && result.Remote.Rebase {
+				result, err = publisher.Push(cmd.Context(), publish.PushRequest{Rebase: true})
+			}
 			// A push can fail after its commit succeeded, so what did happen
 			// is reported before the failure that followed it.
 			if result != nil {
 				report(cmd, result)
 			}
 			if err != nil {
+				if result != nil && result.Remote != nil {
+					return fmt.Errorf("publish: committed, but not pushed")
+				}
 				return err
 			}
 			if jsonOut(cmd) {
@@ -97,6 +113,8 @@ func newPublishCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&message, "message", "m", "", "commit message")
 	cmd.Flags().BoolVar(&push, "push", false, "push the commit to the remote")
+	cmd.Flags().BoolVar(&rebase, "rebase", false,
+		"when the remote has moved on without touching this commit, put it on top and push")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report what would happen and stop")
 	cmd.Flags().BoolVar(&force, "force", false, "go ahead despite warnings")
 	cmd.Flags().BoolVar(&all, "all", false, "publish everything uncommitted that Kite manages")
@@ -136,8 +154,72 @@ func report(cmd *cobra.Command, result *publish.Result) {
 	if jsonOut(cmd) || result.Commit == "" {
 		return
 	}
-	printf(cmd, "\n  committed %s\n", result.Commit[:min(8, len(result.Commit))])
+	if result.Rebased {
+		printf(cmd, "\n  committed %s, on top of the remote's new commits\n", short(result.Commit))
+	} else {
+		printf(cmd, "\n  committed %s\n", short(result.Commit))
+	}
 	if result.Pushed {
 		printf(cmd, "  pushed\n")
 	}
+	if result.Remote != nil {
+		describeRemote(cmd, result.Remote)
+	}
 }
+
+// pushCommitted pushes what is already committed, for a publish whose push
+// did not go through: publishing the same paths again finds nothing to commit.
+func pushCommitted(cmd *cobra.Command, publisher publish.Publisher, rebase bool) error {
+	result, err := publisher.Push(cmd.Context(), publish.PushRequest{Rebase: rebase})
+	if result != nil && !jsonOut(cmd) {
+		if result.Pushed {
+			how := ""
+			if result.Rebased {
+				how = ", on top of the remote's new commits"
+			}
+			printf(cmd, "\n  pushed %s%s\n", short(result.Commit), how)
+		}
+		if result.Remote != nil {
+			describeRemote(cmd, result.Remote)
+		}
+	}
+	if err != nil {
+		if result != nil && result.Remote != nil {
+			return fmt.Errorf("publish: not pushed")
+		}
+		return err
+	}
+	if jsonOut(cmd) {
+		return writeJSON(cmd.OutOrStdout(), result)
+	}
+	return nil
+}
+
+// describeRemote says what a remote that moved on has, and what to do.
+func describeRemote(cmd *cobra.Command, r *publish.RemoteChange) {
+	printf(cmd, "\n  %s has %d commit(s) this branch does not:\n", r.Upstream, r.Behind)
+	shown := min(len(r.Commits), 5)
+	for _, c := range r.Commits[:shown] {
+		printf(cmd, "    %s %s (%s)\n", short(c.Hash), c.Subject, c.Author)
+	}
+	if more := r.Behind - shown; more > 0 {
+		printf(cmd, "    and %d more\n", more)
+	}
+
+	if r.Rebase {
+		printf(cmd, "\n  none of them change what you published, so your commit can go on top:\n")
+		printf(cmd, "    kite publish --push --rebase\n")
+		return
+	}
+	if r.Blocked != nil {
+		printf(cmd, "\n  %s\n", r.Blocked.Detail)
+		if r.Blocked.Fix != "" {
+			printf(cmd, "  %s\n", r.Blocked.Fix)
+		}
+	}
+	if r.Diff != "" {
+		printf(cmd, "\n%s", r.Diff)
+	}
+}
+
+func short(hash string) string { return hash[:min(8, len(hash))] }

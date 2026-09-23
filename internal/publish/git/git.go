@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,6 +35,41 @@ const (
 // runner invokes git in a repository.
 type runner struct {
 	root string
+
+	// env is added to every command's environment, for the scratch index
+	// and the literal paths a replay needs.
+	env []string
+}
+
+// with returns a runner whose commands see more of an environment.
+func (r runner) with(env ...string) runner {
+	r.env = append(slices.Clone(r.env), env...)
+	return r
+}
+
+// literal returns a runner that takes every path as spelled. A file name
+// with a glob character in it would otherwise be a pattern, and could match
+// files nobody named.
+func (r runner) literal() runner { return r.with("GIT_LITERAL_PATHSPECS=1") }
+
+// call runs a command with input, for the plumbing that reads its work from
+// stdin, and returns what it wrote.
+func (r runner) call(ctx context.Context, stdin string, args ...string) (string, error) {
+	var stdout, stderr bytes.Buffer
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", r.root}, args...)...)
+	cmd.Env = r.environ()
+	cmd.Stdin = strings.NewReader(stdin)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return stdout.String(), r.wrap(err, args, &stderr)
+	}
+	return stdout.String(), nil
 }
 
 // ok runs a command and reports only whether it succeeded, for the many git
@@ -86,7 +122,7 @@ func (r runner) environ() []string {
 	if os.Getenv("GIT_SSH_COMMAND") == "" {
 		env = append(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
 	}
-	return env
+	return append(env, r.env...)
 }
 
 // read runs a command that only inspects the repository.

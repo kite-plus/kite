@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/kite-plus/kite/internal/content"
@@ -86,14 +87,60 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request) {
 		// A push can fail after the commit succeeded. Reporting only the
 		// error would invite an author to repeat a commit they already have,
 		// so what did happen is reported alongside what did not.
-		writeJSON(w, http.StatusConflict, PublishRefused{
-			Error: ErrorDetail{Code: CodePublishFailed, Message: err.Error()},
-			Plan:  plan,
-			Done:  result,
-		})
+		refuse(w, err, plan, result)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+// handlePush sends what is already committed.
+//
+// A publish whose push failed has nothing left to commit, so publishing the
+// same items again cannot finish it. This can, and it is also where an author
+// who has read what a remote that moved on has asks for their commit to be
+// replayed on top of it.
+func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
+	view := s.src()
+	if view.Publisher == nil {
+		fail(w, http.StatusNotImplemented, CodeReadOnly,
+			"this project has no publisher configured")
+		return
+	}
+	if !s.writable(w, view) {
+		return
+	}
+	body, ok := decodeJSON[PushBody](s, w, r)
+	if !ok {
+		return
+	}
+
+	result, err := view.Publisher.Push(r.Context(), publish.PushRequest{Rebase: body.Rebase})
+	// A replay brings in whatever the remote had, and the site should show
+	// it now rather than whenever the watcher next notices.
+	if result != nil && result.Rebased && view.Refresh != nil {
+		if rerr := view.Refresh(r.Context()); rerr != nil {
+			s.log.Warn("reload after rebase failed", "err", rerr)
+		}
+	}
+	if err != nil {
+		refuse(w, err, nil, result)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// refuse reports a publish or a push that did not finish, with whatever did.
+func refuse(w http.ResponseWriter, err error, plan *publish.Plan, done *publish.Result) {
+	body := PublishRefused{
+		Error: ErrorDetail{Code: CodePublishFailed, Message: err.Error()},
+		Plan:  plan,
+		Done:  done,
+	}
+	var problem publish.Problem
+	if errors.As(err, &problem) {
+		body.Problem = &problem
+	}
+	writeJSON(w, http.StatusConflict, body)
 }
 
 // publishRequest reads a publish body and resolves the items it names.

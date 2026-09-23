@@ -168,6 +168,7 @@ func (s *Server) routes() []route {
 		{http.MethodGet, "/publish", s.handlePublishState},
 		{http.MethodPost, "/publish", s.handlePublish},
 		{http.MethodPost, "/publish/preflight", s.handlePreflight},
+		{http.MethodPost, "/publish/push", s.handlePush},
 		{http.MethodGet, "/settings", s.handleSettings},
 		{http.MethodPut, "/settings", s.handleUpdateSettings},
 		{http.MethodGet, "/contents", s.handleContents},

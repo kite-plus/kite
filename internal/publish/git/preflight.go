@@ -243,7 +243,8 @@ func (p *Publisher) checkRemote(ctx context.Context, plan *publish.Plan, req pub
 	if _, behind, ok := p.divergence(ctx, plan.Branch, plan.Remote); ok && behind > 0 {
 		warn(publish.CodeRemoteMoved,
 			strconv.Itoa(behind)+" commit(s) on the remote are not in this branch",
-			"pull first; the push will otherwise be refused")
+			"the push will be refused; if they change none of these files, the commit "+
+				"can then go on top of them, and otherwise pull first")
 	}
 }
 

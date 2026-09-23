@@ -68,7 +68,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const delivery = useDelivery();
   const publish = usePublish(
     id ? [id] : [],
-    () => toast.success(t("publish.done")),
+    (result) => toast.success(t(result.rebased ? "publish.rebased" : "publish.done")),
     // The panel that lists the reasons may be closed, so the headline is said here.
     (failure, confirmable) => {
       const said = problem(failure.code, failure.detail);

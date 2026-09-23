@@ -27,8 +27,8 @@ interface Props {
 export function PublishDialog({ ids, open, onOpenChange, onDone }: Props) {
   const { t } = useI18n();
   const delivery = useDelivery();
-  const publish = usePublish(ids, () => {
-    toast.success(t("publish.done"));
+  const publish = usePublish(ids, (result) => {
+    toast.success(t(result.rebased ? "publish.rebased" : "publish.done"));
     onOpenChange(false);
     onDone();
   });
@@ -47,7 +47,7 @@ export function PublishDialog({ ids, open, onOpenChange, onDone }: Props) {
           <DialogDescription>{t("publish.selectedNote")}</DialogDescription>
         </DialogHeader>
 
-        <DeliveryStages delivery={delivery.data} />
+        <DeliveryStages delivery={delivery.data} publish={publish} />
         <PublishProblems publish={publish} />
 
         <DialogFooter>

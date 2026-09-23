@@ -60,7 +60,7 @@
 | M3 | 只改标题时，`git diff` 只有标题一行 | 通过 | `TestChangingTitleTouchesOnlyTitleLine`、`TestEditingTheTitleRewritesOnlyTheTitleLine` |
 | M4 | 点「发布」后 5 分钟内在 GitHub Pages 上可见 | 未验证 | 没做过端到端验收 |
 | M4 | commit 只包含这篇文章的文件，用户的其他改动原封不动 | 通过 | `TestPublishCommitsOnlyWhatItWasAskedTo`、`TestARefusedPlanLeavesTheRepositoryExactlyAsItWas` |
-| M4 | 远端有新提交时被拦下，并给出选项 | 部分 | 能拦下并报告（`TestARemoteWithNewCommitsIsReportedBeforePublishing`），但只让用户「先 pull 再试」，没有给出选项 |
+| M4 | 远端有新提交时被拦下，并给出选项 | 通过 | 能拦下并报告（`TestARemoteWithNewCommitsIsReportedBeforePublishing`）；没有重叠时可以一键接到远端之后推送（`TestARemoteThatMovedOnElsewhereIsOfferedARebase`），有重叠时给出远端的 diff（`TestAnOverlapIsShownAndNothingIsReplayed`） |
 | M4 | 没有凭据时立刻报错，不会卡住 | 通过 | `TestAnUnreachableRemoteFailsQuicklyRatherThanHanging` |
 
 ## 4. v1.0 收尾清单
@@ -69,7 +69,7 @@
 |---|---|---|---|
 | 1 | **定时文章会提前上线（bug）** | **已修复。** 构建只收录构建时刻已经公开的内容：`published`，以及 `published_at` 不晚于构建时刻的 `scheduled`。规则和 `Content.IsPublic` 相同，过滤在 SQL 里完成（`content.Query.PublicAt`），首页、列表、分类、RSS、sitemap 和文章页一起生效。serve 记下下一篇定时文章的时间，到点后的第一个请求先重新规划页面再应答。`kite build --verify` 的两次构建共用同一时刻。测试：`TestPublicAtAgreesWithIsPublic`、`TestScheduledContentWaitsForItsTime`、`TestAScheduledPostIsServedOnceItsTimeComes` | P0 |
 | 2 | **静态站点的定时发布没有东西去触发** | **已解决。** `kite init` 另外生成一个 `scheduled.yml`，每小时运行一次（`17 * * * *`，避开整点的排队高峰）。每次构建在报告里给出下一篇定时文章的时间（`kite build --json` 的 `next_due`），`deploy.yml` 把它存进 Actions 缓存；`scheduled.yml` 只在这个时间已过、或者找不到记录时才调用 `deploy.yml` 构建和部署，其余情况一个很短的检查 job 就结束。定时触发单独放一个文件，是因为公开仓库 60 天没有提交时，GitHub 会把带 `schedule` 的 workflow 整个关掉，push 触发也一起失效。测试：`TestBuildReportsWhenTheNextScheduledPostIsDue`、`TestTheScheduleNeverSitsInTheDeployWorkflow`、`TestTheScheduledWorkflowReadsTheDueTimeTheBuildReports`，生成的两个 workflow 都通过 actionlint。`kite init` 不会改写已有的 workflow，之前建的站点需要从新生成的项目里复制这两个文件 | P0 |
-| 3 | 远端有新提交时只会拒绝 | `internal/publish/git/publisher.go` 的 `push` 识别出非快进后只返回 `remote_moved`。设计要求（[architecture.md §16.6](architecture.md#16-git-workflow最高危模块)）：先 fetch，判断远端改动是否碰到本次发布的路径；没碰到就提供一键 `rebase --onto`，碰到了就展示 diff，交给用户处理 | P1 |
+| 3 | 远端有新提交时只会拒绝 | **已解决。** push 因非快进被拒后先 fetch，再判断三件事：远端的新提交有没有改到这次发布的文件，这次发布是不是唯一没推送的提交，远端改过的文件在本地有没有未提交的改动。都没有问题时，后台显示「接在后面推送」（命令行是 `kite publish --push --rebase`），把提交接到远端之后再推送；做法见 [architecture.md §16.6](architecture.md#16-git-workflow最高危模块)，工作区里的其他改动不受影响。有重叠时展示远端那一侧的 diff，交还作者处理。另外新增 `POST /publish/push` 和 `kite publish --push`，推送失败后可以单独重试。测试：`internal/publish/git/remote_test.go` 的 6 个用例和 `TestAPushRefusedByAMovedRemoteCanBeReplayedOnIt` | P1 |
 | 4 | 「已部署」这一步永远不会完成 | `publisher.go` 的 `State` 固定返回 pending。要么对接 GitHub Pages 的部署状态，要么在拿不到时在界面上隐藏这一步 | P1 |
 | 5 | 性能没有验收 | 做一个 2000 篇的 fixture，测量 §3 里四项时延（构建、列表首屏、预览、切分支），放进 `make` 目标或 CI | P1 |
 | 6 | `kite theme verify` 命令没有实现 | [theme-system.md §11.2](theme-system.md) 要求 M0 就提供；现在只有针对内置主题的 build/serve 一致性测试。可以并入 M5 | P2 |

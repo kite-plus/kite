@@ -343,6 +343,17 @@ export const en = {
   "publish.uncommitted_other": "{count} files uncommitted",
   "publish.toPush_one": "{count} commit to push",
   "publish.toPush_other": "{count} commits to push",
+  "publish.push": "Push",
+  "publish.pushAgain": "Push again",
+  "publish.rebased": "Published on top of the remote's new commits",
+  "publish.remote.title_one": "{upstream} has {count} new commit",
+  "publish.remote.title_other": "{upstream} has {count} new commits",
+  "publish.remote.more_one": "and {count} more",
+  "publish.remote.more_other": "and {count} more",
+  "publish.remote.rebaseNote":
+    "None of them change what you published, so your commit can go on top of them.",
+  "publish.remote.rebase": "Put mine on top and push",
+  "publish.remote.diff": "What the remote changed",
 
   // Settings.
   "settings.title": "Settings",
@@ -405,4 +416,9 @@ export const en = {
   "problem.locked": "Another publish is in progress.",
   "problem.git_missing": "Git is not installed.",
   "problem.git_failed": "Git refused the command.",
+  "problem.nothing_to_push": "There is nothing to push.",
+  "problem.remote_overlap": "The remote changed the same files.",
+  "problem.unpushed_commits": "Other commits are waiting to be pushed too.",
+  "problem.local_changes": "Files the remote changed have uncommitted changes here.",
+  "problem.unrelated_history": "This branch and the remote share no history.",
 } as const;

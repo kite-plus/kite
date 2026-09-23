@@ -259,6 +259,13 @@ func openAPI() *document {
 				RequestBody: body(ref(PublishBody{})),
 				Responses:   ok(ref(publish.Plan{}), "The plan, with everything wrong with it.", "400", "404", "405", "501"),
 			}},
+			"/publish/push": {Post: &operation{
+				OperationID: "push",
+				Summary:     "Push what is already committed, replaying it onto a remote that moved on when asked to.",
+				RequestBody: body(ref(PushBody{})),
+				Responses: withRefused(ref(PublishRefused{}),
+					ok(ref(publish.Result{}), "What was pushed.", "400", "405", "501")),
+			}},
 			"/settings": {
 				Get: &operation{
 					OperationID: "getSettings",

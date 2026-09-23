@@ -84,6 +84,14 @@ const (
 	CodeLocked            = "locked"
 	CodeGitMissing        = "git_missing"
 	CodeGitFailed         = "git_failed"
+	CodeNothingToPush     = "nothing_to_push"
+
+	// Why an unpushed commit cannot be replayed on top of a remote that has
+	// moved on. See [RemoteChange].
+	CodeRemoteOverlap    = "remote_overlap"
+	CodeUnpushedCommits  = "unpushed_commits"
+	CodeLocalChanges     = "local_changes"
+	CodeUnrelatedHistory = "unrelated_history"
 )
 
 // Plan is what a publish would do, produced by looking and changing nothing.
@@ -118,6 +126,48 @@ type Result struct {
 	Committed []string  `json:"committed,omitempty"`
 	Pushed    bool      `json:"pushed"`
 	At        time.Time `json:"at,omitzero"`
+
+	// Rebased says the commit was replayed on top of the remote before it
+	// was pushed, so Commit is not the hash it was first made with.
+	Rebased bool `json:"rebased,omitempty"`
+
+	// Remote is what the remote had that this branch did not, when that is
+	// why a push was refused.
+	Remote *RemoteChange `json:"remote,omitempty"`
+}
+
+// RemoteChange is what a remote has that this branch does not.
+//
+// A push is never forced and a remote's commits are never merged on the
+// author's behalf. What can be offered is narrower: when the remote changed
+// nothing the unpushed commit changed, that commit can be replayed on top of
+// the remote, which is what a person would do with a rebase.
+type RemoteChange struct {
+	// Upstream names the remote branch, as in origin/main, and Behind is how
+	// many commits it has that this branch does not. Commits lists the
+	// newest of them, newest first.
+	Upstream string   `json:"upstream"`
+	Behind   int      `json:"behind"`
+	Commits  []Commit `json:"commits"`
+
+	// Overlap lists the files the unpushed commit changed that the remote
+	// changed too, and Diff is the remote's side of them, for a person to
+	// read before deciding what to keep. Diff is cut short when very long.
+	Overlap []string `json:"overlap,omitempty"`
+	Diff    string   `json:"diff,omitempty"`
+
+	// Rebase says whether the commit can be replayed on top of the remote;
+	// when it cannot, Blocked says why.
+	Rebase  bool     `json:"rebase"`
+	Blocked *Problem `json:"blocked,omitempty"`
+}
+
+// Commit is one commit, as a person would recognize it.
+type Commit struct {
+	Hash    string    `json:"hash"`
+	Subject string    `json:"subject"`
+	Author  string    `json:"author"`
+	At      time.Time `json:"at"`
 }
 
 // Request is what a caller wants published.
@@ -139,6 +189,13 @@ type Request struct {
 	Force bool
 }
 
+// PushRequest is what a caller wants done with commits already made.
+type PushRequest struct {
+	// Rebase replays the one unpushed commit on top of a remote that has
+	// moved on, when the remote changed nothing that commit changed.
+	Rebase bool
+}
+
 // Publisher moves a set of paths to where they are served.
 type Publisher interface {
 	Name() string
@@ -149,6 +206,10 @@ type Publisher interface {
 
 	// Apply carries out a plan that Preflight produced.
 	Apply(ctx context.Context, plan *Plan) (*Result, error)
+
+	// Push sends what is already committed, for a publish whose commit
+	// was made but whose push did not go through.
+	Push(ctx context.Context, req PushRequest) (*Result, error)
 
 	// State reports how far the content has traveled.
 	State(ctx context.Context) (*DeliveryState, error)

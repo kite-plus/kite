@@ -195,6 +195,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/publish/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Push what is already committed, replaying it onto a remote that moved on when asked to. */
+        post: operations["push"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings": {
         parameters: {
             query?: never;
@@ -286,6 +303,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Commit: {
+            /** Format: date-time */
+            at: string;
+            author: string;
+            hash: string;
+            subject: string;
+        };
         Conflict: {
             actual_revision: string;
             expected_revision: string;
@@ -439,6 +463,19 @@ export interface components {
             done?: components["schemas"]["Result"];
             error: components["schemas"]["ErrorDetail"];
             plan?: components["schemas"]["Plan"];
+            problem?: components["schemas"]["Problem"];
+        };
+        PushBody: {
+            rebase?: boolean;
+        };
+        RemoteChange: {
+            behind: number;
+            blocked?: components["schemas"]["Problem"];
+            commits: components["schemas"]["Commit"][];
+            diff?: string;
+            overlap?: string[];
+            rebase: boolean;
+            upstream: string;
         };
         Result: {
             /** Format: date-time */
@@ -446,6 +483,8 @@ export interface components {
             commit?: string;
             committed?: string[];
             pushed: boolean;
+            rebased?: boolean;
+            remote?: components["schemas"]["RemoteChange"];
         };
         SessionInfo: {
             authenticated: boolean;
@@ -1424,6 +1463,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    push: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushBody"];
+            };
+        };
+        responses: {
+            /** @description What was pushed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Result"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The publish did not fully happen. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishRefused"];
                 };
             };
             /** @description Failed. */

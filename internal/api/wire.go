@@ -292,6 +292,14 @@ type PublishBody struct {
 	Force bool `json:"force,omitempty"`
 }
 
+// PushBody asks for what is already committed to be pushed.
+type PushBody struct {
+	// Rebase replays the one unpushed commit on top of a remote that has
+	// moved on, when the remote changed nothing that commit changed. It is
+	// asked for, never assumed, because it rewrites that commit.
+	Rebase bool `json:"rebase,omitempty"`
+}
+
 // PublishRefused is returned when a publish did not fully happen.
 //
 // It carries the plan, so a client can show every reason at once, and what
@@ -301,4 +309,8 @@ type PublishRefused struct {
 	Error ErrorDetail     `json:"error"`
 	Plan  *publish.Plan   `json:"plan,omitempty"`
 	Done  *publish.Result `json:"done,omitempty"`
+
+	// Problem is the publisher's own account of what stopped it, with a
+	// code a client can explain and what to do about it.
+	Problem *publish.Problem `json:"problem,omitempty"`
 }

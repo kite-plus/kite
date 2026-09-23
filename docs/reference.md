@@ -169,6 +169,14 @@ staged, and every other change stays where it is. `--all` publishes everything
 uncommitted that Kite manages, and `--dry-run` reports what would happen and
 stops.
 
+A push is never forced. When the remote has commits the branch does not, the
+commit stays where it is and the refusal lists them. If none of them change
+what was published, `kite publish --push --rebase`, or the button the studio
+shows, puts the commit on top of them and pushes, without touching anything
+else in the working tree. If they changed the same files, the remote's side is
+shown and settling it is left to you. `kite publish --push` on its own pushes
+whatever is already committed, for a push that failed the first time.
+
 ### With Docker
 
 ```bash
