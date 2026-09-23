@@ -155,12 +155,14 @@ site that would deploy differently on a second run fails before it is
 published. Turn Pages on under **Settings → Pages → Source → GitHub Actions**
 and a push to `main` deploys.
 
-A second workflow, `scheduled.yml`, publishes posts scheduled for later. Each
-build records when the next scheduled post falls due, and once an hour the
-workflow checks that time and deploys only if it has passed, so a post goes
-live within the hour after its time and an hour with nothing due costs one
-short job. In a private repository each check is billed as a minute of
-Actions time; change its `cron` line to check less often.
+A second workflow, `scheduled.yml`, publishes posts scheduled for later. A
+post dated in the future waits for its date whether its status is `scheduled`
+or `published`, as in Hugo and Jekyll, so a site moved from either keeps its
+future posts back. Each build records when the next scheduled post falls due,
+and once an hour the workflow checks that time and deploys only if it has
+passed, so a post goes live within the hour after its time and an hour with
+nothing due costs one short job. In a private repository each check is billed
+as a minute of Actions time; change its `cron` line to check less often.
 
 GitHub turns scheduled workflows off in a public repository with no commits
 for 60 days. Turn it back on under the **Actions** tab. Deploying on push is

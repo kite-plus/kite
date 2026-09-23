@@ -185,6 +185,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "editor.slug": "别名",
   "editor.slugPlaceholder": "留空则从标题生成",
   "editor.publishedAt": "发布时间",
+  "editor.waitsForDate": "{date} 起才会出现在站点上",
   "editor.visibility": "可见性",
   "editor.public": "公开",
   "editor.lastSaved": "最后保存 {time}",

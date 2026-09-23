@@ -196,6 +196,7 @@ export const en = {
   "editor.slug": "Slug",
   "editor.slugPlaceholder": "derived from the title",
   "editor.publishedAt": "Published",
+  "editor.waitsForDate": "On the site from {date}",
   "editor.visibility": "Visibility",
   "editor.public": "Public",
   "editor.lastSaved": "Last saved {time}",

@@ -13,7 +13,7 @@
   - front matter 保真：只改标题时，文件的 diff 只有标题这一行；
   - build 和 serve 的输出逐字节一致，预览和最终页面也逐字节一致；
   - 发布只提交本次涉及的文件，不动用户暂存区里的其他改动。
-- **§4 的收尾项除两项外都已解决**。第 11 项要在 GitHub 组织下建仓库，需要仓库主人自己动手；第 12 项要先定规则。另外 M4 还差一次在真实仓库上的端到端验收（§3）。
+- **§4 的收尾项只剩第 11 项**：要在 GitHub 组织下建仓库，需要仓库主人自己动手。另外 M4 还差一次在真实仓库上的端到端验收（§3）。
 - **M5–M8 都还没开始**，其中 M5 有一部分已经提前做了。后台按设计稿画出的「即将推出」占位功能，各自归到哪个阶段见 §6。
 
 ## 2. 各里程碑完成情况
@@ -67,7 +67,7 @@
 
 | # | 问题 | 现状与位置 | 优先级 |
 |---|---|---|---|
-| 1 | **定时文章会提前上线（bug）** | **已修复。** 构建只收录构建时刻已经公开的内容：`published`，以及 `published_at` 不晚于构建时刻的 `scheduled`。规则和 `Content.IsPublic` 相同，过滤在 SQL 里完成（`content.Query.PublicAt`），首页、列表、分类、RSS、sitemap 和文章页一起生效。serve 记下下一篇定时文章的时间，到点后的第一个请求先重新规划页面再应答。`kite build --verify` 的两次构建共用同一时刻。测试：`TestPublicAtAgreesWithIsPublic`、`TestScheduledContentWaitsForItsTime`、`TestAScheduledPostIsServedOnceItsTimeComes` | P0 |
+| 1 | **定时文章会提前上线（bug）** | **已修复。** 构建只收录构建时刻已经公开的内容：`published_at` 不晚于构建时刻的 `published` 和 `scheduled`，以及没有日期的 `published`（`published` 也看日期是第 12 项定的）。规则和 `Content.IsPublic` 相同，过滤在 SQL 里完成（`content.Query.PublicAt`），首页、列表、分类、RSS、sitemap 和文章页一起生效。serve 记下下一篇定时文章的时间，到点后的第一个请求先重新规划页面再应答。`kite build --verify` 的两次构建共用同一时刻。测试：`TestPublicAtAgreesWithIsPublic`、`TestScheduledContentWaitsForItsTime`、`TestAScheduledPostIsServedOnceItsTimeComes` | P0 |
 | 2 | **静态站点的定时发布没有东西去触发** | **已解决。** `kite init` 另外生成一个 `scheduled.yml`，每小时运行一次（`17 * * * *`，避开整点的排队高峰）。每次构建在报告里给出下一篇定时文章的时间（`kite build --json` 的 `next_due`），`deploy.yml` 把它存进 Actions 缓存；`scheduled.yml` 只在这个时间已过、或者找不到记录时才调用 `deploy.yml` 构建和部署，其余情况一个很短的检查 job 就结束。定时触发单独放一个文件，是因为公开仓库 60 天没有提交时，GitHub 会把带 `schedule` 的 workflow 整个关掉，push 触发也一起失效。测试：`TestBuildReportsWhenTheNextScheduledPostIsDue`、`TestTheScheduleNeverSitsInTheDeployWorkflow`、`TestTheScheduledWorkflowReadsTheDueTimeTheBuildReports`，生成的两个 workflow 都通过 actionlint。`kite init` 不会改写已有的 workflow，之前建的站点需要从新生成的项目里复制这两个文件 | P0 |
 | 3 | 远端有新提交时只会拒绝 | **已解决。** push 因非快进被拒后先 fetch，再判断三件事：远端的新提交有没有改到这次发布的文件，这次发布是不是唯一没推送的提交，远端改过的文件在本地有没有未提交的改动。都没有问题时，后台显示「接在后面推送」（命令行是 `kite publish --push --rebase`），把提交接到远端之后再推送；做法见 [architecture.md §16.6](architecture.md#16-git-workflow最高危模块)，工作区里的其他改动不受影响。有重叠时展示远端那一侧的 diff，交还作者处理。另外新增 `POST /publish/push` 和 `kite publish --push`，推送失败后可以单独重试。测试：`internal/publish/git/remote_test.go` 的 6 个用例和 `TestAPushRefusedByAMovedRemoteCanBeReplayedOnIt` | P1 |
 | 4 | 「已部署」这一步永远不会完成 | **已解决。** 远端在 github.com、并且部署到 `github-pages` 环境的仓库，「已部署」按推送的那个提交的部署状态显示：成功、失败或进行中，成功后给出站点链接；被后来的提交取代的部署也算上线。其他托管平台、私有仓库、从不部署到 Pages 的仓库显示「托管平台不回报」，不再一直等待。查询在后台进行，不阻塞面板；匿名调用每小时只有 60 次，所以进行中的部署会逐步拉长查询间隔，上线后不再查询，剩余次数不到 10 次时暂停。测试：`internal/publish/git/deploy_internal_test.go`、`TestAPushToGitHubPagesIsReportedDeployedWhenItIs`、`TestAnyOtherHostLeavesDeploymentNotApplicable`，并对真实的 GitHub API 核对过一次。[architecture.md §17](architecture.md#17-cicd) 原先写的是 V1「不做任何 API 集成」，已改为「不做需要凭据的 API 集成」 | P1 |
@@ -78,7 +78,7 @@
 | 9 | 文章列表不显示「置顶」 | **已解决。** 列表摘要带上 `pinned`，在 SQL 里从存储的 meta 取出（`json_type(meta_json, '$.pinned') = 'true'`），列表仍然不需要逐行解析 meta；只有真正的 `true` 才算置顶，和条目本身的判断一致。文章列表在标题后按设计稿画出琥珀色的「置顶」标记，深色模式有对应的配色。测试：`TestSummariesSayWhichItemsArePinned` | P2 |
 | 10 | 发布的备用路径没有实现 | **已解决。** 按 [architecture.md §16.3](architecture.md#16-git-workflow最高危模块) 的逃生舱实现：在临时 index 里从 HEAD 出发 `git add` 这次发布的路径（clean filter 和 LFS 照常生效），`commit-tree` 生成提交，`update-ref` 以旧值做 CAS 移动分支，最后只更新真实 index 里这几个路径，失败时把分支移回原处。用在 hook 拒绝发布之后：拒绝会报成 `hook_refused` 并带上 hook 的输出，后台提供「跳过 hooks 发布」，命令行是 `kite publish --no-verify`。测试：`internal/publish/git/escape_test.go`、`TestAPublishAHookRefusedCanGoAheadWithoutTheHooks` | P2 |
 | 11 | 周边仓库和文档站没有建 | 组织下现在有 `kite`、`.github`，以及另一个产品 Explore（内容发现平台）用的 `explore`。官网文档站 `website`（用 Kite 自己搭）、`starters`、`setup-kite`，以及存放预研和设计存档的 `lab` 都还没有 | P2 |
-| 12 | Hugo 里日期在未来的文章会立即公开 | Hugo 默认不构建 `date` 在未来的内容，但 Kite 把没有 `status` 的文件读成 `published`，而 `published` 不看日期（`Content.IsPublic`）。从 Hugo 迁过来的站点，原本排在未来的文章会马上上线。可以让日期在未来的 `published` 也等到时间，也可以只在 `kite doctor` 里提示，需要先定规则 | P2 |
+| 12 | Hugo 里日期在未来的文章会立即公开 | **已解决。** 日期在未来的 `published` 和 `scheduled` 一样，等到发布时间才公开，和 Hugo、Jekyll 的默认做法一致；没有日期的 `published` 仍然立即公开。Kite 把没有 `status` 的文件读成 `published`、把 Hugo 的 `date` 读成发布时间，所以从 Hugo 迁过来的站点，排在未来的文章会按时上线：serve 到点后的第一个请求重新规划页面，静态站点由构建报告的 `next_due` 和 `scheduled.yml` 在到点后一小时内补上。规则在 `Content.IsPublic` 和 SQL 过滤里各有一份，`TestPublicAtAgreesWithIsPublic` 保证两者一致。测试：`TestAPublishedPostDatedLaterWaitsForItsDate`、`TestAScheduledPostIsServedOnceItsTimeComes/published` | P2 |
 
 ## 5. 分阶段计划
 

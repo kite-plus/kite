@@ -58,8 +58,8 @@ type Stats struct {
 	Extra    int           `json:"extra"`
 	Duration time.Duration `json:"-"`
 
-	// NextDue is when the output stops being current because a scheduled
-	// item falls due; zero when nothing is waiting. See [Builder.NextDue].
+	// NextDue is when the output stops being current because an item dated
+	// later falls due; zero when nothing is waiting. See [Builder.NextDue].
 	NextDue time.Time `json:"-"`
 }
 
@@ -349,24 +349,25 @@ func (b *Builder) scope() content.Query {
 	return content.Query{PublicAt: &now}
 }
 
-// NextDue reports when the next scheduled item falls due, or the zero time
-// when nothing is waiting. The plan describes the site until then, so a
-// server still running at that moment has to plan again to publish it.
+// NextDue reports when the next item dated later falls due, published or
+// scheduled, or the zero time when nothing is waiting. The plan describes
+// the site until then, so a server still running at that moment has to plan
+// again to publish it.
 func (b *Builder) NextDue(ctx context.Context) (time.Time, error) {
 	if b.opts.IncludeDrafts {
-		return time.Time{}, nil // scheduled items are in the plan already
+		return time.Time{}, nil // items dated later are in the plan already
 	}
 	// The index keeps whole seconds, so everything up to the current one is
 	// already public.
 	after := time.Unix(b.buildCtx.Now().Unix()+1, 0).UTC()
 	page, err := b.opts.Reader.Query(ctx, content.Query{
-		Statuses:  []content.Status{content.StatusScheduled},
+		Statuses:  []content.Status{content.StatusPublished, content.StatusScheduled},
 		Published: &content.Range{From: &after},
 		Sort:      []content.SortKey{{Field: content.SortPublishedAt}},
 		Limit:     1,
 	})
 	if err != nil {
-		return time.Time{}, fmt.Errorf("build: find scheduled content: %w", err)
+		return time.Time{}, fmt.Errorf("build: find content dated later: %w", err)
 	}
 	if len(page.Items) == 0 || page.Items[0].PublishedAt == nil {
 		return time.Time{}, nil

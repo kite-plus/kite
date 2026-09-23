@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Trash2 } from "lucide-react";
+import { Clock, Trash2 } from "lucide-react";
 import { cn } from "cn";
 
 import type { ContentType, Draft } from "@/api/client";
@@ -40,7 +40,7 @@ const field =
 
 /** Everything about an item that is not its text. */
 export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, onDelete }: Props) {
-  const { t } = useI18n();
+  const { t, date } = useI18n();
   const taxonomyLabel = useTaxonomyLabel();
 
   // Categories lead, as they do in the listing, and read as a dropdown.
@@ -114,6 +114,12 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
               }
             />
           </Row>
+          {waitsForDate(draft) && (
+            <p className="flex items-center justify-end gap-1.5 text-[11.5px] text-subtle">
+              <Clock className="size-3 shrink-0" />
+              {t("editor.waitsForDate", { date: date(draft.published_at, "long") })}
+            </p>
+          )}
         </div>
         <div className="mt-3 empty:hidden">
           <PublishProblems publish={publish} />
@@ -233,6 +239,12 @@ function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; ch
       {children}
     </div>
   );
+}
+
+/** waitsForDate reports whether the site holds the item back until its date. */
+function waitsForDate(draft: Draft): boolean {
+  if (draft.status !== "published" && draft.status !== "scheduled") return false;
+  return !!draft.published_at && new Date(draft.published_at).getTime() > Date.now();
 }
 
 /** toLocalInput formats an instant for a datetime-local control. */

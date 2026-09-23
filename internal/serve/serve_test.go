@@ -315,54 +315,59 @@ func TestDraftsAreHiddenUnlessRequested(t *testing.T) {
 }
 
 // A server plans against a frozen clock, and nothing on disk changes when a
-// scheduled post falls due, so a server left running has to notice the time
-// itself or go on hiding the post until some unrelated edit.
+// post dated later falls due, so a server left running has to notice the
+// time itself or go on hiding the post until some unrelated edit.
 func TestAScheduledPostIsServedOnceItsTimeComes(t *testing.T) {
-	root := newProject(t, 2)
-	dir := filepath.Join(root, "content", "posts", "launch-day")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	body := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ951\ntitle: Launch Day\nslug: launch-day\n" +
-		"status: scheduled\npublished_at: 2026-06-01T12:30:00Z\n---\n\nNot yet.\n"
-	if err := os.WriteFile(filepath.Join(dir, "index.md"), []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	// A published post dated later waits for its date just the same.
+	for _, status := range []string{"scheduled", "published"} {
+		t.Run(status, func(t *testing.T) {
+			root := newProject(t, 2)
+			dir := filepath.Join(root, "content", "posts", "launch-day")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			body := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ951\ntitle: Launch Day\nslug: launch-day\n" +
+				"status: " + status + "\npublished_at: 2026-06-01T12:30:00Z\n---\n\nNot yet.\n"
+			if err := os.WriteFile(filepath.Join(dir, "index.md"), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
 
-	var mu sync.Mutex
-	now := frozen
-	clock := func() time.Time {
-		mu.Lock()
-		defer mu.Unlock()
-		return now
-	}
-	srv, err := serve.NewWithClock(t.Context(), openSite(t, root), serve.Options{}, clock)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler := srv.Handler()
-	get := func(path string) *httptest.ResponseRecorder {
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
-		return rec
-	}
+			var mu sync.Mutex
+			now := frozen
+			clock := func() time.Time {
+				mu.Lock()
+				defer mu.Unlock()
+				return now
+			}
+			srv, err := serve.NewWithClock(t.Context(), openSite(t, root), serve.Options{}, clock)
+			if err != nil {
+				t.Fatal(err)
+			}
+			handler := srv.Handler()
+			get := func(path string) *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+				return rec
+			}
 
-	if rec := get("/posts/launch-day/"); rec.Code != http.StatusNotFound {
-		t.Errorf("served before its time (status %d)", rec.Code)
-	}
-	if strings.Contains(get("/").Body.String(), "Launch Day") {
-		t.Error("listed on the home page before its time")
-	}
+			if rec := get("/posts/launch-day/"); rec.Code != http.StatusNotFound {
+				t.Errorf("served before its time (status %d)", rec.Code)
+			}
+			if strings.Contains(get("/").Body.String(), "Launch Day") {
+				t.Error("listed on the home page before its time")
+			}
 
-	mu.Lock()
-	now = time.Date(2026, 6, 1, 12, 30, 0, 0, time.UTC)
-	mu.Unlock()
+			mu.Lock()
+			now = time.Date(2026, 6, 1, 12, 30, 0, 0, time.UTC)
+			mu.Unlock()
 
-	if rec := get("/posts/launch-day/"); rec.Code != http.StatusOK {
-		t.Errorf("not served once its time came (status %d)", rec.Code)
-	}
-	if !strings.Contains(get("/").Body.String(), "Launch Day") {
-		t.Error("not listed on the home page once its time came")
+			if rec := get("/posts/launch-day/"); rec.Code != http.StatusOK {
+				t.Errorf("not served once its time came (status %d)", rec.Code)
+			}
+			if !strings.Contains(get("/").Body.String(), "Launch Day") {
+				t.Error("not listed on the home page once its time came")
+			}
+		})
 	}
 }
 

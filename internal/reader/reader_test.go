@@ -303,8 +303,11 @@ func TestPublicAtAgreesWithIsPublic(t *testing.T) {
 	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 	items := []struct{ slug, front string }{
 		{"published-past", "status: published\npublished_at: 2026-01-01T00:00:00Z\n"},
+		{"published-now", "status: published\npublished_at: 2026-06-01T12:00:00Z\n"},
+		{"published-next-second", "status: published\npublished_at: 2026-06-01T12:00:01Z\n"},
 		{"published-future", "status: published\npublished_at: 2027-01-01T00:00:00Z\n"},
 		{"published-undated", "status: published\n"},
+		{"hugo-future", "date: 2027-01-01T00:00:00Z\n"},
 		{"scheduled-past", "status: scheduled\npublished_at: 2026-05-31T12:00:00Z\n"},
 		{"scheduled-now", "status: scheduled\npublished_at: 2026-06-01T12:00:00Z\n"},
 		{"scheduled-next-second", "status: scheduled\npublished_at: 2026-06-01T12:00:01Z\n"},
@@ -357,7 +360,7 @@ func TestPublicAtAgreesWithIsPublic(t *testing.T) {
 		}
 	}
 
-	want := []string{"published-future", "published-past", "published-undated", "scheduled-now", "scheduled-past"}
+	want := []string{"published-now", "published-past", "published-undated", "scheduled-now", "scheduled-past"}
 	if !slices.Equal(public, want) {
 		t.Errorf("public = %v, want %v", public, want)
 	}

@@ -106,7 +106,7 @@ type Server struct {
 	site     *site.Site
 	builder  *build.Builder
 	problems []string
-	// due is when the next scheduled item falls due and the plan with it
+	// due is when the next item dated later falls due and the plan with it
 	// stops being current; zero when nothing is waiting.
 	due time.Time
 	// configHash detects a settings change, which needs more than a reindex.
@@ -375,7 +375,7 @@ func (s *Server) refresh(ctx context.Context) error {
 	return nil
 }
 
-// catchUp plans again once a scheduled item has fallen due.
+// catchUp plans again once an item dated later has fallen due.
 //
 // A plan is made against a frozen clock, and nothing on disk changes when the
 // moment a post was waiting for arrives. A server left running would go on

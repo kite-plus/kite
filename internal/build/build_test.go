@@ -389,6 +389,64 @@ Not yet.
 	}
 }
 
+// Hugo and Jekyll hold back a post dated in the future, and Kite reads a
+// file that gives no status as published, with its date as the time it goes
+// out. A published post dated later has to wait as a scheduled one does, or
+// a site moved from either puts its future posts up at once.
+func TestAPublishedPostDatedLaterWaitsForItsDate(t *testing.T) {
+	f := newFixture(t, 3)
+	f.add(t, "content/posts/from-hugo/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZ902
+title: From Hugo
+slug: from-hugo
+date: 2026-08-01T09:00:00Z
+tags: [Later]
+---
+
+Not yet.
+`)
+	f.add(t, "content/posts/launch-day/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZ901
+title: Launch Day
+slug: launch-day
+status: scheduled
+published_at: 2026-09-01T09:00:00Z
+---
+
+Later still.
+`)
+	due := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
+
+	stats, early := f.run(t, f.out, nil)
+	if !stats.NextDue.Equal(due) {
+		t.Errorf("Stats.NextDue = %v, want the published post's %v", stats.NextDue, due)
+	}
+	for _, file := range []string{"posts/from-hugo/index.html", "tags/later/index.html"} {
+		if slices.Contains(early, file) {
+			t.Errorf("%s was built before its date", file)
+		}
+	}
+	for _, file := range []string{"index.html", "posts/index.html", "tags/index.html", "rss.xml", "sitemap.xml"} {
+		if page := readFile(t, f.out, file); strings.Contains(page, "from-hugo") || strings.Contains(page, "tags/later") {
+			t.Errorf("%s shows the post before its date", file)
+		}
+	}
+
+	onTime := filepath.Join(f.root, "on-time")
+	stats, files := f.run(t, onTime, func(o *build.Options) { o.Now = due })
+	for _, file := range []string{"posts/from-hugo/index.html", "tags/later/index.html"} {
+		if !slices.Contains(files, file) {
+			t.Errorf("%s is missing once its date has come", file)
+		}
+	}
+	if !strings.Contains(readFile(t, onTime, "rss.xml"), "from-hugo") {
+		t.Error("the feed does not list the post once its date has come")
+	}
+	if next := time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC); !stats.NextDue.Equal(next) {
+		t.Errorf("Stats.NextDue = %v, want the scheduled post's %v", stats.NextDue, next)
+	}
+}
+
 // Term listings are grouped from the items the plan has already loaded
 // rather than asked of the index one term at a time. What they list, and in
 // what order, has to be exactly what the index would have said.

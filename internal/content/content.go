@@ -140,7 +140,8 @@ func (c *Content) IsPublic(now time.Time) bool {
 	}
 	switch c.Status {
 	case StatusPublished:
-		return true
+		// A date in the future holds it back too, as in Hugo and Jekyll.
+		return c.PublishedAt == nil || !c.PublishedAt.After(now)
 	case StatusScheduled:
 		return c.PublishedAt != nil && !c.PublishedAt.After(now)
 	default:

@@ -61,8 +61,8 @@ type Query struct {
 	IDs      []ID
 
 	// PublicAt keeps only what is public at that instant, as
-	// [Content.IsPublic] decides it: published items, and scheduled ones
-	// whose time has come.
+	// [Content.IsPublic] decides it: published and scheduled items whose
+	// time has come, and published ones that have no time.
 	PublicAt *time.Time
 
 	// TermsAny matches items carrying at least one of the listed terms in the
