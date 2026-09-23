@@ -116,6 +116,11 @@ func (r runner) environ() []string {
 		// A path that cannot be executed: git then falls back to the
 		// terminal, which the line above has already closed off.
 		"GIT_ASKPASS="+filepath.Join(r.root, ".kite", "no-askpass"),
+		// Git's messages in English whatever language the machine speaks.
+		// A few are read to tell failures apart -- a credential git could
+		// not ask for, its own warnings ahead of a hook's refusal -- and a
+		// translated one would pass for something else.
+		"LANGUAGE=en",
 	)
 	// Only when the user has not configured ssh themselves, so a custom ssh
 	// command keeps working.

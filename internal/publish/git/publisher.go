@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -168,7 +169,7 @@ func (p *Publisher) commit(ctx context.Context, plan *publish.Plan) error {
 		if hooks := p.commitHooks(ctx); len(hooks) > 0 {
 			return publish.Problem{
 				Code:   publish.CodeHookRefused,
-				Detail: "the repository's " + strings.Join(hooks, " or ") + " hook refused: " + firstLine(stderr.String()),
+				Detail: "the repository's " + strings.Join(hooks, " or ") + " hook refused: " + hookSaid(stderr.String()),
 				Fix:    "fix what the hook reports, or publish without running the hooks",
 			}
 		}
@@ -185,7 +186,13 @@ func (p *Publisher) commitHooks(ctx context.Context) []string {
 	}
 	var active []string
 	for _, name := range []string{"pre-commit", "prepare-commit-msg", "commit-msg"} {
-		if info, err := os.Stat(filepath.Join(dir, name)); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+		info, err := os.Stat(filepath.Join(dir, name))
+		if err != nil || info.IsDir() {
+			continue
+		}
+		// Git for Windows runs a hook that merely exists: there is no
+		// executable bit for it to look at.
+		if runtime.GOOS == "windows" || info.Mode()&0o111 != 0 {
 			active = append(active, name)
 		}
 	}
@@ -398,6 +405,19 @@ func firstLine(s string) string {
 		}
 	}
 	return strings.TrimSpace(s)
+}
+
+// hookSaid is the first line of what a refusing hook wrote. Git's own
+// warnings come first on the same stream, such as the line ending notice
+// core.autocrlf prints, and they are not why the commit was refused.
+func hookSaid(stderr string) string {
+	for _, line := range strings.Split(stderr, "\n") {
+		t := strings.TrimSpace(line)
+		if t != "" && !strings.HasPrefix(t, "warning: ") && !strings.HasPrefix(t, "hint: ") {
+			return t
+		}
+	}
+	return firstLine(stderr)
 }
 
 func problemOf(err error) *publish.Problem {

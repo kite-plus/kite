@@ -31,6 +31,9 @@ func refusingHook(t *testing.T, root string) (ran string) {
 func TestAHookRefusalSaysSo(t *testing.T) {
 	root := newRepo(t)
 	refusingHook(t, root)
+	// As on a Windows runner: git then warns about line endings on the same
+	// stream, before the hook has said anything.
+	run(t, root, "config", "core.autocrlf", "true")
 	write(t, root, "content/posts/second/index.md", "new\n")
 
 	pub := newPublisher(root)
@@ -117,6 +120,7 @@ func TestSkippingHooksPublishesADeletion(t *testing.T) {
 // A repository with no commit yet gets its first one.
 func TestSkippingHooksCanMakeTheFirstCommit(t *testing.T) {
 	root := t.TempDir()
+	hermetic(t)
 	run(t, root, "init", "-q", "-b", "main", root)
 	run(t, root, "config", "user.name", "Test")
 	run(t, root, "config", "user.email", "test@example.com")

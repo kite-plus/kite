@@ -51,6 +51,7 @@ func newRepo(t *testing.T) string {
 	}
 
 	root := t.TempDir()
+	hermetic(t)
 	run(t, root, "init", "-q", "-b", "main", root)
 	run(t, root, "config", "user.name", "Test")
 	run(t, root, "config", "user.email", "test@example.com")
@@ -62,6 +63,16 @@ func newRepo(t *testing.T) string {
 	run(t, root, "add", "-A")
 	run(t, root, "commit", "-q", "-m", "initial")
 	return root
+}
+
+// hermetic keeps the machine's git configuration away from the publisher,
+// as run keeps it away from the test's own git. Otherwise a setting one
+// runner has and another lacks, such as core.autocrlf on Windows, makes the
+// two see the same files differently.
+func hermetic(t *testing.T) {
+	t.Helper()
+	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+	t.Setenv("GIT_CONFIG_SYSTEM", "/dev/null")
 }
 
 func newPublisher(root string) *gitpub.Publisher {
