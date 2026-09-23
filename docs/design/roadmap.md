@@ -13,7 +13,7 @@
   - front matter 保真：只改标题时，文件的 diff 只有标题这一行；
   - build 和 serve 的输出逐字节一致，预览和最终页面也逐字节一致；
   - 发布只提交本次涉及的文件，不动用户暂存区里的其他改动。
-- **§4 的收尾项只剩第 11 项**：要在 GitHub 组织下建仓库，需要仓库主人自己动手。另外 M4 还差一次在真实仓库上的端到端验收（§3）。
+- **§4 的收尾项还剩两项**：第 11 项的周边仓库建了一半（`website` 和 `lab` 已建，`starters` 和 `setup-kite` 等 v1.0 之后）；第 14 项是新发现的问题，部署在带子路径的地址上时站内链接会失效。M4 的端到端验收已在 `kite-plus/website` 上通过（§3）。
 - **M5–M8 都还没开始**，其中 M5 有一部分已经提前做了。后台按设计稿画出的「即将推出」占位功能，各自归到哪个阶段见 §6。
 
 ## 2. 各里程碑完成情况
@@ -24,7 +24,7 @@
 | **M1** serve | 完成 | 按请求从文件渲染；fsnotify 文件监听；热重载 |
 | **M2** 只读后台 | 完成 | REST API，并从代码生成 OpenAPI；前端请求一律用生成的客户端；React 后台嵌入二进制；列表的筛选、排序、游标分页和搜索；索引一致性的三层机制：文件监听、stat 全树扫描、Git HEAD 哨兵（切分支时只重新索引变化的路径） |
 | **M3** 可写后台 | 完成 | `PUT` + `If-Match` 走 `Apply(ChangeSet)`；在旧版本上保存时返回 409，并给出三方对比；由 schema 驱动的表单，内容字段、主题设置、站点设置共用；可视化编辑器（Tiptap）加 Markdown 源码模式（CodeMirror）；服务端渲染的预览；拖图进 page bundle；站点设置和主题设置页（改 `kite.yaml` 时保留注释和顺序）；`kite doctor --fix-ids` |
-| **M4** Git 发布 | 基本完成，只差 §3 的端到端验收 | 发布前检查：不是仓库、子模块、游离 HEAD、有进行中的 merge/rebase/cherry-pick、缺 git-lfs、文件超出托管平台限制；`git commit --only` 只提交指定路径；`GIT_TERMINAL_PROMPT=0` 加空的 `GIT_ASKPASS`，缺凭据时立刻报错；`.kite/publish.lock` 加 `index.lock` 退避重试；从不强推；DeliveryState 和发布面板；`kite publish` 命令行；`kite init` 生成 GitHub Pages 部署 workflow 和发布定时文章的 `scheduled.yml`；远端有新提交且没有改到同样的文件时一键接到后面推送；hook 拒绝后可跳过 hooks 发布；「已部署」对接 GitHub Pages 的部署状态 |
+| **M4** Git 发布 | 完成 | 发布前检查：不是仓库、子模块、游离 HEAD、有进行中的 merge/rebase/cherry-pick、缺 git-lfs、文件超出托管平台限制；`git commit --only` 只提交指定路径；`GIT_TERMINAL_PROMPT=0` 加空的 `GIT_ASKPASS`，缺凭据时立刻报错；`.kite/publish.lock` 加 `index.lock` 退避重试；从不强推；DeliveryState 和发布面板；`kite publish` 命令行；`kite init` 生成 GitHub Pages 部署 workflow 和发布定时文章的 `scheduled.yml`；远端有新提交且没有改到同样的文件时一键接到后面推送；hook 拒绝后可跳过 hooks 发布；「已部署」对接 GitHub Pages 的部署状态 |
 | **M5** 主题契约 | 部分提前完成 | `apiVersion` 硬校验和 `requires` 检查；命名空间化的函数；由 `theme.yaml` 生成的主题设置页；`kite theme verify`。其余见 §5 |
 | **M6** | 未开始 | 构建时已经按 OutputTarget 记录依赖和缓存键，只是跳过判断还没启用 |
 | **M7** | 未开始 | 读模型已按双 Store 设计；单账号认证和 Docker 已提前完成 |
@@ -58,7 +58,7 @@
 | M3 | 用 VS Code 改文件后，后台 3 秒内更新 | 通过 | `make perf`：约 200ms |
 | M3 | 在旧版本上保存得到 409 和三方对比 | 通过 | `TestSavingAgainstAReplacedVersionIsRefusedWithWhatIsStored`；后台的冲突对话框 |
 | M3 | 只改标题时，`git diff` 只有标题一行 | 通过 | `TestChangingTitleTouchesOnlyTitleLine`、`TestEditingTheTitleRewritesOnlyTheTitleLine` |
-| M4 | 点「发布」后 5 分钟内在 GitHub Pages 上可见 | 未验证 | 没做过端到端验收 |
+| M4 | 点「发布」后 5 分钟内在 GitHub Pages 上可见 | 通过 | 2026-09-23 在 `kite-plus/website` 上用 `kite publish --push` 发布一篇文章，48 秒后在 GitHub Pages 上可以访问（其中 workflow 从源码安装 Kite、构建、部署共 45 秒）；提交只包含这一篇；「已部署」一步由匿名的 GitHub API 确认，并给出站点地址 |
 | M4 | commit 只包含这篇文章的文件，用户的其他改动原封不动 | 通过 | `TestPublishCommitsOnlyWhatItWasAskedTo`、`TestARefusedPlanLeavesTheRepositoryExactlyAsItWas` |
 | M4 | 远端有新提交时被拦下，并给出选项 | 通过 | 能拦下并报告（`TestARemoteWithNewCommitsIsReportedBeforePublishing`）；没有重叠时可以一键接到远端之后推送（`TestARemoteThatMovedOnElsewhereIsOfferedARebase`），有重叠时给出远端的 diff（`TestAnOverlapIsShownAndNothingIsReplayed`） |
 | M4 | 没有凭据时立刻报错，不会卡住 | 通过 | `TestAnUnreachableRemoteFailsQuicklyRatherThanHanging` |
@@ -77,9 +77,10 @@
 | 8 | 主题的 `requires` 只读取、不检查 | **已解决。** 每次加载主题（打开站点、构建、serve）都检查 `requires`：支持 `>=`、`>`、`<=`、`<`、`=`，空格隔开表示同时满足，`||` 表示任一满足，按 semver 比较，预发布版本排在正式版之前。不满足就拒绝加载，并说明主题要求的范围和正在运行的 Kite 版本。从源码构建的版本（`dev` 或提交哈希）不参与比较；`git describe` 生成的「tag 之后又有提交」按那个 tag 比较。测试：`internal/render/theme/requires_test.go` | P2 |
 | 9 | 文章列表不显示「置顶」 | **已解决。** 列表摘要带上 `pinned`，在 SQL 里从存储的 meta 取出（`json_type(meta_json, '$.pinned') = 'true'`），列表仍然不需要逐行解析 meta；只有真正的 `true` 才算置顶，和条目本身的判断一致。文章列表在标题后按设计稿画出琥珀色的「置顶」标记，深色模式有对应的配色。测试：`TestSummariesSayWhichItemsArePinned` | P2 |
 | 10 | 发布的备用路径没有实现 | **已解决。** 按 [architecture.md §16.3](architecture.md#16-git-workflow最高危模块) 的逃生舱实现：在临时 index 里从 HEAD 出发 `git add` 这次发布的路径（clean filter 和 LFS 照常生效），`commit-tree` 生成提交，`update-ref` 以旧值做 CAS 移动分支，最后只更新真实 index 里这几个路径，失败时把分支移回原处。用在 hook 拒绝发布之后：拒绝会报成 `hook_refused` 并带上 hook 的输出，后台提供「跳过 hooks 发布」，命令行是 `kite publish --no-verify`。测试：`internal/publish/git/escape_test.go`、`TestAPublishAHookRefusedCanGoAheadWithoutTheHooks` | P2 |
-| 11 | 周边仓库和文档站没有建 | 组织下现在有 `kite`、`.github`，以及另一个产品 Explore（内容发现平台）用的 `explore`。官网文档站 `website`（用 Kite 自己搭）、`starters`、`setup-kite`，以及存放预研和设计存档的 `lab` 都还没有 | P2 |
+| 11 | 周边仓库和文档站没有建 | **部分完成。** 2026-09-23 建了 `website`（公开）：官网和文档，用 `kite init` 生成的站点加两个覆盖主题的模板搭成，推送到 `main` 即部署到 GitHub Pages；文档页来自本仓库的 README 和 `docs/reference.md`，两边要一起改。域名 www.kite.plus 还没指过来，在那之前站点在 `kite-plus.github.io/website/`，受第 14 项影响站内链接不可用。`lab`（私有）存放设计稿存档：后台和默认主题的原始设计稿，以及各自对应的提交。`starters` 等 M5 有第二套主题，`setup-kite` 等有了第一个 release | P2 |
 | 12 | Hugo 里日期在未来的文章会立即公开 | **已解决。** 日期在未来的 `published` 和 `scheduled` 一样，等到发布时间才公开，和 Hugo、Jekyll 的默认做法一致；没有日期的 `published` 仍然立即公开。Kite 把没有 `status` 的文件读成 `published`、把 Hugo 的 `date` 读成发布时间，所以从 Hugo 迁过来的站点，排在未来的文章会按时上线：serve 到点后的第一个请求重新规划页面，静态站点由构建报告的 `next_due` 和 `scheduled.yml` 在到点后一小时内补上。规则在 `Content.IsPublic` 和 SQL 过滤里各有一份，`TestPublicAtAgreesWithIsPublic` 保证两者一致。测试：`TestAPublishedPostDatedLaterWaitsForItsDate`、`TestAScheduledPostIsServedOnceItsTimeComes/published` | P2 |
 | 13 | serve 没有 RSS 和 sitemap | **已解决。** 核对第 12 项时发现：`kite serve` 对 `/rss.xml` 和 `/sitemap.xml` 都返回 404，而每个页面都链接着 RSS。两者由 build 结束时的 completion hook 生成，serve 从来不调用这些 hook；build 和 serve 的比对只看 `.html`，所以一直没被发现。现在 serve 在第一次有请求用到时，用和 build 相同的代码算出每页交给 hook 的信息（不画模板，2000 篇的站点约 120ms，完整构建约 1 秒），跑同一组 hook，结果留在内存里，直到下一次重新规划：文件改动和定时文章到点都会让它重算。同名时 hook 的产物优先于静态文件，和 build 后写覆盖先写一致。测试：`TestServedFilesAreByteIdenticalToBuiltOnes`（改为比较 build 写出的每个文件）、`TestTheFeedFollowsTheSite`、`TestExtrasAreWhatABuildWrites`；`kite theme verify` 也改为比较全部文件 | P2 |
+| 14 | 部署在带子路径的地址上时站内链接失效 | 搭 `website` 时发现：Kite 生成的站内链接都从根开始（`/posts/x/`），`baseURL` 里的路径被忽略，`url.Resolver.Absolute` 用 `ResolveReference` 拼地址时也会把它丢掉。GitHub Pages 的项目站点（`user.github.io/repo/`，没有自定义域名时）就在子路径下，`kite init` 生成的 workflow 部署出来的页面能打开，但导航、文章链接、RSS 链接和图片都指向域名根路径，全部 404。需要让 URL 解析、输出路径、serve 路由、sitemap/feed 和主题模板（如 `baseof.html` 里写死的 `/rss.xml`）都认 `baseURL` 的路径前缀 | P1 |
 
 ## 5. 分阶段计划
 
@@ -115,7 +116,7 @@
 1. **静态站点的定时发布怎么触发**：已定。每小时检查一次，下一篇的时间由构建算出，只在有文章到点时才构建和部署（§4 第 2 项）。私有仓库每小时的检查仍按 1 分钟计费，大约每月 720 分钟。
 2. **评论**：先接 Giscus 或 Waline 这类现成组件，还是等 Kite 自己实现？
 3. **访问统计**：接哪一家第三方服务，还是先不做？
-4. **v1.0 标签的时机**：§4 的 P0 和 P1 已经修完。打标签前建议再做一次 §3 里 M4 的端到端验收：在真实仓库里发布一篇，看 5 分钟内是否出现在 GitHub Pages 上。
+4. **v1.0 标签的时机**：M4 的端到端验收已经通过（§3）。打标签前建议先修第 14 项：`kite init` 生成的 GitHub Pages workflow 在没有自定义域名的项目仓库里会部署出链接全坏的站点，而这正是 v1.0 主推的部署方式。
 
 ## 8. 维护本文
 
