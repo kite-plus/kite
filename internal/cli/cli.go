@@ -38,6 +38,7 @@ func newRootCmd() *cobra.Command {
 		newAuthCmd(),
 		newOpenAPICmd(),
 		newRunCmd(),
+		newThemeCmd(),
 	)
 	return root
 }

@@ -86,6 +86,18 @@ Templates live under `layouts/` in a theme and in a site alike, and the same
 relative path in the site wins, so a single template can be replaced without
 forking the theme.
 
+A theme can be checked against the contract it is written to:
+
+```bash
+kite theme verify ./themes/paper
+```
+
+It builds a small site that uses every kind of page with the theme, asks a
+server for the same pages, and compares every byte. A theme that passes
+publishes exactly what `kite run` previewed; one that fails is shown the first
+line that differs on each page. With no directory it checks the project's own
+theme, or the built-in one outside a project.
+
 The theme contract is not frozen yet; it freezes at M5, after a second theme
 has been written against it.
 

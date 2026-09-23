@@ -25,7 +25,7 @@
 | **M2** 只读后台 | 完成 | REST API，并从代码生成 OpenAPI；前端请求一律用生成的客户端；React 后台嵌入二进制；列表的筛选、排序、游标分页和搜索；索引一致性的三层机制：文件监听、stat 全树扫描、Git HEAD 哨兵（切分支时只重新索引变化的路径） |
 | **M3** 可写后台 | 完成 | `PUT` + `If-Match` 走 `Apply(ChangeSet)`；在旧版本上保存时返回 409，并给出三方对比；由 schema 驱动的表单，内容字段、主题设置、站点设置共用；可视化编辑器（Tiptap）加 Markdown 源码模式（CodeMirror）；服务端渲染的预览；拖图进 page bundle；站点设置和主题设置页（改 `kite.yaml` 时保留注释和顺序）；`kite doctor --fix-ids` |
 | **M4** Git 发布 | 基本完成，只差 §3 的端到端验收 | 发布前检查：不是仓库、子模块、游离 HEAD、有进行中的 merge/rebase/cherry-pick、缺 git-lfs、文件超出托管平台限制；`git commit --only` 只提交指定路径；`GIT_TERMINAL_PROMPT=0` 加空的 `GIT_ASKPASS`，缺凭据时立刻报错；`.kite/publish.lock` 加 `index.lock` 退避重试；从不强推；DeliveryState 和发布面板；`kite publish` 命令行；`kite init` 生成 GitHub Pages 部署 workflow |
-| **M5** 主题契约 | 部分提前完成 | `apiVersion` 硬校验；命名空间化的函数；由 `theme.yaml` 生成的主题设置页。其余见 §5 |
+| **M5** 主题契约 | 部分提前完成 | `apiVersion` 硬校验；命名空间化的函数；由 `theme.yaml` 生成的主题设置页；`kite theme verify`。其余见 §5 |
 | **M6** | 未开始 | 构建时已经按 OutputTarget 记录依赖和缓存键，只是跳过判断还没启用 |
 | **M7** | 未开始 | 读模型已按双 Store 设计；单账号认证和 Docker 已提前完成 |
 | **M8** | 未开始 | HookBus 已被内置功能使用 |
@@ -72,7 +72,7 @@
 | 3 | 远端有新提交时只会拒绝 | **已解决。** push 因非快进被拒后先 fetch，再判断三件事：远端的新提交有没有改到这次发布的文件，这次发布是不是唯一没推送的提交，远端改过的文件在本地有没有未提交的改动。都没有问题时，后台显示「接在后面推送」（命令行是 `kite publish --push --rebase`），把提交接到远端之后再推送；做法见 [architecture.md §16.6](architecture.md#16-git-workflow最高危模块)，工作区里的其他改动不受影响。有重叠时展示远端那一侧的 diff，交还作者处理。另外新增 `POST /publish/push` 和 `kite publish --push`，推送失败后可以单独重试。测试：`internal/publish/git/remote_test.go` 的 6 个用例和 `TestAPushRefusedByAMovedRemoteCanBeReplayedOnIt` | P1 |
 | 4 | 「已部署」这一步永远不会完成 | **已解决。** 远端在 github.com、并且部署到 `github-pages` 环境的仓库，「已部署」按推送的那个提交的部署状态显示：成功、失败或进行中，成功后给出站点链接；被后来的提交取代的部署也算上线。其他托管平台、私有仓库、从不部署到 Pages 的仓库显示「托管平台不回报」，不再一直等待。查询在后台进行，不阻塞面板；匿名调用每小时只有 60 次，所以进行中的部署会逐步拉长查询间隔，上线后不再查询，剩余次数不到 10 次时暂停。测试：`internal/publish/git/deploy_internal_test.go`、`TestAPushToGitHubPagesIsReportedDeployedWhenItIs`、`TestAnyOtherHostLeavesDeploymentNotApplicable`，并对真实的 GitHub API 核对过一次。[architecture.md §17](architecture.md#17-cicd) 原先写的是 V1「不做任何 API 集成」，已改为「不做需要凭据的 API 集成」 | P1 |
 | 5 | 性能没有验收 | **已解决。** `make perf`（`internal/perf`）生成 2000 篇的站点，用真实的服务器、文件监听和热重载通道测量 §3 的五项时延，达不到目标就失败，结果见 §3。第一次测量时构建 3.7 秒、改文件到页面 564ms，都没有达标，为此做了四处优化：全量构建按目标并行渲染（输出与顺序无关，observer 仍按计划顺序收到页面）；规划时一次批量取出所有条目（`Reader.GetMany`），不再每篇查两次；分类和标签的列表直接从已经取出的条目分组，不再每个标签查一次；建索引时每个文件的语句只准备一次。没有放进 CI：GitHub 的机器比作者的电脑慢，速度也不稳定，发布前在本机跑 | P1 |
-| 6 | `kite theme verify` 命令没有实现 | [theme-system.md §11.2](theme-system.md) 要求 M0 就提供；现在只有针对内置主题的 build/serve 一致性测试。可以并入 M5 | P2 |
+| 6 | `kite theme verify` 命令没有实现 | **已解决。** `kite theme verify [dir]` 用内置的 fixture 站点（`internal/themecheck`：七篇文章分三页、一个页面、带图片的 page bundle、标签和分类及其 term 页、404，还有不该出现的草稿和定时文章）以 build 和 serve 各渲染一遍，逐字节比较 23 个页面，指出每页第一处不同的行。不给目录时检查当前项目的主题，项目之外检查内置主题。还没做的：fixture 没有覆盖多语言（i18n 在 M5 才定）；`--strict` 要等引擎有了废弃告警再加。测试：`internal/themecheck/themecheck_test.go` | P2 |
 | 7 | 只支持 YAML front matter | `internal/frontmatter` 需要支持 TOML，保真要求和 YAML 一样 | P2 |
 | 8 | 主题的 `requires` 只读取、不检查 | `internal/render/theme/theme.go` 读取了 `requires`，但没有和实际运行的 Kite 版本比较。可以并入 M5 | P2 |
 | 9 | 文章列表不显示「置顶」 | `internal/api/wire.go` 的 `Summary` 不带 meta。返回 `pinned`，或者一小组列表要用的字段即可 | P2 |
@@ -87,7 +87,7 @@
 | 阶段 | 版本 | 范围 | 已有基础 |
 |---|---|---|---|
 | **1. v1.0 收尾** | v1.0 | §4 的 P0 和 P1 项；另外可以顺手做两个低成本占位：「存储空间」（统计内容目录大小）、版本号旁的「最新」（查询 GitHub Releases）；最后打 `v1.0.0` 标签 | — |
-| **2. M5 主题契约** | v1.1 | 写第二套风格完全不同的主题；`kite theme verify`（对比 build 和 serve 的输出）和 `kite theme list/add/new`；检查 `requires`；菜单（`.Site.Menus`）写入契约；冻结之前要把 [theme-system.md](theme-system.md) §12 i18n 的三件事（尤其是多语言 URL 策略）和 §14 的开放问题定下来；发布 `kite/v1`，建 themes 仓库和主题开发文档 | 查找顺序、带方法的 RenderContext、命名空间函数、`apiVersion` 校验、由 settings schema 生成的配置页都已经有了 |
+| **2. M5 主题契约** | v1.1 | 写第二套风格完全不同的主题，并用 `kite theme verify`（已有）检查它；`kite theme list/add/new`；检查 `requires`；菜单（`.Site.Menus`）写入契约；冻结之前要把 [theme-system.md](theme-system.md) §12 i18n 的三件事（尤其是多语言 URL 策略）和 §14 的开放问题定下来；发布 `kite/v1`，建 themes 仓库和主题开发文档 | 查找顺序、带方法的 RenderContext、命名空间函数、`apiVersion` 校验、由 settings schema 生成的配置页都已经有了 |
 | **3. M6 可重现构建** | v1.2 | `kite.lock`、`kitew`、Cloudflare Pages 部署模板；启用增量构建里的跳过判断 | 依赖记录和缓存键已经有了 |
 | **4. 媒体库**（新增） | v1.5 | 在现有索引上汇总所有 page bundle 里的文件：媒体列表、跨文章复用、找出没人引用的文件、上传入口。顺带支持 TOML front matter，提高 Hugo 兼容性 | 单篇的附件上传和删除 API 已经有了 |
 | **5. M7 动态模式** | v2.0 | SQLite 作为真相源，写入同一套读模型；`kite migrate` 在文件和数据库之间互转；多用户和角色；私密文章；数据库备份和 `kite export`；Kite 自己存储的评论 | 读模型、单账号认证、Docker 都已经有了 |

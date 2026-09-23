@@ -1,0 +1,7 @@
+site:
+  title: Theme check
+  description: A small site that uses every kind of page a theme draws.
+  baseURL: https://example.com
+  language: en
+build:
+  pageSize: 3
