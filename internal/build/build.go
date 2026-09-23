@@ -1,6 +1,7 @@
 package build
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -139,12 +140,8 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 	stats.Rendered = len(pages)
 	stats.Skipped = plan.Len() - len(pages)
 
-	// Observers hear about every page in plan order, one at a time, however
-	// the rendering was spread out.
-	for i := range pages {
-		if err := b.opts.Hooks.PageRendered(ctx, &pages[i]); err != nil {
-			return stats, err
-		}
+	if err := b.observe(ctx, pages); err != nil {
+		return stats, err
 	}
 
 	media, err := MediaFiles(plan, b.opts.Media)
@@ -162,7 +159,7 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 		stats.Extra++
 	}
 
-	extra, err := b.runCompletionHooks(ctx, pages)
+	extra, err := b.complete(ctx, pages, b.opts.Emitter.Write)
 	if err != nil {
 		return stats, err
 	}
@@ -179,13 +176,8 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 	return stats, nil
 }
 
-// renderAll renders and writes every target, on as many cores as there are,
-// and returns what was rendered in plan order.
-//
-// A target's bytes depend on the plan and the frozen clock alone, which is
-// also what lets a server render requests concurrently through this code, so
-// the order targets finish in changes nothing that is written. A failure
-// reports the first failing target in plan order, whichever worker met it.
+// renderAll renders and writes every target and returns what was rendered in
+// plan order.
 //
 // The loop is per output target, with the skip check in place from the start.
 // v1 never skips; making that decision real later is a change to one
@@ -193,6 +185,81 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 func (b *Builder) renderAll(ctx context.Context, plan *Plan) ([]hook.PageInfo, error) {
 	infos := make([]hook.PageInfo, plan.Len())
 	rendered := make([]bool, plan.Len())
+	err := eachTarget(ctx, plan, func(ctx context.Context, i int, t Target) error {
+		out := b.buildCtx.ForOutput()
+		if b.cached(out, t) {
+			return nil
+		}
+		html, info, err := b.renderTarget(ctx, out, t, nil)
+		if err == nil {
+			err = b.opts.Emitter.Write(t.Path, html)
+		}
+		if err != nil {
+			return err
+		}
+		infos[i], rendered[i] = info, true
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	pages := make([]hook.PageInfo, 0, plan.Len())
+	for i, info := range infos {
+		if rendered[i] {
+			pages = append(pages, info)
+		}
+	}
+	return pages, nil
+}
+
+// Extras returns what the completion hooks write for a plan, such as the feed
+// and the sitemap, keyed by output path.
+//
+// A server has no build to run them after, so it asks for them here. The
+// hooks are told about the same pages a build tells them about, worked out by
+// the same code, but no template is drawn: nothing a hook is told depends on
+// the HTML, and drawing every page costs several times as much.
+func (b *Builder) Extras(ctx context.Context, plan *Plan) (map[string][]byte, error) {
+	pages := make([]hook.PageInfo, plan.Len())
+	err := eachTarget(ctx, plan, func(ctx context.Context, i int, t Target) error {
+		page, err := b.page(ctx, b.buildCtx.ForOutput(), t)
+		if err != nil {
+			return err
+		}
+		pages[i] = describe(t, page)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := b.observe(ctx, pages); err != nil {
+		return nil, err
+	}
+
+	files := make(map[string][]byte)
+	_, err = b.complete(ctx, pages, func(rel string, data []byte) error {
+		clean, err := outputPath(rel)
+		if err != nil {
+			return err
+		}
+		files[clean] = bytes.Clone(data)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+// eachTarget runs do for every target of a plan, on as many cores as there
+// are, and reports the first failure in plan order, whichever worker met it.
+//
+// A target's output depends on the plan and the frozen clock alone, which is
+// also what lets a server render requests concurrently through this code, so
+// the order targets finish in changes nothing. Once one target has failed the
+// rest are stopped.
+func eachTarget(ctx context.Context, plan *Plan, do func(ctx context.Context, i int, t Target) error) error {
 	errs := make([]error, plan.Len())
 
 	work, stop := context.WithCancel(ctx)
@@ -202,26 +269,17 @@ func (b *Builder) renderAll(ctx context.Context, plan *Plan) ([]hook.PageInfo, e
 	for range min(runtime.GOMAXPROCS(0), plan.Len()) {
 		wg.Go(func() {
 			for i := range next {
-				target := plan.Targets[i]
-				out := b.buildCtx.ForOutput()
-				if b.cached(out, target) {
-					continue
-				}
-				html, info, err := b.renderTarget(work, out, target, nil)
+				err := do(work, i, plan.Targets[i])
 				if err == nil {
-					err = b.opts.Emitter.Write(target.Path, html)
-				}
-				if err != nil {
-					// Once one target has failed the rest are stopped, and a
-					// target stopped that way is not the failure to report.
-					if ctx.Err() == nil && work.Err() != nil && errors.Is(err, context.Canceled) {
-						continue
-					}
-					errs[i] = err
-					stop()
 					continue
 				}
-				infos[i], rendered[i] = info, true
+				// A target stopped because another one failed is not the
+				// failure to report.
+				if ctx.Err() == nil && work.Err() != nil && errors.Is(err, context.Canceled) {
+					continue
+				}
+				errs[i] = err
+				stop()
 			}
 		})
 	}
@@ -237,20 +295,25 @@ feed:
 	wg.Wait()
 
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return err
 	}
 	for _, err := range errs {
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	pages := make([]hook.PageInfo, 0, plan.Len())
-	for i, info := range infos {
-		if rendered[i] {
-			pages = append(pages, info)
+	return nil
+}
+
+// observe tells the page observers about every page in plan order, one at a
+// time, however the pages were spread across cores.
+func (b *Builder) observe(ctx context.Context, pages []hook.PageInfo) error {
+	for i := range pages {
+		if err := b.opts.Hooks.PageRendered(ctx, &pages[i]); err != nil {
+			return err
 		}
 	}
-	return pages, nil
+	return nil
 }
 
 // MediaFiles lists what a page bundle contributes to the output, mapping the
@@ -419,8 +482,12 @@ func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req 
 	if err := b.opts.Hooks.TransformHTML(ctx, &doc); err != nil {
 		return nil, info, err
 	}
+	return []byte(doc.HTML), describe(t, page), nil
+}
 
-	info = hook.PageInfo{
+// describe is what hooks are told about a rendered target.
+func describe(t Target, page render.Page) hook.PageInfo {
+	info := hook.PageInfo{
 		Item:       t.Item,
 		URL:        t.URL,
 		OutputPath: t.Path,
@@ -430,17 +497,30 @@ func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req 
 		info.Title = page.Title()
 		info.Excerpt = page.Excerpt()
 	}
-	return []byte(doc.HTML), info, nil
+	return info
 }
 
 // pages builds the Page view of a target and of everything it lists.
 func (b *Builder) pages(ctx context.Context, out *Context, t Target) (render.Page, []render.Page, error) {
+	page, err := b.page(ctx, out, t)
+	if err != nil {
+		return nil, nil, err
+	}
+	listed := make([]render.Page, 0, len(t.Items))
+	for _, s := range t.Items {
+		listed = append(listed, b.listedPage(out, s))
+	}
+	return page, listed, nil
+}
+
+// page builds the Page view of a target itself.
+func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page, error) {
 	var page render.Page
 
 	if t.Item != nil {
 		doc, err := b.renderBody(ctx, t.Item)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		out.Read(Node{Kind: NodeContent, ID: string(t.Item.ID)}, string(t.Item.Revision),
 			"title", "slug", "body", "params", "published_at", "updated_at", "taxonomies")
@@ -462,12 +542,7 @@ func (b *Builder) pages(ctx context.Context, out *Context, t Target) (render.Pag
 	} else if t.Kind != render.KindSingle {
 		page = b.listingPage(t)
 	}
-
-	listed := make([]render.Page, 0, len(t.Items))
-	for _, s := range t.Items {
-		listed = append(listed, b.listedPage(out, s))
-	}
-	return page, listed, nil
+	return page, nil
 }
 
 // listedPage is the Page of an item that another page links to: an entry in a
@@ -558,7 +633,9 @@ func (b *Builder) termsOfMap(taxonomies map[string][]string) map[string][]render
 	return out
 }
 
-func (b *Builder) runCompletionHooks(ctx context.Context, pages []hook.PageInfo) (int, error) {
+// complete runs the completion hooks over every page, handing what they emit
+// to emit, and reports how many files that was.
+func (b *Builder) complete(ctx context.Context, pages []hook.PageInfo, emit func(path string, data []byte) error) (int, error) {
 	var extra int
 	info := hook.BuildInfo{
 		Site: hook.SiteInfo{
@@ -570,7 +647,7 @@ func (b *Builder) runCompletionHooks(ctx context.Context, pages []hook.PageInfo)
 		Pages: pages,
 		Emit: func(path string, data []byte) error {
 			extra++
-			return b.opts.Emitter.Write(path, data)
+			return emit(path, data)
 		},
 	}
 	if err := b.opts.Hooks.BuildComplete(ctx, &info); err != nil {

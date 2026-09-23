@@ -108,7 +108,8 @@ type Server struct {
 	problems []string
 	// due is when the next item dated later falls due and the plan with it
 	// stops being current; zero when nothing is waiting.
-	due time.Time
+	due    time.Time
+	extras *extras
 	// configHash detects a settings change, which needs more than a reindex.
 	configHash string
 }
@@ -239,6 +240,7 @@ func (s *Server) reload(ctx context.Context) error {
 
 	s.mu.Lock()
 	s.builder, s.problems, s.due = builder, problems, due
+	s.extras = &extras{builder: builder, plan: plan, log: s.log}
 	s.mu.Unlock()
 
 	s.log.Info("site loaded", "routes", s.router.size())
@@ -458,6 +460,9 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	s.catchUp(r.Context())
 	if target, ok := s.router.lookup(r.URL.Path); ok {
 		s.renderTarget(w, r, target, http.StatusOK)
+		return
+	}
+	if s.serveExtra(w, r) {
 		return
 	}
 	if s.serveStatic(w, r) {

@@ -50,9 +50,9 @@ func newThemeVerifyCmd() *cobra.Command {
 					return err
 				}
 			} else if report.OK() {
-				printf(cmd, "%s (%s): %d pages identical built and served\n", report.Theme, where, report.Compared)
+				printf(cmd, "%s (%s): %d files identical built and served\n", report.Theme, where, report.Compared)
 			} else {
-				printf(cmd, "%s (%s): %d of %d pages differ between build and serve\n",
+				printf(cmd, "%s (%s): %d of %d files differ between build and serve\n",
 					report.Theme, where, len(report.Differ), report.Compared)
 				for _, d := range report.Differ {
 					printf(cmd, "  %s\n    %s\n", d.URL, d.Detail)

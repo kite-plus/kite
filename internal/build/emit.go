@@ -47,10 +47,9 @@ func NewEmitter(outDir string) (*Emitter, error) {
 // silently rewriting it would put the file somewhere the caller did not mean,
 // and no legitimate build target ever asks for one.
 func (e *Emitter) Write(rel string, data []byte) error {
-	clean := path.Clean(rel)
-	if clean == "" || clean == "." || path.IsAbs(clean) ||
-		clean == ".." || strings.HasPrefix(clean, "../") {
-		return fmt.Errorf("build: refusing to write outside the output directory: %q", rel)
+	clean, err := outputPath(rel)
+	if err != nil {
+		return err
 	}
 
 	target := filepath.Join(e.stageDir, filepath.FromSlash(clean))
@@ -65,6 +64,17 @@ func (e *Emitter) Write(rel string, data []byte) error {
 	e.written = append(e.written, clean)
 	e.mu.Unlock()
 	return nil
+}
+
+// outputPath is where a site-relative path lands inside the output, or an
+// error for a path that would leave it.
+func outputPath(rel string) (string, error) {
+	clean := path.Clean(rel)
+	if clean == "" || clean == "." || path.IsAbs(clean) ||
+		clean == ".." || strings.HasPrefix(clean, "../") {
+		return "", fmt.Errorf("build: refusing to write outside the output directory: %q", rel)
+	}
+	return clean, nil
 }
 
 // CopyTree copies a directory of unprocessed files, such as static assets.

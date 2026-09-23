@@ -605,7 +605,7 @@ kite theme verify ./themes/paper --strict   # 废弃告警升级为失败
 
 1. 拿一个内置的 **fixture 站点**（覆盖 single / list / taxonomy / term / 分页 / 404 / RSS / 多语言 / 有图与无图 / 有 term 页与无 term 页）
 2. 在 **build 模式**下渲染全站
-3. 在 **serve 模式**下逐 URL 请求同样的页面
+3. 在 **serve 模式**下逐 URL 请求 build 写出的每个文件
 4. **逐字节 diff**
 
 > **那个测试才是契约本身，文档不是。** 文档会过时、会被误读；一个跑在 CI 里的黄金文件测试不会。

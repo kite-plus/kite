@@ -3,9 +3,10 @@
 //
 // The contract a theme is written against is this check rather than the
 // documentation of it (docs/design/theme-system.md §9.4). A small site that
-// uses every kind of page is built with the theme, the same pages are then
-// asked of a server, and every byte is compared. A theme that passes can be
-// previewed with `kite run` and trusted to publish what the preview showed.
+// uses every kind of page is built with the theme, every file the build
+// writes is then asked of a server, and every byte is compared. A theme that
+// passes can be previewed with `kite run` and trusted to publish what the
+// preview showed.
 package themecheck
 
 import (
@@ -42,17 +43,17 @@ type Report struct {
 	Differ   []Difference `json:"differ,omitempty"`
 }
 
-// Difference is a page the two runtimes did not draw alike.
+// Difference is a file the two runtimes did not produce alike.
 type Difference struct {
 	URL    string `json:"url"`
 	Detail string `json:"detail"`
 }
 
-// OK reports whether every page matched.
+// OK reports whether every file matched.
 func (r *Report) OK() bool { return r.Compared > 0 && len(r.Differ) == 0 }
 
 // Check renders the fixture site with a theme, built and served, and
-// compares every page.
+// compares every file.
 func Check(ctx context.Context, theme fs.FS) (*Report, error) {
 	root, err := os.MkdirTemp("", "kite-theme-check-*")
 	if err != nil {
@@ -100,7 +101,7 @@ func Check(ctx context.Context, theme fs.FS) (*Report, error) {
 
 	report := &Report{Theme: s.Theme.Manifest.Name}
 	err = filepath.WalkDir(out, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || filepath.Ext(p) != ".html" {
+		if err != nil || d.IsDir() {
 			return err
 		}
 		rel, err := filepath.Rel(out, p)

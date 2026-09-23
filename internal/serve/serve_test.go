@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -99,8 +100,17 @@ func openSite(t *testing.T, root string) *site.Site {
 // and how it is delivered are independent, so the same content delivered two
 // ways is the same bytes. If this test ever fails, a theme author can no
 // longer trust the preview, and the claim is marketing.
-func TestServedPagesAreByteIdenticalToBuiltFiles(t *testing.T) {
+func TestServedFilesAreByteIdenticalToBuiltOnes(t *testing.T) {
 	root := newProject(t, 7)
+	// A build writes the feed after the static files, over this one, and a
+	// server has to answer with the same file.
+	static := filepath.Join(root, "static")
+	if err := os.MkdirAll(static, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(static, "rss.xml"), []byte("<rss>stale</rss>\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	built := openSite(t, root)
 	outDir := filepath.Join(root, "public")
@@ -113,9 +123,9 @@ func TestServedPagesAreByteIdenticalToBuiltFiles(t *testing.T) {
 	srv := newServer(t, root, serve.Options{LiveReload: false})
 	handler := srv.Handler()
 
-	var checked int
+	var checked []string
 	err := filepath.WalkDir(outDir, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || filepath.Ext(p) != ".html" {
+		if err != nil || d.IsDir() {
 			return err
 		}
 		rel, err := filepath.Rel(outDir, p)
@@ -141,16 +151,23 @@ func TestServedPagesAreByteIdenticalToBuiltFiles(t *testing.T) {
 			t.Errorf("%s differs between build and serve\n%s", url, firstDifference(string(want), got))
 			return nil
 		}
-		checked++
+		checked = append(checked, url)
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if checked < 10 {
-		t.Fatalf("only %d pages compared; the fixture is not exercising enough of the site", checked)
+	if len(checked) < 10 {
+		t.Fatalf("only %d files compared; the fixture is not exercising enough of the site", len(checked))
 	}
-	t.Logf("compared %d pages byte for byte", checked)
+	// Hooks write these after the pages, and a server once had no answer for
+	// them at all.
+	for _, url := range []string{"/rss.xml", "/sitemap.xml"} {
+		if !slices.Contains(checked, url) {
+			t.Errorf("%s was not compared", url)
+		}
+	}
+	t.Logf("compared %d files byte for byte", len(checked))
 }
 
 func statusFor(rel string) int {
@@ -400,6 +417,70 @@ func TestEditedContentIsServedAfterReload(t *testing.T) {
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/posts/post-00/", nil))
 	if !strings.Contains(rec.Body.String(), "Renamed") {
 		t.Error("the edit was not picked up after a reload")
+	}
+}
+
+// The feed and the sitemap describe the site as the server plans it now: a
+// post that falls due joins them, and so does an edit.
+func TestTheFeedFollowsTheSite(t *testing.T) {
+	root := newProject(t, 2)
+	dir := filepath.Join(root, "content", "posts", "launch-day")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ951\ntitle: Launch Day\nslug: launch-day\n" +
+		"status: published\npublished_at: 2026-06-01T12:30:00Z\n---\n\nNot yet.\n"
+	if err := os.WriteFile(filepath.Join(dir, "index.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var mu sync.Mutex
+	now := frozen
+	srv, err := serve.NewWithClock(t.Context(), openSite(t, root), serve.Options{}, func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		return now
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := srv.Handler()
+	get := func(path string) string {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: status %d", path, rec.Code)
+		}
+		return rec.Body.String()
+	}
+
+	if strings.Contains(get("/rss.xml"), "launch-day") || strings.Contains(get("/sitemap.xml"), "launch-day") {
+		t.Error("the post is described before its time")
+	}
+
+	mu.Lock()
+	now = time.Date(2026, 6, 1, 12, 30, 0, 0, time.UTC)
+	mu.Unlock()
+	if !strings.Contains(get("/rss.xml"), "launch-day") || !strings.Contains(get("/sitemap.xml"), "launch-day") {
+		t.Error("the post is not described once its time came")
+	}
+
+	p := filepath.Join(root, "content", "posts", "post-00", "index.md")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.Replace(string(data), "title: Post 00", "title: A renamed post", 1)
+	if err := os.WriteFile(p, []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// What the file watcher does on a change.
+	if err := srv.Reload(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(get("/rss.xml"), "A renamed post") {
+		t.Error("the feed still has the title from before the edit")
 	}
 }
 

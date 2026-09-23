@@ -571,6 +571,70 @@ func TestSitemapAndFeedComeFromHooks(t *testing.T) {
 	}
 }
 
+// A server asks for what the completion hooks write without drawing any page,
+// and has to be given the bytes a build writes, observers included.
+func TestExtrasAreWhatABuildWrites(t *testing.T) {
+	f := newFixture(t, 5)
+	bus := hook.NewBus()
+	bus.Register(retitling{hook.Base{HookName: "retitling", HookPhase: hook.PhaseBuild}}, hook.DefaultPriority)
+	builtin.Register(bus, builtin.DefaultOptions())
+	withBus := func(o *build.Options) { o.Hooks = bus }
+
+	_, files := f.run(t, f.out, withBus)
+	if !strings.Contains(readFile(t, f.out, "rss.xml"), "Observed:") {
+		t.Fatal("the observer did not reach the feed")
+	}
+
+	b := f.builder(t, nil, withBus)
+	plan, err := b.Plan(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	extras, err := b.Extras(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := slices.Sorted(maps.Keys(extras)); !slices.Equal(got, []string{"rss.xml", "sitemap.xml"}) {
+		t.Fatalf("extras = %v", got)
+	}
+	for name, data := range extras {
+		if !slices.Contains(files, name) {
+			t.Errorf("%s is not something the build wrote", name)
+		} else if want := readFile(t, f.out, name); string(data) != want {
+			t.Errorf("%s differs from the built one:\n%s\nwant:\n%s", name, data, want)
+		}
+	}
+}
+
+// A hook that writes outside the output is refused whichever runtime asked.
+func TestExtrasRefuseWhatABuildRefuses(t *testing.T) {
+	f := newFixture(t, 1)
+	bus := hook.NewBus()
+	bus.Register(escaping{hook.Base{HookName: "escaping", HookPhase: hook.PhaseBuild}}, hook.DefaultPriority)
+	b := f.builder(t, nil, func(o *build.Options) { o.Hooks = bus })
+
+	plan, err := b.Plan(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Extras(t.Context(), plan); err == nil || !strings.Contains(err.Error(), "outside the output") {
+		t.Errorf("err = %v, want the refusal a build gives", err)
+	}
+}
+
+type retitling struct{ hook.Base }
+
+func (retitling) PageRendered(_ context.Context, p *hook.PageInfo) error {
+	p.Title = "Observed: " + p.Title
+	return nil
+}
+
+type escaping struct{ hook.Base }
+
+func (escaping) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
+	return b.Emit("../outside.xml", []byte("x"))
+}
+
 func readAll(t *testing.T, root string, files []string) map[string]string {
 	t.Helper()
 	out := make(map[string]string, len(files))
