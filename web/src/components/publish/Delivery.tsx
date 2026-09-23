@@ -64,7 +64,25 @@ export function DeliveryStages({
       <Stage
         label={t("publish.deployed")}
         step={delivery?.deployed}
-        note={t("publish.deployedNote")}
+        note={
+          {
+            pending: t("publish.deployedNote"),
+            not_applicable: t("publish.deployedUnknown"),
+            failed: t("publish.deployFailed"),
+          }[delivery?.deployed ?? "pending"]
+        }
+        action={
+          delivery?.deployed === "done" && delivery.deployed_url ? (
+            <a
+              href={delivery.deployed_url}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-auto shrink-0 text-xs text-brand hover:underline"
+            >
+              {t("publish.viewSite")}
+            </a>
+          ) : undefined
+        }
       />
     </ol>
   );

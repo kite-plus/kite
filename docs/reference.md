@@ -154,6 +154,12 @@ GitHub turns scheduled workflows off in a public repository with no commits
 for 60 days. Turn it back on under the **Actions** tab. Deploying on push is
 a separate workflow for exactly this reason, and keeps working either way.
 
+The studio follows a publish from the commit through the push to the
+deployment. For a public repository on GitHub that deploys to Pages, it asks
+GitHub's API, anonymously and read-only, whether the pushed commit is live,
+and links to the site once it is. Other hosts do not report deployments, and
+the studio says so instead of waiting.
+
 `kite build` prints when the next scheduled post falls due. On any other host
 that is when the site has to be built again, because a static site only shows
 a scheduled post once it has been built after the post's time.

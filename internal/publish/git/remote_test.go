@@ -1,11 +1,16 @@
 package git_test
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/kite-plus/kite/internal/publish"
 	gitpub "github.com/kite-plus/kite/internal/publish/git"
@@ -262,5 +267,69 @@ func TestACommitThatWasNotPushedCanBePushedLater(t *testing.T) {
 
 	if _, err := s.pub.Push(t.Context(), publish.PushRequest{}); codeOf(err) != publish.CodeNothingToPush {
 		t.Errorf("err = %v, want nothing_to_push", err)
+	}
+}
+
+// A GitHub repository that deploys to Pages reports whether a push is live,
+// and the delivery state says so once GitHub has.
+func TestAPushToGitHubPagesIsReportedDeployedWhenItIs(t *testing.T) {
+	root := newRepo(t)
+	run(t, root, "remote", "add", "origin", "https://github.com/acme/site.git")
+	// Pushed, as far as this repository can tell, without reaching GitHub.
+	run(t, root, "update-ref", "refs/remotes/origin/main", "HEAD")
+	run(t, root, "config", "branch.main.remote", "origin")
+	run(t, root, "config", "branch.main.merge", "refs/heads/main")
+	head := run(t, root, "rev-parse", "HEAD")
+
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/acme/site/deployments":
+			fmt.Fprintf(w, `[{"id": 7, "sha": %q}]`, head)
+		case "/repos/acme/site/deployments/7/statuses":
+			fmt.Fprint(w, `[{"id": 1, "state": "success", "environment_url": "https://acme.github.io/site/"}]`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer api.Close()
+
+	pub := gitpub.New(gitpub.Options{Root: root, GitHubAPI: api.URL})
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		state, err := pub.State(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if state.Deployed == publish.StepDone {
+			if state.DeployedURL != "https://acme.github.io/site/" {
+				t.Errorf("deployed url = %q", state.DeployedURL)
+			}
+			break
+		}
+		if state.Deployed != publish.StepPending || time.Now().After(deadline) {
+			t.Fatalf("deployed = %q, want done", state.Deployed)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// A host that does not report deployments is not asked, and the step says it
+// does not apply rather than waiting forever.
+func TestAnyOtherHostLeavesDeploymentNotApplicable(t *testing.T) {
+	s := newShared(t)
+	var asked atomic.Int32
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { asked.Add(1) }))
+	defer api.Close()
+
+	state, err := gitpub.New(gitpub.Options{Root: s.root, GitHubAPI: api.URL}).State(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Pushed != publish.StepDone || state.Deployed != publish.StepNotApplicable {
+		t.Errorf("pushed %q, deployed %q; want done and not_applicable", state.Pushed, state.Deployed)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := asked.Load(); n != 0 {
+		t.Errorf("GitHub was asked %d times about a repository that is not there", n)
 	}
 }

@@ -348,6 +348,7 @@ export interface components {
             checked_at?: string;
             committed: string;
             deployed: string;
+            deployed_url?: string;
             dirty?: string[];
             last_error?: components["schemas"]["Problem"];
             local: string;

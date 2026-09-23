@@ -23,15 +23,23 @@ type Options struct {
 	// Message is a template for the commit subject. Empty uses a default.
 	Message string
 
+	// GitHubAPI is where a repository on GitHub is asked whether a push has
+	// been deployed. Empty means GitHub's own API.
+	GitHubAPI string
+
 	// Now is injected so a test can make a commit reproducible.
 	Now func() time.Time
 }
 
 // Publisher commits and pushes content with the git binary.
+//
+// It remembers what GitHub said about deployments, so it is meant to be
+// made once and asked many times.
 type Publisher struct {
-	opts Options
-	git  runner
-	lock *lockFile
+	opts    Options
+	git     runner
+	lock    *lockFile
+	deploys *deployChecker
 }
 
 // New returns a publisher over a project.
@@ -40,9 +48,10 @@ func New(opts Options) *Publisher {
 		opts.Now = time.Now
 	}
 	return &Publisher{
-		opts: opts,
-		git:  runner{root: opts.Root},
-		lock: newLock(opts.Root),
+		opts:    opts,
+		git:     runner{root: opts.Root},
+		lock:    newLock(opts.Root),
+		deploys: newDeployChecker(opts.GitHubAPI, opts.Now),
 	}
 }
 
@@ -224,9 +233,6 @@ func (p *Publisher) State(ctx context.Context) (*publish.DeliveryState, error) {
 		Local:     publish.StepDone,
 		Committed: publish.StepPending,
 		Pushed:    publish.StepPending,
-		// Whether a deployment finished is something the hosting platform
-		// knows and this publisher does not. Reporting a guess would be
-		// worse than reporting nothing.
 		Deployed:  publish.StepPending,
 		CheckedAt: p.opts.Now().UTC(),
 	}
@@ -254,13 +260,36 @@ func (p *Publisher) State(ctx context.Context) (*publish.DeliveryState, error) {
 	ahead, behind, ok := p.divergence(ctx, state.Branch, state.Remote)
 	if !ok {
 		state.Pushed = publish.StepNotApplicable
+		state.Deployed = publish.StepNotApplicable
 		return state, nil
 	}
 	state.Ahead, state.Behind = ahead, behind
 	if ahead == 0 && len(dirty) == 0 {
 		state.Pushed = publish.StepDone
 	}
+	state.Deployed, state.DeployedURL = p.deployed(ctx, state)
 	return state, nil
+}
+
+// deployed reports whether what was pushed is live, as far as the host says.
+//
+// Whether a deployment finished is something the host knows and this
+// publisher does not, so only a host that reports it is asked: GitHub, for a
+// repository that deploys to Pages. Anywhere else the step does not apply,
+// which is the truth, where a guess would be worse than nothing.
+func (p *Publisher) deployed(ctx context.Context, state *publish.DeliveryState) (publish.Step, string) {
+	remote, err := p.git.read(ctx, "remote", "get-url", state.Remote)
+	if err != nil {
+		return publish.StepNotApplicable, ""
+	}
+	repo, ok := githubRepo(remote)
+	if !ok {
+		return publish.StepNotApplicable, ""
+	}
+	head := p.head(ctx)
+	return p.deploys.look(repo, head, state.Pushed == publish.StepDone, func(sha string) bool {
+		return p.git.ok(context.Background(), "merge-base", "--is-ancestor", head, sha)
+	})
 }
 
 // dirtyContent lists what is uncommitted under the paths Kite writes.

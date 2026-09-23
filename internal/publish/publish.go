@@ -53,6 +53,10 @@ type DeliveryState struct {
 	// a publish would carry.
 	Dirty []string `json:"dirty,omitempty"`
 
+	// DeployedURL is where the host says the deployment is live, once it
+	// has said so.
+	DeployedURL string `json:"deployed_url,omitempty"`
+
 	LastError *Problem  `json:"last_error,omitempty"`
 	CheckedAt time.Time `json:"checked_at,omitzero"`
 }

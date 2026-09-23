@@ -48,6 +48,10 @@ type Site struct {
 	Engine   *theme.Engine
 	Markdown *markdown.Renderer
 	Hooks    *hook.Bus
+
+	// publisher is made once, because it remembers what the host has said
+	// about deployments between one question and the next.
+	publisher publish.Publisher
 }
 
 // Open loads a project and everything it needs to render.
@@ -140,8 +144,22 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 			HardWraps:      cfg.Markdown.HardWraps,
 			HighlightTheme: cfg.Markdown.HighlightTheme,
 		}),
-		Hooks: bus,
+		Hooks:     bus,
+		publisher: newPublisher(p, cfg),
 	}, nil
+}
+
+func newPublisher(p *project.Project, cfg *config.Config) publish.Publisher {
+	switch cfg.Publish.Publisher {
+	case "", "git":
+		return gitpub.New(gitpub.Options{
+			Root:    p.Root,
+			Branch:  cfg.Publish.Branch,
+			Message: cfg.Publish.Message,
+		})
+	default:
+		return nil
+	}
 }
 
 // Publisher returns the configured publisher, or nil when the project
@@ -150,18 +168,7 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 // A project without one is an ordinary way to run: an author may prefer to
 // commit and push themselves, and "none" says so rather than leaving a button
 // that half works.
-func (s *Site) Publisher() publish.Publisher {
-	switch s.Config.Publish.Publisher {
-	case "", "git":
-		return gitpub.New(gitpub.Options{
-			Root:    s.Project.Root,
-			Branch:  s.Config.Publish.Branch,
-			Message: s.Config.Publish.Message,
-		})
-	default:
-		return nil
-	}
-}
+func (s *Site) Publisher() publish.Publisher { return s.publisher }
 
 // Close releases the site's resources.
 func (s *Site) Close() error { return s.Index.Close() }

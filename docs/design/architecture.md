@@ -671,7 +671,7 @@ type DeliveryState struct {
     Local     StepState  // 内容已写入文件/DB
     Committed StepState  // 已 commit（Git 模式）
     Pushed    StepState  // 已 push
-    Deployed  StepState  // CI/CD 完成（通过 Actions API 或 webhook 回填）
+    Deployed  StepState  // CI/CD 完成（V1 匿名查询 GitHub Deployments API 回填；不回报的托管平台为 N/A）
     LastError *PublishError
 }
 ```
@@ -835,7 +835,7 @@ Admin Publish → GitPublisher → push → GitHub
 
 **仓库只存 Source，`public/` 永不入库。** CI 产出物作为 Deployment Artifact。
 
-**V1 只做 GitHub Pages**，而且只生成一个 GitHub Actions workflow 文件，不做任何 API 集成。
+**V1 只做 GitHub Pages**，部署只靠生成的 GitHub Actions workflow 文件（推送时部署的 `deploy.yml`，发布定时文章的 `scheduled.yml`），不做任何需要凭据的 API 集成。唯一的 API 调用是匿名、只读地查询 `github-pages` 环境的部署状态，用来回填 DeliveryState.Deployed。
 
 Cloudflare Pages 放到 M6 和 `kitew` 一起做——因为 CF Pages 的构建容器没法预装 Kite，正是 wrapper 的用武之地。
 
