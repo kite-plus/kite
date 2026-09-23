@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -51,7 +52,10 @@ func newBuildCmd() *cobra.Command {
 				outDir = filepath.Join(s.Project.Root, s.Config.Build.Output)
 			}
 
-			stats, files, err := s.Build(cmd.Context(), site.BuildOptions{OutDir: outDir, Drafts: drafts})
+			// One instant for both runs of --verify: a scheduled post falling
+			// due between them is not a reproducibility failure.
+			opts := site.BuildOptions{OutDir: outDir, Drafts: drafts, Now: time.Now()}
+			stats, files, err := s.Build(cmd.Context(), opts)
 			if err != nil {
 				return err
 			}
@@ -67,7 +71,7 @@ func newBuildCmd() *cobra.Command {
 			}
 
 			if verify {
-				diverged, err := verifyBuild(cmd, s, outDir, drafts)
+				diverged, err := verifyBuild(cmd, s, opts)
 				if err != nil {
 					return err
 				}
@@ -118,23 +122,24 @@ func printBuild(cmd *cobra.Command, r buildReport) {
 // output varies between runs would make those records, and any cache built on
 // them, meaningless. Checking it in CI is the only way to notice the day some
 // hidden input creeps in.
-func verifyBuild(cmd *cobra.Command, s *site.Site, outDir string, drafts bool) ([]string, error) {
+func verifyBuild(cmd *cobra.Command, s *site.Site, opts site.BuildOptions) ([]string, error) {
 	scratch, err := os.MkdirTemp("", "kite-verify-*")
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = os.RemoveAll(scratch) }()
 
-	second := filepath.Join(scratch, "public")
-	if _, _, err := s.Build(cmd.Context(), site.BuildOptions{OutDir: second, Drafts: drafts}); err != nil {
+	again := opts
+	again.OutDir = filepath.Join(scratch, "public")
+	if _, _, err := s.Build(cmd.Context(), again); err != nil {
 		return nil, err
 	}
 
-	first, err := hashTree(outDir)
+	first, err := hashTree(opts.OutDir)
 	if err != nil {
 		return nil, err
 	}
-	other, err := hashTree(second)
+	other, err := hashTree(again.OutDir)
 	if err != nil {
 		return nil, err
 	}

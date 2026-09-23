@@ -266,12 +266,43 @@ func (b *Builder) newSite(c *Context) render.Site {
 	return render.NewSite(info)
 }
 
-// statuses returns the statuses a build includes.
-func (b *Builder) statuses() []content.Status {
+// scope is the query every listing in a build starts from: what is public at
+// the build's instant, or everything when drafts are included.
+//
+// Status alone is not enough. A post scheduled for next month would otherwise
+// be on the home page, in the feed and at its own address the moment it was
+// saved.
+func (b *Builder) scope() content.Query {
 	if b.opts.IncludeDrafts {
-		return nil
+		return content.Query{}
 	}
-	return []content.Status{content.StatusPublished, content.StatusScheduled}
+	now := b.buildCtx.Now()
+	return content.Query{PublicAt: &now}
+}
+
+// NextDue reports when the next scheduled item falls due, or the zero time
+// when nothing is waiting. The plan describes the site until then, so a
+// server still running at that moment has to plan again to publish it.
+func (b *Builder) NextDue(ctx context.Context) (time.Time, error) {
+	if b.opts.IncludeDrafts {
+		return time.Time{}, nil // scheduled items are in the plan already
+	}
+	// The index keeps whole seconds, so everything up to the current one is
+	// already public.
+	after := time.Unix(b.buildCtx.Now().Unix()+1, 0).UTC()
+	page, err := b.opts.Reader.Query(ctx, content.Query{
+		Statuses:  []content.Status{content.StatusScheduled},
+		Published: &content.Range{From: &after},
+		Sort:      []content.SortKey{{Field: content.SortPublishedAt}},
+		Limit:     1,
+	})
+	if err != nil {
+		return time.Time{}, fmt.Errorf("build: find scheduled content: %w", err)
+	}
+	if len(page.Items) == 0 || page.Items[0].PublishedAt == nil {
+		return time.Time{}, nil
+	}
+	return *page.Items[0].PublishedAt, nil
 }
 
 // renderTarget produces the bytes of one output.
@@ -426,7 +457,7 @@ func (b *Builder) terms(ctx context.Context, out *Context, t Target) []render.Te
 	if t.Kind != render.KindTaxonomy {
 		return nil
 	}
-	counts, err := b.opts.Reader.CountTerms(ctx, t.Type, content.Query{Statuses: b.statuses()})
+	counts, err := b.opts.Reader.CountTerms(ctx, t.Type, b.scope())
 	if err != nil {
 		return nil
 	}

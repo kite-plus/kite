@@ -60,6 +60,11 @@ type Query struct {
 	Locales  []string
 	IDs      []ID
 
+	// PublicAt keeps only what is public at that instant, as
+	// [Content.IsPublic] decides it: published items, and scheduled ones
+	// whose time has come.
+	PublicAt *time.Time
+
 	// TermsAny matches items carrying at least one of the listed terms in the
 	// given taxonomy; TermsAll requires every listed term.
 	TermsAny map[string][]string

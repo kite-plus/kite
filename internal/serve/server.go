@@ -99,10 +99,16 @@ type Server struct {
 	// every server that is not one.
 	setup *setup.Flow
 
+	// reloading lets one reload run at a time, whoever asked for it.
+	reloading sync.Mutex
+
 	mu       sync.RWMutex
 	site     *site.Site
 	builder  *build.Builder
 	problems []string
+	// due is when the next scheduled item falls due and the plan with it
+	// stops being current; zero when nothing is waiting.
+	due time.Time
 	// configHash detects a settings change, which needs more than a reindex.
 	configHash string
 }
@@ -184,6 +190,12 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 // between two changes agrees about what time it is, the way every page in one
 // build does.
 func (s *Server) Reload(ctx context.Context) error {
+	s.reloading.Lock()
+	defer s.reloading.Unlock()
+	return s.reload(ctx)
+}
+
+func (s *Server) reload(ctx context.Context) error {
 	// Configuration first: a changed title or theme has to be in place before
 	// anything derived from it is rebuilt.
 	if err := s.reconfigureIfChanged(); err != nil {
@@ -214,16 +226,19 @@ func (s *Server) Reload(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	s.router.load(plan)
-
+	due, err := builder.NextDue(ctx)
+	if err != nil {
+		return err
+	}
 	media, err := build.MediaFiles(plan, os.DirFS(s.root))
 	if err != nil {
 		return err
 	}
+	s.router.load(plan)
 	s.router.loadMedia(media)
 
 	s.mu.Lock()
-	s.builder, s.problems = builder, problems
+	s.builder, s.problems, s.due = builder, problems, due
 	s.mu.Unlock()
 
 	s.log.Info("site loaded", "routes", s.router.size())
@@ -360,6 +375,42 @@ func (s *Server) refresh(ctx context.Context) error {
 	return nil
 }
 
+// catchUp plans again once a scheduled item has fallen due.
+//
+// A plan is made against a frozen clock, and nothing on disk changes when the
+// moment a post was waiting for arrives. A server left running would go on
+// hiding it until some unrelated edit, so the first request after that moment
+// replans before it is answered.
+func (s *Server) catchUp(ctx context.Context) {
+	if !s.overdue() {
+		return
+	}
+	s.reloading.Lock()
+	defer s.reloading.Unlock()
+	if !s.overdue() {
+		return // a request that got here first has already replanned
+	}
+	// Every request queued behind this one needs the result, so the client
+	// that asked first going away must not abandon it.
+	if err := s.reload(context.WithoutCancel(ctx)); err != nil {
+		s.log.Error("publishing scheduled content failed", "err", err)
+		// Retrying on every request would replan once per page view until
+		// someone fixed what broke.
+		s.mu.Lock()
+		s.due = s.now().Add(time.Minute)
+		s.mu.Unlock()
+		return
+	}
+	s.hub.broadcast()
+}
+
+func (s *Server) overdue() bool {
+	s.mu.RLock()
+	due := s.due
+	s.mu.RUnlock()
+	return !due.IsZero() && !s.now().Before(due)
+}
+
 // ListenAndServe runs until the context is canceled.
 func (s *Server) ListenAndServe(ctx context.Context) error {
 	listener, err := net.Listen("tcp", s.opts.Addr)
@@ -404,6 +455,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 func (s *Server) URL() string { return "http://" + s.opts.Addr }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
+	s.catchUp(r.Context())
 	if target, ok := s.router.lookup(r.URL.Path); ok {
 		s.renderTarget(w, r, target, http.StatusOK)
 		return

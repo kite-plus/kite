@@ -37,13 +37,10 @@ func (b *Builder) plan(ctx context.Context, c *Context) (*Plan, error) {
 // loadAll reads every item the build includes, newest first.
 func (b *Builder) loadAll(ctx context.Context) ([]content.Summary, error) {
 	var out []content.Summary
-	cursor := ""
+	q := b.scope()
+	q.Limit = content.MaxLimit
 	for {
-		page, err := b.opts.Reader.Query(ctx, content.Query{
-			Statuses: b.statuses(),
-			Limit:    content.MaxLimit,
-			Cursor:   cursor,
-		})
+		page, err := b.opts.Reader.Query(ctx, q)
 		if err != nil {
 			return nil, fmt.Errorf("build: load content: %w", err)
 		}
@@ -51,7 +48,7 @@ func (b *Builder) loadAll(ctx context.Context) ([]content.Summary, error) {
 		if !page.HasMore {
 			return out, nil
 		}
-		cursor = page.NextCursor
+		q.Cursor = page.NextCursor
 	}
 }
 
@@ -121,7 +118,7 @@ func (b *Builder) planLists(p *Plan, all []content.Summary) {
 // planTaxonomies adds one listing per taxonomy and one per term.
 func (b *Builder) planTaxonomies(ctx context.Context, p *Plan) error {
 	for _, taxonomy := range b.opts.Types.TaxonomyNames() {
-		counts, err := b.opts.Reader.CountTerms(ctx, taxonomy, content.Query{Statuses: b.statuses()})
+		counts, err := b.opts.Reader.CountTerms(ctx, taxonomy, b.scope())
 		if err != nil {
 			return fmt.Errorf("build: count %s terms: %w", taxonomy, err)
 		}
@@ -154,14 +151,11 @@ func (b *Builder) planTaxonomies(ctx context.Context, p *Plan) error {
 
 func (b *Builder) itemsWithTerm(ctx context.Context, taxonomy, term string) ([]content.Summary, error) {
 	var out []content.Summary
-	cursor := ""
+	q := b.scope()
+	q.TermsAny = map[string][]string{taxonomy: {term}}
+	q.Limit = content.MaxLimit
 	for {
-		page, err := b.opts.Reader.Query(ctx, content.Query{
-			Statuses: b.statuses(),
-			TermsAny: map[string][]string{taxonomy: {term}},
-			Limit:    content.MaxLimit,
-			Cursor:   cursor,
-		})
+		page, err := b.opts.Reader.Query(ctx, q)
 		if err != nil {
 			return nil, fmt.Errorf("build: load %s/%s: %w", taxonomy, term, err)
 		}
@@ -169,7 +163,7 @@ func (b *Builder) itemsWithTerm(ctx context.Context, taxonomy, term string) ([]c
 		if !page.HasMore {
 			return out, nil
 		}
-		cursor = page.NextCursor
+		q.Cursor = page.NextCursor
 	}
 }
 

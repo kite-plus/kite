@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/index"
@@ -291,5 +292,80 @@ func TestSummariesCarryTerms(t *testing.T) {
 	}
 	if got := page.Items[0].Taxonomies["categories"]; !slices.Equal(got, []string{"Tech"}) {
 		t.Errorf("category = %v", got)
+	}
+}
+
+// A build decides in SQL what a site publishes, and the domain decides it in
+// Go. The day the two disagree, a post is public in one place and not in the
+// other.
+func TestPublicAtAgreesWithIsPublic(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	items := []struct{ slug, front string }{
+		{"published-past", "status: published\npublished_at: 2026-01-01T00:00:00Z\n"},
+		{"published-future", "status: published\npublished_at: 2027-01-01T00:00:00Z\n"},
+		{"published-undated", "status: published\n"},
+		{"scheduled-past", "status: scheduled\npublished_at: 2026-05-31T12:00:00Z\n"},
+		{"scheduled-now", "status: scheduled\npublished_at: 2026-06-01T12:00:00Z\n"},
+		{"scheduled-next-second", "status: scheduled\npublished_at: 2026-06-01T12:00:01Z\n"},
+		{"scheduled-undated", "status: scheduled\n"},
+		{"draft", "status: draft\npublished_at: 2026-01-01T00:00:00Z\n"},
+		{"archived", "status: archived\npublished_at: 2026-01-01T00:00:00Z\n"},
+		{"deleted", "status: published\npublished_at: 2026-01-01T00:00:00Z\ndeleted_at: 2026-02-01T00:00:00Z\n"},
+	}
+
+	root := t.TempDir()
+	for i, it := range items {
+		body := fmt.Sprintf("---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ%03d\ntitle: %s\nslug: %s\n%s---\n\nbody\n", i, it.slug, it.slug, it.front)
+		p := filepath.Join(root, "content", "posts", it.slug, "index.md")
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ix, err := index.Open(root, content.DefaultRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ix.Close() })
+	if _, err := ix.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	r := reader.New(ix.DB())
+
+	// Deleted items are asked for too, so that it is the public filter
+	// itself that has to leave them out.
+	page, err := r.Query(t.Context(), content.Query{PublicAt: &now, IncludeDeleted: true, Limit: content.MaxLimit})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	var public []string
+	for _, s := range page.Items {
+		public = append(public, s.Slug)
+	}
+	slices.Sort(public)
+
+	for _, it := range items {
+		item, err := r.GetBySlug(t.Context(), "post", it.slug)
+		if err != nil {
+			t.Fatalf("GetBySlug(%s): %v", it.slug, err)
+		}
+		if want, got := item.IsPublic(now), slices.Contains(public, it.slug); got != want {
+			t.Errorf("%s: selected = %v, but IsPublic = %v", it.slug, got, want)
+		}
+	}
+
+	want := []string{"published-future", "published-past", "published-undated", "scheduled-now", "scheduled-past"}
+	if !slices.Equal(public, want) {
+		t.Errorf("public = %v, want %v", public, want)
+	}
+
+	count, err := r.Count(t.Context(), content.Query{PublicAt: &now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != len(want) {
+		t.Errorf("Count = %d, want %d", count, len(want))
 	}
 }

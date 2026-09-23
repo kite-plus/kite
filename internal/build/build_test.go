@@ -99,12 +99,11 @@ Body of post %02d.
 	}
 }
 
-func (f *fixture) run(t *testing.T, outDir string, mutate func(*build.Options)) (build.Stats, []string) {
+// fixtureNow is the build clock unless a test sets its own.
+var fixtureNow = time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+
+func (f *fixture) builder(t *testing.T, emitter *build.Emitter, mutate func(*build.Options)) *build.Builder {
 	t.Helper()
-	emitter, err := build.NewEmitter(outDir)
-	if err != nil {
-		t.Fatal(err)
-	}
 	opts := build.Options{
 		Site: render.SiteInfo{
 			Title: "Test", BaseURL: "https://example.com", Language: "en",
@@ -117,7 +116,7 @@ func (f *fixture) run(t *testing.T, outDir string, mutate func(*build.Options)) 
 		Types:    f.types,
 		Emitter:  emitter,
 		PageSize: 3,
-		Now:      time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC),
+		Now:      fixtureNow,
 	}
 	if mutate != nil {
 		mutate(&opts)
@@ -126,6 +125,37 @@ func (f *fixture) run(t *testing.T, outDir string, mutate func(*build.Options)) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	return b
+}
+
+// add writes a file into the project and indexes it.
+func (f *fixture) add(t *testing.T, rel, body string) {
+	t.Helper()
+	p := filepath.Join(f.root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ix, err := index.Open(f.root, f.types)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ix.Close() })
+	if _, err := ix.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	f.reader = reader.New(ix.DB())
+}
+
+func (f *fixture) run(t *testing.T, outDir string, mutate func(*build.Options)) (build.Stats, []string) {
+	t.Helper()
+	emitter, err := build.NewEmitter(outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := f.builder(t, emitter, mutate)
 	stats, err := b.Run(context.Background())
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -288,6 +318,71 @@ func TestDraftsAreExcludedUnlessRequested(t *testing.T) {
 	_, withDrafts := f.run(t, filepath.Join(f.root, "drafts"), func(o *build.Options) { o.IncludeDrafts = true })
 	if !slices.Contains(withDrafts, "posts/hidden/index.html") {
 		t.Error("--drafts did not include the draft")
+	}
+}
+
+// A scheduled post used to be built as soon as it was saved, because a build
+// chose what to publish by status alone: it was on the home page, in the feed
+// and at its own address a month early.
+func TestScheduledContentWaitsForItsTime(t *testing.T) {
+	f := newFixture(t, 3)
+	due := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC)
+	f.add(t, "content/posts/launch-day/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZ901
+title: Launch Day
+slug: launch-day
+status: scheduled
+published_at: 2026-07-01T09:00:00Z
+tags: [Go, Soon]
+---
+
+Not yet.
+`)
+
+	_, early := f.run(t, f.out, nil)
+	for _, file := range []string{"posts/launch-day/index.html", "tags/soon/index.html"} {
+		if slices.Contains(early, file) {
+			t.Errorf("%s was built before its time", file)
+		}
+	}
+	for _, file := range []string{"index.html", "posts/index.html", "tags/index.html", "tags/go/index.html", "rss.xml", "sitemap.xml"} {
+		page := readFile(t, f.out, file)
+		for _, leak := range []string{"launch-day", "Launch Day", "tags/soon"} {
+			if strings.Contains(page, leak) {
+				t.Errorf("%s shows %q before its time", file, leak)
+			}
+		}
+	}
+	if got, err := f.builder(t, nil, nil).NextDue(t.Context()); err != nil || !got.Equal(due) {
+		t.Errorf("NextDue = %v, %v; want %v", got, err, due)
+	}
+
+	onTime := filepath.Join(f.root, "on-time")
+	_, files := f.run(t, onTime, func(o *build.Options) { o.Now = due })
+	for _, file := range []string{"posts/launch-day/index.html", "tags/soon/index.html"} {
+		if !slices.Contains(files, file) {
+			t.Errorf("%s is missing once its time has come", file)
+		}
+	}
+	for _, file := range []string{"index.html", "rss.xml", "sitemap.xml"} {
+		if !strings.Contains(readFile(t, onTime, file), "launch-day") {
+			t.Errorf("%s does not list the post once its time has come", file)
+		}
+	}
+	if !strings.Contains(readFile(t, onTime, "tags/index.html"), "tags/soon") {
+		t.Error("the tag index does not list the new term once its time has come")
+	}
+	if got, err := f.builder(t, nil, func(o *build.Options) { o.Now = due }).NextDue(t.Context()); err != nil || !got.IsZero() {
+		t.Errorf("NextDue with nothing waiting = %v, %v; want zero", got, err)
+	}
+
+	// A preview with drafts shows what is coming, so nothing in it is waiting.
+	_, preview := f.run(t, filepath.Join(f.root, "preview"), func(o *build.Options) { o.IncludeDrafts = true })
+	if !slices.Contains(preview, "posts/launch-day/index.html") {
+		t.Error("--drafts did not include the scheduled post")
+	}
+	if got, err := f.builder(t, nil, func(o *build.Options) { o.IncludeDrafts = true }).NextDue(t.Context()); err != nil || !got.IsZero() {
+		t.Errorf("NextDue with drafts = %v, %v; want zero", got, err)
 	}
 }
 

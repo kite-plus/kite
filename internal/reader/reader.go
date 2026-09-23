@@ -279,6 +279,12 @@ func buildWhere(q content.Query) (string, []any, error) {
 	if !q.IncludeDeleted {
 		add(`deleted_at IS NULL`)
 	}
+	if q.PublicAt != nil {
+		// A scheduled item without a date never becomes public, and a NULL
+		// comparison is false, which is the same answer.
+		add(`(deleted_at IS NULL AND (status = ? OR (status = ? AND published_at <= ?)))`,
+			string(content.StatusPublished), string(content.StatusScheduled), q.PublicAt.Unix())
+	}
 	if q.Published != nil {
 		if q.Published.From != nil {
 			add(`published_at >= ?`, q.Published.From.Unix())

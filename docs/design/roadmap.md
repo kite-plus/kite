@@ -1,6 +1,6 @@
 # Kite 路线图与实现现状
 
-> 状态：持续更新 · 最近核对：2026-09-23（提交 `dc2efb5`）
+> 状态：持续更新 · 最近核对：2026-09-23
 > 里程碑的原始定义见 [architecture.md §28 Roadmap](architecture.md#28-roadmap)，验收标准见 [§29](architecture.md#29-每阶段验收标准)。
 > 本文记录的是**对照代码和测试逐项核实后**的进度，不是对计划的复述；有疑问的项都实际运行确认过。
 
@@ -13,7 +13,7 @@
   - front matter 保真：只改标题时，文件的 diff 只有标题这一行；
   - build 和 serve 的输出逐字节一致，预览和最终页面也逐字节一致；
   - 发布只提交本次涉及的文件，不动用户暂存区里的其他改动。
-- **打 v1.0 标签前还有收尾项**：一个会让定时文章提前上线的 bug，以及几处没做完的发布和验收工作，见 §4。
+- **打 v1.0 标签前还有收尾项**：静态站点的定时发布还没有东西去触发，以及几处没做完的发布和验收工作，见 §4。定时文章提前上线的 bug 已经修复。
 - **M5–M8 都还没开始**，其中 M5 有一部分已经提前做了。后台按设计稿画出的「即将推出」占位功能，各自归到哪个阶段见 §6。
 
 ## 2. 各里程碑完成情况
@@ -67,7 +67,7 @@
 
 | # | 问题 | 现状与位置 | 优先级 |
 |---|---|---|---|
-| 1 | **定时文章会提前上线（bug）** | `internal/build/build.go` 的 `statuses()` 把 `scheduled` 和 `published` 一起放进构建，没有按 `published_at <= BuildTime` 过滤；serve 用的是同一个构建器，也有这个问题。实测：发布时间设为 2027 年的定时文章，会出现在首页、列表、RSS 和它自己的页面上。修复时还要注意，serve 是常驻进程，到了发布时间需要重新规划页面 | **P0** |
+| 1 | **定时文章会提前上线（bug）** | **已修复。** 构建只收录构建时刻已经公开的内容：`published`，以及 `published_at` 不晚于构建时刻的 `scheduled`。规则和 `Content.IsPublic` 相同，过滤在 SQL 里完成（`content.Query.PublicAt`），首页、列表、分类、RSS、sitemap 和文章页一起生效。serve 记下下一篇定时文章的时间，到点后的第一个请求先重新规划页面再应答。`kite build --verify` 的两次构建共用同一时刻。测试：`TestPublicAtAgreesWithIsPublic`、`TestScheduledContentWaitsForItsTime`、`TestAScheduledPostIsServedOnceItsTimeComes` | P0 |
 | 2 | **静态站点的定时发布没有东西去触发** | `internal/cli/starter.go` 生成的 workflow 只在 push 和手动运行时触发。需要加 `schedule`，频率待定（见 §7） | **P0** |
 | 3 | 远端有新提交时只会拒绝 | `internal/publish/git/publisher.go` 的 `push` 识别出非快进后只返回 `remote_moved`。设计要求（[architecture.md §16.6](architecture.md#16-git-workflow最高危模块)）：先 fetch，判断远端改动是否碰到本次发布的路径；没碰到就提供一键 `rebase --onto`，碰到了就展示 diff，交给用户处理 | P1 |
 | 4 | 「已部署」这一步永远不会完成 | `publisher.go` 的 `State` 固定返回 pending。要么对接 GitHub Pages 的部署状态，要么在拿不到时在界面上隐藏这一步 | P1 |
@@ -78,6 +78,7 @@
 | 9 | 文章列表不显示「置顶」 | `internal/api/wire.go` 的 `Summary` 不带 meta。返回 `pinned`，或者一小组列表要用的字段即可 | P2 |
 | 10 | 发布的备用路径没有实现 | 设计里的「临时 index + `commit-tree` + `update-ref` CAS」备用路径还没做（[architecture.md §16.3](architecture.md#16-git-workflow最高危模块)），现在只有主路径 | P2 |
 | 11 | 周边仓库和文档站没有建 | 组织下现在有 `kite`、`.github`，以及另一个产品 Explore（内容发现平台）用的 `explore`。官网文档站 `website`（用 Kite 自己搭）、`starters`、`setup-kite`，以及存放预研和设计存档的 `lab` 都还没有 | P2 |
+| 12 | Hugo 里日期在未来的文章会立即公开 | Hugo 默认不构建 `date` 在未来的内容，但 Kite 把没有 `status` 的文件读成 `published`，而 `published` 不看日期（`Content.IsPublic`）。从 Hugo 迁过来的站点，原本排在未来的文章会马上上线。可以让日期在未来的 `published` 也等到时间，也可以只在 `kite doctor` 里提示，需要先定规则 | P2 |
 
 ## 5. 分阶段计划
 
