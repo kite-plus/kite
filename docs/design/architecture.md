@@ -765,6 +765,8 @@ rm -f $GIT_DIR/kite.tmpindex
 
 `update-ref` 的 `$OLD` 参数是 **compare-and-swap**——这是防"用户在终端里同时提交"的并发保护。
 
+V1 在 hook 拒绝了一次发布、作者看过理由后选择「跳过 hooks 发布」（命令行 `kite publish --no-verify`）时走这条路径。
+
 另外：当 `git diff --name-only --cached -- <paths>` 非空时**要警告而不是静默覆盖**，因为用户对你即将提交的路径有不同的暂存内容。
 
 ### 16.4 凭据：根本不要碰

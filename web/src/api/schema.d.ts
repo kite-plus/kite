@@ -447,6 +447,7 @@ export interface components {
             publisher: string;
             push: boolean;
             remote?: string;
+            skip_hooks?: boolean;
             warnings?: components["schemas"]["Problem"][];
         };
         Problem: {
@@ -460,6 +461,7 @@ export interface components {
             message?: string;
             paths?: string[];
             push: boolean;
+            skip_hooks?: boolean;
         };
         PublishRefused: {
             done?: components["schemas"]["Result"];

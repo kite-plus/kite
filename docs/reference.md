@@ -195,6 +195,10 @@ else in the working tree. If they changed the same files, the remote's side is
 shown and settling it is left to you. `kite publish --push` on its own pushes
 whatever is already committed, for a push that failed the first time.
 
+The repository's commit hooks run as they would for any commit. When one
+refuses, the studio shows what it said and offers to publish without the
+hooks; `kite publish --no-verify` does the same from a terminal.
+
 ### With Docker
 
 ```bash

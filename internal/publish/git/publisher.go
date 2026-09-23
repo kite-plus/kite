@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -63,6 +65,7 @@ func (p *Publisher) Preflight(ctx context.Context, req publish.Request) (*publis
 	plan := &publish.Plan{
 		Publisher: p.Name(),
 		Message:   p.message(req),
+		SkipHooks: req.SkipHooks,
 	}
 	p.preflight(ctx, req, plan)
 	return plan, nil
@@ -94,13 +97,17 @@ func (p *Publisher) Apply(ctx context.Context, plan *publish.Plan) (*publish.Res
 	}
 	defer release()
 
-	if err := p.commit(ctx, plan); err != nil {
+	commit := p.commit
+	if plan.SkipHooks {
+		commit = p.commitWithoutHooks
+	}
+	if err := commit(ctx, plan); err != nil {
 		return nil, err
 	}
-	commit := p.head(ctx)
+	made := p.head(ctx)
 
 	result := &publish.Result{
-		Commit:    commit,
+		Commit:    made,
 		Committed: plan.Paths,
 		At:        p.opts.Now().UTC(),
 	}
@@ -158,9 +165,31 @@ func (p *Publisher) commit(ctx context.Context, plan *publish.Plan) error {
 		// exactly as it was found, which is what makes a refused publish
 		// something an author can ignore.
 		p.forget(ctx, introduced)
+		if hooks := p.commitHooks(ctx); len(hooks) > 0 {
+			return publish.Problem{
+				Code:   publish.CodeHookRefused,
+				Detail: "the repository's " + strings.Join(hooks, " or ") + " hook refused: " + firstLine(stderr.String()),
+				Fix:    "fix what the hook reports, or publish without running the hooks",
+			}
+		}
 		return p.git.wrap(err, args, &stderr)
 	}
 	return nil
+}
+
+// commitHooks lists the hooks that run on a commit and can refuse it.
+func (p *Publisher) commitHooks(ctx context.Context) []string {
+	dir, err := p.git.read(ctx, "rev-parse", "--path-format=absolute", "--git-path", "hooks")
+	if err != nil {
+		return nil
+	}
+	var active []string
+	for _, name := range []string{"pre-commit", "prepare-commit-msg", "commit-msg"} {
+		if info, err := os.Stat(filepath.Join(dir, name)); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+			active = append(active, name)
+		}
+	}
+	return active
 }
 
 // tracked returns the subset of paths git already knows about.

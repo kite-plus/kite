@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, type components } from "@/api/client";
@@ -67,6 +67,9 @@ export function usePublish(
   const [failure, setFailure] = useState<Failure | null>(null);
   // What did happen when the rest did not: a commit whose push failed.
   const [done, setDone] = useState<Result | null>(null);
+  // What was last asked for, so a publish a hook refused can be asked for
+  // again without the hooks.
+  const last = useRef<string[]>(ids);
 
   const needsConfirmation = Boolean(plan?.warnings?.length) && !plan?.problems?.length;
 
@@ -94,8 +97,8 @@ export function usePublish(
   };
 
   const mutation = useMutation({
-    mutationFn: ({ ids, force }: { ids: string[]; force: boolean }) =>
-      post("/api/v1/publish", { ids, push: true, force }),
+    mutationFn: ({ ids, force, skipHooks }: { ids: string[]; force: boolean; skipHooks?: boolean }) =>
+      post("/api/v1/publish", { ids, push: true, force, skip_hooks: skipHooks }),
     onSuccess: settled,
     onError: (refusal: Refusal) =>
       refused(refusal, Boolean(refusal.plan?.warnings?.length) && !refusal.plan?.problems?.length),
@@ -118,8 +121,22 @@ export function usePublish(
      * moment ago has an id this hook was not rendered with, so it is passed.
      */
     run: async (override?: string[]) => {
+      last.current = override ?? ids;
       try {
-        await mutation.mutateAsync({ ids: override ?? ids, force: needsConfirmation });
+        await mutation.mutateAsync({ ids: last.current, force: needsConfirmation });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    /**
+     * runWithoutHooks asks again for a publish a repository hook refused,
+     * this time without running the hooks. It is only ever offered after the
+     * refusal has been shown.
+     */
+    runWithoutHooks: async () => {
+      try {
+        await mutation.mutateAsync({ ids: last.current, force: true, skipHooks: true });
         return true;
       } catch {
         return false;

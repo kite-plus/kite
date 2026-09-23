@@ -294,6 +294,10 @@ type PublishBody struct {
 
 	// Force proceeds despite warnings that have already been shown.
 	Force bool `json:"force,omitempty"`
+
+	// SkipHooks commits without running the repository's commit hooks, for
+	// an author who has read why one refused and decided to publish anyway.
+	SkipHooks bool `json:"skip_hooks,omitempty"`
 }
 
 // PushBody asks for what is already committed to be pushed.

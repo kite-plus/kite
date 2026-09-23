@@ -162,10 +162,11 @@ func (s *Server) publishRequest(w http.ResponseWriter, r *http.Request) (View, p
 	}
 
 	req := publish.Request{
-		Paths:   body.Paths,
-		Message: body.Message,
-		Push:    body.Push,
-		Force:   body.Force,
+		Paths:     body.Paths,
+		Message:   body.Message,
+		Push:      body.Push,
+		Force:     body.Force,
+		SkipHooks: body.SkipHooks,
 	}
 	// An item is named by id; where its bytes live is the store's business,
 	// not the caller's.

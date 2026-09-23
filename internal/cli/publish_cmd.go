@@ -12,12 +12,13 @@ import (
 
 func newPublishCmd() *cobra.Command {
 	var (
-		message string
-		push    bool
-		rebase  bool
-		dryRun  bool
-		force   bool
-		all     bool
+		message  string
+		push     bool
+		rebase   bool
+		dryRun   bool
+		force    bool
+		all      bool
+		noVerify bool
 	)
 
 	cmd := &cobra.Command{
@@ -63,10 +64,11 @@ func newPublishCmd() *cobra.Command {
 			}
 
 			plan, err := publisher.Preflight(cmd.Context(), publish.Request{
-				Paths:   paths,
-				Message: message,
-				Push:    push,
-				Force:   force,
+				Paths:     paths,
+				Message:   message,
+				Push:      push,
+				Force:     force,
+				SkipHooks: noVerify,
 			})
 			if err != nil {
 				return err
@@ -118,6 +120,7 @@ func newPublishCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report what would happen and stop")
 	cmd.Flags().BoolVar(&force, "force", false, "go ahead despite warnings")
 	cmd.Flags().BoolVar(&all, "all", false, "publish everything uncommitted that Kite manages")
+	cmd.Flags().BoolVar(&noVerify, "no-verify", false, "commit without running the repository's commit hooks")
 	return cmd
 }
 

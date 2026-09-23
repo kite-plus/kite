@@ -124,6 +124,18 @@ export function PublishProblems({ publish }: { publish: Publish }) {
   return (
     <div className="flex flex-col gap-2">
       {failure && <Problem tone="stop" {...problem(failure.code, failure.detail, failure.fix)} />}
+      {failure?.code === "hook_refused" && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          disabled={publish.pending}
+          onClick={() => void publish.runWithoutHooks()}
+        >
+          {publish.pending ? <Spinner data-icon="inline-start" /> : <Upload data-icon="inline-start" />}
+          {t("publish.skipHooks")}
+        </Button>
+      )}
       {remote && <RemoteMoved remote={remote} publish={publish} />}
       {retry && (
         <Button

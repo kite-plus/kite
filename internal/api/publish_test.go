@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -253,5 +254,52 @@ func TestAPushRefusedByAMovedRemoteCanBeReplayedOnIt(t *testing.T) {
 	}
 	if again := decode[api.PublishRefused](t, rec); again.Problem == nil || again.Problem.Code != publish.CodeNothingToPush {
 		t.Errorf("problem = %+v, want nothing_to_push", again.Problem)
+	}
+}
+
+// A hook that refuses is reported as the hook's refusal, and an author who
+// has read it can publish without the hooks.
+func TestAPublishAHookRefusedCanGoAheadWithoutTheHooks(t *testing.T) {
+	root := newRepoProject(t, 2)
+	ran := filepath.Join(t.TempDir(), "ran")
+	write(t, filepath.Join(root, ".git", "hooks", "pre-commit"),
+		"#!/bin/sh\ntouch '"+ran+"'\necho 'no commits on Fridays' >&2\nexit 1\n")
+	if err := os.Chmod(filepath.Join(root, ".git", "hooks", "pre-commit"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	h, _ := newWritableServer(t, root)
+
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
+	item, tag := load(t, h, list.Items[0].ID)
+	draft := draftOf(item)
+	draft.Body = "Edited in the admin.\n"
+	if rec := send(t, h, http.MethodPut, api.Prefix+"/contents/"+item.ID, draft,
+		map[string]string{"If-Match": tag}); rec.Code != http.StatusOK {
+		t.Fatalf("save: %d\n%s", rec.Code, rec.Body.String())
+	}
+
+	rec := send(t, h, http.MethodPost, api.Prefix+"/publish", api.PublishBody{IDs: []string{item.ID}}, nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("publish: %d, want 409\n%s", rec.Code, rec.Body.String())
+	}
+	refused := decode[api.PublishRefused](t, rec)
+	if refused.Problem == nil || refused.Problem.Code != publish.CodeHookRefused ||
+		!strings.Contains(refused.Problem.Detail, "no commits on Fridays") {
+		t.Fatalf("problem = %+v, want the hook's refusal", refused.Problem)
+	}
+	if err := os.Remove(ran); err != nil {
+		t.Fatalf("the hook did not run the first time: %v", err)
+	}
+
+	rec = send(t, h, http.MethodPost, api.Prefix+"/publish",
+		api.PublishBody{IDs: []string{item.ID}, SkipHooks: true}, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("publish without hooks: %d\n%s", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(ran); err == nil {
+		t.Error("the hook ran although it was to be skipped")
+	}
+	if committed := git(t, root, "show", "--name-only", "--pretty=format:", "HEAD"); committed != string(item.Locator)+"/index.md" {
+		t.Errorf("the commit carries %q", committed)
 	}
 }

@@ -167,6 +167,9 @@ kite publish content/posts/hello --push
 会显示远端那一侧的改动，怎么合由你决定。单独运行 `kite publish --push` 会推送已经
 提交的内容，用于第一次没推送成功的情况。
 
+仓库里的提交 hook 会像任何一次提交那样运行。hook 拒绝时，后台会显示它给出的理由，
+并提供「跳过 hooks 发布」；在终端里用 `kite publish --no-verify` 效果相同。
+
 ### 用 Docker
 
 ```bash

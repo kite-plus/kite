@@ -89,6 +89,7 @@ const (
 	CodeGitMissing        = "git_missing"
 	CodeGitFailed         = "git_failed"
 	CodeNothingToPush     = "nothing_to_push"
+	CodeHookRefused       = "hook_refused"
 
 	// Why an unpushed commit cannot be replayed on top of a remote that has
 	// moved on. See [RemoteChange].
@@ -119,6 +120,10 @@ type Plan struct {
 	// Push says whether the plan will reach the remote, which it will not
 	// when there is no remote configured.
 	Push bool `json:"push"`
+
+	// SkipHooks says the commit will be made without running the
+	// repository's commit hooks, as the request asked.
+	SkipHooks bool `json:"skip_hooks,omitempty"`
 }
 
 // OK reports whether a plan can be applied.
@@ -191,6 +196,11 @@ type Request struct {
 
 	// Force allows applying a plan that carries warnings.
 	Force bool
+
+	// SkipHooks commits without running the repository's commit hooks, for
+	// an author who has read why a hook refused and decided to publish
+	// anyway. Never assumed: a hook is the repository owner's rule.
+	SkipHooks bool
 }
 
 // PushRequest is what a caller wants done with commits already made.
