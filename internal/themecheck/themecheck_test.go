@@ -25,8 +25,8 @@ func TestTheBuiltInThemeDrawsTheSamePagesBuiltAndServed(t *testing.T) {
 	// Every kind of page: seven posts and a page, three pages of the home
 	// listing and of the posts, the pages listing, both taxonomies, their
 	// five terms and the 404. Then the feed, the sitemap and the image a
-	// page bundle carries.
-	if want := 8 + 3 + 3 + 1 + 2 + 5 + 1 + 3; report.Compared != want {
+	// page bundle carries, and a page for the links layout the theme offers.
+	if want := 8 + 3 + 3 + 1 + 2 + 5 + 1 + 3 + 1; report.Compared != want {
 		t.Errorf("%d files compared, want %d; the fixture no longer covers what it did", report.Compared, want)
 	}
 	if !report.OK() {
@@ -80,6 +80,21 @@ func TestAThemeThatLinksToTheRootOfTheHostIsCaught(t *testing.T) {
 	// Named once, however many pages carry the footer.
 	if len(report.Outside) != 1 || report.Outside[0].Detail != "links to /rss.xml" {
 		t.Errorf("outside = %+v, want the one link to /rss.xml", report.Outside)
+	}
+}
+
+// A layout a theme offers is drawn and compared like any other page, though
+// no page of the fixture names it, so a fault in it cannot hide.
+func TestEveryLayoutAThemeOffersIsDrawnAndCompared(t *testing.T) {
+	theme := defaultThemeWith(t, "layouts/page/links.html", `{{ define "main" }}`,
+		`{{ define "main" }}{{ with .Request }}<p>served from {{ .Path }}</p>{{ end }}`)
+
+	report, err := themecheck.Check(t.Context(), theme)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if len(report.Differ) != 1 || report.Differ[0].URL != "/blog/layout-links/index.html" {
+		t.Errorf("differ = %+v, want the one page drawn with the links layout", report.Differ)
 	}
 }
 

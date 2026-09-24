@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/serve"
 	"github.com/kite-plus/kite/internal/site"
 )
@@ -70,7 +71,7 @@ var rootLink = regexp.MustCompile(`\b(?:href|src|action|poster)\s*=\s*["'](/[^"'
 
 // Check renders the fixture site with a theme, built and served, and
 // compares every file.
-func Check(ctx context.Context, theme fs.FS) (*Report, error) {
+func Check(ctx context.Context, fsys fs.FS) (*Report, error) {
 	root, err := os.MkdirTemp("", "kite-theme-check-*")
 	if err != nil {
 		return nil, err
@@ -84,8 +85,11 @@ func Check(ctx context.Context, theme fs.FS) (*Report, error) {
 	if err := os.CopyFS(root, files); err != nil {
 		return nil, fmt.Errorf("themecheck: write the fixture site: %w", err)
 	}
-	if err := os.CopyFS(filepath.Join(root, "themes", installed), theme); err != nil {
+	if err := os.CopyFS(filepath.Join(root, "themes", installed), fsys); err != nil {
 		return nil, fmt.Errorf("themecheck: install the theme: %w", err)
+	}
+	if err := addLayoutPages(root, fsys); err != nil {
+		return nil, err
 	}
 	config, err := os.OpenFile(filepath.Join(root, "kite.yaml"), os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
@@ -188,4 +192,46 @@ func firstDifference(built, served string) string {
 		}
 	}
 	return "the same line by line, but not the same bytes"
+}
+
+// addLayoutPages gives the fixture one item for every layout the theme
+// offers, of each type it is offered to, so each layout is drawn and
+// compared like the rest of the site rather than only found to exist. A
+// layout offered to every type is drawn as a page.
+func addLayoutPages(root string, fsys fs.FS) error {
+	th, err := theme.Load(fsys)
+	if err != nil {
+		return err
+	}
+	n := 0
+	for _, l := range th.Manifest.Layouts {
+		kinds := l.Types
+		if len(kinds) == 0 {
+			kinds = []string{"page"}
+		}
+		for _, kind := range kinds {
+			var rel string
+			switch kind {
+			case "page":
+				rel = filepath.Join("content", "pages", "layout-"+l.Name+".md")
+			case "post":
+				rel = filepath.Join("content", "posts", "layout-"+l.Name, "index.md")
+			default:
+				continue // the fixture has posts and pages only
+			}
+			n++
+			body := fmt.Sprintf("---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ4%02d\ntitle: Layout %s\nslug: layout-%s\n"+
+				"status: published\npublished_at: 2026-01-01T00:00:00Z\nlayout: %s\n---\n\n"+
+				"- [Kite](https://example.com/kite/) A link, as a list of them is written.\n"+
+				"- [Explore](https://example.com/explore/) Another one.\n", n, l.Name, l.Name, l.Name)
+			path := filepath.Join(root, rel)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+				return fmt.Errorf("themecheck: write a page for layout %s: %w", l.Name, err)
+			}
+		}
+	}
+	return nil
 }

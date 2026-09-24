@@ -213,6 +213,14 @@
   .content pre code { padding: 0; background: none; font-size: inherit; }
   .page .content { margin-top: 24px; font-size: 15px; line-height: calc(var(--leading) - .05); }
 
+  /* The links layout draws a page's lists as cards: the link an item opens
+     with is its name, in ink, and whatever follows it the note. They stay on
+     one line, so a colon or a dash between them reads as written. */
+  .links .content ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0; list-style: none; }
+  .links .content li { margin: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 4px; font-size: 14px; line-height: 1.8; color: var(--muted); }
+  .links .content li > a:first-child { color: var(--ink); font-weight: 700; text-decoration: none; }
+  .links .content li > a:first-child:hover { color: var(--accent); }
+
   /* Highlighting arrives as classes rather than inline colours, which is what
      lets the inks above change with the page. */
   .chroma .c, .chroma .c1, .chroma .ch, .chroma .cm, .chroma .cs, .chroma .cp, .chroma .cpf { color: var(--muted); font-style: italic; }
@@ -248,6 +256,7 @@
   .colophon svg { display: inline-block; vertical-align: -2.5px; margin: 0 1px; }
 
   @media (max-width: 480px) {
+    .links .content ul { grid-template-columns: 1fr; }
     header.site, main, footer.site { padding-left: 20px; padding-right: 20px; }
     .post { grid-template-columns: 72px minmax(0, 1fr); gap: 0 12px; }
     article > header h1 { font-size: 23px; }

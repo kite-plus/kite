@@ -1,6 +1,6 @@
 name: default
 title: Kite Default
-version: 0.2.0
+version: 0.3.0
 apiVersion: kite/v1
 requires: ">=0.1.0 <2.0.0"
 description: The theme Kite ships with. Quiet serif typography for personal writing, dependency free, light and dark.
@@ -9,6 +9,12 @@ license: Apache-2.0
 capabilities: [static, dynamic]
 contentTypes: [post, page]
 taxonomies: [tags, categories]
+
+layouts:
+  - name: links
+    label: Links
+    description: Draws the page's lists of links as cards, for a friends page or a blogroll.
+    types: [page]
 
 settings:
   - key: accent
