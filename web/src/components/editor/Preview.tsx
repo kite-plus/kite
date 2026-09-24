@@ -55,7 +55,8 @@ export function Preview({ draft, id, base }: Props) {
         setFailed(null);
         setHtml(await response.text());
       } catch (err) {
-        if ((err as Error).name !== "AbortError") setFailed(String(err));
+        if ((err as Error).name === "AbortError") return;
+        setFailed(err instanceof TypeError ? t("problem.unreachable") : String(err));
       }
     }, 250);
 

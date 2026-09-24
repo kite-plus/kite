@@ -426,6 +426,7 @@ export const en = {
   "problem.setup_required": "This server has not been set up yet.",
   "problem.already_set_up": "This server is already set up. Sign in instead.",
   "problem.internal": "Something went wrong on the server.",
+  "problem.unreachable": "Could not reach the server. Check that kite is still running, then try again.",
   "problem.publish_refused": "The publish was refused.",
   "problem.publish_needs_confirmation": "Read the warnings, then publish again.",
   "problem.publish_failed": "The publish did not finish.",

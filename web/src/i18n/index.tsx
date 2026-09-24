@@ -165,6 +165,10 @@ export function useProblem() {
         code !== undefined &&
         (locales.en.catalog as Record<string, string>)[key] !== undefined;
 
+      // The browser's own words for a lost connection add nothing to the
+      // headline, and differ from one browser to the next.
+      if (known && code === "unreachable") return { title: t(key), detail: undefined, fix };
+
       // The headline is translated; what the server said stays underneath,
       // on its own line, because it is where the specifics live -- which
       // file, how large, how many commits behind. A phrase written in

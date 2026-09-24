@@ -39,12 +39,19 @@ interface Failure {
 }
 
 async function post(path: string, body: unknown): Promise<Result> {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    // Shaped like a refusal, so a lost connection is told like any other.
+    if (err instanceof TypeError) throw { error: { code: "unreachable", message: err.message } };
+    throw err;
+  }
   const answer = await response.json();
   if (!response.ok) throw answer;
   return answer;

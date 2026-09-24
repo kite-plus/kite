@@ -1,5 +1,6 @@
 import { useNavigate, useRouter, type ErrorComponentProps } from '@tanstack/react-router'
-import { useI18n } from '@/i18n'
+import { ApiError } from '@/api/client'
+import { useI18n, useProblem } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -20,6 +21,7 @@ export function GeneralError({
   reset,
 }: GeneralErrorProps) {
   const { t } = useI18n()
+  const problem = useProblem()
   const navigate = useNavigate()
   const router = useRouter()
 
@@ -38,10 +40,16 @@ export function GeneralError({
         <p className='text-center text-muted-foreground'>
           {t('error.generalNote')}
         </p>
-        {error instanceof Error && (
-          <p className='max-w-lg text-center font-mono text-xs break-all text-muted-foreground'>
-            {error.message}
+        {error instanceof ApiError ? (
+          <p className='max-w-lg text-center text-sm text-muted-foreground'>
+            {problem(error.code, error.message).title}
           </p>
+        ) : (
+          error instanceof Error && (
+            <p className='max-w-lg text-center font-mono text-xs break-all text-muted-foreground'>
+              {error.message}
+            </p>
+          )
         )}
         {!minimal && (
           <div className='mt-6 flex gap-4'>

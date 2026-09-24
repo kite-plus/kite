@@ -4,6 +4,7 @@ import { ChevronLeft, Info, Minus, SlidersHorizontal, Table, Type, XCircle } fro
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
+import { ApiError } from "@/api/client";
 import { useI18n, useProblem, type Key } from "@/i18n";
 import { useContentTypes } from "@/hooks/useContents";
 import { useItem } from "@/hooks/useItem";
@@ -173,13 +174,21 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
         return await item.attach(file, target, (progress) => onProgress?.({ progress }), signal);
       } catch (err) {
         // A cancelled upload was the author's doing, not a failure to report.
-        if (!signal?.aborted) setUploadError(err instanceof Error ? err.message : String(err));
+        if (!signal?.aborted) {
+          setUploadError(
+            err instanceof ApiError
+              ? problem(err.code, err.message).title
+              : err instanceof Error
+                ? err.message
+                : String(err),
+          );
+        }
         throw err;
       } finally {
         setUploading((n) => Math.max(0, n - 1));
       }
     },
-    [id, save, item, t],
+    [id, save, item, t, problem],
   );
 
   // Files chosen from the toolbar or dropped on the source view.
@@ -281,6 +290,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     );
   }
   if (!draft) {
+    const said = item.error ? problem(item.error.code, item.error.detail) : null;
     return (
       <>
         <AppHeader />
@@ -288,7 +298,9 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           <Alert variant="destructive">
             <XCircle />
             <AlertTitle>{t("editor.nothingToEdit")}</AlertTitle>
-            <AlertDescription>{item.error?.detail}</AlertDescription>
+            <AlertDescription>
+              {said && [said.title, said.detail].filter(Boolean).join(" ")}
+            </AlertDescription>
           </Alert>
           <Button variant="outline" className="self-start" asChild>
             <Link to="/content/$kind" params={{ kind }}>

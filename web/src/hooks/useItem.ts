@@ -3,6 +3,13 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { api, ApiError, type Draft, type Item } from "@/api/client";
 
+/** failureOf describes a request that threw instead of being answered. */
+function failureOf(err: unknown): { code?: string; detail: string } {
+  return err instanceof ApiError
+    ? { code: err.code, detail: err.message }
+    : { detail: err instanceof Error ? err.message : String(err) };
+}
+
 /** Conflict is what the server sends when an edit lost a race. */
 export interface Conflict {
   expected_revision: string;
@@ -59,9 +66,16 @@ export function useItem(id: string | null, kind: string) {
     setStatus("loading");
 
     (async () => {
-      const { data, error, response } = await api.GET("/contents/{id}", {
-        params: { path: { id } },
-      });
+      let answer;
+      try {
+        answer = await api.GET("/contents/{id}", { params: { path: { id } } });
+      } catch (err) {
+        if (cancelled) return;
+        setError(failureOf(err));
+        setStatus("error");
+        return;
+      }
+      const { data, error, response } = answer;
       if (cancelled) return;
       if (error || !data) {
         setError({
@@ -98,12 +112,21 @@ export function useItem(id: string | null, kind: string) {
     setStatus("saving");
     setError(null);
 
-    const result = id
-      ? await api.PUT("/contents/{id}", {
-          params: { path: { id }, header: { "If-Match": revision.current } },
-          body: draft,
-        })
-      : await api.POST("/contents", { body: draft });
+    let result;
+    try {
+      result = id
+        ? await api.PUT("/contents/{id}", {
+            params: { path: { id }, header: { "If-Match": revision.current } },
+            body: draft,
+          })
+        : await api.POST("/contents", { body: draft });
+    } catch (err) {
+      // Nothing reached the server, so nothing was stored: the draft stays
+      // as it is, still marked unsaved, for the next attempt.
+      setError(failureOf(err));
+      setStatus("ready");
+      return null;
+    }
 
     if (result.error) {
       // A conflict is not a failure to report and forget: it is a decision
@@ -156,11 +179,17 @@ export function useItem(id: string | null, kind: string) {
 
   const remove = useCallback(async () => {
     if (!id) return false;
-    const { error } = await api.DELETE("/contents/{id}", {
-      params: { path: { id }, header: { "If-Match": revision.current } },
-    });
-    if (error) {
-      setError({ code: error.error.code, detail: error.error.message });
+    let answer;
+    try {
+      answer = await api.DELETE("/contents/{id}", {
+        params: { path: { id }, header: { "If-Match": revision.current } },
+      });
+    } catch (err) {
+      setError(failureOf(err));
+      return false;
+    }
+    if (answer.error) {
+      setError({ code: answer.error.error.code, detail: answer.error.error.message });
       return false;
     }
     await queryClient.invalidateQueries({ queryKey: ["contents"] });
@@ -205,7 +234,7 @@ export function useItem(id: string | null, kind: string) {
           }
           reject(new ApiError(body?.error?.code ?? "internal", body?.error?.message ?? "upload failed"));
         };
-        request.onerror = () => reject(new ApiError("internal", "upload failed"));
+        request.onerror = () => reject(new ApiError("unreachable", "upload failed"));
         request.onabort = () => reject(new DOMException("upload cancelled", "AbortError"));
         signal?.addEventListener("abort", () => request.abort(), { once: true });
         request.send(form);

@@ -403,6 +403,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "problem.setup_required": "这个服务器还没有安装。",
   "problem.already_set_up": "这个服务器已经安装过了，直接登录即可。",
   "problem.internal": "服务器出错了。",
+  "problem.unreachable": "连不上服务器。请确认 kite 还在运行，然后再试一次。",
   "problem.publish_refused": "发布被拒绝。",
   "problem.publish_needs_confirmation": "请先读一下警告，然后再发布一次。",
   "problem.publish_failed": "发布没有完成。",

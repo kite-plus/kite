@@ -41,6 +41,11 @@ api.use({
     }
     return response;
   },
+  // fetch rejects with a TypeError, worded differently by every browser, when
+  // the server cannot be reached at all. An abort is left as it is.
+  onError({ error }) {
+    if (error instanceof TypeError) return new ApiError("unreachable", error.message);
+  },
 });
 
 export type Summary = components["schemas"]["Summary"];
