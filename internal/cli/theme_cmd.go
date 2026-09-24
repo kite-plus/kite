@@ -52,14 +52,26 @@ func newThemeVerifyCmd() *cobra.Command {
 			} else if report.OK() {
 				printf(cmd, "%s (%s): %d files identical built and served\n", report.Theme, where, report.Compared)
 			} else {
-				printf(cmd, "%s (%s): %d of %d files differ between build and serve\n",
-					report.Theme, where, len(report.Differ), report.Compared)
-				for _, d := range report.Differ {
-					printf(cmd, "  %s\n    %s\n", d.URL, d.Detail)
+				if len(report.Differ) > 0 {
+					printf(cmd, "%s (%s): %d of %d files differ between build and serve\n",
+						report.Theme, where, len(report.Differ), report.Compared)
+					for _, d := range report.Differ {
+						printf(cmd, "  %s\n    %s\n", d.URL, d.Detail)
+					}
+				}
+				if len(report.Outside) > 0 {
+					printf(cmd, "%s (%s): %d link(s) leave a site published under a path; use url.For or url.Rel\n",
+						report.Theme, where, len(report.Outside))
+					for _, d := range report.Outside {
+						printf(cmd, "  %s\n    %s\n", d.URL, d.Detail)
+					}
 				}
 			}
-			if !report.OK() {
+			switch {
+			case len(report.Differ) > 0:
 				return fmt.Errorf("theme: %s does not draw the same pages in both runtimes", report.Theme)
+			case !report.OK():
+				return fmt.Errorf("theme: %s links outside the site", report.Theme)
 			}
 			return nil
 		},

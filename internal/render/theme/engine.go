@@ -39,6 +39,10 @@ type Options struct {
 	// Funcs are merged over the built-in namespaces, for values that are only
 	// known once a site is loaded.
 	Funcs template.FuncMap
+
+	// Links answers url.For, url.Rel and url.Abs. Without it url.For fails
+	// and the other two return what they are given.
+	Links Links
 }
 
 // NewEngine returns an engine.
@@ -48,7 +52,7 @@ func NewEngine(opts Options) *Engine {
 		formats = map[string]Format{FormatHTML.Name: FormatHTML}
 	}
 
-	funcs := baseFuncs()
+	funcs := baseFuncs(opts.Links)
 	for name, fn := range opts.Funcs {
 		funcs[name] = fn
 	}

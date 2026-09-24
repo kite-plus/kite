@@ -84,6 +84,11 @@ kite theme verify ./themes/paper
 RSS 和 sitemap，逐字节比较。通过检查的主题，发布出去的就是 `kite run` 预览时看到的；
 没通过的，会指出每个文件第一处不同的行。不给目录时，检查当前项目在用的主题，在项目之外则检查内置主题。
 
+这个小站点发布在一个路径下，就像 GitHub Pages 的项目站点那样，所以从域名根开始写的链接，
+比如 `/rss.xml`，也会被报告出来。模板链接到 Kite 自己的页面用 `url.For "home"`、
+`url.For "list" "post"`、`url.For "taxonomy" "tags"` 或 `url.For "term" "tags" "Go"`，
+链接到站点的其他路径用 `url.Rel "rss.xml"`，两者都会带上这段路径。
+
 主题契约尚未冻结；它会在 M5、也就是有了第二套按它写出来的主题之后再冻结。
 
 ## 配置
@@ -135,6 +140,9 @@ publish:
 `kite init` 会写好一个 GitHub Pages 工作流，构建时带 `--verify` —— 跑第二次会得到
 不同产物的站点，会在这里失败，而不是被发布出去。在 **Settings → Pages → Source →
 GitHub Actions** 打开 Pages，之后推送到 `main` 即部署。
+
+在有自己的域名之前，仓库的站点位于 `https://<owner>.github.io/<仓库名>/`。把这个地址
+填为 `baseURL`：Kite 生成的每个链接都会带上这段路径，`kite serve` 也会在这个路径下预览。
 
 定时文章由另一个工作流 `scheduled.yml` 发布。日期在未来的文章，状态是 `scheduled`
 还是 `published` 都一样，要等到那个时间才公开，这和 Hugo、Jekyll 的做法相同，

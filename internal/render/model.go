@@ -68,6 +68,7 @@ type pageModel struct {
 	kind       Kind
 	doc        *markdown.Document
 	resolver   *url.Resolver
+	url        string
 	terms      map[string][]Term
 	prev, next Page
 }
@@ -78,6 +79,9 @@ type PageOptions struct {
 	Rendered *markdown.Document
 	Resolver *url.Resolver
 	Terms    map[string][]Term
+
+	// URL is the page's link when it is not an item's own, as for a listing.
+	URL string
 
 	// Prev and Next are the neighbors of a single page, nil where there is
 	// none.
@@ -94,6 +98,7 @@ func NewPage(item *content.Content, opts PageOptions) Page {
 		kind:     opts.Kind,
 		doc:      opts.Rendered,
 		resolver: opts.Resolver,
+		url:      opts.URL,
 		terms:    opts.Terms,
 		prev:     opts.Prev,
 		next:     opts.Next,
@@ -115,7 +120,10 @@ func (p *pageModel) Description() string {
 }
 
 func (p *pageModel) RelPermalink() string {
-	if p.resolver == nil {
+	switch {
+	case p.url != "":
+		return p.url
+	case p.resolver == nil:
 		return "/" + p.item.Slug
 	}
 	return p.resolver.For(p.item)

@@ -463,12 +463,20 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		s.renderTarget(w, r, target, http.StatusOK)
 		return
 	}
-	if s.serveExtra(w, r) {
+
+	// A site published under a path is served under it too, so a link that
+	// forgot the path fails here rather than after it is deployed. A request
+	// for the bare host is sent to the home page.
+	current := s.project()
+	if within, ok := current.Resolver.SitePath(r.URL.Path); ok {
+		if s.serveExtra(w, r, within) || s.serveStatic(w, r, within) {
+			return
+		}
+	} else if r.URL.Path == "/" {
+		http.Redirect(w, r, current.Resolver.ForHome(current.Config.Site.Language), http.StatusFound)
 		return
 	}
-	if s.serveStatic(w, r) {
-		return
-	}
+
 	if target, ok := s.router.notFoundTarget(); ok {
 		s.renderTarget(w, r, target, http.StatusNotFound)
 		return
@@ -503,9 +511,10 @@ func (s *Server) renderTarget(w http.ResponseWriter, r *http.Request, t build.Ta
 	}
 }
 
-// serveStatic answers for files a build would copy rather than render.
-func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) bool {
-	rel := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+// serveStatic answers for files a build would copy rather than render. within
+// is the request's path inside the site.
+func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request, within string) bool {
+	rel := strings.TrimPrefix(path.Clean("/"+within), "/")
 	if rel == "" || rel == "." || strings.HasPrefix(rel, "..") {
 		return false
 	}

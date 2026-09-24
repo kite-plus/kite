@@ -9,7 +9,7 @@
   {{- $description := .Site.Description }}
   {{- with .Page }}{{ with .Description }}{{ $description = . }}{{ end }}{{ end }}
   {{ with $description }}<meta name="description" content="{{ . }}">{{ end }}
-  <link rel="alternate" type="application/rss+xml" title="{{ .Site.Title }}" href="/rss.xml">
+  <link rel="alternate" type="application/rss+xml" title="{{ .Site.Title }}" href="{{ url.Rel "rss.xml" }}">
   {{ partial "theme-init.html" . }}
   {{ partial "style.html" . }}
   {{- with .Site.ThemeSettings.font_stylesheet }}

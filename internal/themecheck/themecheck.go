@@ -7,6 +7,10 @@
 // writes is then asked of a server, and every byte is compared. A theme that
 // passes can be previewed with `kite run` and trusted to publish what the
 // preview showed.
+//
+// The site is published under a path, as a GitHub Pages project site is, and
+// a link a page makes to the root of the host is reported as well: it works
+// on a site at the root and breaks on every other one.
 package themecheck
 
 import (
@@ -18,6 +22,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -41,16 +46,27 @@ type Report struct {
 	Theme    string       `json:"theme"`
 	Compared int          `json:"compared"`
 	Differ   []Difference `json:"differ,omitempty"`
+
+	// Outside holds each link that leaves the site for the root of its host,
+	// with the first page that makes it.
+	Outside []Difference `json:"outside,omitempty"`
 }
 
-// Difference is a file the two runtimes did not produce alike.
+// Difference is a file the two runtimes did not produce alike, or a page
+// that links outside the site.
 type Difference struct {
 	URL    string `json:"url"`
 	Detail string `json:"detail"`
 }
 
-// OK reports whether every file matched.
-func (r *Report) OK() bool { return r.Compared > 0 && len(r.Differ) == 0 }
+// OK reports whether every file matched and every link stayed in the site.
+func (r *Report) OK() bool {
+	return r.Compared > 0 && len(r.Differ) == 0 && len(r.Outside) == 0
+}
+
+// rootLink matches a link that starts at the root of its host, in the
+// attributes that hold one.
+var rootLink = regexp.MustCompile(`\b(?:href|src|action|poster)\s*=\s*["'](/[^"'\s]*)`)
 
 // Check renders the fixture site with a theme, built and served, and
 // compares every file.
@@ -100,6 +116,7 @@ func Check(ctx context.Context, theme fs.FS) (*Report, error) {
 	handler := srv.Handler()
 
 	report := &Report{Theme: s.Theme.Manifest.Name}
+	seen := make(map[string]bool)
 	err = filepath.WalkDir(out, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
@@ -112,7 +129,24 @@ func Check(ctx context.Context, theme fs.FS) (*Report, error) {
 		if err != nil {
 			return err
 		}
-		url := "/" + filepath.ToSlash(rel)
+		url := s.Resolver.Rel(filepath.ToSlash(rel))
+		if strings.HasSuffix(rel, ".html") {
+			for _, m := range rootLink.FindAllStringSubmatch(string(built), -1) {
+				link := m[1]
+				// A protocol-relative address names a host of its own.
+				if strings.HasPrefix(link, "//") || seen[link] {
+					continue
+				}
+				path := link
+				if i := strings.IndexAny(path, "?#"); i >= 0 {
+					path = path[:i]
+				}
+				if _, inside := s.Resolver.SitePath(path); !inside {
+					seen[link] = true
+					report.Outside = append(report.Outside, Difference{URL: url, Detail: "links to " + link})
+				}
+			}
+		}
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, httptest.NewRequestWithContext(ctx, http.MethodGet, url, nil))
 

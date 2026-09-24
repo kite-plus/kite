@@ -3,5 +3,5 @@
   <header class="heading">
     <h1>{{ partial "t.html" (dict "k" "notfound" "lang" $lang) }}</h1>
   </header>
-  <p class="lost">{{ partial "t.html" (dict "k" "notfound_body" "lang" $lang) }} <a href="/">{{ partial "t.html" (dict "k" "back" "lang" $lang) }}</a></p>
+  <p class="lost">{{ partial "t.html" (dict "k" "notfound_body" "lang" $lang) }} <a href="{{ url.For "home" }}">{{ partial "t.html" (dict "k" "back" "lang" $lang) }}</a></p>
 {{ end }}

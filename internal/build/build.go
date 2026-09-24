@@ -582,7 +582,12 @@ func (b *Builder) listingPage(t Target) render.Page {
 		Slug:  t.URL,
 		Title: t.Title,
 	}
-	return render.NewPage(item, render.PageOptions{Kind: t.Kind, Rendered: &markdown.Document{}})
+	return render.NewPage(item, render.PageOptions{
+		Kind:     t.Kind,
+		Rendered: &markdown.Document{},
+		Resolver: b.opts.Resolver,
+		URL:      t.URL,
+	})
 }
 
 func (b *Builder) listBase(t Target) string {
@@ -592,7 +597,7 @@ func (b *Builder) listBase(t Target) string {
 	case render.KindTaxonomy:
 		return b.opts.Resolver.ForTaxonomy(t.Type, b.opts.Site.Language)
 	case render.KindHome:
-		return "/"
+		return b.opts.Resolver.ForHome(b.opts.Site.Language)
 	default:
 		return b.opts.Resolver.ForList(content.Kind(t.Type), b.opts.Site.Language)
 	}

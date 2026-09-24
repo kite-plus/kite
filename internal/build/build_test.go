@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -28,6 +29,7 @@ import (
 type fixture struct {
 	root    string
 	out     string
+	baseURL string
 	reader  *reader.Reader
 	types   *content.Registry
 	hooks   *hook.Bus
@@ -36,6 +38,12 @@ type fixture struct {
 }
 
 func newFixture(t *testing.T, posts int) *fixture {
+	t.Helper()
+	return newFixtureAt(t, posts, "https://example.com")
+}
+
+// newFixtureAt is a fixture site published at baseURL.
+func newFixtureAt(t *testing.T, posts int, baseURL string) *fixture {
 	t.Helper()
 	root := t.TempDir()
 
@@ -73,7 +81,7 @@ Body of post %02d.
 	}
 
 	resolver, err := kurl.New(kurl.Options{
-		BaseURL: "https://example.com", Style: kurl.StyleDirectory,
+		BaseURL: baseURL, Style: kurl.StyleDirectory,
 		PaginationPath: "page", TaxonomyRoute: "/:taxonomy", TermRoute: "/:taxonomy/:term",
 	}, types)
 	if err != nil {
@@ -91,11 +99,15 @@ Body of post %02d.
 	return &fixture{
 		root:    root,
 		out:     filepath.Join(root, "public"),
+		baseURL: baseURL,
 		reader:  reader.New(ix.DB()),
 		types:   types,
 		hooks:   bus,
 		resolve: resolver,
-		engine:  theme.NewEngine(theme.Options{Sources: []theme.Source{{Name: "default", FS: th.Layouts}}}),
+		engine: theme.NewEngine(theme.Options{
+			Sources: []theme.Source{{Name: "default", FS: th.Layouts}},
+			Links:   resolver,
+		}),
 	}
 }
 
@@ -106,7 +118,7 @@ func (f *fixture) builder(t *testing.T, emitter *build.Emitter, mutate func(*bui
 	t.Helper()
 	opts := build.Options{
 		Site: render.SiteInfo{
-			Title: "Test", BaseURL: "https://example.com", Language: "en",
+			Title: "Test", BaseURL: f.baseURL, Language: "en",
 		},
 		Reader:   f.reader,
 		Resolver: f.resolve,
@@ -512,7 +524,7 @@ func TestFailedBuildLeavesPreviousOutputIntact(t *testing.T) {
 
 	broken := theme.NewEngine(theme.Options{Sources: []theme.Source{
 		{Name: "broken", FS: os.DirFS(t.TempDir())},
-	}})
+	}, Links: f.resolve})
 	emitter, err := build.NewEmitter(f.out)
 	if err != nil {
 		t.Fatal(err)
@@ -570,6 +582,55 @@ func TestSitemapAndFeedComeFromHooks(t *testing.T) {
 		t.Error("the error page must not appear in the sitemap")
 	}
 }
+
+// A GitHub Pages project site without a domain of its own is published at
+// /<repository>/. The files go where they would for a site at the root, since
+// the host maps the path onto the published directory, and every link has to
+// carry the path.
+func TestASiteUnderAPathLinksWithinIt(t *testing.T) {
+	f := newFixtureAt(t, 5, "https://example.github.io/blog/")
+	_, files := f.run(t, f.out, nil)
+
+	for _, want := range []string{"index.html", "page/2/index.html", "posts/post-00/index.html", "tags/go/index.html", "404.html"} {
+		if !slices.Contains(files, want) {
+			t.Errorf("%s was not written; the build wrote %v", want, files)
+		}
+	}
+
+	checked := 0
+	for _, name := range files {
+		if !strings.HasSuffix(name, ".html") {
+			continue
+		}
+		for _, m := range rootRelativeLink.FindAllStringSubmatch(readFile(t, f.out, name), -1) {
+			checked++
+			if link := m[1]; link != "/blog" && !strings.HasPrefix(link, "/blog/") {
+				t.Errorf("%s links to %s, outside the site at /blog/", name, link)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no link was checked")
+	}
+
+	for _, name := range []string{"sitemap.xml", "rss.xml"} {
+		found := absoluteLink.FindAllStringSubmatch(readFile(t, f.out, name), -1)
+		if len(found) == 0 {
+			t.Errorf("%s holds no address", name)
+		}
+		for _, m := range found {
+			if !strings.HasPrefix(m[1], "https://example.github.io/blog/") {
+				t.Errorf("%s gives %s, outside the site", name, m[1])
+			}
+		}
+	}
+}
+
+// rootRelativeLink matches a link that starts at the root of its host.
+var rootRelativeLink = regexp.MustCompile(`(?:href|src)="(/(?:[^/"][^"]*)?)"`)
+
+// absoluteLink matches the addresses a sitemap or a feed gives.
+var absoluteLink = regexp.MustCompile(`<(?:loc|link)>([^<]*)</(?:loc|link)>`)
 
 // A server asks for what the completion hooks write without drawing any page,
 // and has to be given the bytes a build writes, observers included.

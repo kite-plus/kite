@@ -99,6 +99,13 @@ previewed; one that fails is shown the first line that differs in each file.
 With no directory it checks the project's own theme, or the built-in one
 outside a project.
 
+The small site is published under a path, as a GitHub Pages project site is,
+so a link written from the root of the host, such as `/rss.xml`, is reported
+as well. A template links to Kite's own pages with `url.For "home"`,
+`url.For "list" "post"`, `url.For "taxonomy" "tags"` or
+`url.For "term" "tags" "Go"`, and to any other path of the site with
+`url.Rel "rss.xml"`; both carry the path.
+
 The theme contract is not frozen yet; it freezes at M5, after a second theme
 has been written against it.
 
@@ -155,6 +162,11 @@ can change your mind about.
 site that would deploy differently on a second run fails before it is
 published. Turn Pages on under **Settings → Pages → Source → GitHub Actions**
 and a push to `main` deploys.
+
+Until it has a domain of its own, a repository's site lives at
+`https://<owner>.github.io/<repository>/`. Give that address as `baseURL`:
+every link Kite makes carries the path, and `kite serve` previews the site
+under it.
 
 A second workflow, `scheduled.yml`, publishes posts scheduled for later. A
 post dated in the future waits for its date whether its status is `scheduled`

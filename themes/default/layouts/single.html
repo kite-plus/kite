@@ -3,7 +3,7 @@
   {{- $site := .Site }}
   {{- $settings := .Site.ThemeSettings }}
   {{- with .Page }}
-  <p class="back"><a href="/">← {{ partial "t.html" (dict "k" "back" "lang" $lang) }}</a></p>
+  <p class="back"><a href="{{ url.For "home" }}">← {{ partial "t.html" (dict "k" "back" "lang" $lang) }}</a></p>
   <article>
     <header>
       <h1>{{ .Title }}</h1>

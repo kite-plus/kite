@@ -131,7 +131,12 @@ func serveCommand(shape commandShape) *cobra.Command {
 			}
 
 			url := displayURL(listenAddr)
-			printf(cmd, "\n  %s\n\n", url)
+			// A site published under a path is served under it.
+			if home := s.Resolver.ForHome(s.Config.Site.Language); home != "/" {
+				printf(cmd, "\n  %s%s\n\n", url, home)
+			} else {
+				printf(cmd, "\n  %s\n\n", url)
+			}
 			if drafts {
 				printf(cmd, "  drafts included\n")
 			}

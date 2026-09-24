@@ -167,8 +167,10 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 	return b.Emit("rss.xml", buf.Bytes())
 }
 
-// absolute joins a site-relative URL onto the base URL. A site with no base
-// URL configured still builds; its feed just carries relative links.
+// absolute makes a page's link absolute with the base URL. The link already
+// starts with the base URL's path, so resolving it against the base keeps
+// that path once. A site with no base URL configured still builds; its feed
+// just carries relative links.
 func absolute(base, rel string) string {
 	if base == "" {
 		return rel

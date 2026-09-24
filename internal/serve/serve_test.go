@@ -57,9 +57,16 @@ func main() {}
 
 func newProject(t *testing.T, posts int) string {
 	t.Helper()
+	return newProjectAt(t, posts, "https://example.com")
+}
+
+// newProjectAt is a project published at baseURL.
+func newProjectAt(t *testing.T, posts int, baseURL string) string {
+	t.Helper()
 	root := t.TempDir()
 
-	if err := os.WriteFile(filepath.Join(root, "kite.yaml"), []byte(config), 0o644); err != nil {
+	written := strings.Replace(config, "https://example.com", baseURL, 1)
+	if err := os.WriteFile(filepath.Join(root, "kite.yaml"), []byte(written), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	for i := range posts {
@@ -101,73 +108,128 @@ func openSite(t *testing.T, root string) *site.Site {
 // ways is the same bytes. If this test ever fails, a theme author can no
 // longer trust the preview, and the claim is marketing.
 func TestServedFilesAreByteIdenticalToBuiltOnes(t *testing.T) {
-	root := newProject(t, 7)
-	// A build writes the feed after the static files, over this one, and a
-	// server has to answer with the same file.
+	// A site published under a path, as a GitHub Pages project site is, is
+	// served under that path, where its host would publish each file.
+	for _, at := range []struct{ name, baseURL, prefix string }{
+		{"root", "https://example.com", ""},
+		{"path", "https://example.github.io/blog/", "/blog"},
+	} {
+		t.Run(at.name, func(t *testing.T) {
+			root := newProjectAt(t, 7, at.baseURL)
+			// A build writes the feed after the static files, over this one,
+			// and a server has to answer with the same file.
+			static := filepath.Join(root, "static")
+			if err := os.MkdirAll(static, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(static, "rss.xml"), []byte("<rss>stale</rss>\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			built := openSite(t, root)
+			outDir := filepath.Join(root, "public")
+			if _, files, err := built.Build(t.Context(), site.BuildOptions{OutDir: outDir, Now: frozen}); err != nil {
+				t.Fatalf("Build: %v", err)
+			} else if len(files) == 0 {
+				t.Fatal("build produced nothing to compare against")
+			}
+
+			srv := newServer(t, root, serve.Options{LiveReload: false})
+			handler := srv.Handler()
+
+			var checked []string
+			err := filepath.WalkDir(outDir, func(p string, d os.DirEntry, err error) error {
+				if err != nil || d.IsDir() {
+					return err
+				}
+				rel, err := filepath.Rel(outDir, p)
+				if err != nil {
+					return err
+				}
+				url := at.prefix + "/" + filepath.ToSlash(rel)
+
+				want, err := os.ReadFile(p)
+				if err != nil {
+					return err
+				}
+
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, url, nil))
+
+				// 404.html is served with its own status, everything else with 200.
+				if wantStatus := statusFor(rel); rec.Code != wantStatus {
+					t.Errorf("%s: status %d, want %d", url, rec.Code, wantStatus)
+					return nil
+				}
+				if got := rec.Body.String(); got != string(want) {
+					t.Errorf("%s differs between build and serve\n%s", url, firstDifference(string(want), got))
+					return nil
+				}
+				checked = append(checked, url)
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(checked) < 10 {
+				t.Fatalf("only %d files compared; the fixture is not exercising enough of the site", len(checked))
+			}
+			// Hooks write these after the pages, and a server once had no
+			// answer for them at all.
+			for _, name := range []string{"rss.xml", "sitemap.xml"} {
+				if url := at.prefix + "/" + name; !slices.Contains(checked, url) {
+					t.Errorf("%s was not compared", url)
+				}
+			}
+			t.Logf("compared %d files byte for byte", len(checked))
+		})
+	}
+}
+
+// A preview under the site's path shows the links the deployed site will
+// have, so one that forgot the path breaks here rather than after a push.
+func TestASiteUnderAPathIsServedUnderIt(t *testing.T) {
+	root := newProjectAt(t, 3, "https://example.github.io/blog/")
+	bundle := filepath.Join(root, "content", "posts", "post-00", "photo.png")
+	if err := os.WriteFile(bundle, []byte("not really a png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	static := filepath.Join(root, "static")
 	if err := os.MkdirAll(static, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(static, "rss.xml"), []byte("<rss>stale</rss>\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(static, "robots.txt"), []byte("User-agent: *\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	handler := newServer(t, root, serve.Options{}).Handler()
 
-	built := openSite(t, root)
-	outDir := filepath.Join(root, "public")
-	if _, files, err := built.Build(t.Context(), site.BuildOptions{OutDir: outDir, Now: frozen}); err != nil {
-		t.Fatalf("Build: %v", err)
-	} else if len(files) == 0 {
-		t.Fatal("build produced nothing to compare against")
-	}
-
-	srv := newServer(t, root, serve.Options{LiveReload: false})
-	handler := srv.Handler()
-
-	var checked []string
-	err := filepath.WalkDir(outDir, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		rel, err := filepath.Rel(outDir, p)
-		if err != nil {
-			return err
-		}
-		url := "/" + filepath.ToSlash(rel)
-
-		want, err := os.ReadFile(p)
-		if err != nil {
-			return err
-		}
-
+	get := func(url string) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		return rec
+	}
 
-		// 404.html is served with its own status, everything else with 200.
-		if wantStatus := statusFor(rel); rec.Code != wantStatus {
-			t.Errorf("%s: status %d, want %d", url, rec.Code, wantStatus)
-			return nil
-		}
-		if got := rec.Body.String(); got != string(want) {
-			t.Errorf("%s differs between build and serve\n%s", url, firstDifference(string(want), got))
-			return nil
-		}
-		checked = append(checked, url)
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	// The address the server prints leads to the site.
+	if rec := get("/"); rec.Code != http.StatusFound || rec.Header().Get("Location") != "/blog/" {
+		t.Errorf("/ answered %d to %q, want a redirect to /blog/", rec.Code, rec.Header().Get("Location"))
 	}
-	if len(checked) < 10 {
-		t.Fatalf("only %d files compared; the fixture is not exercising enough of the site", len(checked))
-	}
-	// Hooks write these after the pages, and a server once had no answer for
-	// them at all.
-	for _, url := range []string{"/rss.xml", "/sitemap.xml"} {
-		if !slices.Contains(checked, url) {
-			t.Errorf("%s was not compared", url)
+	for _, url := range []string{
+		"/blog/", "/blog", "/blog/posts/post-00/", "/blog/tags/go/",
+		"/blog/rss.xml", "/blog/sitemap.xml",
+		"/blog/posts/post-00/photo.png", "/blog/robots.txt",
+	} {
+		if rec := get(url); rec.Code != http.StatusOK {
+			t.Errorf("%s: status %d, want 200", url, rec.Code)
 		}
 	}
-	t.Logf("compared %d files byte for byte", len(checked))
+	// What the host would not publish there, the preview does not serve.
+	for _, url := range []string{
+		"/posts/post-00/", "/rss.xml", "/posts/post-00/photo.png", "/robots.txt", "/blogger/",
+	} {
+		if rec := get(url); rec.Code != http.StatusNotFound {
+			t.Errorf("%s: status %d, want 404", url, rec.Code)
+		}
+	}
 }
 
 func statusFor(rel string) int {

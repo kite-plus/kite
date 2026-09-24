@@ -13,7 +13,7 @@
         {{- $used := false }}
         {{- range $pages }}{{ if .Terms $taxonomy }}{{ $used = true }}{{ end }}{{ end }}
         {{- if $used }}
-      <a href="/{{ $taxonomy }}/">{{ partial "t.html" (dict "k" "taxonomy" "lang" $lang "x" $taxonomy) }}</a>
+      <a href="{{ url.For "taxonomy" $taxonomy }}">{{ partial "t.html" (dict "k" "taxonomy" "lang" $lang "x" $taxonomy) }}</a>
         {{- end }}
       {{- end }}
     </span>

@@ -137,7 +137,7 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 		Reader:   reader.New(ix.DB()),
 		Resolver: resolver,
 		Theme:    th,
-		Engine:   theme.NewEngine(theme.Options{Sources: sources}),
+		Engine:   theme.NewEngine(theme.Options{Sources: sources, Links: resolver}),
 		Markdown: markdown.New(markdown.Options{
 			UnsafeHTML:     cfg.Markdown.UnsafeHTML,
 			Typographer:    cfg.Markdown.Typographer,

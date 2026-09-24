@@ -43,12 +43,13 @@ func (e *extras) get(ctx context.Context) map[string][]byte {
 	return e.files
 }
 
-// serveExtra answers for a file the completion hooks write.
+// serveExtra answers for a file the completion hooks write. within is the
+// request's path inside the site.
 //
 // It is asked before the static files, because a build writes these last,
 // over any static file of the same name.
-func (s *Server) serveExtra(w http.ResponseWriter, r *http.Request) bool {
-	rel := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+func (s *Server) serveExtra(w http.ResponseWriter, r *http.Request, within string) bool {
+	rel := strings.TrimPrefix(path.Clean("/"+within), "/")
 
 	s.mu.RLock()
 	current := s.extras

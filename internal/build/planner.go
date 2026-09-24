@@ -106,17 +106,18 @@ func neighbors(all []content.Summary) (prev, next []*content.Summary) {
 
 func (b *Builder) planHome(p *Plan, all []content.Summary) {
 	posts := filterKind(all, "post")
-	b.paginate(p, render.KindHome, "/", "post", "", "", posts)
+	b.paginate(p, render.KindHome, b.opts.Resolver.ForHome(b.opts.Site.Language), "post", "", "", posts)
 }
 
 func (b *Builder) planLists(p *Plan, all []content.Summary) {
+	home := b.opts.Resolver.ForHome(b.opts.Site.Language)
 	for _, t := range b.opts.Types.Types() {
 		items := filterKind(all, t.Kind)
 		if len(items) == 0 {
 			continue
 		}
 		base := b.opts.Resolver.ForList(t.Kind, b.opts.Site.Language)
-		if base == "/" {
+		if base == home {
 			continue // the home page already covers this listing
 		}
 		b.paginate(p, render.KindList, base, string(t.Kind), "", displayName(t.Dir), items)
@@ -172,7 +173,7 @@ func (b *Builder) planNotFound(p *Plan) {
 	}
 	p.Targets = append(p.Targets, Target{
 		Kind:  render.KindNotFound,
-		URL:   "/404",
+		URL:   b.opts.Resolver.Rel("404"),
 		Path:  "404.html",
 		Title: "Not found",
 	})

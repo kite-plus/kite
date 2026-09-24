@@ -422,6 +422,14 @@ url.Abs  url.Rel  url.JoinPath  url.Query  url.Anchorize  url.Parse
 
 > **主题里禁止手工拼接站内链接。** Static 模式（目录索引 / `.html` 后缀）与 Dynamic 模式（路由）的 URL 形态不同，只有 `url.For` / `.Permalink` 能保证两边一致。这是 [§9 跨 Runtime 一致性](#9-跨-runtime-一致性)的第一道防线。
 
+已实现的三个的语义：
+
+- `url.For "home"`、`url.For "list" KIND`、`url.For "taxonomy" NAME`、`url.For "term" NAME TERM`：Kite 规划出的页面的链接，按站点配置的路由、URL 风格和 `baseURL` 的路径生成。名字或参数个数不对时模板报错。
+- `url.Rel PATH`：站点里任意路径的链接，如 `"rss.xml"`，或作者在主题设置里填的 `/about/`，前面加上 `baseURL` 的路径。开头有没有 `/` 都一样，这一点和 Hugo 的 `relURL` 不同：交给 Kite 的路径一律是站内路径。完整网址、`//` 开头的地址、只有 `#` 或 `?` 的引用原样返回。
+- `url.Abs PATH`：`url.Rel` 的结果再用 `baseURL` 补成绝对地址。
+
+> 站点部署在子路径下时（GitHub Pages 的项目站点 `user.github.io/repo/`），`.RelPermalink`、分页、term 链接和上面三个函数给出的链接都以这段路径开头，输出文件的位置不变。`kite theme verify` 的夹具站点就发布在子路径下，并报告从域名根开始写的链接。
+
 **`img.*`** —— 图片处理
 
 ```

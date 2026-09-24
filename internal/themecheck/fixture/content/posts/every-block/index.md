@@ -13,7 +13,7 @@ An opening paragraph with **strong**, *emphasis*, `code` and [a link](https://ex
 ## A second level heading
 
 - a list item
-- another, with [a link to another post](/posts/no-terms/)
+- another, with [a link to another post](../no-terms/)
 
 1. first
 2. second

@@ -20,14 +20,14 @@ import (
 //
 // Only the handful of helpers that the template language itself needs are
 // registered at the top level.
-func baseFuncs() template.FuncMap {
+func baseFuncs(links Links) template.FuncMap {
 	return template.FuncMap{
 		// Namespaces.
 		"str":         func() strNS { return strNS{} },
 		"collections": func() collNS { return collNS{} },
 		"coll":        func() collNS { return collNS{} },
 		"time":        func() timeNS { return timeNS{} },
-		"url":         func() urlNS { return urlNS{} },
+		"url":         func() urlNS { return urlNS{links: links} },
 		"math":        func() mathNS { return mathNS{} },
 
 		// Top level, because the template language cannot express them any
@@ -220,9 +220,49 @@ func (timeNS) Parse(layout, value string) (time.Time, error) {
 	return time.Parse(layout, value)
 }
 
-// urlNS holds link helpers. Themes must not assemble paths themselves; these
-// exist for the few cases a resolver cannot cover.
-type urlNS struct{}
+// Links is what the url namespace asks of the site it renders, which is its
+// URL resolver.
+type Links interface {
+	// Named is the URL of a page Kite plans: "home", "list" and a content
+	// kind, "taxonomy" and a taxonomy, or "term", a taxonomy and a term.
+	Named(name string, args ...string) (string, error)
+	// Rel is the link to a path within the site, such as "rss.xml".
+	Rel(path string) string
+	// Absolute makes a link absolute with the site's base URL.
+	Absolute(link string) string
+}
+
+// urlNS holds link helpers. Themes must not assemble paths themselves: For
+// and Rel ask the site's resolver, which knows the routes and the base path
+// of a site published under a directory of its host.
+type urlNS struct{ links Links }
+
+// For links to a page Kite plans, by name: {{ url.For "home" }},
+// {{ url.For "list" "post" }}, {{ url.For "taxonomy" "tags" }} or
+// {{ url.For "term" "tags" "Go" }}.
+func (n urlNS) For(name string, args ...string) (string, error) {
+	if n.links == nil {
+		return "", fmt.Errorf("url.For: there is no site to link within")
+	}
+	return n.links.Named(name, args...)
+}
+
+// Rel links to a path within the site, such as "rss.xml" or a path an author
+// wrote in the theme settings. A full URL is left as it is.
+func (n urlNS) Rel(p string) string {
+	if n.links == nil {
+		return p
+	}
+	return n.links.Rel(p)
+}
+
+// Abs is [urlNS.Rel] made absolute with the site's base URL.
+func (n urlNS) Abs(p string) string {
+	if n.links == nil {
+		return p
+	}
+	return n.links.Absolute(n.links.Rel(p))
+}
 
 func (urlNS) Escape(s string) string { return url.PathEscape(s) }
 func (urlNS) Query(s string) string  { return url.QueryEscape(s) }

@@ -5,6 +5,12 @@
 // concatenating strings. Every permalink, pagination link and taxonomy link in
 // Kite comes from this one resolver, and themes are forbidden from assembling
 // paths themselves.
+//
+// A link starts with the path of the base URL, so a site published at
+// https://example.github.io/blog/ links its posts as /blog/posts/hello/. A
+// GitHub Pages project site without a domain of its own lives at such a path.
+// Where a file is written does not depend on it: the host maps the path onto
+// the published directory.
 package url
 
 import (
@@ -69,6 +75,10 @@ type Resolver struct {
 	opts  Options
 	types *content.Registry
 	base  *url.URL
+
+	// prefix is the base URL's path without its trailing slash, empty for a
+	// site at the root of its host.
+	prefix string
 }
 
 // New returns a resolver. An unparsable base URL is an error rather than a
@@ -88,11 +98,17 @@ func New(opts Options, types *content.Registry) (*Resolver, error) {
 			return nil, fmt.Errorf("url: invalid baseURL %q: %w", opts.BaseURL, err)
 		}
 		r.base = u
+		r.prefix = strings.TrimRight(u.Path, "/")
 	}
 	return r, nil
 }
 
-// For returns the site-relative URL of an item.
+// ForHome returns the URL of the home page.
+func (r *Resolver) ForHome(locale string) string {
+	return r.finish(locale, "/")
+}
+
+// For returns the URL of an item.
 func (r *Resolver) For(item *content.Content) string {
 	t := r.types.Get(item.Kind)
 	if t == nil {
@@ -153,7 +169,8 @@ func (r *Resolver) ForPage(base string, n int) string {
 	return r.decorate(trimmed + "/" + r.opts.PaginationPath + "/" + strconv.Itoa(n))
 }
 
-// Absolute turns a site-relative URL into an absolute one.
+// Absolute turns a link, as the other methods return it, into an absolute
+// URL.
 func (r *Resolver) Absolute(rel string) string {
 	if r.base == nil {
 		return rel
@@ -165,10 +182,69 @@ func (r *Resolver) Absolute(rel string) string {
 	return r.base.ResolveReference(ref).String()
 }
 
-// OutputPath returns the file a site-relative URL is written to during a
-// static build. It is the inverse of the URL style, which is why both live
-// here: a build that guessed this separately would drift from the links.
+// Rel returns the link to a path within the site, such as "rss.xml" or
+// "/about/", with or without its leading slash. A full URL, a
+// protocol-relative one, a fragment or a query is returned as it is.
+//
+// Unlike Hugo's relURL, a leading slash does not step out of the base path:
+// a path given to Kite is always one of the site's own.
+func (r *Resolver) Rel(p string) string {
+	if external(p) {
+		return p
+	}
+	return r.prefix + "/" + strings.TrimLeft(p, "/")
+}
+
+// Named returns the URL of one of the pages Kite plans, by name: "home",
+// "list" and a content kind, "taxonomy" and a taxonomy, or "term", a taxonomy
+// and a term. It is how a theme links to them without knowing the routes.
+func (r *Resolver) Named(name string, args ...string) (string, error) {
+	n, known := namedArgs[name]
+	switch {
+	case !known:
+		return "", fmt.Errorf("url: no page is named %q; want home, list, taxonomy or term", name)
+	case len(args) != n:
+		return "", fmt.Errorf("url: %q takes %d argument(s), got %d", name, n, len(args))
+	}
+
+	locale := r.opts.DefaultLocale
+	switch name {
+	case "list":
+		return r.ForList(content.Kind(args[0]), locale), nil
+	case "taxonomy":
+		return r.ForTaxonomy(args[0], locale), nil
+	case "term":
+		return r.ForTerm(args[0], args[1], locale), nil
+	default:
+		return r.ForHome(locale), nil
+	}
+}
+
+// namedArgs is how many arguments each page [Resolver.Named] knows takes.
+var namedArgs = map[string]int{"home": 0, "list": 1, "taxonomy": 1, "term": 2}
+
+// SitePath removes the base path from a link or the path of a request, giving
+// the path within the site. It reports false for a path outside the site.
+func (r *Resolver) SitePath(p string) (string, bool) {
+	if r.prefix == "" {
+		return p, true
+	}
+	if p == r.prefix {
+		return "/", true
+	}
+	if rest, ok := strings.CutPrefix(p, r.prefix+"/"); ok {
+		return "/" + rest, true
+	}
+	return "", false
+}
+
+// OutputPath returns the file a link is written to during a static build. It
+// is the inverse of the URL style, which is why both live here: a build that
+// guessed this separately would drift from the links.
 func (r *Resolver) OutputPath(rel string) string {
+	if within, ok := r.SitePath(rel); ok {
+		rel = within
+	}
 	trimmed := strings.Trim(rel, "/")
 	if trimmed == "" {
 		return "index.html"
@@ -182,12 +258,24 @@ func (r *Resolver) OutputPath(rel string) string {
 	return trimmed + "/index.html"
 }
 
-// finish applies the locale prefix and the URL style.
+// finish applies the locale prefix, the URL style and the base path.
 func (r *Resolver) finish(locale, path string) string {
 	if r.opts.LocalePrefix && locale != "" && locale != r.opts.DefaultLocale {
 		path = "/" + locale + path
 	}
-	return r.decorate(path)
+	// The base path goes on last: under the extension style the home page is
+	// /blog/, not /blog.html.
+	return r.prefix + r.decorate(path)
+}
+
+// external reports whether a reference leaves the site's paths: it names a
+// scheme or a host, or only a fragment or a query of the current page.
+func external(p string) bool {
+	if strings.HasPrefix(p, "#") || strings.HasPrefix(p, "?") || strings.HasPrefix(p, "//") {
+		return true
+	}
+	u, err := url.Parse(p)
+	return err != nil || u.Scheme != ""
 }
 
 func (r *Resolver) decorate(path string) string {

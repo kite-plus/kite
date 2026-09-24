@@ -3,17 +3,18 @@
 {{- with .Page }}{{ $kind = printf "%s" .Kind }}{{ $type = .Type }}{{ $here = .RelPermalink }}{{ end -}}
 <header class="site">
   <div class="masthead">
-    <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>{{ .Site.Title }}</a>
+    <a class="brand" href="{{ url.For "home" }}"><span class="mark" aria-hidden="true"></span>{{ .Site.Title }}</a>
     {{ with .Site.Description }}<span class="tagline">{{ . }}</span>{{ end }}
     <nav>
-      <a href="/"{{ if eq $kind "home" }} aria-current="page"{{ end }}>{{ partial "t.html" (dict "k" "home" "lang" $lang) }}</a>
-      <a href="/posts/"{{ if and (eq $kind "list") (eq $type "post") }} aria-current="page"{{ end }}>{{ partial "t.html" (dict "k" "archive" "lang" $lang) }}</a>
-      {{- /* Extra links are one "Label | /path/" per line. */ -}}
+      <a href="{{ url.For "home" }}"{{ if eq $kind "home" }} aria-current="page"{{ end }}>{{ partial "t.html" (dict "k" "home" "lang" $lang) }}</a>
+      <a href="{{ url.For "list" "post" }}"{{ if and (eq $kind "list") (eq $type "post") }} aria-current="page"{{ end }}>{{ partial "t.html" (dict "k" "archive" "lang" $lang) }}</a>
+      {{- /* Extra links are one "Label | /path/" per line; a path is within
+             the site, under its base path. */ -}}
       {{- with .Site.ThemeSettings.nav }}
       {{- range str.Split "\n" (printf "%v" .) }}
       {{- $parts := str.Split "|" . }}
       {{- if eq (len $parts) 2 }}
-      {{- $url := str.Trim (index $parts 1) }}
+      {{- $url := url.Rel (str.Trim (index $parts 1)) }}
       <a href="{{ $url }}"{{ if eq $url $here }} aria-current="page"{{ end }}>{{ str.Trim (index $parts 0) }}</a>
       {{- end }}
       {{- end }}
