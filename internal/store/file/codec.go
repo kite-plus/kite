@@ -192,7 +192,17 @@ func (c *Codec) Encode(t *content.Type, item *content.Content, existing []byte) 
 	}
 
 	for _, key := range slices.Sorted(maps.Keys(item.Meta)) {
-		if err := doc.Set(key, item.Meta[key]); err != nil {
+		value := item.Meta[key]
+		// A field the admin cleared arrives as null and takes its key out of
+		// the file. A null the file already spells out is left as written, so
+		// saving an unrelated edit does not touch that line.
+		if value == nil {
+			if old, ok := doc.Get(key); ok && old != nil {
+				doc.Delete(key)
+			}
+			continue
+		}
+		if err := doc.Set(key, value); err != nil {
 			return nil, err
 		}
 	}

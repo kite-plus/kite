@@ -246,3 +246,79 @@ func TestReservedDirectories(t *testing.T) {
 		}
 	}
 }
+
+// A theme offers layouts by name, and each has to be a template's file name
+// with a template behind it for every type it is offered to: the admin lists
+// them, and a layout that quietly fell back would be a broken promise.
+func TestLayoutsAreNamesWithTemplatesBehindThem(t *testing.T) {
+	manifest := func(layouts string) string {
+		return "name: x\nversion: 1.0.0\napiVersion: kite/v1\nlayouts:\n" + layouts
+	}
+	for _, tc := range []struct {
+		name    string
+		fsys    fstest.MapFS
+		refused string // part of the error, or empty when the theme loads
+	}{
+		{
+			name: "offered to pages, drawn from the page directory",
+			fsys: fstest.MapFS{
+				"theme.yaml":              file(manifest("  - {name: links, label: Links, types: [page]}\n")),
+				"layouts/single.html":     file("x"),
+				"layouts/page/links.html": file("x"),
+			},
+		},
+		{
+			name: "offered to every type, drawn from the top",
+			fsys: fstest.MapFS{
+				"theme.yaml":          file(manifest("  - {name: plain}\n")),
+				"layouts/single.html": file("x"),
+				"layouts/plain.html":  file("x"),
+			},
+		},
+		{
+			name: "offered to pages with no template",
+			fsys: fstest.MapFS{
+				"theme.yaml":          file(manifest("  - {name: links, types: [page]}\n")),
+				"layouts/single.html": file("x"),
+			},
+			refused: "page/links.html",
+		},
+		{
+			name: "offered to every type but drawn for pages only",
+			fsys: fstest.MapFS{
+				"theme.yaml":              file(manifest("  - {name: links}\n")),
+				"layouts/single.html":     file("x"),
+				"layouts/page/links.html": file("x"),
+			},
+			refused: "every type",
+		},
+		{
+			name: "a name that is a path",
+			fsys: fstest.MapFS{
+				"theme.yaml":          file(manifest("  - {name: ../single}\n")),
+				"layouts/single.html": file("x"),
+			},
+			refused: "../single",
+		},
+		{
+			name: "one name declared twice",
+			fsys: fstest.MapFS{
+				"theme.yaml":         file(manifest("  - {name: plain}\n  - {name: plain}\n")),
+				"layouts/plain.html": file("x"),
+			},
+			refused: "twice",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := theme.Load(tc.fsys)
+			switch {
+			case tc.refused == "" && err != nil:
+				t.Fatalf("refused: %v", err)
+			case tc.refused != "" && err == nil:
+				t.Fatalf("loaded, want a refusal naming %q", tc.refused)
+			case tc.refused != "" && !strings.Contains(err.Error(), tc.refused):
+				t.Errorf("the refusal does not name %q: %v", tc.refused, err)
+			}
+		})
+	}
+}

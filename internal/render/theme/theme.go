@@ -10,6 +10,8 @@ package theme
 import (
 	"fmt"
 	"io/fs"
+	"regexp"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -38,6 +40,32 @@ type Author struct {
 	URL  string `yaml:"url,omitempty"`
 }
 
+// Layout is a template a theme offers items to choose by name, as front
+// matter writes it: layout: links. It is looked up like any other page
+// template, as layouts/<type>/<name>.html and then layouts/<name>.html, and
+// is declared so the admin can list it rather than leave it to be guessed.
+type Layout struct {
+	Name  string `yaml:"name"`
+	Label string `yaml:"label,omitempty"`
+	// Description says what the layout is for.
+	Description string `yaml:"description,omitempty"`
+	// Types limits the layout to some content types; left empty it is
+	// offered to every type.
+	Types []string `yaml:"types,omitempty"`
+}
+
+// ForType reports whether the layout is offered to items of a type.
+func (l Layout) ForType(kind string) bool {
+	return len(l.Types) == 0 || slices.Contains(l.Types, kind)
+}
+
+var layoutName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+
+// ValidLayoutName reports whether a name can stand for a layout. It is a
+// template's file name, never a path, so front matter cannot point a page at
+// a template outside the layouts it is meant to choose from.
+func ValidLayoutName(name string) bool { return layoutName.MatchString(name) }
+
 // Manifest is the parsed theme.yaml.
 type Manifest struct {
 	Name       string `yaml:"name"`
@@ -61,6 +89,9 @@ type Manifest struct {
 	// Settings drives the theme configuration form in the admin, so that a
 	// theme author never writes admin code.
 	Settings schema.Schema `yaml:"settings,omitempty"`
+
+	// Layouts are the templates an item may choose besides its type's own.
+	Layouts []Layout `yaml:"layouts,omitempty"`
 }
 
 // Validate checks a manifest.
@@ -81,6 +112,17 @@ func (m *Manifest) Validate() error {
 	}
 	if err := m.Settings.Validate(); err != nil {
 		return fmt.Errorf("theme %s: %w", m.Name, err)
+	}
+	seen := make(map[string]bool, len(m.Layouts))
+	for _, l := range m.Layouts {
+		if !ValidLayoutName(l.Name) {
+			return fmt.Errorf("theme %s: layout name %q must be lowercase letters, digits, - or _",
+				m.Name, l.Name)
+		}
+		if seen[l.Name] {
+			return fmt.Errorf("theme %s: layout %q is declared twice", m.Name, l.Name)
+		}
+		seen[l.Name] = true
 	}
 	return nil
 }
@@ -140,6 +182,9 @@ func Load(fsys fs.FS) (*Theme, error) {
 	if err != nil {
 		return nil, fmt.Errorf("theme %s: %s directory is missing: %w", m.Name, LayoutsDir, err)
 	}
+	if err := checkLayouts(&m, layouts); err != nil {
+		return nil, err
+	}
 
 	t := &Theme{Manifest: m, Layouts: layouts}
 	if sub, err := fs.Sub(fsys, "assets"); err == nil {
@@ -149,4 +194,33 @@ func Load(fsys fs.FS) (*Theme, error) {
 		t.Static = sub
 	}
 	return t, nil
+}
+
+// checkLayouts makes sure every layout a theme offers has a template it can
+// be drawn with: in the directory of each type it is offered to, or at the
+// top of layouts/ where every type finds it. A layout offered without one
+// would quietly fall back to the type's own template, which is a promise the
+// admin would be making on the theme's behalf and breaking.
+func checkLayouts(m *Manifest, layouts fs.FS) error {
+	exists := func(name string) bool {
+		_, err := fs.Stat(layouts, name)
+		return err == nil
+	}
+	for _, l := range m.Layouts {
+		top := exists(l.Name + ".html")
+		if len(l.Types) == 0 {
+			if !top {
+				return fmt.Errorf("theme %s offers layout %q to every type but has no %s/%s.html",
+					m.Name, l.Name, LayoutsDir, l.Name)
+			}
+			continue
+		}
+		for _, kind := range l.Types {
+			if !top && !exists(kind+"/"+l.Name+".html") {
+				return fmt.Errorf("theme %s offers layout %q to %s but has no %s/%s/%s.html or %s/%s.html",
+					m.Name, l.Name, kind, LayoutsDir, kind, l.Name, LayoutsDir, l.Name)
+			}
+		}
+	}
+	return nil
 }

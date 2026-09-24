@@ -6,6 +6,7 @@ import (
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/publish"
+	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/render/url"
 	"github.com/kite-plus/kite/internal/schema"
 )
@@ -27,6 +28,8 @@ type View struct {
 	// form out of the first without writing any admin code.
 	ThemeSchema schema.Schema
 	ThemeValues map[string]any
+	// ThemeLayouts are the templates the theme offers items to choose.
+	ThemeLayouts []theme.Layout
 
 	// Writer is nil when this deployment may not be written to, which is the
 	// difference between a preview an author is typing into and a read-only

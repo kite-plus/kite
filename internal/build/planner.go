@@ -69,16 +69,29 @@ func (b *Builder) planSingles(ctx context.Context, p *Plan, all []content.Summar
 	for i, item := range items {
 		link := b.opts.Resolver.For(item)
 		p.Targets = append(p.Targets, Target{
-			Kind: render.KindSingle,
-			URL:  link,
-			Path: b.opts.Resolver.OutputPath(link),
-			Item: item,
-			Prev: prev[i],
-			Next: next[i],
-			Type: string(item.Kind),
+			Kind:   render.KindSingle,
+			URL:    link,
+			Path:   b.opts.Resolver.OutputPath(link),
+			Item:   item,
+			Prev:   prev[i],
+			Next:   next[i],
+			Type:   string(item.Kind),
+			Layout: LayoutOf(item),
 		})
 	}
 	return nil
+}
+
+// LayoutOf is the layout an item asks for in its front matter, as in Hugo:
+// layout: links. A value that could not be a template's name is ignored, and
+// the item is drawn with its type's own template, as it is when the layout it
+// names has no template.
+func LayoutOf(item *content.Content) string {
+	name, _ := item.Meta["layout"].(string)
+	if !theme.ValidLayoutName(name) {
+		return ""
+	}
+	return name
 }
 
 // neighbors finds, for every item, the one published before it and the one

@@ -500,6 +500,15 @@ templates:
   - term
   - 404
 
+# ── 可选布局：作者按页面选用，front matter 写 layout: links ──
+# 查找顺序同 §5：layouts/page/links.html，再 layouts/links.html。
+# 声明了却没有模板文件的布局在加载主题时即报错；后台据此列出“模板”下拉框。
+layouts:
+  - name: links                     # 只能是文件名：小写字母、数字、- 与 _
+    label: Links
+    description: A list of links drawn as cards.
+    types: [page]                   # 缺省即对所有内容类型提供
+
 # ── 设置 schema → Admin 自动生成配置页 ──
 settings:
   - key: primary_color

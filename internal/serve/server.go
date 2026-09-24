@@ -289,8 +289,9 @@ func (s *Server) view() api.View {
 		ConfigRevision: content.Revision("sha256:" + configHash),
 		Problems:       problems,
 
-		ThemeSchema: current.Theme.Manifest.Settings,
-		ThemeValues: current.ThemeSettings(),
+		ThemeSchema:  current.Theme.Manifest.Settings,
+		ThemeValues:  current.ThemeSettings(),
+		ThemeLayouts: current.Theme.Manifest.Layouts,
 	}
 	if s.opts.Write {
 		v.Writer = current.Project.Writer()
@@ -312,10 +313,11 @@ func (s *Server) preview(ctx context.Context, item *content.Content) ([]byte, er
 	s.mu.RUnlock()
 
 	target := build.Target{
-		Kind: render.KindSingle,
-		Type: string(item.Kind),
-		URL:  current.Resolver.For(item),
-		Item: item,
+		Kind:   render.KindSingle,
+		Type:   string(item.Kind),
+		URL:    current.Resolver.For(item),
+		Item:   item,
+		Layout: build.LayoutOf(item),
 	}
 	// A saved item keeps the neighbors the plan gave it. They come from where
 	// it sits among the others, which editing its text does not move; a draft

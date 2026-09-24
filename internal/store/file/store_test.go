@@ -175,6 +175,54 @@ Body stays put.
 	}
 }
 
+// A field cleared in the admin arrives as null and leaves the file, which is
+// how a page goes back to its type's own template. A null the file already
+// spells out is someone's writing, and an unrelated edit leaves it alone.
+func TestANullFieldLeavesTheFileButAWrittenNullStays(t *testing.T) {
+	root, types, w := newTestProject(t)
+
+	const src = `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZABD
+title: Friends
+slug: friends
+status: published
+created_at: 2026-01-01T00:00:00Z
+updated_at: 2026-01-01T00:00:00Z
+layout: links
+subtitle: null
+---
+
+Links.
+`
+	writeFile(t, root, "content/pages/friends.md", src)
+
+	scan, err := NewScanner(root, types).Scan()
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	item := scan.Entries[0].Item
+	item.Meta["layout"] = nil
+
+	if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{
+		content.PutContent{Content: item, IfRevision: item.Revision},
+	}}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+
+	got := readFile(t, root, "content/pages/friends.md")
+	if strings.Contains(got, "layout") {
+		t.Errorf("the cleared layout is still in the file:\n%s", got)
+	}
+	if !strings.Contains(got, "subtitle: null") {
+		t.Errorf("the null the file spelled out was rewritten:\n%s", got)
+	}
+	for _, line := range diffLines(src, got) {
+		if !strings.Contains(line, "layout:") && !strings.Contains(line, "updated_at:") {
+			t.Errorf("unexpected line changed: %q", line)
+		}
+	}
+}
+
 func TestRevisionConflict(t *testing.T) {
 	root, types, w := newTestProject(t)
 	writeFile(t, root, "content/posts/a/index.md", "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZABC\ntitle: A\nslug: a\n---\nbody\n")

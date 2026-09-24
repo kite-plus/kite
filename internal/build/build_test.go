@@ -823,3 +823,41 @@ func TestBundlesWithTheirOwnDirectoriesDoNotCollide(t *testing.T) {
 		t.Errorf("files = %v, want %v", files, want)
 	}
 }
+
+// A page is drawn with the layout its front matter names, as Hugo writes it.
+// A page that names none, or names something that could not be a template's
+// file name, keeps its type's own template.
+func TestAPageIsDrawnWithTheLayoutItNames(t *testing.T) {
+	f := newFixture(t, 1)
+
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	site := fstest.MapFS{
+		"page/links.html": {Data: []byte(`{{ define "main" }}<ul class="drawn-as-links">{{ .Page.Title }}</ul>{{ end }}`)},
+	}
+	f.engine = theme.NewEngine(theme.Options{
+		Sources: []theme.Source{{Name: "site", FS: site}, {Name: "default", FS: th.Layouts}},
+		Links:   f.resolve,
+	})
+
+	page := func(id, slug, layout string) string {
+		return fmt.Sprintf("---\nid: %s\ntitle: %s\nslug: %s\nstatus: published\n"+
+			"published_at: 2026-01-10T00:00:00Z\n%s---\n\nBody.\n", id, slug, slug, layout)
+	}
+	f.add(t, "content/pages/friends.md", page("01J8KQ2P3R4S5T6V7W8X9YZ901", "friends", "layout: links\n"))
+	f.add(t, "content/pages/about.md", page("01J8KQ2P3R4S5T6V7W8X9YZ902", "about", ""))
+	f.add(t, "content/pages/escape.md", page("01J8KQ2P3R4S5T6V7W8X9YZ903", "escape", "layout: ../page/links\n"))
+
+	f.run(t, f.out, nil)
+
+	if !strings.Contains(readFile(t, f.out, "friends/index.html"), `class="drawn-as-links"`) {
+		t.Error("a page naming layout links was not drawn with page/links.html")
+	}
+	for _, file := range []string{"about/index.html", "escape/index.html"} {
+		if strings.Contains(readFile(t, f.out, file), "drawn-as-links") {
+			t.Errorf("%s was drawn with a layout it did not validly name", file)
+		}
+	}
+}

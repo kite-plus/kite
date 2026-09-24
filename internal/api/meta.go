@@ -40,11 +40,14 @@ func (s *Server) handleSite(w http.ResponseWriter, r *http.Request) {
 // The admin generates its forms from this rather than knowing about posts and
 // pages, which is what makes opening custom types later additive.
 func (s *Server) handleContentTypes(w http.ResponseWriter, r *http.Request) {
-	types := s.src().Types.Types()
+	view := s.src()
+	types := view.Types.Types()
 
 	out := make([]ContentType, 0, len(types))
 	for _, t := range types {
-		out = append(out, contentTypeOf(t))
+		ct := contentTypeOf(t)
+		ct.Layouts = layoutsFor(view.ThemeLayouts, string(t.Kind))
+		out = append(out, ct)
 	}
 	writeJSON(w, http.StatusOK, List[ContentType]{Items: out})
 }

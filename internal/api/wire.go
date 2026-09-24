@@ -5,6 +5,7 @@ import (
 
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/publish"
+	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/render/url"
 	"github.com/kite-plus/kite/internal/schema"
 )
@@ -90,6 +91,33 @@ type ContentType struct {
 	Taxonomies []string      `json:"taxonomies,omitempty"`
 	Sortable   []string      `json:"sortable,omitempty"`
 	Fields     schema.Schema `json:"fields,omitempty"`
+	// Layouts are the templates the active theme offers items of this type,
+	// chosen by name in an item's meta as layout. Layout above is unrelated:
+	// it says how the items are stored.
+	Layouts []LayoutOption `json:"layouts,omitempty"`
+}
+
+// LayoutOption is one template an item may choose.
+type LayoutOption struct {
+	Name        string `json:"name"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
+}
+
+// layoutsFor lists the layouts a theme offers items of one kind.
+func layoutsFor(layouts []theme.Layout, kind string) []LayoutOption {
+	var out []LayoutOption
+	for _, l := range layouts {
+		if !l.ForType(kind) {
+			continue
+		}
+		label := l.Label
+		if label == "" {
+			label = l.Name
+		}
+		out = append(out, LayoutOption{Name: l.Name, Label: label, Description: l.Description})
+	}
+	return out
 }
 
 // SiteInfo describes the project the server has open.

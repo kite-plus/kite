@@ -86,6 +86,22 @@ Templates live under `layouts/` in a theme and in a site alike, and the same
 relative path in the site wins, so a single template can be replaced without
 forking the theme.
 
+A theme can also offer templates for an author to choose page by page, such
+as a page of links, by declaring them in `theme.yaml`:
+
+```yaml
+layouts:
+  - name: links
+    label: Links
+    description: A list of links drawn as cards.
+    types: [page]        # left out, every type is offered it
+```
+
+An item chooses one in its front matter, as Hugo writes it: `layout: links`.
+It is then drawn with `layouts/page/links.html`, or `layouts/links.html`. A
+theme cannot declare a layout it has no template for, and a page naming a
+layout the active theme lacks keeps its type's own template.
+
 A theme can be checked against the contract it is written to:
 
 ```bash

@@ -342,6 +342,7 @@ export interface components {
             kind: string;
             label: string;
             layout: string;
+            layouts?: components["schemas"]["LayoutOption"][];
             route: string;
             sortable?: string[];
             taxonomies?: string[];
@@ -443,6 +444,11 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             url: string;
+        };
+        LayoutOption: {
+            description?: string;
+            label: string;
+            name: string;
         };
         Media: {
             link: string;

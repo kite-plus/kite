@@ -74,6 +74,20 @@ Kite 自带一套主题，编译进二进制：为个人写作准备的安静衬
 声明，而不是一个文档问题。主题和站点的模板都放在 `layouts/` 下，同名相对路径以
 站点的为准，所以替换单个模板不需要 fork 整套主题。
 
+主题还可以提供让作者按页面选用的模板，比如友链页，在 `theme.yaml` 里声明：
+
+```yaml
+layouts:
+  - name: links
+    label: Links
+    description: 把一组链接排成卡片。
+    types: [page]        # 不写则所有类型都可以选
+```
+
+内容在 front matter 里用 `layout: links` 选用，和 Hugo 的写法一样。页面随后用
+`layouts/page/links.html` 渲染，没有的话用 `layouts/links.html`。主题不能声明
+没有模板文件的布局；页面选了当前主题没有的模板时，退回它所属类型的默认模板。
+
 主题可以对照它所依据的契约检查：
 
 ```bash

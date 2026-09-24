@@ -7,10 +7,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/kite-plus/kite/internal/api"
+	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/site"
 )
 
@@ -376,6 +378,37 @@ func TestContentTypesCarryTheFieldSchemaFormsAreBuiltFrom(t *testing.T) {
 	}
 	if post.Route == "" || post.Layout == "" {
 		t.Errorf("route = %q, layout = %q, want both", post.Route, post.Layout)
+	}
+}
+
+// Each content type carries the layouts the theme offers it, which is what
+// the admin lists when an author picks a page's template.
+func TestContentTypesOfferTheLayoutsTheThemeMadeForThem(t *testing.T) {
+	h, _ := newServer(t, newProject(t, 1), func(o *api.Options) {
+		plain := o.Site
+		o.Site = func() api.View {
+			v := plain()
+			v.ThemeLayouts = []theme.Layout{
+				{Name: "links", Label: "Links", Types: []string{"page"}},
+				{Name: "plain"},
+			}
+			return v
+		}
+	})
+
+	offered := map[string][]api.LayoutOption{}
+	for _, ct := range get[api.List[api.ContentType]](t, h, api.Prefix+"/content-types", http.StatusOK).Items {
+		offered[ct.Kind] = ct.Layouts
+	}
+
+	want := map[string][]api.LayoutOption{
+		"page": {{Name: "links", Label: "Links"}, {Name: "plain", Label: "plain"}},
+		"post": {{Name: "plain", Label: "plain"}},
+	}
+	for kind, layouts := range want {
+		if !slices.Equal(offered[kind], layouts) {
+			t.Errorf("%s is offered %v, want %v", kind, offered[kind], layouts)
+		}
 	}
 }
 
