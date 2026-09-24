@@ -1,34 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
+import { useBlocker } from "@tanstack/react-router";
 
-import { setGuard } from "@/lib/router";
-
+/**
+ * useUnsavedGuard holds a navigation back while there is work that would be
+ * lost, and asks first. Leaving the page altogether gets the browser's own
+ * question, which is the only one a page may ask then.
+ */
 export function useUnsavedGuard(dirty: boolean) {
-  const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
-  const [leaving, setLeaving] = useState<(() => void) | null>(null);
+  // One navigation the page makes itself, such as a new item moving to its
+  // own address after its first save, goes through without asking.
+  const passing = useRef(false);
 
-  useEffect(() => {
-    setGuard({
-      blocked: () => dirtyRef.current,
-      ask: (proceed) => setLeaving(() => proceed),
-    });
-    const warn = (event: BeforeUnloadEvent) => {
-      if (dirtyRef.current) event.preventDefault();
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => {
-      setGuard(null);
-      window.removeEventListener("beforeunload", warn);
-    };
-  }, []);
+  const blocker = useBlocker({
+    shouldBlockFn: () => {
+      if (passing.current) {
+        passing.current = false;
+        return false;
+      }
+      return dirty;
+    },
+    enableBeforeUnload: () => dirty,
+    withResolver: true,
+  });
 
   return {
-    leaving: leaving !== null,
-    cancel: () => setLeaving(null),
-    discard: () => {
-      dirtyRef.current = false;
-      leaving?.();
-      setLeaving(null);
+    leaving: blocker.status === "blocked",
+    cancel: () => blocker.reset?.(),
+    discard: () => blocker.proceed?.(),
+    pass: () => {
+      passing.current = true;
     },
   };
 }

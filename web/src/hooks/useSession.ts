@@ -9,6 +9,20 @@ export type Credentials = components["schemas"]["Credentials"];
 const key = ["session"];
 
 /**
+ * sessionQuery is the one question about the session, shared by the hook
+ * and by the routes that check it before a screen is drawn.
+ */
+export const sessionQuery = {
+  queryKey: key,
+  queryFn: async () => unwrap(await api.GET("/auth/session", {})),
+  // Asked for once per page load and then only when something says
+  // otherwise: the answer changes on sign-in, sign-out and a refusal, and
+  // all three already write it here.
+  staleTime: Infinity,
+  retry: false,
+};
+
+/**
  * Who the studio is being used by, and whether it needs to know.
  *
  * A server with no account answers required: false, and the admin then never
@@ -28,15 +42,7 @@ export function useSession() {
     [client],
   );
 
-  return useQuery({
-    queryKey: key,
-    queryFn: async () => unwrap(await api.GET("/auth/session", {})),
-    // Asked for once per page load and then only when something says
-    // otherwise: the answer changes on sign-in, sign-out and a refusal, and
-    // all three already write it here.
-    staleTime: Infinity,
-    retry: false,
-  });
+  return useQuery(sessionQuery);
 }
 
 export function useSignIn() {

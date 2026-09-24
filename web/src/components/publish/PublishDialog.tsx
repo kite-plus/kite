@@ -51,12 +51,14 @@ export function PublishDialog({ ids, open, onOpenChange, onDone }: Props) {
         <PublishProblems publish={publish} />
 
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>{t("common.cancel")}</DialogClose>
+          <DialogClose asChild>
+            <Button variant="outline">{t("common.cancel")}</Button>
+          </DialogClose>
           <Button disabled={publish.pending} onClick={() => void publish.run()}>
             {publish.pending ? (
-              <Spinner data-icon="inline-start" />
+              <Spinner />
             ) : (
-              <Upload data-icon="inline-start" />
+              <Upload />
             )}
             {publish.needsConfirmation ? t("publish.anyway") : t("publish.action")}
           </Button>

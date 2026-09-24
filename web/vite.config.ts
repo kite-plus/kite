@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwind from "@tailwindcss/vite";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -26,7 +27,14 @@ const target = process.env.KITE_URL ?? "http://127.0.0.1:1717";
 // proxies the API to a running `kite run`, which means the admin talks to the
 // same endpoints in both cases and there is no second code path to keep true.
 export default defineConfig({
-  plugins: [react(), tailwind(), keepOutDirInGit()],
+  plugins: [
+    // Generates src/routeTree.gen.ts from src/routes, and loads each screen
+    // when it is first opened, so the editor's weight is paid only there.
+    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    react(),
+    tailwind(),
+    keepOutDirInGit(),
+  ],
   base: "/admin/",
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "src") },

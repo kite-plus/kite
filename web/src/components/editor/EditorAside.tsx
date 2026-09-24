@@ -1,19 +1,14 @@
 import type { ReactNode } from "react";
 import { Clock, Trash2 } from "lucide-react";
-import { cn } from "cn";
 
 import type { ContentType, Draft } from "@/api/client";
 import { useI18n, type Key } from "@/i18n";
 import { STATUSES } from "@/hooks/useContents";
 import { useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { canPublish, type DeliveryState, type usePublish } from "@/hooks/usePublish";
-
-import { ImageField, SchemaForm, type Uploads } from "@/components/SchemaForm";
-import { Soon } from "@/components/Soon";
-import { TermsInput } from "@/components/editor/TermsInput";
-import { IconChevronDown } from "@/components/icons";
-import { DeliveryStages, PublishProblems } from "@/components/publish/Delivery";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -22,6 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { ImageField, SchemaForm, type Uploads } from "@/components/SchemaForm";
+import { TermsInput } from "@/components/editor/TermsInput";
+import { DeliveryStages, PublishProblems } from "@/components/publish/Delivery";
 
 interface Props {
   draft: Draft;
@@ -34,16 +34,12 @@ interface Props {
   onDelete?: () => void;
 }
 
-// The design's controls in this panel: 30px high, 12px text, 170px beside a label.
-const field =
-  "h-[30px] rounded-[7px] border border-input bg-background px-2.5 text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
-
 /** Everything about an item that is not its text. */
 export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, onDelete }: Props) {
   const { t, date } = useI18n();
   const taxonomyLabel = useTaxonomyLabel();
 
-  // Categories lead, as they do in the listing, and read as a dropdown.
+  // Categories lead, as they do in the listing.
   const taxonomies = [...(type?.taxonomies ?? [])].sort(
     (a, b) => Number(b === "categories") - Number(a === "categories"),
   );
@@ -51,8 +47,8 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
   // "/posts/:slug" reads as "/posts/" in front of the field.
   const prefix = type?.route.includes(":slug") ? type.route.split(":slug")[0] : "/";
 
-  // The built-in summary and cover have places of their own in the design;
-  // whatever else the type declares follows them.
+  // The built-in summary and cover have places of their own; whatever else
+  // the type declares follows them.
   const fields = type?.fields ?? [];
   const summary = fields.find((each) => each.key === "description" && each.type === "text");
   const cover = fields.find((each) => each.key === "cover" && each.type === "image");
@@ -61,125 +57,97 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
   const setMeta = (key: string, value: unknown) => onEdit({ meta: { ...meta, [key]: value } });
 
   return (
-    <div className="flex flex-col gap-5 px-4 pt-[18px] pb-[26px]">
+    <div className="flex flex-col gap-5 p-4">
       <Section title={t("publish.title")}>
-        <div className="flex flex-col gap-2">
-          <Row label={t("list.status")} htmlFor="status">
-            <Select value={draft.status} onValueChange={(status) => status && onEdit({ status })}>
-              <SelectTrigger
-                id="status"
-                className={cn(field, "w-[170px] gap-1.5 py-0 data-[size=default]:h-[30px] [&_svg]:size-3")}
-              >
-                {/* The stored value is English; a person reads their own language. */}
-                <SelectValue>{(status: string) => t(`status.${status}` as Key)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {STATUSES.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {t(`status.${status}` as Key)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Row>
-
-          <Row label={t("editor.visibility")}>
-            {/* Everything Kite publishes is public; there is nothing to choose yet. */}
-            <Soon side="left">
-              <div
-                tabIndex={0}
-                aria-disabled
-                className={cn(field, "flex w-[170px] cursor-default items-center justify-between text-subtle")}
-              >
-                {t("editor.public")}
-                <IconChevronDown className="size-3" />
-              </div>
-            </Soon>
-          </Row>
-
-          <Row label={t("editor.publishedAt")} htmlFor="published_at">
-            <input
-              id="published_at"
-              type="datetime-local"
-              className={cn(field, "w-[170px]")}
-              value={toLocalInput(draft.published_at)}
-              onChange={(event) =>
-                onEdit({
-                  published_at: event.target.value
-                    ? new Date(event.target.value).toISOString()
-                    : undefined,
-                })
-              }
-            />
-          </Row>
+        <div className="grid gap-2">
+          <Label htmlFor="status">{t("list.status")}</Label>
+          <Select value={draft.status} onValueChange={(status) => onEdit({ status })}>
+            <SelectTrigger id="status" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {STATUSES.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {t(`status.${status}` as Key)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="published_at">{t("editor.publishedAt")}</Label>
+          <Input
+            id="published_at"
+            type="datetime-local"
+            value={toLocalInput(draft.published_at)}
+            onChange={(event) =>
+              onEdit({
+                published_at: event.target.value
+                  ? new Date(event.target.value).toISOString()
+                  : undefined,
+              })
+            }
+          />
           {waitsForDate(draft) && (
-            <p className="flex items-center justify-end gap-1.5 text-[11.5px] text-subtle">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="size-3 shrink-0" />
               {t("editor.waitsForDate", { date: date(draft.published_at, "long") })}
             </p>
           )}
         </div>
-        <div className="mt-3 empty:hidden">
+        <div className="empty:hidden">
           <PublishProblems publish={publish} />
         </div>
       </Section>
 
       {taxonomies.length > 0 && (
         <Section title={t("editor.terms")}>
-          <div className="flex flex-col gap-2">
-            {taxonomies.map((taxonomy, i) => (
+          {taxonomies.map((taxonomy) => (
+            <div key={taxonomy} className="grid gap-2">
+              <Label htmlFor={`terms-${taxonomy}`}>{taxonomyLabel(taxonomy)}</Label>
               <TermsInput
-                key={taxonomy}
                 id={`terms-${taxonomy}`}
                 label={taxonomyLabel(taxonomy)}
                 taxonomy={taxonomy}
-                variant={i === 0 && taxonomies.length > 1 ? "select" : "chips"}
-                placeholder={
-                  i === 0 && taxonomies.length > 1
-                    ? t("editor.chooseTerm")
-                    : taxonomy === "tags"
-                      ? t("editor.addTag")
-                      : t("editor.addTerm")
-                }
+                placeholder={taxonomy === "tags" ? t("editor.addTag") : t("editor.addTerm")}
                 value={draft.taxonomies?.[taxonomy] ?? []}
-                onChange={(terms) =>
-                  onEdit({ taxonomies: { ...draft.taxonomies, [taxonomy]: terms } })
-                }
+                onChange={(terms) => onEdit({ taxonomies: { ...draft.taxonomies, [taxonomy]: terms } })}
               />
-            ))}
-          </div>
+            </div>
+          ))}
         </Section>
       )}
 
       <Section title={t("editor.details")}>
-        <div className="flex flex-col gap-2">
-          <div className="flex h-[30px] items-center overflow-hidden rounded-[7px] border border-input bg-background transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30">
-            <span className="shrink-0 border-r bg-surface px-2 text-[11px] leading-7 whitespace-nowrap text-subtle">
+        <div className="grid gap-2">
+          <Label htmlFor="slug">{t("editor.slug")}</Label>
+          <div className="flex h-9 items-center overflow-hidden rounded-md border border-input shadow-xs focus-within:ring-[3px] focus-within:ring-ring/50">
+            <span className="shrink-0 border-e bg-muted px-2 text-xs leading-9 text-muted-foreground">
               {prefix}
             </span>
             <input
               id="slug"
-              aria-label={t("editor.slug")}
-              className="min-w-0 flex-1 bg-transparent px-2 font-mono text-xs outline-none placeholder:font-sans placeholder:text-subtle"
+              className="min-w-0 flex-1 bg-transparent px-2 font-mono text-sm outline-none placeholder:font-sans placeholder:text-muted-foreground"
               value={draft.slug ?? ""}
               onChange={(event) => onEdit({ slug: event.target.value })}
               placeholder={t("editor.slugPlaceholder")}
             />
           </div>
-          {summary && (
-            <textarea
+        </div>
+        {summary && (
+          <div className="grid gap-2">
+            <Label htmlFor={summary.key}>{t("field.description")}</Label>
+            <Textarea
               id={summary.key}
               rows={3}
-              aria-label={t("field.description")}
-              placeholder={summary.placeholder ?? t("field.description")}
+              placeholder={summary.placeholder}
               value={typeof meta[summary.key] === "string" ? (meta[summary.key] as string) : ""}
               onChange={(event) => setMeta(summary.key, event.target.value)}
-              className="w-full resize-y rounded-[7px] border border-input bg-background px-2.5 py-2 text-xs leading-[1.6] outline-none transition-colors placeholder:text-subtle focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
             />
-          )}
-        </div>
+          </div>
+        )}
       </Section>
 
       {cover && uploads && (
@@ -212,10 +180,13 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
       )}
 
       {onDelete && (
-        <Button variant="destructive" onClick={onDelete}>
-          <Trash2 data-icon="inline-start" />
-          {t("editor.delete")}
-        </Button>
+        <>
+          <Separator />
+          <Button variant="destructive" onClick={onDelete}>
+            <Trash2 />
+            {t("editor.delete")}
+          </Button>
+        </>
       )}
     </div>
   );
@@ -223,21 +194,10 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section>
-      <h3 className="mb-2.5 text-[12.5px] font-semibold">{title}</h3>
+    <section className="grid gap-3">
+      <h3 className="text-sm font-semibold">{title}</h3>
       {children}
     </section>
-  );
-}
-
-function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2.5">
-      <label htmlFor={htmlFor} className="shrink-0 text-xs text-muted-foreground">
-        {label}
-      </label>
-      {children}
-    </div>
   );
 }
 

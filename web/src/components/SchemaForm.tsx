@@ -1,21 +1,14 @@
-import { useRef, useState } from "react";
-import { ImageUp, X } from "lucide-react";
-import { cn } from "cn";
+import { useRef, useState, type ReactNode } from "react";
+import { ImagePlus, ImageUp, X } from "lucide-react";
 
 import type { components } from "@/api/schema";
 import { locales, useI18n, type Key } from "@/i18n";
 import { resolveLink } from "@/lib/links";
-import { IconImage } from "@/components/icons";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -27,7 +20,6 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /** SchemaField is one declared field; Field is the control it is drawn in. */
 type SchemaField = components["schemas"]["Field"];
@@ -59,7 +51,7 @@ export function SchemaForm({ fields, values, onChange, uploads }: Props) {
   const set = (key: string, value: unknown) => onChange({ ...values, [key]: value });
 
   return (
-    <FieldGroup>
+    <div className="grid gap-6">
       {fields.map((field) =>
         visible(field, values) ? (
           <FieldRow
@@ -71,7 +63,7 @@ export function SchemaForm({ fields, values, onChange, uploads }: Props) {
           />
         ) : null,
       )}
-    </FieldGroup>
+    </div>
   );
 }
 
@@ -79,6 +71,10 @@ export function SchemaForm({ fields, values, onChange, uploads }: Props) {
 function visible(field: SchemaField, values: Record<string, unknown>): boolean {
   if (!field.showIf) return true;
   return Object.entries(field.showIf).every(([key, want]) => values[key] === want);
+}
+
+function Help({ children, className }: { children: ReactNode; className?: string }) {
+  return <p className={cn("text-sm text-muted-foreground", className)}>{children}</p>;
 }
 
 function FieldRow({
@@ -98,26 +94,28 @@ function FieldRow({
   // A switch reads better beside its label than under it.
   if (field.type === "boolean") {
     return (
-      <Field orientation="horizontal">
-        <FieldContent>
-          <FieldLabel htmlFor={field.key}>{label}</FieldLabel>
-          {field.help && <FieldDescription>{field.help}</FieldDescription>}
-        </FieldContent>
+      <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+        <div className="space-y-1">
+          <Label htmlFor={field.key}>{label}</Label>
+          {field.help && <Help>{field.help}</Help>}
+        </div>
         <Switch
           id={field.key}
           checked={Boolean(value)}
           onCheckedChange={(checked) => onChange(checked)}
         />
-      </Field>
+      </div>
     );
   }
 
+  const chosen = Array.isArray(value) ? (value as string[]) : [];
+
   return (
-    <Field>
-      <FieldLabel htmlFor={field.key}>
+    <div className="grid gap-2">
+      <Label htmlFor={field.key}>
         {label}
         {field.required && <span className="text-destructive">*</span>}
-      </FieldLabel>
+      </Label>
 
       {field.type === "text" || field.type === "code" ? (
         <Textarea
@@ -131,11 +129,7 @@ function FieldRow({
       ) : field.type === "select" ? (
         <Select value={asString(value)} onValueChange={(next) => next && onChange(next)}>
           <SelectTrigger id={field.key} className="w-full">
-            <SelectValue placeholder={field.placeholder ?? t("form.choose")}>
-              {(chosen: string) =>
-                field.options?.find((option) => option.value === chosen)?.label || chosen
-              }
-            </SelectValue>
+            <SelectValue placeholder={field.placeholder ?? t("form.choose")} />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -148,41 +142,40 @@ function FieldRow({
           </SelectContent>
         </Select>
       ) : field.type === "multiselect" ? (
-        <ToggleGroup
-          multiple
-          variant="outline"
-          size="sm"
-          className="flex-wrap"
-          value={Array.isArray(value) ? (value as string[]) : []}
-          onValueChange={(chosen) => onChange(chosen)}
-        >
+        <div className="flex flex-wrap gap-x-5 gap-y-2" id={field.key}>
           {field.options?.map((option) => (
-            <ToggleGroupItem key={option.value} value={option.value}>
+            <label key={option.value} className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={chosen.includes(option.value)}
+                onCheckedChange={(on) =>
+                  onChange(
+                    on ? [...chosen, option.value] : chosen.filter((each) => each !== option.value),
+                  )
+                }
+              />
               {option.label || option.value}
-            </ToggleGroupItem>
+            </label>
           ))}
-        </ToggleGroup>
+        </div>
       ) : field.type === "color" ? (
         // The swatch picks and the text says, since a colour is as often
         // pasted from a brand sheet as it is chosen by eye.
-        <InputGroup>
-          <InputGroupAddon>
-            <input
-              type="color"
-              aria-label={label}
-              value={/^#[0-9a-f]{6}$/i.test(asString(value)) ? asString(value) : "#000000"}
-              onChange={(event) => onChange(event.target.value)}
-              className="size-4.5 cursor-pointer appearance-none rounded-sm border-0 bg-transparent p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border [&::-webkit-color-swatch]:border-border [&::-webkit-color-swatch-wrapper]:p-0"
-            />
-          </InputGroupAddon>
-          <InputGroupInput
+        <div className="flex h-9 items-center gap-2 rounded-md border border-input px-3 shadow-xs focus-within:ring-[3px] focus-within:ring-ring/50">
+          <input
+            type="color"
+            aria-label={label}
+            value={/^#[0-9a-f]{6}$/i.test(asString(value)) ? asString(value) : "#000000"}
+            onChange={(event) => onChange(event.target.value)}
+            className="size-5 cursor-pointer appearance-none rounded-sm border-0 bg-transparent p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border [&::-webkit-color-swatch]:border-border [&::-webkit-color-swatch-wrapper]:p-0"
+          />
+          <input
             id={field.key}
             value={asString(value)}
             placeholder={field.placeholder ?? "#000000"}
-            className="font-mono"
             onChange={(event) => onChange(event.target.value)}
+            className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground"
           />
-        </InputGroup>
+        </div>
       ) : field.type === "image" && uploads ? (
         <ImageField id={field.key} value={asString(value)} onChange={onChange} uploads={uploads} />
       ) : (
@@ -205,8 +198,8 @@ function FieldRow({
         />
       )}
 
-      {field.help && <FieldDescription>{field.help}</FieldDescription>}
-    </Field>
+      {field.help && <Help>{field.help}</Help>}
+    </div>
   );
 }
 
@@ -221,10 +214,7 @@ function builtinLabel(field: SchemaField, t: (key: Key) => string): string | und
   return stock !== undefined && stock === field.label ? t(key as Key) : undefined;
 }
 
-/**
- * An image is chosen by handing over a file, not by typing where one is.
- * As a cover it waits in the admin design's striped drop zone.
- */
+/** An image is chosen by handing over a file, not by typing where one is. */
 export function ImageField({
   id,
   value,
@@ -256,11 +246,16 @@ export function ImageField({
     }
   };
 
+  const drop = {
+    onDragOver: (event: React.DragEvent) => event.preventDefault(),
+    onDrop: (event: React.DragEvent) => {
+      event.preventDefault();
+      void take(event.dataTransfer.files[0]);
+    },
+  };
+
   return (
     <>
-      {/* Hidden, not sr-only: a Field widens an sr-only child back to its
-          intrinsic width, and this input is absolute, so it overflowed the page.
-          The label and the button below both still open the picker. */}
       <input
         ref={input}
         id={id}
@@ -273,7 +268,7 @@ export function ImageField({
         }}
       />
       {value ? (
-        <div className={cn("relative overflow-hidden border", cover ? "rounded-[9px]" : "rounded-lg")}>
+        <div className="relative overflow-hidden rounded-lg border">
           <img
             src={resolveLink(value, uploads.base)}
             alt=""
@@ -285,7 +280,8 @@ export function ImageField({
             </span>
             <Button
               variant="ghost"
-              size="icon-xs"
+              size="icon"
+              className="size-7"
               aria-label={t("form.removeImage")}
               onClick={() => onChange(undefined)}
             >
@@ -293,38 +289,22 @@ export function ImageField({
             </Button>
           </div>
         </div>
-      ) : cover ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => input.current?.click()}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => {
-            event.preventDefault();
-            void take(event.dataTransfer.files[0]);
-          }}
-          className="flex h-[118px] w-full flex-col items-center justify-center gap-1.5 rounded-[9px] border border-dashed border-border-strong bg-[repeating-linear-gradient(45deg,#fafafa,#fafafa_6px,#f2f2f3_6px,#f2f2f3_12px)] text-subtle outline-none transition-colors hover:border-brand hover:text-brand focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_6px,rgb(255_255_255/0.03)_6px,rgb(255_255_255/0.03)_12px)]"
-        >
-          {busy ? <Spinner /> : <IconImage className="size-[18px]" strokeWidth={1.6} />}
-          <span className="font-mono text-[11px]">{t("editor.coverPrompt")}</span>
-        </button>
       ) : (
         <Button
           variant="outline"
           disabled={busy}
-          className="h-28 w-full flex-col gap-1.5 border-dashed font-normal text-muted-foreground"
+          className={cn(
+            "w-full flex-col gap-1.5 border-dashed font-normal text-muted-foreground",
+            cover ? "h-28 bg-muted/40" : "h-28",
+          )}
           onClick={() => input.current?.click()}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => {
-            event.preventDefault();
-            void take(event.dataTransfer.files[0]);
-          }}
+          {...drop}
         >
-          {busy ? <Spinner /> : <ImageUp />}
-          <span className="text-xs">{t("form.chooseImage")}</span>
+          {busy ? <Spinner /> : cover ? <ImagePlus /> : <ImageUp />}
+          <span className="text-xs">{t(cover ? "editor.coverPrompt" : "form.chooseImage")}</span>
         </Button>
       )}
-      {failed && <FieldDescription className="text-destructive">{failed}</FieldDescription>}
+      {failed && <Help className="text-destructive">{failed}</Help>}
     </>
   );
 }

@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+
 import { useI18n } from "@/i18n";
 import { useContentTypes } from "@/hooks/useContents";
 
@@ -25,6 +27,10 @@ export function useKindLabel() {
 /** useTaxonomyLabel translates the two built-in taxonomies and leaves the rest. */
 export function useTaxonomyLabel() {
   const { t } = useI18n();
-  return (name: string) =>
-    name === "tags" ? t("taxonomy.tags") : name === "categories" ? t("taxonomy.categories") : name;
+  // Stable while the language is, so a table's columns built from it are too.
+  return useCallback(
+    (name: string) =>
+      name === "tags" ? t("taxonomy.tags") : name === "categories" ? t("taxonomy.categories") : name,
+    [t],
+  );
 }

@@ -2,6 +2,9 @@ node_modules/
 openapi.json
 *.tsbuildinfo
 
+# The route generator's scratch space while it writes src/routeTree.gen.ts.
+.tanstack/
+
 # The built admin is not committed, but the directory is: the Go build
 # embeds it, and `go build ./...` has to work on a machine with no Node.
 dist/*

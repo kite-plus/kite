@@ -8,6 +8,16 @@ export type SetupRequest = components["schemas"]["SetupRequest"];
 
 const key = ["setup"];
 
+/** setupQuery asks whether this server has an owner yet. */
+export const setupQuery = {
+  queryKey: key,
+  queryFn: async () => unwrap(await api.GET("/setup", {})),
+  // A server is set up once. The answer changes exactly when this tab
+  // changes it, and that path writes it here itself.
+  staleTime: Infinity,
+  retry: false,
+};
+
 /**
  * Whether this server has ever been configured.
  *
@@ -17,14 +27,7 @@ const key = ["setup"];
  * error page over a working installer.
  */
 export function useSetup() {
-  return useQuery({
-    queryKey: key,
-    queryFn: async () => unwrap(await api.GET("/setup", {})),
-    // A server is set up once. The answer changes exactly when this tab
-    // changes it, and that path writes it here itself.
-    staleTime: Infinity,
-    retry: false,
-  });
+  return useQuery(setupQuery);
 }
 
 /** useInstall finishes setup and leaves the browser signed in. */

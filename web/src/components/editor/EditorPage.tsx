@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChainedCommands, Editor } from "@tiptap/react";
 import { ChevronLeft, Info, Minus, SlidersHorizontal, Table, Type, XCircle } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { cn } from "cn";
 
 import { useI18n, useProblem, type Key } from "@/i18n";
 import { useContentTypes } from "@/hooks/useContents";
@@ -10,11 +10,15 @@ import { useItem } from "@/hooks/useItem";
 import { useKindLabel } from "@/hooks/useKindLabel";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { canPublish, useDelivery, usePublish } from "@/hooks/usePublish";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { isoDate } from "@/lib/dates";
-import { linkProps, navigate, setGuard } from "@/lib/router";
+import { cn } from "@/lib/utils";
 
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { StatusPill } from "@/components/StatusDot";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { StatusDot } from "@/components/StatusDot";
+import { AppHeader } from "@/components/layout/app-header";
+import { Header } from "@/components/layout/header";
+import { Main } from "@/components/layout/main";
 import { ConflictDialog } from "@/components/editor/ConflictDialog";
 import { EditorAside } from "@/components/editor/EditorAside";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
@@ -30,7 +34,6 @@ import { Preview } from "@/components/editor/Preview";
 import { RichEditor } from "@/components/editor/RichEditor";
 import type { SlashItem } from "@/components/editor/SlashMenu";
 import { SourceEditor, type SourceHandle } from "@/components/editor/SourceEditor";
-import { IconChevronLeft } from "@/components/icons";
 import { BlockquoteIcon } from "@/components/tiptap-icons/blockquote-icon";
 import { CodeBlockIcon } from "@/components/tiptap-icons/code-block-icon";
 import { HeadingFourIcon } from "@/components/tiptap-icons/heading-four-icon";
@@ -42,10 +45,9 @@ import { ListIcon } from "@/components/tiptap-icons/list-icon";
 import { ListOrderedIcon } from "@/components/tiptap-icons/list-ordered-icon";
 import { ListTodoIcon } from "@/components/tiptap-icons/list-todo-icon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -55,13 +57,10 @@ import "@/styles/_variables.scss";
 import "@/styles/_keyframe-animations.scss";
 import "@/components/editor/editor.scss";
 
-// The header's buttons are the design's smaller ones: 32px high, 12.5px.
-const headButton = "h-8 px-3 text-[12.5px] font-normal text-foreground-2";
-const primaryButton = "h-8 px-3.5 text-[12.5px] font-medium";
-
 export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const { t, locale } = useI18n();
   const problem = useProblem();
+  const navigate = useNavigate();
   const kindLabel = useKindLabel();
   const types = useContentTypes();
   const item = useItem(id, kind);
@@ -85,7 +84,6 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [removing, setRemoving] = useState(false);
-  const [leaving, setLeaving] = useState<(() => void) | null>(null);
 
   const [mode, setMode] = useState<Mode>(preferredMode);
   // What the source view is protecting, when a document opened in it for a reason.
@@ -101,20 +99,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   dirty.current = item.dirty;
 
   // Work that is not saved is asked about before anything navigates away.
-  useEffect(() => {
-    setGuard({
-      blocked: () => dirty.current,
-      ask: (proceed) => setLeaving(() => proceed),
-    });
-    const warn = (event: BeforeUnloadEvent) => {
-      if (dirty.current) event.preventDefault();
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => {
-      setGuard(null);
-      window.removeEventListener("beforeunload", warn);
-    };
-  }, []);
+  const guard = useUnsavedGuard(item.dirty);
 
   const draft = item.draft;
   const type = types.data?.items.find((entry) => entry.kind === (draft?.kind ?? kind));
@@ -145,10 +130,11 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     setSavedAt(new Date());
     // A new item has no id until the server gives it one.
     if (!id) {
-      navigate({ name: "edit", kind, id: saved }, { replace: true, skipGuard: true });
+      guard.pass();
+      void navigate({ to: "/content/$kind/$id", params: { kind, id: saved }, replace: true });
     }
     return saved;
-  }, [item, id, kind]);
+  }, [item, id, kind, guard, navigate]);
 
   // Read through a ref so the listener is not rebound on every keystroke.
   const saveRef = useRef(save);
@@ -285,29 +271,33 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
 
   if (item.status === "loading") {
     return (
-      <Empty className="h-svh">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <Spinner />
-          </EmptyMedia>
-          <EmptyTitle>{t("editor.loading")}</EmptyTitle>
-        </EmptyHeader>
-      </Empty>
+      <>
+        <Header className="border-b" />
+        <div className="flex flex-1 items-center justify-center gap-2 py-24 text-sm text-muted-foreground">
+          <Spinner />
+          {t("editor.loading")}
+        </div>
+      </>
     );
   }
   if (!draft) {
     return (
-      <div className="flex flex-col gap-4 p-6">
-        <Alert variant="destructive">
-          <XCircle />
-          <AlertTitle>{t("editor.nothingToEdit")}</AlertTitle>
-          <AlertDescription>{item.error?.detail}</AlertDescription>
-        </Alert>
-        <Button variant="outline" className="self-start" onClick={() => navigate({ name: "list", kind })}>
-          <ChevronLeft data-icon="inline-start" />
-          {t("editor.back")}
-        </Button>
-      </div>
+      <>
+        <AppHeader />
+        <Main className="flex flex-col gap-4">
+          <Alert variant="destructive">
+            <XCircle />
+            <AlertTitle>{t("editor.nothingToEdit")}</AlertTitle>
+            <AlertDescription>{item.error?.detail}</AlertDescription>
+          </Alert>
+          <Button variant="outline" className="self-start" asChild>
+            <Link to="/content/$kind" params={{ kind }}>
+              <ChevronLeft />
+              {t("editor.back")}
+            </Link>
+          </Button>
+        </Main>
+      </>
     );
   }
 
@@ -353,33 +343,27 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   );
 
   return (
-    <div className="flex h-svh min-w-0 flex-col">
-      <header className="flex shrink-0 items-center gap-3 border-b bg-background px-2 py-2.5 sm:px-4">
-        <SidebarTrigger className="md:hidden" />
+    // Fixed: the layout gives this page the viewport's height, and the text
+    // scrolls inside it rather than the page.
+    <div data-layout="fixed" className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <Header className="border-b">
         <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                aria-label={t("editor.back")}
-                onClick={() => navigate({ name: "list", kind })}
-                className="flex size-[30px] shrink-0 items-center justify-center rounded-[7px] text-foreground-3 outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-              />
-            }
-          >
-            <IconChevronLeft className="size-4" />
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="size-8 shrink-0" asChild>
+              <Link to="/content/$kind" params={{ kind }} aria-label={t("editor.back")}>
+                <ChevronLeft />
+              </Link>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>{t("editor.back")}</TooltipContent>
         </Tooltip>
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13.5px] font-semibold">
-            {draft.title || t("editor.untitled")}
-          </div>
-          <div className="mt-px truncate text-[11px] text-subtle">
-            <a {...linkProps({ name: "list", kind })} className="transition-colors hover:text-foreground-3">
+          <div className="truncate text-sm font-semibold">{draft.title || t("editor.untitled")}</div>
+          <div className="truncate text-xs text-muted-foreground">
+            <Link to="/content/$kind" params={{ kind }} className="hover:text-foreground">
               {kindLabel.many(kind)}
-            </a>
+            </Link>
             {" / "}
             {id ? t("editor.editing") : t("editor.creating")}
             {" · "}
@@ -387,14 +371,16 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           </div>
         </div>
 
-        <StatusPill status={draft.status} className="hidden sm:inline-flex" />
-        <span aria-hidden className="hidden h-[18px] w-px shrink-0 bg-border sm:block" />
+        <Badge variant="outline" className="hidden sm:inline-flex">
+          <StatusDot status={draft.status} />
+        </Badge>
 
         <Button
           variant="outline"
+          size="sm"
           aria-pressed={preview}
           onClick={() => setPreview(!preview)}
-          className={cn(headButton, "hidden sm:inline-flex aria-pressed:bg-muted aria-pressed:text-foreground")}
+          className="hidden sm:inline-flex aria-pressed:bg-muted"
         >
           {t("editor.preview")}
         </Button>
@@ -402,11 +388,11 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           <Button
             variant="outline"
             size="icon"
+            className="size-8 shrink-0"
             aria-label={t("editor.panel")}
             onClick={() => setPanel(true)}
-            className="size-8 shrink-0 text-foreground-2"
           >
-            <SlidersHorizontal className="size-3.5" />
+            <SlidersHorizontal />
           </Button>
         )}
 
@@ -414,14 +400,14 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           <>
             <Button
               variant="outline"
-              className={headButton}
+              size="sm"
               disabled={!item.dirty || busy}
               onClick={() => void save()}
             >
               {saving && <Spinner />}
               {t("editor.save")}
             </Button>
-            <Button className={primaryButton} disabled={busy} onClick={() => void ship()}>
+            <Button size="sm" disabled={busy} onClick={() => void ship()}>
               {publish.pending && <Spinner />}
               {publish.needsConfirmation
                 ? t("publish.anyway")
@@ -431,12 +417,12 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             </Button>
           </>
         ) : (
-          <Button className={primaryButton} disabled={!item.dirty || busy} onClick={() => void save()}>
+          <Button size="sm" disabled={!item.dirty || busy} onClick={() => void save()}>
             {saving && <Spinner />}
             {t("editor.save")}
           </Button>
         )}
-      </header>
+      </Header>
 
       {(item.error || uploadError) && (
         <div className="border-b px-4 py-2">
@@ -470,8 +456,8 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
               </span>
               <Button
                 variant="link"
-                size="xs"
-                className="h-auto p-0 text-brand"
+                size="sm"
+                className="h-auto p-0 text-xs"
                 onClick={() => switchMode("visual")}
               >
                 {t("editor.switchAnyway")}
@@ -527,7 +513,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             </div>
           </div>
 
-          <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-divider px-4 py-1.5 text-[11.5px] text-subtle">
+          <footer className="flex shrink-0 items-center justify-between gap-3 border-t px-4 py-1.5 text-xs text-muted-foreground">
             <span className="truncate">
               {t("editor.words", { count: words, n: new Intl.NumberFormat(locale).format(words) })}
               {" · Markdown"}
@@ -537,12 +523,12 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
         </div>
 
         {preview && (
-          <div className="min-w-0 flex-1 md:border-l">
+          <div className="min-w-0 flex-1 md:border-s">
             <Preview draft={draft} id={id} base={item.base?.url} />
           </div>
         )}
 
-        {docked && <aside className="w-73 shrink-0 overflow-auto border-l">{aside}</aside>}
+        {docked && <aside className="w-80 shrink-0 overflow-auto border-s">{aside}</aside>}
       </div>
 
       <input
@@ -583,9 +569,9 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
         open={switching !== null}
         onOpenChange={(open) => !open && setSwitching(null)}
         title={t("editor.switchTitle")}
-        description={t("editor.switchNote", { what: listOf(switching ?? []) })}
-        confirmLabel={t("editor.switchAnyway")}
-        onConfirm={() => {
+        desc={t("editor.switchNote", { what: listOf(switching ?? []) })}
+        confirmText={t("editor.switchAnyway")}
+        handleConfirm={() => {
           setSwitching(null);
           rememberMode("visual");
           setMode("visual");
@@ -597,32 +583,29 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
         open={removing}
         onOpenChange={setRemoving}
         title={t("list.confirmDelete", { count: 1 })}
-        description={t("list.confirmDeleteNote")}
-        confirmLabel={t("editor.delete")}
+        desc={t("list.confirmDeleteNote")}
+        confirmText={t("editor.delete")}
         destructive
-        onConfirm={async () => {
+        handleConfirm={async () => {
           setRemoving(false);
           if (await item.remove()) {
-            dirty.current = false;
             toast.success(t("list.deleted", { count: 1 }));
-            navigate({ name: "list", kind });
+            // What was not saved went with the item.
+            guard.pass();
+            void navigate({ to: "/content/$kind", params: { kind } });
           }
         }}
       />
 
       <ConfirmDialog
-        open={leaving !== null}
-        onOpenChange={(open) => !open && setLeaving(null)}
+        open={guard.leaving}
+        onOpenChange={(open) => !open && guard.cancel()}
         title={t("editor.discardTitle")}
-        description={t("editor.discardNote")}
-        confirmLabel={t("editor.discard")}
-        cancelLabel={t("conflict.keepEditing")}
+        desc={t("editor.discardNote")}
+        cancelBtnText={t("conflict.keepEditing")}
+        confirmText={t("editor.discard")}
         destructive
-        onConfirm={() => {
-          dirty.current = false;
-          leaving?.();
-          setLeaving(null);
-        }}
+        handleConfirm={guard.discard}
       />
     </div>
   );

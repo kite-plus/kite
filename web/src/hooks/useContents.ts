@@ -12,6 +12,8 @@ export interface Filters {
   q?: string;
   sort?: string;
   deletedOnly?: boolean;
+  /** limit is the page size, PAGE_SIZE when not given. */
+  limit?: number;
 }
 
 export const PAGE_SIZE = 20;
@@ -32,7 +34,7 @@ export function useContentPage(filters: Filters, cursor: string | undefined) {
         await api.GET("/contents", {
           params: {
             query: {
-              limit: PAGE_SIZE,
+              limit: filters.limit ?? PAGE_SIZE,
               count: true,
               cursor,
               kind: filters.kind ? [filters.kind] : undefined,
@@ -99,12 +101,15 @@ export function useSite() {
   });
 }
 
+/** contentTypesQuery is shared with the route that turns away a kind the project lacks. */
+export const contentTypesQuery = {
+  queryKey: ["content-types"],
+  staleTime: Infinity,
+  queryFn: async () => unwrap(await api.GET("/content-types", {})),
+};
+
 export function useContentTypes() {
-  return useQuery({
-    queryKey: ["content-types"],
-    staleTime: Infinity,
-    queryFn: async () => unwrap(await api.GET("/content-types", {})),
-  });
+  return useQuery(contentTypesQuery);
 }
 
 export function useTaxonomies() {
@@ -134,4 +139,41 @@ export function useTermsOf(taxonomies: string[]) {
   return Object.fromEntries(
     taxonomies.map((name, i) => [name, results[i].data?.items ?? []]),
   );
+}
+
+/**
+ * useMonthlyCounts counts what a kind published in each of the last months,
+ * oldest first, by asking for each month's total rather than every item.
+ */
+export function useMonthlyCounts(kind: string, months: number) {
+  const now = new Date();
+  const ranges = Array.from({ length: months }, (_, i) => {
+    const start = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1);
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+    return { start, end };
+  });
+  const results = useQueries({
+    queries: ranges.map(({ start, end }) => ({
+      queryKey: ["contents", "month", kind, start.toISOString()],
+      queryFn: async () => {
+        const page = unwrap(
+          await api.GET("/contents", {
+            params: {
+              query: {
+                kind: [kind],
+                status: ["published"],
+                published_from: start.toISOString(),
+                // The range is inclusive, so it stops a second before the next month.
+                published_to: new Date(end.getTime() - 1000).toISOString(),
+                limit: 1,
+                count: true,
+              },
+            },
+          }),
+        );
+        return page.total ?? 0;
+      },
+    })),
+  });
+  return ranges.map((range, i) => ({ month: range.start, total: results[i].data }));
 }

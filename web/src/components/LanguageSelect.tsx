@@ -63,24 +63,16 @@ export function LanguageSelect({ id, value, onChange }: Props) {
   return (
     <Select value={value} onValueChange={(v) => v && onChange(v)}>
       <SelectTrigger id={id} className="w-full">
-        <SelectValue>
-          {(tag: string) => {
-            const chosen = options.find((o) => o.tag === tag);
-            return (
-              <span className="flex min-w-0 items-baseline gap-2">
-                <span className="truncate">{chosen?.label ?? tag}</span>
-                <span className="font-mono text-xs text-muted-foreground">{tag}</span>
-              </span>
-            );
-          }}
-        </SelectValue>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent className="max-h-72">
         <SelectGroup>
           {options.map((o) => (
+            // Radix shows the chosen item's text in the trigger, so the tag
+            // beside the name appears there too.
             <SelectItem key={o.tag} value={o.tag}>
-              <span className="flex w-full items-baseline gap-2">
-                <span className="flex-1">{o.label}</span>
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="truncate">{o.label}</span>
                 <span className="font-mono text-xs text-muted-foreground">{o.tag}</span>
               </span>
             </SelectItem>

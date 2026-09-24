@@ -1,5 +1,5 @@
 import { GitMerge, TriangleAlert, Upload, XCircle } from "lucide-react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 import { useI18n, useProblem } from "@/i18n";
 import type { DeliveryState, RemoteChange, usePublish } from "@/hooks/usePublish";
@@ -132,7 +132,7 @@ export function PublishProblems({ publish }: { publish: Publish }) {
           disabled={publish.pending}
           onClick={() => void publish.runWithoutHooks()}
         >
-          {publish.pending ? <Spinner data-icon="inline-start" /> : <Upload data-icon="inline-start" />}
+          {publish.pending ? <Spinner /> : <Upload />}
           {t("publish.skipHooks")}
         </Button>
       )}
@@ -145,7 +145,7 @@ export function PublishProblems({ publish }: { publish: Publish }) {
           disabled={publish.pending}
           onClick={() => void publish.push()}
         >
-          {publish.pending ? <Spinner data-icon="inline-start" /> : <Upload data-icon="inline-start" />}
+          {publish.pending ? <Spinner /> : <Upload />}
           {t("publish.pushAgain")}
         </Button>
       )}
@@ -183,7 +183,7 @@ function RemoteMoved({ remote, publish }: { remote: RemoteChange; publish: Publi
       <ul className="flex flex-col gap-1">
         {remote.commits.slice(0, shownCommits).map((commit) => (
           <li key={commit.hash} className="flex min-w-0 items-baseline gap-2">
-            <code className="shrink-0 font-mono text-xs text-subtle">{commit.hash.slice(0, 7)}</code>
+            <code className="shrink-0 font-mono text-xs text-muted-foreground">{commit.hash.slice(0, 7)}</code>
             <span className="truncate">{commit.subject}</span>
             <span className="ml-auto shrink-0 text-xs text-muted-foreground">{commit.author}</span>
           </li>
@@ -205,9 +205,9 @@ function RemoteMoved({ remote, publish }: { remote: RemoteChange; publish: Publi
             onClick={() => void publish.push(true)}
           >
             {publish.pending ? (
-              <Spinner data-icon="inline-start" />
+              <Spinner />
             ) : (
-              <GitMerge data-icon="inline-start" />
+              <GitMerge />
             )}
             {t("publish.remote.rebase")}
           </Button>
