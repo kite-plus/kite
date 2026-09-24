@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { Clock, Trash2 } from "lucide-react";
 
-import type { ContentType, Draft } from "@/api/client";
-import { useI18n, type Key } from "@/i18n";
+import type { components, ContentType, Draft } from "@/api/client";
+import { locales, useI18n, type Key } from "@/i18n";
 import { STATUSES } from "@/hooks/useContents";
 import { useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { canPublish, type DeliveryState, type usePublish } from "@/hooks/usePublish";
@@ -22,6 +22,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { ImageField, SchemaForm, type Uploads } from "@/components/SchemaForm";
 import { TermsInput } from "@/components/editor/TermsInput";
 import { DeliveryStages, PublishProblems } from "@/components/publish/Delivery";
+
+type LayoutOption = components["schemas"]["LayoutOption"];
+
+// Radix gives an empty value no item, so the default template takes a name
+// no layout can have.
+const DEFAULT_LAYOUT = "@default";
+
+/**
+ * layoutText is a layout's label and note as the operator reads them. The
+ * built-in theme's are translated when they are its stock English words; a
+ * theme's own are shown as it wrote them.
+ */
+function layoutText(layout: LayoutOption, t: (key: Key) => string) {
+  const stock = locales.en.catalog as Record<string, string>;
+  const translated = (key: string, text: string | undefined) =>
+    text !== undefined && stock[key] === text ? t(key as Key) : text;
+  return {
+    label: translated(`layout.${layout.name}`, layout.label) ?? layout.name,
+    note: translated(`layoutNote.${layout.name}`, layout.description),
+  };
+}
 
 interface Props {
   draft: Draft;
@@ -55,6 +76,12 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
   const others = fields.filter((each) => each !== summary && each !== cover);
   const meta = draft.meta ?? {};
   const setMeta = (key: string, value: unknown) => onEdit({ meta: { ...meta, [key]: value } });
+
+  // The templates the theme offers this kind. One the item names that the
+  // theme does not offer is still listed, so it can be seen and undone.
+  const layouts = type?.layouts ?? [];
+  const chosen = typeof meta.layout === "string" && meta.layout ? meta.layout : undefined;
+  const offered = layouts.find((each) => each.name === chosen);
 
   return (
     <div className="flex flex-col gap-5 p-4">
@@ -101,6 +128,40 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
           <PublishProblems publish={publish} />
         </div>
       </Section>
+
+      {(layouts.length > 0 || chosen) && (
+        <Section title={t("editor.template")}>
+          <div className="grid gap-2">
+            <Select
+              value={chosen ?? DEFAULT_LAYOUT}
+              // A cleared template goes out as null, which takes it out of the file.
+              onValueChange={(value) => setMeta("layout", value === DEFAULT_LAYOUT ? null : value)}
+            >
+              <SelectTrigger className="w-full" aria-label={t("editor.template")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={DEFAULT_LAYOUT}>{t("editor.templateDefault")}</SelectItem>
+                  {layouts.map((layout) => (
+                    <SelectItem key={layout.name} value={layout.name}>
+                      {layoutText(layout, t).label}
+                    </SelectItem>
+                  ))}
+                  {chosen && !offered && <SelectItem value={chosen}>{chosen}</SelectItem>}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {chosen && !offered
+                ? t("editor.templateMissing", { name: chosen })
+                : offered
+                  ? layoutText(offered, t).note
+                  : t("editor.templateDefaultNote")}
+            </p>
+          </div>
+        </Section>
+      )}
 
       {taxonomies.length > 0 && (
         <Section title={t("editor.terms")}>

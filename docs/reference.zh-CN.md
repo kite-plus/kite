@@ -84,7 +84,8 @@ layouts:
     types: [page]        # 不写则所有类型都可以选
 ```
 
-内容在 front matter 里用 `layout: links` 选用，和 Hugo 的写法一样。页面随后用
+内容在 front matter 里用 `layout: links` 选用，和 Hugo 的写法一样；也可以在
+编辑器的“模板”下拉框里选，它列出当前主题为这类内容提供的模板，预览随之切换。页面随后用
 `layouts/page/links.html` 渲染，没有的话用 `layouts/links.html`。主题不能声明
 没有模板文件的布局；页面选了当前主题没有的模板时，退回它所属类型的默认模板。
 

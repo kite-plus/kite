@@ -97,8 +97,9 @@ layouts:
     types: [page]        # left out, every type is offered it
 ```
 
-An item chooses one in its front matter, as Hugo writes it: `layout: links`.
-It is then drawn with `layouts/page/links.html`, or `layouts/links.html`. A
+An item chooses one in its front matter, as Hugo writes it: `layout: links`,
+or from the Template menu in the editor, which lists what the active theme
+offers that kind of item and previews the page with it. It is then drawn with `layouts/page/links.html`, or `layouts/links.html`. A
 theme cannot declare a layout it has no template for, and a page naming a
 layout the active theme lacks keeps its type's own template.
 
