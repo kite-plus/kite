@@ -37,7 +37,7 @@
 - 后台中英文界面；
 - 命令面板（⌘K）；
 - 分类法页面；
-- 后台界面基于 [shadcn-admin](https://github.com/satnaing/shadcn-admin) 重建：TanStack Router 文件路由，列表用服务端分页的 TanStack Table，筛选状态写在地址里。
+- 后台界面基于 [shadcn-admin](https://github.com/satnaing/shadcn-admin) 重建：TanStack Router 文件路由，列表用服务端分页的 TanStack Table，筛选状态写在地址里。之后参考 explore 的后台做了统一的状态配色、一键切换主题、按状态区分的提示框、状态卡式仪表盘，以及读取失败时的重试和布局内的错误页。
 
 ## 3. 验收标准核对
 

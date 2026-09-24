@@ -6,7 +6,7 @@
 
 | 区域 | 已有能力 | 主要缺口 |
 |---|---|---|
-| 仪表盘 | 内容数量、每月发布趋势、最新文章、待发布改动、常用标签、快捷入口 | 评论、访问、RSS 订阅、存储和备份还没有实现，界面上不再显示占位；部分请求失败时只会持续显示骨架或空值 |
+| 仪表盘 | 四张状态卡（待发布的改动、定时发布、草稿、站点状态）、内容总数、每月发布趋势、最新文章、投递进度、常用标签、刷新 | 评论、访问、RSS 订阅、存储和备份还没有实现，界面上不再显示占位 |
 | 文章与页面 | 创建、列表筛选/搜索/分页、编辑、删除与回收站、批量发布/删除/恢复、Git 发布 | 只读部署仍显示写入口（A04） |
 | 编辑器 | 可视化与 Markdown 源码、服务端预览、图片上传、冲突提示 | 冲突对比缺少基线版本；手机宽度没有预览入口；上传后的文件缺少管理界面 |
 | 分类法 | 查看词条、按词条进入内容列表 | 没有跨文章重命名或合并词条；词条本身从内容推导，不宜做独立 CRUD |
@@ -24,7 +24,7 @@
 | A03 | P1 | 已完成（325bca1） | **删除可恢复，批量删除报告部分成功。** 删除改为写 `deleted_at`，回收站可查询、恢复，bundle 附件留在原处；批量操作逐项报告成功和失败，冲突项需刷新列表并重新确认。隔离站点验证了删除/恢复及“首项成功、次项冲突”的界面结果；API 测试覆盖附件保留和过期版本。 | `internal/api/write.go`、`internal/store/file/writer.go`；`web/src/hooks/useDeleteItems.ts`、`web/src/features/contents/index.tsx` |
 | A04 | P1 | 实现缺口 | **只读部署按能力展示界面。** 服务端能拒绝写入，但后台仍显示新建、编辑、删除、上传、设置保存等控件，直到提交才收到 `read_only`。在站点元信息返回可写能力，统一禁用动作并说明原因。验收：以 `kite serve --admin` 打开后台，所有写入口状态一致，阅读、预览和搜索仍可用。 | `internal/api/write.go` 的 `writable`；`internal/api/wire.go` 的 `SiteInfo`；`web/src/features/contents/index.tsx`、`web/src/components/editor/EditorPage.tsx` |
 | A05 | P1 | 代码风险 | **统一会话过期处理。** API 客户端在 401 时触发重新登录，但发布使用独立 `fetch`，预览也是独立 `fetch`，上传使用 XHR。给这些请求接入相同的 401 处理，并在重新登录后保留未保存草稿。验收：会话过期后分别点击发布、预览、上传，都进入一致的登录恢复流程。 | `web/src/api/client.ts`、`web/src/hooks/usePublish.ts`、`web/src/components/editor/Preview.tsx`、`web/src/hooks/useItem.ts` |
-| A06 | P1 | 实现缺口 | **补齐错误态和重试入口。** 仪表盘和分类法主要依据 `data` 判断加载，查询失败时可能持续显示骨架；主题/设置页虽有错误提示，表单仍可能保持骨架。区分加载、无数据、失败，提供重试并保留旧数据。验收：进入后台后让某个页面的业务请求失败，该页面出现可理解的错误和重试按钮，恢复后正常显示。 | 路由级的失败已有带重试的错误页（`web/src/features/errors/general-error.tsx`）；页面内的查询失败仍待处理：`web/src/features/dashboard/index.tsx`、`web/src/features/taxonomies/index.tsx`、`web/src/features/settings/` |
+| A06 | P1 | 已完成 | **补齐错误态和重试入口。** 仪表盘和分类法主要依据 `data` 判断加载，查询失败时可能持续显示骨架；主题/设置页虽有错误提示，表单仍可能保持骨架。区分加载、无数据、失败，提供重试并保留旧数据。验收：进入后台后让某个页面的业务请求失败，该页面出现可理解的错误和重试按钮，恢复后正常显示。 | 页面出错时错误页显示在布局内（`web/src/features/errors/page-error.tsx`）；仪表盘各卡片、列表和分类法读取失败时显示“读取失败 + 重试”（`web/src/components/query-error.tsx`），已有数据在重新读取失败时保留；设置页读取失败时提供重新加载 |
 | A07 | P1 | 实现缺口 | **把冲突对话框补为真正的三方比较。** 当前只展示“我的版本”和“磁盘版本”的标题与正文，未展示编辑前基线，也没有字段级差异；保留“使用我的/磁盘的”选择。验收：标题、正文和元数据各自改动时都能识别共同基线及冲突字段，选择前不会丢掉任何一方。 | `web/src/components/editor/ConflictDialog.tsx`；`web/src/hooks/useItem.ts` 已保存 `base`，但对话框未接收它 |
 | A08 | P1 | 实现缺口 | **让手机也能打开预览。** 预览按钮在 `sm` 以下隐藏，`preview` 默认关闭，页面没有其他切换入口。验收：窄屏可在编辑与预览之间切换，返回编辑后光标和未保存内容仍在。 | `web/src/components/editor/EditorPage.tsx` 的预览按钮与 `preview` 状态 |
 
