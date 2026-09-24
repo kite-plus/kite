@@ -13,6 +13,7 @@ import { common, createLowlight } from "lowlight";
 
 import { CodeBlockView } from "@/components/editor/CodeBlockView";
 import { Slash, type SlashItem } from "@/components/editor/SlashMenu";
+import { StableTable } from "@/components/editor/table";
 import { HorizontalRule } from "@/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension";
 import { ImageUploadNode, type UploadFunction } from "@/components/tiptap-node/image-upload-node";
 import { resolveLink } from "@/lib/links";
@@ -122,7 +123,8 @@ export function extensions(env: Env) {
     TaskList,
     TaskItem.configure({ nested: true }),
     // A dragged column width has no markdown to go to, so there is none.
-    TableKit.configure({ table: { resizable: false } }),
+    StableTable.configure({ resizable: false }),
+    TableKit.configure({ table: false }),
     // Keeps the selection drawn while a toolbar field has the focus.
     Selection,
     FindAndReplace.configure({ searchDebounceMs: 300, injectCSS: false }),
