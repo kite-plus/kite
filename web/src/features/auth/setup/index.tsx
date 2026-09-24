@@ -8,7 +8,6 @@ import { useInstall, useSetup } from "@/hooks/useSetup";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LanguageSelect } from "@/components/LanguageSelect";
@@ -78,127 +77,117 @@ export function Setup() {
         : null;
 
   return (
-    <AuthLayout>
-      <Card className="w-full max-w-md gap-4">
-        <CardHeader>
-          <CardTitle className="text-lg tracking-tight">
-            {t(step === "site" ? "setup.site.title" : "setup.account.title")}
-          </CardTitle>
-          <CardDescription>
-            {t(step === "site" ? "setup.site.description" : "setup.account.description")}
-          </CardDescription>
-          <Steps step={step} />
-        </CardHeader>
+    <AuthLayout
+      title={t(step === "site" ? "setup.site.title" : "setup.account.title")}
+      description={t(step === "site" ? "setup.site.description" : "setup.account.description")}
+    >
+      <Steps step={step} />
+      <form onSubmit={submit} className="grid gap-3">
+        {step === "site" ? (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="title">{t("setup.siteTitle")}</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="base-url">{t("setup.baseURL")}</Label>
+              <Input
+                id="base-url"
+                type="url"
+                value={baseURL}
+                onChange={(e) => setBaseURL(e.target.value)}
+                placeholder="https://example.com"
+                required
+              />
+              <p className="text-sm text-muted-foreground">{t("setup.baseURLHelp")}</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="language">{t("setup.language")}</Label>
+              <LanguageSelect id="language" value={language} onChange={setLanguage} />
+            </div>
+            <Button type="submit" className="mt-2">
+              {t("setup.next")}
+              <ArrowRight />
+            </Button>
+          </>
+        ) : (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="user">{t("setup.user")}</Label>
+              <Input
+                id="user"
+                value={user}
+                onChange={(e) => setUser(e.target.value)}
+                autoComplete="username"
+                autoFocus
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="password">{t("setup.password")}</Label>
+              <PasswordInput
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              {tooShort ? (
+                <Hint tone="wrong">{t("setup.passwordNeeds", { count: missing })}</Hint>
+              ) : longEnough ? (
+                <Hint tone="right">{t("setup.passwordOK")}</Hint>
+              ) : (
+                <Hint>{t("setup.passwordHelp", { n: minimum })}</Hint>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="again">{t("setup.again")}</Label>
+              <PasswordInput
+                id="again"
+                value={again}
+                onChange={(e) => setAgain(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              {mismatch ? (
+                <Hint tone="wrong">{t("setup.mismatch")}</Hint>
+              ) : matches ? (
+                <Hint tone="right">{t("setup.match")}</Hint>
+              ) : null}
+            </div>
 
-        <CardContent>
-          <form onSubmit={submit} className="grid gap-4">
-            {step === "site" ? (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="title">{t("setup.siteTitle")}</Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    autoFocus
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="base-url">{t("setup.baseURL")}</Label>
-                  <Input
-                    id="base-url"
-                    type="url"
-                    value={baseURL}
-                    onChange={(e) => setBaseURL(e.target.value)}
-                    placeholder="https://example.com"
-                    required
-                  />
-                  <p className="text-sm text-muted-foreground">{t("setup.baseURLHelp")}</p>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="language">{t("setup.language")}</Label>
-                  <LanguageSelect id="language" value={language} onChange={setLanguage} />
-                </div>
-                <Button type="submit">
-                  {t("setup.next")}
-                  <ArrowRight />
-                </Button>
-              </>
-            ) : (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="user">{t("setup.user")}</Label>
-                  <Input
-                    id="user"
-                    value={user}
-                    onChange={(e) => setUser(e.target.value)}
-                    autoComplete="username"
-                    autoFocus
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password">{t("setup.password")}</Label>
-                  <PasswordInput
-                    id="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
-                    required
-                  />
-                  {tooShort ? (
-                    <Hint tone="wrong">{t("setup.passwordNeeds", { count: missing })}</Hint>
-                  ) : longEnough ? (
-                    <Hint tone="right">{t("setup.passwordOK")}</Hint>
-                  ) : (
-                    <Hint>{t("setup.passwordHelp", { n: minimum })}</Hint>
-                  )}
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="again">{t("setup.again")}</Label>
-                  <PasswordInput
-                    id="again"
-                    value={again}
-                    onChange={(e) => setAgain(e.target.value)}
-                    autoComplete="new-password"
-                    required
-                  />
-                  {mismatch ? (
-                    <Hint tone="wrong">{t("setup.mismatch")}</Hint>
-                  ) : matches ? (
-                    <Hint tone="right">{t("setup.match")}</Hint>
-                  ) : null}
-                </div>
-
-                {refusal && (
-                  <Alert variant="destructive">
-                    <XCircle />
-                    <AlertTitle>{refusal.title}</AlertTitle>
-                    {refusal.detail && <AlertDescription>{refusal.detail}</AlertDescription>}
-                  </Alert>
-                )}
-
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setStep("site")}
-                    disabled={install.isPending}
-                  >
-                    <ArrowLeft />
-                    {t("setup.back")}
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={install.isPending || !ready}>
-                    {install.isPending ? <Loader2 className="animate-spin" /> : <Check />}
-                    {t(install.isPending ? "setup.installing" : "setup.install")}
-                  </Button>
-                </div>
-              </>
+            {refusal && (
+              <Alert variant="destructive">
+                <XCircle />
+                <AlertTitle>{refusal.title}</AlertTitle>
+                {refusal.detail && <AlertDescription>{refusal.detail}</AlertDescription>}
+              </Alert>
             )}
-          </form>
-        </CardContent>
-      </Card>
+
+            <div className="mt-2 flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep("site")}
+                disabled={install.isPending}
+              >
+                <ArrowLeft />
+                {t("setup.back")}
+              </Button>
+              <Button type="submit" className="flex-1" disabled={install.isPending || !ready}>
+                {install.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+                {t(install.isPending ? "setup.installing" : "setup.install")}
+              </Button>
+            </div>
+          </>
+        )}
+      </form>
     </AuthLayout>
   );
 }
@@ -237,7 +226,7 @@ function Steps({ step }: { step: "site" | "account" }) {
   ] as const;
 
   return (
-    <ol className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+    <ol className="flex items-center gap-2 pb-2 text-xs text-muted-foreground">
       {steps.map((s, i) => {
         const done = s.id === "site" && step === "account";
         const here = s.id === step;

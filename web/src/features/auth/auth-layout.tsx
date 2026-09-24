@@ -3,6 +3,8 @@ import { KiteMark } from '@/components/KiteMark'
 import { LanguagePicker } from '@/components/language-picker'
 
 type AuthLayoutProps = {
+  title: React.ReactNode
+  description: React.ReactNode
   children: React.ReactNode
 }
 
@@ -10,24 +12,37 @@ type AuthLayoutProps = {
  * The door, and what it says: no site title and nothing about what is
  * behind it. Everything a studio knows comes from an API that will not answer
  * until somebody has signed in.
+ *
+ * It is shadcn-admin's second sign-in page without its picture: the form
+ * alone, in the middle of the page.
  */
-export function AuthLayout({ children }: AuthLayoutProps) {
+export function AuthLayout({ title, description, children }: AuthLayoutProps) {
   return (
-    <div className='container grid h-svh max-w-none items-center justify-center'>
-      <div className='mx-auto flex w-full flex-col justify-center space-y-2 py-8 sm:p-8'>
-        <div className='mb-4 flex items-center justify-center'>
-          <KiteMark className='me-2 size-7' />
-          <h1 className='text-xl font-medium'>Kite</h1>
+    // Kite: min-h-svh rather than h-svh, so a form taller than a landscape
+    // phone scrolls instead of losing its top.
+    <div className='relative container grid min-h-svh flex-col items-center justify-center'>
+      <div className='lg:p-8'>
+        <div className='mx-auto flex w-full flex-col justify-center space-y-2 py-8 sm:w-120 sm:p-8'>
+          <div className='mb-4 flex items-center justify-center'>
+            <KiteMark className='me-2 size-6' />
+            <h1 className='text-xl font-medium'>Kite</h1>
+          </div>
         </div>
-        {children}
-        <AuthFooter />
+        <div className='mx-auto flex w-full max-w-sm flex-col justify-center space-y-2'>
+          <div className='flex flex-col space-y-2 text-start'>
+            <h2 className='text-lg font-semibold tracking-tight'>{title}</h2>
+            <p className='text-sm text-muted-foreground'>{description}</p>
+          </div>
+          {children}
+          <AuthFooter />
+        </div>
       </div>
     </div>
   )
 }
 
 /** AuthFooter is the way back out, and the language to read the form in. */
-export function AuthFooter() {
+function AuthFooter() {
   const { t } = useI18n()
   return (
     <div className='flex items-center justify-center gap-2 pt-2 text-xs text-muted-foreground'>
