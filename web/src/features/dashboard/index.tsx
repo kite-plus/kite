@@ -3,7 +3,7 @@ import { ExternalLink, Plus } from "lucide-react";
 
 import { useI18n, type Key } from "@/i18n";
 import { useContentTypes, useSite, useTaxonomies } from "@/hooks/useContents";
-import { useKindLabel } from "@/hooks/useKindLabel";
+import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { useSession } from "@/hooks/useSession";
 import { siteHome } from "@/lib/links";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ export function Dashboard() {
   const types = useContentTypes();
   const taxonomies = useTaxonomies();
   const kindLabel = useKindLabel();
+  const taxonomyLabel = useTaxonomyLabel();
 
   const kinds = types.data?.items.map((type) => type.kind) ?? ["post", "page"];
   const primary = kinds[0] ?? "post";
@@ -34,15 +35,14 @@ export function Dashboard() {
   const name = session.data?.required ? session.data.user : undefined;
 
   // The site in figures, as explore's console heads its own: each kind, then
-  // the terms that sort them.
+  // each taxonomy that sorts them.
   const counts = site.data?.counts;
-  const terms = taxonomies.data?.items.reduce((sum, taxonomy) => sum + taxonomy.terms, 0);
   const figures = [
     site.data?.title,
     ...kinds.map((kind) =>
       counts?.[kind] !== undefined ? `${kindLabel.many(kind)} ${counts[kind]}` : undefined,
     ),
-    terms !== undefined ? `${t("dashboard.terms")} ${terms}` : undefined,
+    ...(taxonomies.data?.items ?? []).map((item) => `${taxonomyLabel(item.name)} ${item.terms}`),
   ]
     .filter(Boolean)
     .join(" · ");

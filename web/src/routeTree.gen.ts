@@ -14,12 +14,13 @@ import { Route as authSetupRouteImport } from './routes/(auth)/setup'
 import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
-import { Route as AuthenticatedTaxonomiesRouteImport } from './routes/_authenticated/taxonomies'
 import { Route as AuthenticatedThemeRouteImport } from './routes/_authenticated/theme'
 import { Route as AuthenticatedContentKindRouteRouteImport } from './routes/_authenticated/content/$kind/route'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsThemeRouteImport } from './routes/_authenticated/settings/theme'
+import { Route as AuthenticatedTaxonomiesIndexRouteImport } from './routes/_authenticated/taxonomies/index'
+import { Route as AuthenticatedTaxonomiesTaxonomyRouteImport } from './routes/_authenticated/taxonomies/$taxonomy'
 import { Route as AuthenticatedContentKindIndexRouteImport } from './routes/_authenticated/content/$kind/index'
 import { Route as AuthenticatedContentKindIdRouteImport } from './routes/_authenticated/content/$kind/$id'
 
@@ -48,11 +49,6 @@ const AuthenticatedSettingsRouteRoute =
     path: '/settings',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedTaxonomiesRoute = AuthenticatedTaxonomiesRouteImport.update({
-  id: '/taxonomies',
-  path: '/taxonomies',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedThemeRoute = AuthenticatedThemeRouteImport.update({
   id: '/theme',
   path: '/theme',
@@ -82,6 +78,18 @@ const AuthenticatedSettingsThemeRoute =
     path: '/theme',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedTaxonomiesIndexRoute =
+  AuthenticatedTaxonomiesIndexRouteImport.update({
+    id: '/taxonomies/',
+    path: '/taxonomies/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTaxonomiesTaxonomyRoute =
+  AuthenticatedTaxonomiesTaxonomyRouteImport.update({
+    id: '/taxonomies/$taxonomy',
+    path: '/taxonomies/$taxonomy',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedContentKindIndexRoute =
   AuthenticatedContentKindIndexRouteImport.update({
     id: '/',
@@ -100,24 +108,26 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/setup': typeof authSetupRoute
   '/sign-in': typeof authSignInRoute
-  '/taxonomies': typeof AuthenticatedTaxonomiesRoute
   '/theme': typeof AuthenticatedThemeRoute
   '/content/$kind': typeof AuthenticatedContentKindRouteRouteWithChildren
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/theme': typeof AuthenticatedSettingsThemeRoute
+  '/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/taxonomies/': typeof AuthenticatedTaxonomiesIndexRoute
   '/content/$kind/$id': typeof AuthenticatedContentKindIdRoute
   '/content/$kind/': typeof AuthenticatedContentKindIndexRoute
 }
 export interface FileRoutesByTo {
   '/setup': typeof authSetupRoute
   '/sign-in': typeof authSignInRoute
-  '/taxonomies': typeof AuthenticatedTaxonomiesRoute
   '/theme': typeof AuthenticatedThemeRoute
   '/': typeof AuthenticatedIndexRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/theme': typeof AuthenticatedSettingsThemeRoute
+  '/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
+  '/taxonomies': typeof AuthenticatedTaxonomiesIndexRoute
   '/content/$kind/$id': typeof AuthenticatedContentKindIdRoute
   '/content/$kind': typeof AuthenticatedContentKindIndexRoute
 }
@@ -127,13 +137,14 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/(auth)/setup': typeof authSetupRoute
   '/(auth)/sign-in': typeof authSignInRoute
-  '/_authenticated/taxonomies': typeof AuthenticatedTaxonomiesRoute
   '/_authenticated/theme': typeof AuthenticatedThemeRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/content/$kind': typeof AuthenticatedContentKindRouteRouteWithChildren
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/theme': typeof AuthenticatedSettingsThemeRoute
+  '/_authenticated/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/_authenticated/taxonomies/': typeof AuthenticatedTaxonomiesIndexRoute
   '/_authenticated/content/$kind/$id': typeof AuthenticatedContentKindIdRoute
   '/_authenticated/content/$kind/': typeof AuthenticatedContentKindIndexRoute
 }
@@ -144,24 +155,26 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup'
     | '/sign-in'
-    | '/taxonomies'
     | '/theme'
     | '/content/$kind'
     | '/settings/appearance'
     | '/settings/theme'
+    | '/taxonomies/$taxonomy'
     | '/settings/'
+    | '/taxonomies/'
     | '/content/$kind/$id'
     | '/content/$kind/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/setup'
     | '/sign-in'
-    | '/taxonomies'
     | '/theme'
     | '/'
     | '/settings/appearance'
     | '/settings/theme'
+    | '/taxonomies/$taxonomy'
     | '/settings'
+    | '/taxonomies'
     | '/content/$kind/$id'
     | '/content/$kind'
   id:
@@ -170,13 +183,14 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/(auth)/setup'
     | '/(auth)/sign-in'
-    | '/_authenticated/taxonomies'
     | '/_authenticated/theme'
     | '/_authenticated/'
     | '/_authenticated/content/$kind'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/theme'
+    | '/_authenticated/taxonomies/$taxonomy'
     | '/_authenticated/settings/'
+    | '/_authenticated/taxonomies/'
     | '/_authenticated/content/$kind/$id'
     | '/_authenticated/content/$kind/'
   fileRoutesById: FileRoutesById
@@ -224,13 +238,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/taxonomies': {
-      id: '/_authenticated/taxonomies'
-      path: '/taxonomies'
-      fullPath: '/taxonomies'
-      preLoaderRoute: typeof AuthenticatedTaxonomiesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/theme': {
       id: '/_authenticated/theme'
       path: '/theme'
@@ -265,6 +272,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/theme'
       preLoaderRoute: typeof AuthenticatedSettingsThemeRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/taxonomies/': {
+      id: '/_authenticated/taxonomies/'
+      path: '/taxonomies'
+      fullPath: '/taxonomies/'
+      preLoaderRoute: typeof AuthenticatedTaxonomiesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/taxonomies/$taxonomy': {
+      id: '/_authenticated/taxonomies/$taxonomy'
+      path: '/taxonomies/$taxonomy'
+      fullPath: '/taxonomies/$taxonomy'
+      preLoaderRoute: typeof AuthenticatedTaxonomiesTaxonomyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/content/$kind/': {
       id: '/_authenticated/content/$kind/'
@@ -319,19 +340,21 @@ const AuthenticatedContentKindRouteRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
-  AuthenticatedTaxonomiesRoute: typeof AuthenticatedTaxonomiesRoute
   AuthenticatedThemeRoute: typeof AuthenticatedThemeRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedContentKindRouteRoute: typeof AuthenticatedContentKindRouteRouteWithChildren
+  AuthenticatedTaxonomiesTaxonomyRoute: typeof AuthenticatedTaxonomiesTaxonomyRoute
+  AuthenticatedTaxonomiesIndexRoute: typeof AuthenticatedTaxonomiesIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
-  AuthenticatedTaxonomiesRoute: AuthenticatedTaxonomiesRoute,
   AuthenticatedThemeRoute: AuthenticatedThemeRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedContentKindRouteRoute:
     AuthenticatedContentKindRouteRouteWithChildren,
+  AuthenticatedTaxonomiesTaxonomyRoute: AuthenticatedTaxonomiesTaxonomyRoute,
+  AuthenticatedTaxonomiesIndexRoute: AuthenticatedTaxonomiesIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

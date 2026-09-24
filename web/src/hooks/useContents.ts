@@ -113,11 +113,14 @@ export function useContentTypes() {
   return useQuery(contentTypesQuery);
 }
 
+/** taxonomiesQuery is shared with the routes that turn away a taxonomy the project lacks. */
+export const taxonomiesQuery = {
+  queryKey: ["taxonomies"],
+  queryFn: async () => unwrap(await api.GET("/taxonomies", {})),
+};
+
 export function useTaxonomies() {
-  return useQuery({
-    queryKey: ["taxonomies"],
-    queryFn: async () => unwrap(await api.GET("/taxonomies", {})),
-  });
+  return useQuery(taxonomiesQuery);
 }
 
 const termsQuery = (taxonomy: string) => ({

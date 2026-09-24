@@ -5,7 +5,14 @@ import { useLatest, useTerms } from "@/hooks/useContents";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { useDelivery, usePublish } from "@/hooks/usePublish";
 import { isoDate } from "@/lib/dates";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeliveryStages } from "@/components/publish/Delivery";
 import { QueryError } from "@/components/query-error";
@@ -107,6 +114,15 @@ export function TopTerms({ kind, taxonomy }: { kind: string; taxonomy: string })
       <CardHeader>
         <CardTitle>{t("dashboard.topTerms", { name: taxonomyLabel(taxonomy) })}</CardTitle>
         <CardDescription>{t("dashboard.termCount", { count: terms.data?.items.length ?? 0 })}</CardDescription>
+        <CardAction>
+          <Link
+            to="/taxonomies/$taxonomy"
+            params={{ taxonomy }}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            {t("dashboard.viewAll")}
+          </Link>
+        </CardAction>
       </CardHeader>
       <CardContent>
         {terms.error && !terms.data ? (

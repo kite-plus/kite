@@ -1,16 +1,18 @@
 import {
   FileText,
+  Folder,
   LayoutDashboard,
   Newspaper,
   Palette,
   Settings,
   SlidersHorizontal,
+  Tag,
   Tags,
   UserCog,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { useContentTypes } from '@/hooks/useContents'
-import { useKindLabel } from '@/hooks/useKindLabel'
+import { useContentTypes, useTaxonomies } from '@/hooks/useContents'
+import { useKindLabel, useTaxonomyLabel } from '@/hooks/useKindLabel'
 import { type SidebarData } from '../types'
 
 const kindIcons: Record<string, React.ElementType> = {
@@ -18,17 +20,26 @@ const kindIcons: Record<string, React.ElementType> = {
   page: FileText,
 }
 
+const taxonomyIcons: Record<string, React.ElementType> = {
+  categories: Folder,
+  tags: Tags,
+}
+
 /**
  * useSidebarData is the navigation, built from what the project has: one
- * entry per content kind it declares, and nothing it does not.
+ * entry per content kind it declares and per taxonomy, as a blog's posts,
+ * pages, categories and tags, and nothing it does not.
  */
 export function useSidebarData(): SidebarData {
   const { t } = useI18n()
   const types = useContentTypes()
   const kindLabel = useKindLabel()
+  const taxonomies = useTaxonomies()
+  const taxonomyLabel = useTaxonomyLabel()
 
-  // Until the types arrive the two built-in kinds hold the rail's shape.
+  // Until the answers arrive the built-in kinds and taxonomies hold the rail's shape.
   const kinds = types.data?.items.map((type) => type.kind) ?? ['post', 'page']
+  const names = taxonomies.data?.items.map((item) => item.name) ?? ['categories', 'tags']
 
   return {
     navGroups: [
@@ -44,7 +55,11 @@ export function useSidebarData(): SidebarData {
             url: `/content/${encodeURIComponent(kind)}`,
             icon: kindIcons[kind] ?? FileText,
           })),
-          { title: t('nav.taxonomies'), url: '/taxonomies', icon: Tags },
+          ...names.map((name) => ({
+            title: taxonomyLabel(name),
+            url: `/taxonomies/${encodeURIComponent(name)}`,
+            icon: taxonomyIcons[name] ?? Tag,
+          })),
         ],
       },
       {
