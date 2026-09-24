@@ -16,7 +16,7 @@ import { isoDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { StatusDot } from "@/components/StatusDot";
+import { StatusLabel } from "@/components/StatusLabel";
 import { AppHeader } from "@/components/layout/app-header";
 import { Header } from "@/components/layout/header";
 import { Main } from "@/components/layout/main";
@@ -384,7 +384,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
         </div>
 
         <Badge variant="outline" className="hidden sm:inline-flex">
-          <StatusDot status={draft.status} />
+          <StatusLabel status={draft.status} className="gap-1.5 [&_svg]:size-3.5" />
         </Badge>
 
         <Button

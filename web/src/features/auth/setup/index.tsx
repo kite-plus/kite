@@ -208,7 +208,7 @@ function Hint({ tone, children }: { tone?: "right" | "wrong"; children: ReactNod
       className={cn(
         "text-sm text-muted-foreground",
         tone === "wrong" && "text-destructive",
-        tone === "right" && "text-emerald-600 dark:text-emerald-400",
+        tone === "right" && "text-success",
       )}
     >
       {tone === "right" && <Check aria-hidden className="me-1 inline size-3.5 align-[-0.15em]" />}

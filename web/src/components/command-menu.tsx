@@ -27,7 +27,7 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command'
-import { StatusDot } from './StatusDot'
+import { StatusLabel } from './StatusLabel'
 import { useSidebarData } from './layout/data/sidebar-data'
 import { ScrollArea } from './ui/scroll-area'
 
@@ -177,7 +177,7 @@ export function CommandMenu() {
                 >
                   <FileText />
                   <span className='truncate'>{item.title || item.slug}</span>
-                  <StatusDot status={item.status} className='ms-auto shrink-0 text-xs' />
+                  <StatusLabel status={item.status} className='ms-auto shrink-0 gap-1.5 text-xs' />
                 </CommandItem>
               ))}
             </CommandGroup>

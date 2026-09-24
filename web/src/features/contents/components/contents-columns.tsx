@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTableColumnHeader } from "@/components/data-table";
-import { StatusDot } from "@/components/StatusDot";
+import { StatusLabel } from "@/components/StatusLabel";
 import { RowActions } from "./row-actions";
 
 interface Options {
@@ -135,7 +135,7 @@ export function useContentsColumns({
         id: "status",
         accessorKey: "status",
         header: ({ column }) => <DataTableColumnHeader column={column} title={t("list.status")} />,
-        cell: ({ row }) => <StatusDot status={row.original.status} className="whitespace-nowrap" />,
+        cell: ({ row }) => <StatusLabel status={row.original.status} />,
         enableSorting: false,
         meta: { title: t("list.status") },
       },

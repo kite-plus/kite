@@ -35,8 +35,11 @@
 
   /* Kite: the mark's blue, #4A77D6, for links inside the editor. */
   --brand: #4a77d6;
-  --success: oklch(0.627 0.194 149.214);
+  /* Kite: state colors, as explore's console uses them. Green passed, amber
+     waits, blue is on its way; red stays --destructive. */
+  --success: oklch(0.527 0.154 150.069);
   --warning: oklch(0.666 0.179 58.318);
+  --info: oklch(0.546 0.245 262.881);
   /* Kite: names the editor's stylesheet reads. */
   --prose: var(--foreground);
   --divider: var(--border);
@@ -71,6 +74,7 @@
   --brand: oklch(0.646 0.143 262.5);
   --success: oklch(0.723 0.219 149.579);
   --warning: oklch(0.769 0.188 70.08);
+  --info: oklch(0.707 0.165 254.624);
 }
 
 @theme inline {
@@ -117,4 +121,5 @@
   --color-brand: var(--brand);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-info: var(--info);
 }

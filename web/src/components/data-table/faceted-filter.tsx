@@ -30,6 +30,8 @@ type DataTableFacetedFilterProps<TData, TValue> = {
     icon?: React.ComponentType<{ className?: string }>
     // Kite: how many rows carry it, when the rows live on a server.
     count?: number
+    // Kite: colors the icon and label, as in the column's cells.
+    className?: string
   }[]
 }
 
@@ -117,9 +119,11 @@ export function DataTableFacetedFilter<TData, TValue>({
                       <Check className={cn('h-4 w-4 text-background')} />
                     </div>
                     {option.icon && (
-                      <option.icon className='size-4 text-muted-foreground' />
+                      <option.icon
+                        className={cn('size-4 text-muted-foreground', option.className)}
+                      />
                     )}
-                    <span>{option.label}</span>
+                    <span className={option.className}>{option.label}</span>
                     {(option.count ?? facets?.get(option.value)) ? (
                       <span className='ms-auto flex h-4 min-w-4 items-center justify-center font-mono text-xs'>
                         {option.count ?? facets?.get(option.value)}
