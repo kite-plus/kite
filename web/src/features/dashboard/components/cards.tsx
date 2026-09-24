@@ -1,18 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, Trash2 } from "lucide-react";
 
 import { useI18n } from "@/i18n";
-import { useLatest, useSite, useStatusCounts, useTerms } from "@/hooks/useContents";
+import { useLatest, useTerms } from "@/hooks/useContents";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { useDelivery, usePublish } from "@/hooks/usePublish";
 import { isoDate } from "@/lib/dates";
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeliveryStages } from "@/components/publish/Delivery";
-import { statuses } from "@/components/StatusLabel";
+import { QueryError } from "@/components/query-error";
 
 /** LatestPosts is what went out last, newest first, each one a way back in. */
 export function LatestPosts({ kind }: { kind: string }) {
@@ -28,7 +25,9 @@ export function LatestPosts({ kind }: { kind: string }) {
         <CardDescription>{t("dashboard.latestNote")}</CardDescription>
       </CardHeader>
       <CardContent>
-        {latest.isPending ? (
+        {latest.error && !latest.data ? (
+          <QueryError error={latest.error} onRetry={() => void latest.refetch()} />
+        ) : latest.isPending ? (
           <div className="space-y-4">
             {Array.from({ length: 4 }, (_, i) => (
               <Skeleton key={i} className="h-9 w-full" />
@@ -84,71 +83,13 @@ export function DeliveryCard() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {delivery.isPending ? (
+        {delivery.error && !delivery.data ? (
+          <QueryError error={delivery.error} onRetry={() => void delivery.refetch()} />
+        ) : delivery.isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : (
           <DeliveryStages delivery={delivery.data} publish={publish} />
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** PendingCard lists what is waiting on the author, each a link to it. */
-export function PendingCard({ kind }: { kind: string }) {
-  const { t } = useI18n();
-  const site = useSite();
-  const counts = useStatusCounts(kind, ["draft", "scheduled", "trash"]);
-  const problems = site.data?.problems?.length ?? 0;
-
-  const rows = [
-    {
-      key: "draft",
-      label: t("dashboard.pendingDrafts"),
-      count: counts.draft,
-      search: { status: ["draft"] },
-      ...statuses.draft,
-    },
-    {
-      key: "scheduled",
-      label: t("dashboard.pendingScheduled"),
-      count: counts.scheduled,
-      search: { status: ["scheduled"] },
-      ...statuses.scheduled,
-    },
-    {
-      key: "trash",
-      label: t("status.trash"),
-      count: counts.trash,
-      search: { trash: true },
-      icon: Trash2,
-      className: "text-muted-foreground",
-    },
-  ];
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("dashboard.pending")}</CardTitle>
-        <CardDescription>
-          {problems ? t("problems.notIndexed", { count: problems }) : t("dashboard.healthy")}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-1">
-        {rows.map((row) => (
-          <Button key={row.key} variant="ghost" className="w-full justify-between px-2" asChild>
-            <Link to="/content/$kind" params={{ kind }} search={row.search}>
-              <span className="flex items-center gap-2">
-                <row.icon className={cn("size-4", row.className)} />
-                {row.label}
-              </span>
-              <span className="flex items-center gap-1 text-muted-foreground tabular-nums">
-                {row.count ?? "—"}
-                <ChevronRight className="size-4" />
-              </span>
-            </Link>
-          </Button>
-        ))}
       </CardContent>
     </Card>
   );
@@ -168,7 +109,9 @@ export function TopTerms({ kind, taxonomy }: { kind: string; taxonomy: string })
         <CardDescription>{t("dashboard.termCount", { count: terms.data?.items.length ?? 0 })}</CardDescription>
       </CardHeader>
       <CardContent>
-        {items.length === 0 ? (
+        {terms.error && !terms.data ? (
+          <QueryError error={terms.error} onRetry={() => void terms.refetch()} />
+        ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("dashboard.noTaxonomies")}</p>
         ) : (
           <div className="flex flex-wrap gap-2">

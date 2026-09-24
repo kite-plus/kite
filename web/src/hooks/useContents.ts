@@ -176,5 +176,10 @@ export function useMonthlyCounts(kind: string, months: number) {
       },
     })),
   });
-  return ranges.map((range, i) => ({ month: range.start, total: results[i].data }));
+  return {
+    months: ranges.map((range, i) => ({ month: range.start, total: results[i].data })),
+    // A month that was read before keeps its figure through a failed refetch.
+    error: results.find((result) => result.error && result.data === undefined)?.error ?? null,
+    refetch: () => results.forEach((result) => void result.refetch()),
+  };
 }

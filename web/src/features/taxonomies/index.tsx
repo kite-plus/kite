@@ -18,6 +18,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
+import { PageTitle } from "@/components/layout/page-title";
+import { QueryError } from "@/components/query-error";
 
 export function Taxonomies() {
   const { t } = useI18n();
@@ -27,12 +29,11 @@ export function Taxonomies() {
     <>
       <AppHeader />
       <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">{t("taxonomies.title")}</h2>
-          <p className="text-muted-foreground">{t("taxonomies.description")}</p>
-        </div>
+        <PageTitle title={t("taxonomies.title")} description={t("taxonomies.description")} />
 
-        {taxonomies.data?.items.length === 0 ? (
+        {taxonomies.error && !taxonomies.data ? (
+          <QueryError error={taxonomies.error} onRetry={() => void taxonomies.refetch()} />
+        ) : taxonomies.data?.items.length === 0 ? (
           <div className="rounded-md border p-10 text-center text-muted-foreground">
             {t("taxonomies.empty")}
           </div>

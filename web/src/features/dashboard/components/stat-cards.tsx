@@ -1,89 +1,138 @@
 import type { ReactNode } from "react";
-import { FileText, GitCommitHorizontal, Newspaper, Tags } from "lucide-react";
+import { Link, type LinkProps } from "@tanstack/react-router";
+import {
+  Activity,
+  CalendarClock,
+  ChevronRight,
+  CircleDashed,
+  GitCommitHorizontal,
+  type LucideIcon,
+} from "lucide-react";
 
 import { useI18n } from "@/i18n";
-import { useSite, useStatusCounts, useTaxonomies } from "@/hooks/useContents";
-import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
+import { useSite, useStatusCounts } from "@/hooks/useContents";
+import { useKindLabel } from "@/hooks/useKindLabel";
 import { useDelivery } from "@/hooks/usePublish";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
-function Stat({
+type Tone = "success" | "warning" | "error" | "info" | "neutral";
+
+// The toasts' state colors.
+const toneClass: Record<Tone, string> = {
+  success: "text-success",
+  warning: "text-warning",
+  error: "text-destructive",
+  info: "text-info",
+  neutral: "text-muted-foreground",
+};
+
+/**
+ * StatCard is a figure with its state, after explore's console: as in the
+ * toasts, only the icon carries the state.
+ */
+function StatCard({
   title,
-  icon: Icon,
   value,
-  note,
+  hint,
+  icon: Icon,
+  tone,
+  link,
 }: {
   title: string;
-  icon: React.ElementType;
-  value?: ReactNode;
-  note?: ReactNode;
+  /** Undefined while loading. */
+  value: ReactNode | undefined;
+  hint: ReactNode;
+  icon: LucideIcon;
+  tone: Tone;
+  /** Where the figure is dealt with; without it the card is not a link. */
+  link?: LinkProps;
 }) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="size-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
+  const className = "flex flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground shadow-xs";
+  const body = (
+    <>
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <Icon
+          className={cn("size-4 shrink-0", value === undefined ? toneClass.neutral : toneClass[tone])}
+        />
+        {title}
+        {link && (
+          <ChevronRight className="ms-auto size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        )}
+      </div>
+      <div>
         {value === undefined ? (
           <Skeleton className="h-8 w-16" />
         ) : (
-          <div className="text-2xl font-bold tabular-nums">{value}</div>
+          <div className="text-2xl font-semibold tabular-nums">{value}</div>
         )}
-        <p className="text-xs text-muted-foreground">{note ?? " "}</p>
-      </CardContent>
-    </Card>
+        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+      </div>
+    </>
+  );
+  return link ? (
+    <Link {...link} className={cn(className, "group transition-colors hover:bg-accent/50")}>
+      {body}
+    </Link>
+  ) : (
+    <div className={className}>{body}</div>
   );
 }
 
-/** StatCards are the four numbers a writer checks: what exists and what waits. */
-export function StatCards({ primary, kinds }: { primary: string; kinds: string[] }) {
+/** StatCards are the four things a writer checks: what waits, and whether all is well. */
+export function StatCards({ kind }: { kind: string }) {
   const { t } = useI18n();
   const kindLabel = useKindLabel();
-  const taxonomyLabel = useTaxonomyLabel();
   const site = useSite();
-  const counts = useStatusCounts(primary);
-  const taxonomies = useTaxonomies();
+  const counts = useStatusCounts(kind, ["draft", "scheduled"]);
   const delivery = useDelivery();
 
-  const secondary = kinds.find((kind) => kind !== primary);
-  const terms = taxonomies.data?.items.reduce((sum, taxonomy) => sum + taxonomy.terms, 0);
-  const dirty = delivery.data?.dirty?.length;
+  const dirty = delivery.data?.dirty?.length ?? 0;
   const ahead = delivery.data?.ahead ?? 0;
+  const problems = site.data?.problems?.length ?? 0;
+  const many = kindLabel.many(kind);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Stat
-        title={kindLabel.many(primary)}
-        icon={Newspaper}
-        value={site.data?.counts?.[primary] ?? counts.all}
-        note={t("dashboard.statusNote", {
-          published: counts.published ?? 0,
-          draft: counts.draft ?? 0,
-          scheduled: counts.scheduled ?? 0,
-        })}
-      />
-      {secondary && (
-        <Stat
-          title={kindLabel.many(secondary)}
-          icon={FileText}
-          value={site.data?.counts?.[secondary]}
-        />
-      )}
-      <Stat
-        title={t("nav.taxonomies")}
-        icon={Tags}
-        value={terms}
-        note={taxonomies.data?.items
-          .map((taxonomy) => `${taxonomyLabel(taxonomy.name)} ${taxonomy.terms}`)
-          .join(" · ")}
-      />
-      <Stat
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatCard
         title={t("dashboard.unpublished")}
         icon={GitCommitHorizontal}
-        value={delivery.data ? (dirty ?? 0) : undefined}
-        note={ahead ? t("publish.toPush", { count: ahead }) : t("dashboard.unpublishedNote")}
+        value={delivery.data ? dirty : undefined}
+        tone={dirty || ahead ? "warning" : "success"}
+        hint={
+          ahead
+            ? t("publish.toPush", { count: ahead })
+            : dirty
+              ? t("dashboard.unpublishedNote")
+              : t("dashboard.allPublished")
+        }
+      />
+      <StatCard
+        title={t("dashboard.scheduled")}
+        icon={CalendarClock}
+        value={counts.scheduled}
+        tone={counts.scheduled ? "info" : "neutral"}
+        hint={
+          counts.scheduled ? t("dashboard.scheduledNote") : t("dashboard.noScheduled", { kind: many })
+        }
+        link={{ to: "/content/$kind", params: { kind }, search: { status: ["scheduled"] } }}
+      />
+      <StatCard
+        title={t("dashboard.drafts")}
+        icon={CircleDashed}
+        value={counts.draft}
+        tone="neutral"
+        hint={counts.draft ? t("dashboard.draftsNote", { kind: many }) : t("dashboard.noDrafts")}
+        link={{ to: "/content/$kind", params: { kind }, search: { status: ["draft"] } }}
+      />
+      <StatCard
+        title={t("dashboard.health")}
+        icon={Activity}
+        value={site.data ? (problems ? problems : t("dashboard.healthOK")) : undefined}
+        tone={problems ? "error" : "success"}
+        hint={problems ? t("problems.notIndexed", { count: problems }) : t("dashboard.healthy")}
+        // The listing says which files, and why.
+        link={problems ? { to: "/content/$kind", params: { kind } } : undefined}
       />
     </div>
   );

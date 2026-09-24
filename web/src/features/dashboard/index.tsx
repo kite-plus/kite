@@ -2,25 +2,26 @@ import { Link } from "@tanstack/react-router";
 import { ExternalLink, Plus } from "lucide-react";
 
 import { useI18n, type Key } from "@/i18n";
-import { useContentTypes, useSite } from "@/hooks/useContents";
+import { useContentTypes, useSite, useTaxonomies } from "@/hooks/useContents";
 import { useKindLabel } from "@/hooks/useKindLabel";
 import { useSession } from "@/hooks/useSession";
-import { longDay } from "@/lib/dates";
 import { siteHome } from "@/lib/links";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { IndexProblems } from "@/components/IndexProblems";
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
-import { DeliveryCard, LatestPosts, PendingCard, TopTerms } from "./components/cards";
+import { PageTitle } from "@/components/layout/page-title";
+import { RefreshButton } from "@/components/refresh-button";
+import { DeliveryCard, LatestPosts, TopTerms } from "./components/cards";
 import { Overview } from "./components/overview";
 import { StatCards } from "./components/stat-cards";
 
 export function Dashboard() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const site = useSite();
   const session = useSession();
   const types = useContentTypes();
+  const taxonomies = useTaxonomies();
   const kindLabel = useKindLabel();
 
   const kinds = types.data?.items.map((type) => type.kind) ?? ["post", "page"];
@@ -32,63 +33,66 @@ export function Dashboard() {
   const greeting = t(`dashboard.${part}` as Key);
   const name = session.data?.required ? session.data.user : undefined;
 
+  // The site in figures, as explore's console heads its own: each kind, then
+  // the terms that sort them.
+  const counts = site.data?.counts;
+  const terms = taxonomies.data?.items.reduce((sum, taxonomy) => sum + taxonomy.terms, 0);
+  const figures = [
+    site.data?.title,
+    ...kinds.map((kind) =>
+      counts?.[kind] !== undefined ? `${kindLabel.many(kind)} ${counts[kind]}` : undefined,
+    ),
+    terms !== undefined ? `${t("dashboard.terms")} ${terms}` : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <>
       <AppHeader />
 
-      <Main>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {name ? t("dashboard.greeting", { greeting, name }) : greeting}
-            </h1>
-            <p className="text-muted-foreground">
-              {site.data?.title ? `${site.data.title} · ` : ""}
-              {longDay(locale)}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" asChild>
-              <a href={siteHome(site.data)} target="_blank" rel="noreferrer">
-                <ExternalLink />
-                {t("nav.viewSite")}
-              </a>
-            </Button>
-            <Button asChild>
-              <Link to="/content/$kind/$id" params={{ kind: primary, id: "new" }}>
-                <Plus />
-                {t("dashboard.write", { kind: kindLabel.one(primary) })}
-              </Link>
-            </Button>
-          </div>
+      <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
+        <PageTitle
+          title={name ? t("dashboard.greeting", { greeting, name }) : greeting}
+          description={figures || " "}
+        >
+          <RefreshButton />
+          <Button variant="outline" asChild>
+            <a href={siteHome(site.data)} target="_blank" rel="noreferrer">
+              <ExternalLink />
+              {t("nav.viewSite")}
+            </a>
+          </Button>
+          <Button asChild>
+            <Link to="/content/$kind/$id" params={{ kind: primary, id: "new" }}>
+              <Plus />
+              {t("dashboard.write", { kind: kindLabel.one(primary) })}
+            </Link>
+          </Button>
+        </PageTitle>
+
+        <StatCards kind={primary} />
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
+          <Card className="col-span-1 lg:col-span-4">
+            <CardHeader>
+              <CardTitle>{t("dashboard.overview")}</CardTitle>
+              <CardDescription>
+                {t("dashboard.overviewNote", { kind: kindLabel.many(primary) })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="ps-2">
+              <Overview kind={primary} />
+            </CardContent>
+          </Card>
+          <LatestPosts kind={primary} />
         </div>
 
-        <div className="space-y-4">
-          <IndexProblems />
-          <StatCards primary={primary} kinds={kinds} />
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
-            <Card className="col-span-1 lg:col-span-4">
-              <CardHeader>
-                <CardTitle>{t("dashboard.overview")}</CardTitle>
-                <CardDescription>
-                  {t("dashboard.overviewNote", { kind: kindLabel.many(primary) })}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="ps-2">
-                <Overview kind={primary} />
-              </CardContent>
-            </Card>
-            <LatestPosts kind={primary} />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <DeliveryCard />
-            <PendingCard kind={primary} />
-            {tagged.length > 0 && (
-              <TopTerms kind={primary} taxonomy={tagged.includes("tags") ? "tags" : tagged[0]} />
-            )}
-          </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <DeliveryCard />
+          {tagged.length > 0 && (
+            <TopTerms kind={primary} taxonomy={tagged.includes("tags") ? "tags" : tagged[0]} />
+          )}
         </div>
       </Main>
     </>

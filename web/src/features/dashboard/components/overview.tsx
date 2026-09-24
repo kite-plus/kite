@@ -2,12 +2,15 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recha
 
 import { useI18n } from "@/i18n";
 import { useMonthlyCounts } from "@/hooks/useContents";
+import { QueryError } from "@/components/query-error";
 
 /** Overview draws how much a kind published in each of the last twelve months. */
 export function Overview({ kind }: { kind: string }) {
   const { locale } = useI18n();
   const month = new Intl.DateTimeFormat(locale, { month: "short" });
-  const data = useMonthlyCounts(kind, 12).map((entry) => ({
+  const counts = useMonthlyCounts(kind, 12);
+  if (counts.error) return <QueryError error={counts.error} onRetry={counts.refetch} />;
+  const data = counts.months.map((entry) => ({
     name: month.format(entry.month),
     total: entry.total ?? 0,
   }));

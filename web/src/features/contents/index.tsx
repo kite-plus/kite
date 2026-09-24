@@ -27,7 +27,9 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IndexProblems } from "@/components/IndexProblems";
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
+import { PageTitle } from "@/components/layout/page-title";
 import { PublishDialog } from "@/components/publish/PublishDialog";
+import { QueryError } from "@/components/query-error";
 import { statuses } from "@/components/StatusLabel";
 import { useContentsColumns } from "./components/contents-columns";
 import { ContentsTable } from "./components/contents-table";
@@ -206,44 +208,39 @@ export function ContentList() {
       <AppHeader />
 
       <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">
-              {trashed ? t("status.trash") : kindLabel.many(kind)}
-            </h2>
-            <p className="text-muted-foreground">
-              {t(trashed ? "list.trashNote" : "list.description", { kind: kindLabel.many(kind) })}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            {trashed ? (
+        <PageTitle
+          title={trashed ? t("status.trash") : kindLabel.many(kind)}
+          description={t(trashed ? "list.trashNote" : "list.description", {
+            kind: kindLabel.many(kind),
+          })}
+        >
+          {trashed ? (
+            <Button variant="outline" asChild>
+              <Link to="/content/$kind" params={{ kind }}>
+                <ArrowLeft />
+                {t("list.backTo", { kind: kindLabel.many(kind) })}
+              </Link>
+            </Button>
+          ) : (
+            <>
               <Button variant="outline" asChild>
-                <Link to="/content/$kind" params={{ kind }}>
-                  <ArrowLeft />
-                  {t("list.backTo", { kind: kindLabel.many(kind) })}
+                <Link to="/content/$kind" params={{ kind }} search={{ trash: true }}>
+                  <Trash2 />
+                  {t("status.trash")}
+                  {counts.trash ? (
+                    <span className="text-muted-foreground tabular-nums">{counts.trash}</span>
+                  ) : null}
                 </Link>
               </Button>
-            ) : (
-              <>
-                <Button variant="outline" asChild>
-                  <Link to="/content/$kind" params={{ kind }} search={{ trash: true }}>
-                    <Trash2 />
-                    {t("status.trash")}
-                    {counts.trash ? (
-                      <span className="text-muted-foreground tabular-nums">{counts.trash}</span>
-                    ) : null}
-                  </Link>
-                </Button>
-                <Button asChild>
-                  <Link to="/content/$kind/$id" params={{ kind, id: "new" }}>
-                    <Plus />
-                    {t("list.newKind", { kind: kindLabel.one(kind) })}
-                  </Link>
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
+              <Button asChild>
+                <Link to="/content/$kind/$id" params={{ kind, id: "new" }}>
+                  <Plus />
+                  {t("list.newKind", { kind: kindLabel.one(kind) })}
+                </Link>
+              </Button>
+            </>
+          )}
+        </PageTitle>
 
         <IndexProblems />
 
@@ -283,12 +280,8 @@ export function ContentList() {
           </Alert>
         )}
 
-        {page.error ? (
-          <Alert variant="destructive">
-            <XCircle />
-            <AlertTitle>{t("list.failed")}</AlertTitle>
-            <AlertDescription>{String(page.error)}</AlertDescription>
-          </Alert>
+        {page.error && !page.data ? (
+          <QueryError error={page.error} onRetry={() => void page.refetch()} />
         ) : (
           <ContentsTable
             items={items}
