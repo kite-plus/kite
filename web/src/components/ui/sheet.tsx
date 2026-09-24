@@ -88,11 +88,12 @@ function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
   )
 }
 
+// Kite: unlike shadcn-admin's stacked footer, the buttons share one row equally.
 function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot='sheet-footer'
-      className={cn('mt-auto flex flex-col gap-2 p-4', className)}
+      className={cn('mt-auto flex gap-2 p-4 *:flex-1', className)}
       {...props}
     />
   )

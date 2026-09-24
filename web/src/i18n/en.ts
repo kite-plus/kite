@@ -26,6 +26,7 @@ export const en = {
   "taxonomy.tags": "Tags",
   "taxonomy.categories": "Categories",
   "common.cancel": "Cancel",
+  "common.close": "Close",
   "common.continue": "Continue",
 
   // The command palette.

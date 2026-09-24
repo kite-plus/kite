@@ -24,6 +24,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "taxonomy.tags": "标签",
   "taxonomy.categories": "分类",
   "common.cancel": "取消",
+  "common.close": "关闭",
   "common.continue": "继续",
 
   "palette.title": "搜索",
