@@ -5,11 +5,11 @@ import { useLatest, useTerms } from "@/hooks/useContents";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { useDelivery, usePublish } from "@/hooks/usePublish";
 import { isoDate } from "@/lib/dates";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeliveryStages } from "@/components/publish/Delivery";
 import { QueryError } from "@/components/query-error";
+import { TermBadge } from "@/components/TermBadge";
 
 /** LatestPosts is what went out last, newest first, each one a way back in. */
 export function LatestPosts({ kind }: { kind: string }) {
@@ -122,10 +122,11 @@ export function TopTerms({ kind, taxonomy }: { kind: string; taxonomy: string })
                 params={{ kind }}
                 search={{ terms: [`${taxonomy}:${item.term}`] }}
               >
-                <Badge variant="secondary" className="gap-1.5 font-normal hover:bg-secondary/70">
-                  {item.term}
-                  <span className="text-muted-foreground tabular-nums">{item.count}</span>
-                </Badge>
+                <TermBadge
+                  term={item.term}
+                  count={item.count}
+                  className="transition-opacity hover:opacity-80"
+                />
               </Link>
             ))}
           </div>

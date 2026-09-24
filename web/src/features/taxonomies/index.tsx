@@ -5,7 +5,6 @@ import type { Taxonomy } from "@/api/client";
 import { useI18n } from "@/i18n";
 import { useContentTypes, useTaxonomies, useTerms } from "@/hooks/useContents";
 import { useTaxonomyLabel } from "@/hooks/useKindLabel";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,6 +19,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
 import { QueryError } from "@/components/query-error";
+import { TermBadge } from "@/components/TermBadge";
 
 export function Taxonomies() {
   const { t } = useI18n();
@@ -82,16 +82,14 @@ function TaxonomyCard({ taxonomy }: { taxonomy: Taxonomy }) {
                   params={{ kind }}
                   search={{ terms: [`${taxonomy.name}:${item.term}`] }}
                 >
-                  <Badge variant="secondary" className="gap-1.5 font-normal hover:bg-secondary/70">
-                    {item.term}
-                    <span className="text-muted-foreground tabular-nums">{item.count}</span>
-                  </Badge>
+                  <TermBadge
+                    term={item.term}
+                    count={item.count}
+                    className="transition-opacity hover:opacity-80"
+                  />
                 </Link>
               ) : (
-                <Badge key={item.term} variant="secondary" className="gap-1.5 font-normal">
-                  {item.term}
-                  <span className="text-muted-foreground tabular-nums">{item.count}</span>
-                </Badge>
+                <TermBadge key={item.term} term={item.term} count={item.count} />
               ),
             )}
       </CardContent>
