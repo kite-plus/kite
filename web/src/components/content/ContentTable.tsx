@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef } from "react";
-import { ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { cn } from "cn";
 
 import type { Summary } from "@/api/client";
@@ -38,6 +38,8 @@ interface Props {
   activeTerms: Record<string, string>;
   onTerm: (taxonomy: string, term: string) => void;
   onDelete: (item: Summary) => void;
+  onRestore: (item: Summary) => void;
+  trashed: boolean;
   /** onCreate is offered on an empty listing that no filter is narrowing. */
   onCreate?: () => void;
   total: number;
@@ -57,6 +59,8 @@ export function ContentTable({
   activeTerms,
   onTerm,
   onDelete,
+  onRestore,
+  trashed,
   onCreate,
   total,
   page,
@@ -151,12 +155,16 @@ export function ContentTable({
 
                 <td className="py-3 pr-3.5">
                   <div className="flex min-w-0 items-center gap-[7px]">
-                    <a
-                      {...linkProps({ name: "edit", kind: item.kind, id: item.id })}
-                      className="truncate text-[13px] font-medium transition-colors hover:text-brand"
-                    >
-                      {item.title || item.slug}
-                    </a>
+                    {trashed ? (
+                      <span className="truncate text-[13px] font-medium">{item.title || item.slug}</span>
+                    ) : (
+                      <a
+                        {...linkProps({ name: "edit", kind: item.kind, id: item.id })}
+                        className="truncate text-[13px] font-medium transition-colors hover:text-brand"
+                      >
+                        {item.title || item.slug}
+                      </a>
+                    )}
                     {item.pinned && (
                       <span className="flex-none rounded-[5px] border border-pin-line bg-pin-soft px-1.5 py-px text-[10.5px] whitespace-nowrap text-pin">
                         {t("field.pinned")}
@@ -229,27 +237,36 @@ export function ContentTable({
                       <IconDots className="size-[15px]" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-40">
-                      <DropdownMenuGroup>
-                        <DropdownMenuItem
-                          onClick={() => navigate({ name: "edit", kind: item.kind, id: item.id })}
-                        >
-                          <Pencil />
-                          {t("list.edit")}
+                      {trashed ? (
+                        <DropdownMenuItem onClick={() => onRestore(item)}>
+                          <RotateCcw />
+                          {t("list.restore")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          render={<a href={item.url} target="_blank" rel="noreferrer" />}
-                        >
-                          <ExternalLink />
-                          {t("list.open")}
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuGroup>
-                        <DropdownMenuItem variant="destructive" onClick={() => onDelete(item)}>
-                          <Trash2 />
-                          {t("editor.delete")}
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
+                      ) : (
+                        <>
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem
+                              onClick={() => navigate({ name: "edit", kind: item.kind, id: item.id })}
+                            >
+                              <Pencil />
+                              {t("list.edit")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              render={<a href={item.url} target="_blank" rel="noreferrer" />}
+                            >
+                              <ExternalLink />
+                              {t("list.open")}
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem variant="destructive" onClick={() => onDelete(item)}>
+                              <Trash2 />
+                              {t("editor.delete")}
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </td>

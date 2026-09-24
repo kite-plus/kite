@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"maps"
 	"net/http"
 	"net/url"
@@ -64,6 +65,7 @@ func checkSetting(path string, value any) string {
 // handleSettings describes what can be configured and what it is set to.
 func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
 	view := s.src()
+	w.Header().Set("ETag", etag(view.ConfigRevision))
 
 	writeJSON(w, http.StatusOK, Settings{
 		Site: SiteSettings{
@@ -89,6 +91,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if !s.writable(w, view) {
 		return
 	}
+	revision, ok := s.requireIfMatch(w, r)
+	if !ok {
+		return
+	}
 
 	values, ok := decodeJSON[map[string]any](s, w, r)
 	if !ok {
@@ -110,9 +116,14 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := s.apply(r, view, content.ChangeSet{
-		Ops:     []content.Op{content.PutSettings{Values: values}},
+		Ops:     []content.Op{content.PutSettings{IfRevision: revision, Values: values}},
 		Message: "settings",
 	}); err != nil {
+		if conflict, ok := errors.AsType[*content.ConflictError](err); ok && string(conflict.ID) == "kite.yaml" {
+			w.Header().Set("ETag", etag(conflict.Actual))
+			fail(w, http.StatusConflict, CodeConflict, "settings changed since they were loaded")
+			return
+		}
 		s.failWrite(w, view, r, err)
 		return
 	}

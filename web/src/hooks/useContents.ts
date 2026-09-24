@@ -11,6 +11,7 @@ export interface Filters {
   terms?: string[];
   q?: string;
   sort?: string;
+  deletedOnly?: boolean;
 }
 
 export const PAGE_SIZE = 20;
@@ -39,6 +40,7 @@ export function useContentPage(filters: Filters, cursor: string | undefined) {
               term_all: filters.terms?.length ? filters.terms : undefined,
               q: filters.q || undefined,
               sort: filters.sort || undefined,
+              deleted_only: filters.deletedOnly ? "true" : undefined,
             },
           },
         }),
@@ -46,8 +48,8 @@ export function useContentPage(filters: Filters, cursor: string | undefined) {
   });
 }
 
-export type CountKey = "all" | Status;
-const everyCount: readonly CountKey[] = ["all", ...STATUSES];
+export type CountKey = "all" | "trash" | Status;
+const everyCount: readonly CountKey[] = ["all", ...STATUSES, "trash"];
 
 /** useStatusCounts sizes a kind by status; "all" is every status together. */
 export function useStatusCounts(kind: string, keys: readonly CountKey[] = everyCount) {
@@ -60,7 +62,8 @@ export function useStatusCounts(kind: string, keys: readonly CountKey[] = everyC
             params: {
               query: {
                 kind: [kind],
-                status: status === "all" ? undefined : [status],
+                status: status === "all" || status === "trash" ? undefined : [status],
+                deleted_only: status === "trash" ? "true" : undefined,
                 limit: 1,
                 count: true,
               },

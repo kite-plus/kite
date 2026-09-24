@@ -79,6 +79,7 @@ type Query struct {
 
 	// IncludeDeleted returns soft deleted items as well.
 	IncludeDeleted bool
+	DeletedOnly    bool
 
 	Sort   []SortKey
 	Cursor string

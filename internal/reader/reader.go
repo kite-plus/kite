@@ -322,7 +322,9 @@ func buildWhere(q content.Query) (string, []any, error) {
 	if len(q.IDs) > 0 {
 		add(`id IN (`+placeholders(len(q.IDs))+`)`, toAny(q.IDs)...)
 	}
-	if !q.IncludeDeleted {
+	if q.DeletedOnly {
+		add(`deleted_at IS NOT NULL`)
+	} else if !q.IncludeDeleted {
 		add(`deleted_at IS NULL`)
 	}
 	if q.PublicAt != nil {

@@ -12,14 +12,15 @@ import (
 
 // View is one consistent look at an open project.
 type View struct {
-	Reader   content.Reader
-	Resolver *url.Resolver
-	Types    *content.Registry
-	Site     config.Site
-	Store    string
-	Runtime  string
-	Theme    string
-	Version  string
+	Reader         content.Reader
+	Resolver       *url.Resolver
+	Types          *content.Registry
+	Site           config.Site
+	Store          string
+	Runtime        string
+	Theme          string
+	Version        string
+	ConfigRevision content.Revision
 
 	// ThemeSchema is what the theme declares it can be configured with, and
 	// ThemeValues what it is configured to. A theme author gets a settings

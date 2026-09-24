@@ -62,7 +62,7 @@ export function setGuard(next: Guard | null) {
   guard = next;
 }
 
-export function navigate(route: Route, options: { replace?: boolean } = {}) {
+export function navigate(route: Route, options: { replace?: boolean; skipGuard?: boolean } = {}) {
   const to = href(route);
   if (to === window.location.pathname) return;
 
@@ -71,7 +71,7 @@ export function navigate(route: Route, options: { replace?: boolean } = {}) {
     else window.history.pushState(null, "", to);
     emit();
   };
-  if (guard?.blocked()) guard.ask(go);
+  if (!options.skipGuard && guard?.blocked()) guard.ask(go);
   else go();
 }
 

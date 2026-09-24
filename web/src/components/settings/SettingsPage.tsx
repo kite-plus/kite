@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
 
-import { ApiError } from "@/api/client";
+import { ApiError, type Settings } from "@/api/client";
 import { locales, useI18n, useProblem, type Key, type Locale } from "@/i18n";
 import { useSaveSettings, useSettings } from "@/hooks/useSettings";
+import { useSettingsDraft } from "@/hooks/useSettingsDraft";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { useTheme, type Theme } from "@/lib/theme";
 
 import { LanguageSelect } from "@/components/LanguageSelect";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SettingsProblem } from "@/components/settings/SettingsProblem";
 import { Page } from "@/components/shell/Page";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,15 @@ const appearances = [
   { value: "system", icon: Monitor, label: "settings.system" },
 ] as const;
 
+function siteValues(site: Settings["site"]): Record<string, string> {
+  return {
+    title: site.title,
+    description: site.description ?? "",
+    base_url: site.base_url,
+    language: site.language ?? "",
+  };
+}
+
 export function SettingsPage() {
   const { t, locale, setLocale } = useI18n();
   const problem = useProblem();
@@ -63,24 +74,26 @@ export function SettingsPage() {
   const save = useSaveSettings();
   const { theme, setTheme } = useTheme();
 
-  const [site, setSite] = useState<Record<string, string>>({});
-  const stored = settings.data?.site as Record<string, string | undefined> | undefined;
-
-  useEffect(() => {
-    if (stored) setSite(Object.fromEntries(Object.entries(stored).map(([k, v]) => [k, v ?? ""])));
-  }, [stored]);
+  const stored = settings.data?.site;
+  const incoming = stored ? siteValues(stored) : undefined;
+  const form = useSettingsDraft(incoming, settings.data?.revision);
+  const site = form.values ?? {};
+  const guard = useUnsavedGuard(form.dirty);
 
   // Only what changed is sent, so a file is not rewritten for untouched values.
   const changes = Object.fromEntries(
     (Object.keys(sitePaths) as SiteKey[])
-      .filter((key) => stored && (site[key] ?? "") !== (stored[key] ?? ""))
+      .filter((key) => form.baseline && (site[key] ?? "") !== (form.baseline[key] ?? ""))
       .map((key) => [sitePaths[key], site[key] ?? ""]),
   );
-  const dirty = Object.keys(changes).length > 0;
+  const dirty = form.dirty;
+  const conflict = save.error instanceof ApiError && save.error.code === "conflict";
 
   const failure = settings.error ?? save.error;
   const said = failure
-    ? problem(failure instanceof ApiError ? failure.code : undefined, failure.message)
+    ? conflict
+      ? { title: t("settings.conflict") }
+      : problem(failure instanceof ApiError ? failure.code : undefined, failure.message)
     : null;
 
   return (
@@ -89,8 +102,13 @@ export function SettingsPage() {
       description={t("settings.description")}
       actions={
         <Button
-          disabled={!dirty || save.isPending}
-          onClick={() => save.mutate(changes, { onSuccess: () => toast.success(t("settings.saved")) })}
+          disabled={!dirty || save.isPending || conflict}
+          onClick={() => save.mutate({ changes, revision: form.revision ?? "" }, {
+            onSuccess: (result) => {
+              form.saved(siteValues(result.site), result.revision);
+              toast.success(t("settings.saved"));
+            },
+          })}
         >
           {save.isPending && <Spinner data-icon="inline-start" />}
           {t("settings.save")}
@@ -99,6 +117,15 @@ export function SettingsPage() {
     >
       <div className="flex max-w-2xl flex-col gap-3.5">
         {said && <SettingsProblem {...said} />}
+        {conflict && (
+          <Button variant="outline" onClick={async () => {
+            const result = await settings.refetch();
+            if (result.data) {
+              form.reset(siteValues(result.data.site), result.data.revision);
+              save.reset();
+            }
+          }}>{t("settings.reload")}</Button>
+        )}
 
         <Card>
           <CardHeader>
@@ -117,14 +144,14 @@ export function SettingsPage() {
                       <LanguageSelect
                         id={key}
                         value={site[key] ?? ""}
-                        onChange={(value) => setSite({ ...site, [key]: value })}
+                        onChange={(value) => form.change({ ...site, [key]: value })}
                       />
                     ) : (
                       <Input
                         id={key}
                         type={key === "base_url" ? "url" : "text"}
                         value={site[key] ?? ""}
-                        onChange={(event) => setSite({ ...site, [key]: event.target.value })}
+                        onChange={(event) => form.change({ ...site, [key]: event.target.value })}
                       />
                     )}
                   </Field>
@@ -185,6 +212,16 @@ export function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog
+        open={guard.leaving}
+        onOpenChange={(open) => !open && guard.cancel()}
+        title={t("editor.discardTitle")}
+        description={t("settings.discardNote")}
+        confirmLabel={t("editor.discard")}
+        cancelLabel={t("conflict.keepEditing")}
+        destructive
+        onConfirm={guard.discard}
+      />
     </Page>
   );
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/site"
+	"github.com/kite-plus/kite/internal/store/file"
 )
 
 // send issues a request with a body and returns the recorder, so a test can
@@ -344,13 +345,14 @@ func TestInvalidContentIsAClientError(t *testing.T) {
 	}
 }
 
-func TestDeleteRemovesTheBundleAndRefusesAStalePrecondition(t *testing.T) {
+func TestDeleteKeepsTheBundleRecoverableAndRefusesAStalePrecondition(t *testing.T) {
 	root := newProject(t, 3)
 	h, _ := newWritableServer(t, root)
 
 	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
 	item, tag := load(t, h, list.Items[0].ID)
 	dir := filepath.Join(root, filepath.FromSlash(item.Locator))
+	write(t, filepath.Join(dir, "cover.webp"), "attachment")
 
 	if rec := send(t, h, http.MethodDelete, api.Prefix+"/contents/"+item.ID, nil,
 		map[string]string{"If-Match": `"not-the-revision"`}); rec.Code != http.StatusConflict {
@@ -364,10 +366,35 @@ func TestDeleteRemovesTheBundleAndRefusesAStalePrecondition(t *testing.T) {
 		map[string]string{"If-Match": tag}); rec.Code != http.StatusNoContent {
 		t.Fatalf("delete returned %d, want 204", rec.Code)
 	}
-	if _, err := os.Stat(dir); err == nil {
-		t.Error("the bundle is still on disk")
+	if _, err := os.Stat(filepath.Join(dir, "cover.webp")); err != nil {
+		t.Errorf("soft delete lost the attachment: %v", err)
 	}
-	get[api.ErrorBody](t, h, api.Prefix+"/contents/"+item.ID, http.StatusNotFound)
+	active := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post", http.StatusOK)
+	for _, entry := range active.Items {
+		if entry.ID == item.ID {
+			t.Error("deleted item is still in the active list")
+		}
+	}
+	trash := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&deleted_only=true", http.StatusOK)
+	if len(trash.Items) != 1 || trash.Items[0].ID != item.ID {
+		t.Fatalf("trash = %+v, want only %s", trash.Items, item.ID)
+	}
+	if rec := send(t, h, http.MethodPost, api.Prefix+"/contents/"+item.ID+"/restore", nil,
+		map[string]string{"If-Match": tag}); rec.Code != http.StatusConflict {
+		t.Fatalf("stale restore returned %d, want 409", rec.Code)
+	}
+	_, deletedTag := load(t, h, item.ID)
+	if rec := send(t, h, http.MethodPost, api.Prefix+"/contents/"+item.ID+"/restore", nil,
+		map[string]string{"If-Match": deletedTag}); rec.Code != http.StatusOK {
+		t.Fatalf("restore returned %d, want 200\n%s", rec.Code, rec.Body.String())
+	}
+	trash = get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&deleted_only=true", http.StatusOK)
+	if len(trash.Items) != 0 {
+		t.Errorf("restored item remains in trash: %+v", trash.Items)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "cover.webp")); err != nil {
+		t.Errorf("restore lost the attachment: %v", err)
+	}
 }
 
 // A write has to be visible to the next read without waiting for the file
@@ -429,27 +456,38 @@ func newWritableServer(t *testing.T, root string, with ...func(*api.Options)) (h
 	// running server holds it: a settings change rebuilds everything derived
 	// from the configuration.
 	current := s
+	configBytes, err := os.ReadFile(filepath.Join(root, "kite.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	configRevision := file.RevisionOf(configBytes)
 
 	opts := api.Options{Site: func() api.View {
 		return api.View{
-			Reader:      current.Reader,
-			Resolver:    current.Resolver,
-			Types:       current.Project.Types,
-			Site:        current.Config.Site,
-			Store:       current.Config.Content.Store,
-			Runtime:     "test",
-			Theme:       current.Config.Theme.Name,
-			ThemeSchema: current.Theme.Manifest.Settings,
-			ThemeValues: current.ThemeSettings(),
-			Problems:    current.Problems,
-			Writer:      current.Project.Writer(),
-			Publisher:   current.Publisher(),
+			Reader:         current.Reader,
+			Resolver:       current.Resolver,
+			Types:          current.Project.Types,
+			Site:           current.Config.Site,
+			Store:          current.Config.Content.Store,
+			Runtime:        "test",
+			Theme:          current.Config.Theme.Name,
+			ThemeSchema:    current.Theme.Manifest.Settings,
+			ThemeValues:    current.ThemeSettings(),
+			ConfigRevision: configRevision,
+			Problems:       current.Problems,
+			Writer:         current.Project.Writer(),
+			Publisher:      current.Publisher(),
 			Refresh: func(ctx context.Context) error {
 				next, err := current.Reconfigure()
 				if err != nil {
 					return err
 				}
 				current = next
+				configBytes, err := os.ReadFile(filepath.Join(root, "kite.yaml"))
+				if err != nil {
+					return err
+				}
+				configRevision = file.RevisionOf(configBytes)
 				_, err = current.Index.Reconcile(ctx)
 				return err
 			},
@@ -669,11 +707,12 @@ build:
 `)
 
 	h, _ := newWritableServer(t, root)
+	tag := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil).Header().Get("ETag")
 
 	rec := send(t, h, http.MethodPut, api.Prefix+"/settings", map[string]any{
 		"site.title":     "Renamed In The Admin",
 		"build.pageSize": 25,
-	}, nil)
+	}, map[string]string{"If-Match": tag})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body.String())
 	}
@@ -708,10 +747,57 @@ build:
 	}
 }
 
+func TestSettingsRequireCurrentConfigurationRevision(t *testing.T) {
+	root := newProject(t, 1)
+	configPath := filepath.Join(root, "kite.yaml")
+	h, _ := newWritableServer(t, root)
+	read := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil)
+	oldTag := read.Header().Get("ETag")
+	if oldTag == "" {
+		t.Fatal("GET /settings returned no ETag")
+	}
+
+	missing := send(t, h, http.MethodPut, api.Prefix+"/settings",
+		map[string]any{"site.title": "Browser edit"}, nil)
+	if missing.Code != http.StatusPreconditionRequired {
+		t.Fatalf("missing If-Match: status = %d, want 428", missing.Code)
+	}
+
+	before, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(before), "Field Notes", "External edit", 1)
+	if updated == string(before) {
+		t.Fatal("fixture has no site title to change")
+	}
+	write(t, configPath, updated)
+
+	stale := send(t, h, http.MethodPut, api.Prefix+"/settings",
+		map[string]any{"site.title": "Browser edit"}, map[string]string{"If-Match": oldTag})
+	if stale.Code != http.StatusConflict {
+		t.Fatalf("stale edit: status = %d, want 409\n%s", stale.Code, stale.Body.String())
+	}
+	if decode[api.ErrorBody](t, stale).Error.Code != api.CodeConflict {
+		t.Error("stale edit did not return the conflict code")
+	}
+	after, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != updated {
+		t.Fatalf("stale edit overwrote the external change:\n%s", after)
+	}
+	if stale.Header().Get("ETag") == oldTag {
+		t.Error("conflict returned the stale ETag")
+	}
+}
+
 // The configuration file is the one place where a mistake breaks the whole
 // site, so what may be written is a list rather than a rule.
 func TestASettingNobodyDesignedAControlForIsRefused(t *testing.T) {
 	h, _ := newWritableServer(t, newProject(t, 1))
+	tag := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil).Header().Get("ETag")
 
 	for _, path := range []string{
 		"content.store",   // switching the store is not a form control
@@ -719,7 +805,7 @@ func TestASettingNobodyDesignedAControlForIsRefused(t *testing.T) {
 		"site.title.evil", // nor is a path that is not a setting
 	} {
 		rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
-			map[string]any{path: "x"}, nil)
+			map[string]any{path: "x"}, map[string]string{"If-Match": tag})
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("%s: status = %d, want 400", path, rec.Code)
 		}
@@ -758,6 +844,7 @@ func TestASettingThatWouldBreakTheSiteIsRefusedBeforeItIsWritten(t *testing.T) {
 	}
 
 	h, _ := newWritableServer(t, root)
+	tag := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil).Header().Get("ETag")
 
 	for _, tc := range []struct{ name, path, value string }{
 		{"a mistyped language", "site.language", "engrish!!"},
@@ -768,7 +855,7 @@ func TestASettingThatWouldBreakTheSiteIsRefusedBeforeItIsWritten(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
-				map[string]any{tc.path: tc.value}, nil)
+				map[string]any{tc.path: tc.value}, map[string]string{"If-Match": tag})
 
 			if rec.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want 400\n%s", rec.Code, rec.Body.String())
@@ -797,9 +884,10 @@ func TestASettingThatWouldBreakTheSiteIsRefusedBeforeItIsWritten(t *testing.T) {
 func TestClearingTheLanguageFallsBackToTheDefault(t *testing.T) {
 	root := newProject(t, 1)
 	h, _ := newWritableServer(t, root)
+	tag := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil).Header().Get("ETag")
 
 	rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
-		map[string]any{"site.language": ""}, nil)
+		map[string]any{"site.language": ""}, map[string]string{"If-Match": tag})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body.String())
 	}

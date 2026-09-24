@@ -116,6 +116,7 @@ var paramDoc = map[string]struct {
 	"updated_to":      {Desc: "Latest update time, RFC 3339."},
 	"q":               {Desc: "Free text over title, excerpt and body."},
 	"include_deleted": {Desc: "Include soft deleted items."},
+	"deleted_only":    {Desc: "Return only soft deleted items."},
 	"sort":            {Desc: "Comma separated keys, '-' for descending, e.g. -published_at,title."},
 	"cursor":          {Desc: "Opaque position from a previous response. There is no offset."},
 	"limit":           {Desc: "Items per page, capped by the server."},
@@ -270,11 +271,12 @@ func openAPI() *document {
 				Get: &operation{
 					OperationID: "getSettings",
 					Summary:     "Read what can be configured, and what it is set to.",
-					Responses:   ok(ref(Settings{}), "The settings."),
+					Responses:   ok(ref(Settings{}), "The settings. ETag carries the revision of kite.yaml."),
 				},
 				Put: &operation{
 					OperationID: "updateSettings",
 					Summary:     "Change configuration values by dotted path.",
+					Parameters:  []parameter{ifMatch(true)},
 					RequestBody: &requestBody{
 						Required: true,
 						Content: map[string]mediaType{"application/json": {Schema: &jsonSchema{
@@ -283,7 +285,7 @@ func openAPI() *document {
 							AdditionalProperties: &jsonSchema{},
 						}}},
 					},
-					Responses: ok(ref(Settings{}), "The settings as stored.", "400", "405"),
+					Responses: ok(ref(Settings{}), "The settings as stored.", "400", "405", "409", "428"),
 				},
 			},
 			"/contents": {
@@ -317,17 +319,24 @@ func openAPI() *document {
 				},
 				Delete: &operation{
 					OperationID: "deleteContent",
-					Summary:     "Remove an item and everything its bundle owns.",
+					Summary:     "Move an item to the trash, keeping its files so it can be restored.",
 					Parameters:  []parameter{pathParam("id"), ifMatch(true)},
 					Responses: withConflict(conflictRef,
 						map[string]response{
-							"204": {Description: "Removed."},
+							"204": {Description: "Moved to the trash."},
 							"404": {Description: "Failed.", Content: jsonOf(errorRef)},
 							"405": {Description: "Failed.", Content: jsonOf(errorRef)},
 							"428": {Description: "Failed.", Content: jsonOf(errorRef)},
 						}),
 				},
 			},
+			"/contents/{id}/restore": {Post: &operation{
+				OperationID: "restoreContent",
+				Summary:     "Restore an item from the trash.",
+				Parameters:  []parameter{pathParam("id"), ifMatch(true)},
+				Responses: withConflict(conflictRef,
+					ok(ref(Item{}), "The item as restored.", "400", "404", "405", "428")),
+			}},
 			"/preview": {Post: &operation{
 				OperationID: "preview",
 				Summary:     "Render a draft through the real theme, without storing it.",

@@ -36,6 +36,7 @@ export function useItem(id: string | null, kind: string) {
   // The version the editor started from, kept for the conflict view.
   const base = useRef<Item | null>(null);
   const revision = useRef<string>("");
+  const editVersion = useRef(0);
 
   useEffect(() => {
     // A first save reopens the editor under the id it was given. That item is
@@ -47,6 +48,7 @@ export function useItem(id: string | null, kind: string) {
       // and gets its id from the server when it is first saved.
       base.current = null;
       revision.current = "";
+      editVersion.current = 0;
       setDraft({ kind, title: "", status: "draft", body: "" });
       setConflict(null);
       setDirty(false);
@@ -71,6 +73,7 @@ export function useItem(id: string | null, kind: string) {
       }
       base.current = data;
       revision.current = response.headers.get("ETag") ?? "";
+      editVersion.current = 0;
       setDraft(draftOf(data));
       setConflict(null);
       setDirty(false);
@@ -83,6 +86,7 @@ export function useItem(id: string | null, kind: string) {
   }, [id, kind]);
 
   const edit = useCallback((patch: Partial<Draft>) => {
+    editVersion.current += 1;
     setDraft((current: Draft | null) => (current ? { ...current, ...patch } : current));
     setDirty(true);
   }, []);
@@ -90,6 +94,7 @@ export function useItem(id: string | null, kind: string) {
   /** save stores the draft and returns the item's id, or null on failure. */
   const save = useCallback(async (): Promise<string | null> => {
     if (!draft) return null;
+    const savedVersion = editVersion.current;
     setStatus("saving");
     setError(null);
 
@@ -119,8 +124,10 @@ export function useItem(id: string | null, kind: string) {
 
     base.current = result.data as Item;
     revision.current = result.response.headers.get("ETag") ?? "";
-    setDraft(draftOf(result.data as Item));
-    setDirty(false);
+    if (editVersion.current === savedVersion) {
+      setDraft(draftOf(result.data as Item));
+      setDirty(false);
+    }
     setStatus("ready");
     await queryClient.invalidateQueries({ queryKey: ["contents"] });
     await queryClient.invalidateQueries({ queryKey: ["site"] });
@@ -132,6 +139,7 @@ export function useItem(id: string | null, kind: string) {
     if (!conflict?.theirs) return;
     base.current = conflict.theirs;
     revision.current = `"${conflict.actual_revision}"`;
+    editVersion.current = 0;
     setDraft(draftOf(conflict.theirs));
     setConflict(null);
     setDirty(false);

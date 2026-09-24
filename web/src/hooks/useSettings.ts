@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, unwrap, type Settings } from "@/api/client";
+import { api, unwrap } from "@/api/client";
 
 const key = ["settings"];
 
 export function useSettings() {
   return useQuery({
     queryKey: key,
-    queryFn: async () => unwrap(await api.GET("/settings", {})),
+    queryFn: async () => {
+      const result = await api.GET("/settings", {});
+      return { ...unwrap(result), revision: result.response.headers.get("ETag") ?? "" };
+    },
   });
 }
 
@@ -16,9 +19,14 @@ export function useSaveSettings() {
   const client = useQueryClient();
 
   return useMutation({
-    mutationFn: async (changes: Record<string, unknown>) =>
-      unwrap(await api.PUT("/settings", { body: changes })),
-    onSuccess: async (settings: Settings) => {
+    mutationFn: async ({ changes, revision }: { changes: Record<string, unknown>; revision: string }) => {
+      const result = await api.PUT("/settings", {
+        body: changes,
+        params: { header: { "If-Match": revision } },
+      });
+      return { ...unwrap(result), revision: result.response.headers.get("ETag") ?? "" };
+    },
+    onSuccess: async (settings) => {
       client.setQueryData(key, settings);
       await client.invalidateQueries({ queryKey: ["site"] });
     },

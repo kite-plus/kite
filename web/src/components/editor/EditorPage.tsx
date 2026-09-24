@@ -145,8 +145,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     setSavedAt(new Date());
     // A new item has no id until the server gives it one.
     if (!id) {
-      dirty.current = false;
-      navigate({ name: "edit", kind, id: saved }, { replace: true });
+      navigate({ name: "edit", kind, id: saved }, { replace: true, skipGuard: true });
     }
     return saved;
   }, [item, id, kind]);

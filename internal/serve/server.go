@@ -274,19 +274,20 @@ func (s *Server) Handler() http.Handler {
 // the startup copy would keep reporting a file the author has since fixed.
 func (s *Server) view() api.View {
 	s.mu.RLock()
-	problems, current := s.problems, s.site
+	problems, current, configHash := s.problems, s.site, s.configHash
 	s.mu.RUnlock()
 
 	v := api.View{
-		Reader:   current.Reader,
-		Resolver: current.Resolver,
-		Types:    current.Project.Types,
-		Site:     current.Config.Site,
-		Store:    current.Config.Content.Store,
-		Runtime:  "serve",
-		Theme:    current.Config.Theme.Name,
-		Version:  buildinfo.Version,
-		Problems: problems,
+		Reader:         current.Reader,
+		Resolver:       current.Resolver,
+		Types:          current.Project.Types,
+		Site:           current.Config.Site,
+		Store:          current.Config.Content.Store,
+		Runtime:        "serve",
+		Theme:          current.Config.Theme.Name,
+		Version:        buildinfo.Version,
+		ConfigRevision: content.Revision("sha256:" + configHash),
+		Problems:       problems,
 
 		ThemeSchema: current.Theme.Manifest.Settings,
 		ThemeValues: current.ThemeSettings(),

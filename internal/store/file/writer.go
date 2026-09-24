@@ -85,6 +85,8 @@ func (w *Writer) Apply(ctx context.Context, cs content.ChangeSet) (content.Resul
 			err = w.putContent(o, located, &res)
 		case content.DeleteContent:
 			err = w.deleteContent(o, located, &res)
+		case content.RestoreContent:
+			err = w.restoreContent(o, located, &res)
 		case content.MoveContent:
 			err = w.moveContent(o, located, &res)
 		case content.PutMedia:
@@ -211,6 +213,9 @@ func (w *Writer) deleteContent(op content.DeleteContent, located map[content.ID]
 	}
 
 	if op.Soft {
+		if e.Item.DeletedAt != nil {
+			return fmt.Errorf("%w: %s is already deleted", content.ErrInvalid, op.ID)
+		}
 		now := w.now().UTC().Truncate(time.Second)
 		e.Item.DeletedAt = &now
 		e.Item.UpdatedAt = now
@@ -241,6 +246,35 @@ func (w *Writer) deleteContent(op content.DeleteContent, located map[content.ID]
 		return err
 	}
 	appendUnique(&res.Removed, e.Path)
+	return nil
+}
+
+func (w *Writer) restoreContent(op content.RestoreContent, located map[content.ID]*Entry, res *content.Result) error {
+	e, ok := located[op.ID]
+	if !ok {
+		return fmt.Errorf("%w: %s", content.ErrNotFound, op.ID)
+	}
+	data, err := os.ReadFile(abs(w.root, e.Path))
+	if err != nil {
+		return fmt.Errorf("file store: read %s: %w", e.Path, err)
+	}
+	if err := checkRevision(op.ID, op.IfRevision, RevisionOf(data), data); err != nil {
+		return err
+	}
+	if e.Item.DeletedAt == nil {
+		return fmt.Errorf("%w: %s is not deleted", content.ErrInvalid, op.ID)
+	}
+	e.Item.DeletedAt = nil
+	e.Item.UpdatedAt = w.now().UTC().Truncate(time.Second)
+	encoded, err := w.codec.Encode(e.Type, e.Item, data)
+	if err != nil {
+		return err
+	}
+	if err := w.write(e.Path, encoded); err != nil {
+		return err
+	}
+	res.Revision = RevisionOf(encoded)
+	appendUnique(&res.Written, e.Path)
 	return nil
 }
 
@@ -322,6 +356,12 @@ func (w *Writer) putSettings(op content.PutSettings, res *content.Result) error 
 	current, err := os.ReadFile(abs(w.root, ConfigName))
 	if err != nil {
 		return fmt.Errorf("file store: read %s: %w", ConfigName, err)
+	}
+	actual := RevisionOf(current)
+	if op.IfRevision != "" && op.IfRevision != actual {
+		return &content.ConflictError{
+			ID: content.ID(ConfigName), Expected: op.IfRevision, Actual: actual,
+		}
 	}
 
 	doc, err := frontmatter.ParseYAML(current)

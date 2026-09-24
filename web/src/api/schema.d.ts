@@ -102,7 +102,7 @@ export interface paths {
         /** Replace an item, refusing an edit made against a replaced version. */
         put: operations["updateContent"];
         post?: never;
-        /** Remove an item and everything its bundle owns. */
+        /** Move an item to the trash, keeping its files so it can be restored. */
         delete: operations["deleteContent"];
         options?: never;
         head?: never;
@@ -138,6 +138,23 @@ export interface paths {
         post?: never;
         /** Remove a file from a page's bundle. */
         delete: operations["deleteMedia"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contents/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore an item from the trash. */
+        post: operations["restoreContent"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -762,6 +779,8 @@ export interface operations {
                 q?: string;
                 /** @description Include soft deleted items. */
                 include_deleted?: boolean;
+                /** @description Return only soft deleted items. */
+                deleted_only?: string;
                 /** @description Comma separated keys, '-' for descending, e.g. -published_at,title. */
                 sort?: string;
                 /** @description Opaque position from a previous response. There is no offset. */
@@ -1012,7 +1031,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Removed. */
+            /** @description Moved to the trash. */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -1215,6 +1234,94 @@ export interface operations {
             };
             /** @description Failed. */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    restoreContent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The revision this edit was made against, as returned in ETag. Required: without it a save would overwrite whatever is there. */
+                "If-Match": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item as restored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Item"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The item changed since it was loaded. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictBody"];
+                };
+            };
+            /** @description Failed. */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1568,7 +1675,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The settings. */
+            /** @description The settings. ETag carries the revision of kite.yaml. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1591,7 +1698,10 @@ export interface operations {
     updateSettings: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The revision this edit was made against, as returned in ETag. Required: without it a save would overwrite whatever is there. */
+                "If-Match": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1641,6 +1751,24 @@ export interface operations {
             };
             /** @description Failed. */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1815,6 +1943,8 @@ export interface operations {
                 q?: string;
                 /** @description Include soft deleted items. */
                 include_deleted?: boolean;
+                /** @description Return only soft deleted items. */
+                deleted_only?: string;
                 /** @description Comma separated keys, '-' for descending, e.g. -published_at,title. */
                 sort?: string;
                 /** @description Opaque position from a previous response. There is no offset. */

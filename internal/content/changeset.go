@@ -54,12 +54,13 @@ func (e *ConflictError) Unwrap() error { return ErrConflict }
 type OpKind string
 
 const (
-	OpPutContent    OpKind = "put_content"
-	OpDeleteContent OpKind = "delete_content"
-	OpMoveContent   OpKind = "move_content"
-	OpPutMedia      OpKind = "put_media"
-	OpDeleteMedia   OpKind = "delete_media"
-	OpPutSettings   OpKind = "put_settings"
+	OpPutContent     OpKind = "put_content"
+	OpDeleteContent  OpKind = "delete_content"
+	OpRestoreContent OpKind = "restore_content"
+	OpMoveContent    OpKind = "move_content"
+	OpPutMedia       OpKind = "put_media"
+	OpDeleteMedia    OpKind = "delete_media"
+	OpPutSettings    OpKind = "put_settings"
 )
 
 // Op is a single typed operation inside a [ChangeSet].
@@ -90,6 +91,14 @@ type DeleteContent struct {
 
 func (o DeleteContent) Kind() OpKind     { return OpDeleteContent }
 func (o DeleteContent) Describe() string { return string(o.ID) }
+
+type RestoreContent struct {
+	ID         ID
+	IfRevision Revision
+}
+
+func (o RestoreContent) Kind() OpKind     { return OpRestoreContent }
+func (o RestoreContent) Describe() string { return string(o.ID) }
 
 // MoveContent relocates an item's bytes. Changing a slug does not imply a move:
 // slug, path and URL are independent (see D2). A move is only ever performed
@@ -128,6 +137,7 @@ func (o PutMedia) Describe() string { return o.Name }
 // that one commit can carry both. A configuration edit deserves the commit,
 // the audit record and the undo that a content edit gets.
 type PutSettings struct {
+	IfRevision Revision
 	// Values maps a dotted path to its new value, such as "site.title" or
 	// "theme.settings.primary_color". Only the named leaves change: the keys
 	// around them, and the comments explaining them, are left alone.

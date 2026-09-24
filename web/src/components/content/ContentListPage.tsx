@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
-import { Trash2, Upload, X, XCircle } from "lucide-react";
+import { RotateCcw, Trash2, Upload, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import type { Summary } from "@/api/client";
@@ -13,7 +13,7 @@ import {
   useStatusCounts,
   useTermsOf,
 } from "@/hooks/useContents";
-import { useDeleteItems } from "@/hooks/useDeleteItems";
+import { useDeleteItems, useRestoreItems, type BatchResult, type Target } from "@/hooks/useDeleteItems";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { canPublish, useDelivery } from "@/hooks/usePublish";
 import { useListState } from "@/lib/listState";
@@ -74,7 +74,8 @@ export function ContentListPage({ kind }: { kind: string }) {
   const filters = useMemo(
     () => ({
       kind,
-      status: state.status === "all" ? undefined : state.status,
+      status: state.status === "all" || state.status === "trash" ? undefined : state.status,
+      deletedOnly: state.status === "trash",
       terms: Object.entries(state.terms).map(([taxonomy, term]) => `${taxonomy}:${term}`),
       q,
       sort,
@@ -90,9 +91,13 @@ export function ContentListPage({ kind }: { kind: string }) {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState<Summary[] | null>(null);
+  const [batchResult, setBatchResult] = useState<{ action: "delete" | "restore"; result: BatchResult } | null>(null);
   const [publishing, setPublishing] = useState(false);
 
-  useEffect(() => setSelected(new Set()), [filterKey]);
+  useEffect(() => {
+    setSelected(new Set());
+    setBatchResult(null);
+  }, [filterKey]);
 
   const page = useContentPage(filters, cursors.at(-1));
   const items = page.data?.items ?? [];
@@ -100,6 +105,7 @@ export function ContentListPage({ kind }: { kind: string }) {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const remove = useDeleteItems();
+  const restore = useRestoreItems();
   const chosen = items.filter((item) => selected.has(item.id));
   const unfiltered =
     state.status === "all" && !state.q && Object.keys(state.terms).length === 0;
@@ -107,9 +113,10 @@ export function ContentListPage({ kind }: { kind: string }) {
 
   // The design's tabs are all, published and draft; the other two statuses
   // take a tab only while something is in them.
-  const tabs = (["all", ...STATUSES] as const).filter(
+  const tabs = (["all", ...STATUSES, "trash"] as const).filter(
     (status) =>
       status === "all" ||
+      status === "trash" ||
       status === "published" ||
       status === "draft" ||
       Boolean(counts[status]) ||
@@ -130,25 +137,30 @@ export function ContentListPage({ kind }: { kind: string }) {
     setSelected(new Set());
   };
 
-  const confirmDelete = () => {
-    if (!confirming) return;
-    remove.mutate(
-      confirming.map((item) => ({ id: item.id, revision: item.revision })),
-      {
-        onSuccess: (count) => toast.success(t("list.deleted", { count })),
-        onError: (error) => {
-          const said = problem(
-            error instanceof Error && "code" in error ? String(error.code) : undefined,
-            error.message,
-          );
-          toast.error(said.title, { description: said.detail });
-        },
-        onSettled: () => {
-          setConfirming(null);
-          setSelected(new Set());
-        },
+  const targetOf = (item: Summary): Target => ({ id: item.id, revision: item.revision, title: item.title });
+  const runBatch = (action: "delete" | "restore", targets: Target[]) => {
+    const mutation = action === "delete" ? remove : restore;
+    mutation.mutate(targets, {
+      onSuccess: (result) => {
+        if (result.succeeded.length > 0) {
+          toast.success(t(action === "delete" ? "list.deleted" : "list.restored", {
+            count: result.succeeded.length,
+          }));
+        }
+        setBatchResult(result.failed.length > 0 ? { action, result } : null);
+        setSelected(new Set(result.failed.map(({ target }) => target.id)));
+        setConfirming(null);
       },
-    );
+    });
+  };
+  const confirmDelete = () => {
+    if (confirming) runBatch("delete", confirming.map(targetOf));
+  };
+  const reviewFailed = async () => {
+    if (!batchResult) return;
+    await page.refetch();
+    setSelected(new Set());
+    setBatchResult(null);
   };
 
   return (
@@ -188,16 +200,23 @@ export function ContentListPage({ kind }: { kind: string }) {
               <span className="text-sm text-muted-foreground">
                 {t("list.selected", { count: chosen.length })}
               </span>
-              {canPublish(delivery.data) && (
+              {state.status !== "trash" && canPublish(delivery.data) && (
                 <Button variant="outline" onClick={() => setPublishing(true)}>
                   <Upload data-icon="inline-start" />
                   {t("publish.action")}
                 </Button>
               )}
-              <Button variant="destructive" onClick={() => setConfirming(chosen)}>
-                <Trash2 data-icon="inline-start" />
-                {t("editor.delete")}
-              </Button>
+              {state.status === "trash" ? (
+                <Button variant="outline" onClick={() => runBatch("restore", chosen.map(targetOf))}>
+                  <RotateCcw data-icon="inline-start" />
+                  {t("list.restore")}
+                </Button>
+              ) : (
+                <Button variant="destructive" onClick={() => setConfirming(chosen)}>
+                  <Trash2 data-icon="inline-start" />
+                  {t("editor.delete")}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -275,6 +294,27 @@ export function ContentListPage({ kind }: { kind: string }) {
       <div className="flex flex-col gap-3.5">
         <IndexProblems />
 
+        {batchResult && (
+          <Alert variant="destructive">
+            <XCircle />
+            <AlertTitle>{t("list.partial", {
+              done: batchResult.result.succeeded.length,
+              failed: batchResult.result.failed.length,
+            })}</AlertTitle>
+            <AlertDescription>
+              <ul className="list-inside list-disc">
+                {batchResult.result.failed.map(({ target, error }) => {
+                  const said = problem(error instanceof Error && "code" in error ? String(error.code) : undefined, error.message);
+                  return <li key={target.id}>{target.title}: {said.title}</li>;
+                })}
+              </ul>
+              <Button variant="outline" size="sm" disabled={remove.isPending || restore.isPending} onClick={reviewFailed}>
+                {t("list.reviewFailed")}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {page.error ? (
           <Alert variant="destructive">
             <XCircle />
@@ -294,6 +334,8 @@ export function ContentListPage({ kind }: { kind: string }) {
               setTerm(taxonomy, state.terms[taxonomy] === term ? undefined : term)
             }
             onDelete={(item) => setConfirming([item])}
+            onRestore={(item) => runBatch("restore", [targetOf(item)])}
+            trashed={state.status === "trash"}
             onCreate={unfiltered ? create : undefined}
             total={total}
             page={cursors.length + 1}

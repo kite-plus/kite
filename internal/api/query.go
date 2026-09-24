@@ -24,7 +24,7 @@ var knownParams = []string{
 	"kind", "status", "locale", "id",
 	"term", "term_all",
 	"published_from", "published_to", "updated_from", "updated_to",
-	"q", "include_deleted", "sort", "cursor", "limit", "count",
+	"q", "include_deleted", "deleted_only", "sort", "cursor", "limit", "count",
 }
 
 // parseQuery turns request parameters into a content query.
@@ -76,6 +76,11 @@ func parseQuery(v url.Values) (content.Query, error) {
 	if raw := v.Get("include_deleted"); raw != "" {
 		if q.IncludeDeleted, err = strconv.ParseBool(raw); err != nil {
 			return q, &badParam{Field: "include_deleted", Message: "expected true or false"}
+		}
+	}
+	if raw := v.Get("deleted_only"); raw != "" {
+		if q.DeletedOnly, err = strconv.ParseBool(raw); err != nil {
+			return q, &badParam{Field: "deleted_only", Message: "expected true or false"}
 		}
 	}
 

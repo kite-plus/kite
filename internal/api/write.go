@@ -115,7 +115,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, itemOf(stored, view.Resolver))
 }
 
-// handleDelete removes an item and everything its bundle owns.
+// handleDelete moves an item to the trash and leaves its files on disk.
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	view := s.src()
 	if !s.writable(w, view) {
@@ -129,13 +129,39 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := s.apply(r, view, content.ChangeSet{
-		Ops:     []content.Op{content.DeleteContent{ID: id, IfRevision: revision}},
+		Ops:     []content.Op{content.DeleteContent{ID: id, IfRevision: revision, Soft: true}},
 		Message: "delete: " + string(id),
 	}); err != nil {
 		s.failWrite(w, view, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
+	view := s.src()
+	if !s.writable(w, view) {
+		return
+	}
+	id := content.ID(r.PathValue("id"))
+	revision, ok := s.requireIfMatch(w, r)
+	if !ok {
+		return
+	}
+	if _, err := s.apply(r, view, content.ChangeSet{
+		Ops:     []content.Op{content.RestoreContent{ID: id, IfRevision: revision}},
+		Message: "restore: " + string(id),
+	}); err != nil {
+		s.failWrite(w, view, r, err)
+		return
+	}
+	stored, err := view.Reader.Get(r.Context(), id)
+	if err != nil {
+		s.failErr(w, err)
+		return
+	}
+	w.Header().Set("ETag", etag(stored.Revision))
+	writeJSON(w, http.StatusOK, itemOf(stored, view.Resolver))
 }
 
 // apply runs a change set and brings the read model back into agreement with

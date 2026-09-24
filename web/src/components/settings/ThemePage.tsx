@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
 import { useSaveSettings, useSettings } from "@/hooks/useSettings";
+import { useSettingsDraft } from "@/hooks/useSettingsDraft";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SchemaForm } from "@/components/SchemaForm";
 import { SettingsProblem } from "@/components/settings/SettingsProblem";
 import { Page } from "@/components/shell/Page";
@@ -30,23 +32,24 @@ export function ThemePage() {
   const save = useSaveSettings();
 
   const theme = settings.data?.theme;
-  const [values, setValues] = useState<Record<string, unknown>>({});
-
-  useEffect(() => {
-    if (theme) setValues({ ...(theme.values ?? {}) });
-  }, [theme]);
+  const form = useSettingsDraft(theme?.values ?? undefined, settings.data?.revision);
+  const values = form.values ?? {};
+  const guard = useUnsavedGuard(form.dirty);
 
   // Only what changed is sent, so a file is not rewritten for untouched values.
   const changes = Object.fromEntries(
     Object.entries(values)
-      .filter(([key, value]) => value !== (theme?.values ?? {})[key])
+      .filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(form.baseline?.[key]))
       .map(([key, value]) => [`theme.settings.${key}`, value]),
   );
-  const dirty = Object.keys(changes).length > 0;
+  const dirty = form.dirty;
+  const conflict = save.error instanceof ApiError && save.error.code === "conflict";
 
   const failure = settings.error ?? save.error;
   const said = failure
-    ? problem(failure instanceof ApiError ? failure.code : undefined, failure.message)
+    ? conflict
+      ? { title: t("settings.conflict") }
+      : problem(failure instanceof ApiError ? failure.code : undefined, failure.message)
     : null;
 
   return (
@@ -55,8 +58,13 @@ export function ThemePage() {
       description={t("theme.description")}
       actions={
         <Button
-          disabled={!dirty || save.isPending}
-          onClick={() => save.mutate(changes, { onSuccess: () => toast.success(t("settings.saved")) })}
+          disabled={!dirty || save.isPending || conflict}
+          onClick={() => save.mutate({ changes, revision: form.revision ?? "" }, {
+            onSuccess: (result) => {
+              form.saved(result.theme.values ?? {}, result.revision);
+              toast.success(t("settings.saved"));
+            },
+          })}
         >
           {save.isPending && <Spinner data-icon="inline-start" />}
           {t("settings.save")}
@@ -65,6 +73,15 @@ export function ThemePage() {
     >
       <div className="flex max-w-2xl flex-col gap-3.5">
         {said && <SettingsProblem {...said} />}
+        {conflict && (
+          <Button variant="outline" onClick={async () => {
+            const result = await settings.refetch();
+            if (result.data) {
+              form.reset(result.data.theme.values ?? {}, result.data.revision);
+              save.reset();
+            }
+          }}>{t("settings.reload")}</Button>
+        )}
 
         {!theme ? (
           <Skeleton className="h-16 w-full" />
@@ -94,7 +111,7 @@ export function ThemePage() {
             {!theme ? (
               <Skeleton className="h-40 w-full" />
             ) : theme.schema && theme.schema.length > 0 ? (
-              <SchemaForm fields={theme.schema} values={values} onChange={setValues} />
+              <SchemaForm fields={theme.schema} values={values} onChange={form.change} />
             ) : (
               <Empty>
                 <EmptyHeader>
@@ -106,6 +123,16 @@ export function ThemePage() {
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog
+        open={guard.leaving}
+        onOpenChange={(open) => !open && guard.cancel()}
+        title={t("editor.discardTitle")}
+        description={t("settings.discardNote")}
+        confirmLabel={t("editor.discard")}
+        cancelLabel={t("conflict.keepEditing")}
+        destructive
+        onConfirm={guard.discard}
+      />
     </Page>
   );
 }
