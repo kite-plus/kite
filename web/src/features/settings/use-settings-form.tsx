@@ -52,6 +52,8 @@ export function useSettingsForm(
     loaded: incoming !== undefined,
     dirty: form.dirty,
     conflict,
+    // Nothing was read to show; a reload is the way on, as after a conflict.
+    unread: Boolean(settings.error) && !settings.data,
     said,
     pending: save.isPending,
     guard,
@@ -78,7 +80,7 @@ export function useSettingsForm(
 
 type Form = ReturnType<typeof useSettingsForm>;
 
-/** FormProblem says what a save or a load ran into, with the way out of a conflict. */
+/** FormProblem says what a save or a load ran into, with a reload where one helps. */
 export function FormProblem({ form }: { form: Form }) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
@@ -94,7 +96,7 @@ export function FormProblem({ form }: { form: Form }) {
       <AlertTitle>{form.said.title}</AlertTitle>
       <AlertDescription>
         {form.said.detail && <p>{form.said.detail}</p>}
-        {form.conflict && (
+        {(form.conflict || form.unread) && (
           <Button variant="outline" size="sm" className="mt-2" onClick={() => void form.reload()}>
             {t("settings.reload")}
           </Button>
