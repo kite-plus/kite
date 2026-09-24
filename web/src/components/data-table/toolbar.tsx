@@ -18,6 +18,7 @@ type DataTableToolbarProps<TData> = {
       value: string
       icon?: React.ComponentType<{ className?: string }>
       count?: number
+      className?: string
     }[]
   }[]
   // Kite: controls a screen adds after the filters.

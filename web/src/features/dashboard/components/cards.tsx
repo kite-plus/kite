@@ -1,16 +1,18 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Trash2 } from "lucide-react";
 
 import { useI18n } from "@/i18n";
 import { useLatest, useSite, useStatusCounts, useTerms } from "@/hooks/useContents";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { useDelivery, usePublish } from "@/hooks/usePublish";
 import { isoDate } from "@/lib/dates";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeliveryStages } from "@/components/publish/Delivery";
+import { statuses } from "@/components/StatusLabel";
 
 /** LatestPosts is what went out last, newest first, each one a way back in. */
 export function LatestPosts({ kind }: { kind: string }) {
@@ -100,9 +102,28 @@ export function PendingCard({ kind }: { kind: string }) {
   const problems = site.data?.problems?.length ?? 0;
 
   const rows = [
-    { label: t("dashboard.pendingDrafts"), count: counts.draft, status: "draft" },
-    { label: t("dashboard.pendingScheduled"), count: counts.scheduled, status: "scheduled" },
-    { label: t("status.trash"), count: counts.trash, status: "trash" },
+    {
+      key: "draft",
+      label: t("dashboard.pendingDrafts"),
+      count: counts.draft,
+      search: { status: ["draft"] },
+      ...statuses.draft,
+    },
+    {
+      key: "scheduled",
+      label: t("dashboard.pendingScheduled"),
+      count: counts.scheduled,
+      search: { status: ["scheduled"] },
+      ...statuses.scheduled,
+    },
+    {
+      key: "trash",
+      label: t("status.trash"),
+      count: counts.trash,
+      search: { trash: true },
+      icon: Trash2,
+      className: "text-muted-foreground",
+    },
   ];
 
   return (
@@ -115,9 +136,12 @@ export function PendingCard({ kind }: { kind: string }) {
       </CardHeader>
       <CardContent className="space-y-1">
         {rows.map((row) => (
-          <Button key={row.status} variant="ghost" className="w-full justify-between px-2" asChild>
-            <Link to="/content/$kind" params={{ kind }} search={{ status: row.status }}>
-              <span>{row.label}</span>
+          <Button key={row.key} variant="ghost" className="w-full justify-between px-2" asChild>
+            <Link to="/content/$kind" params={{ kind }} search={row.search}>
+              <span className="flex items-center gap-2">
+                <row.icon className={cn("size-4", row.className)} />
+                {row.label}
+              </span>
               <span className="flex items-center gap-1 text-muted-foreground tabular-nums">
                 {row.count ?? "—"}
                 <ChevronRight className="size-4" />

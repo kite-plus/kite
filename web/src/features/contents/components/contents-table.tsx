@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-table";
 
 import type { Summary } from "@/api/client";
+import { useI18n } from "@/i18n";
 import { useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +32,15 @@ function apply<T>(updater: Updater<T>, current: T): T {
   return typeof updater === "function" ? (updater as (old: T) => T)(current) : updater;
 }
 
+/** One choice in a facet: a status or a term. */
+interface FacetOption {
+  label: string;
+  value: string;
+  icon?: ComponentType<{ className?: string }>;
+  className?: string;
+  count?: number;
+}
+
 interface Props {
   items: Summary[];
   loading: boolean;
@@ -40,6 +50,7 @@ interface Props {
   /** sort is the order in force, the kind's default when the address has none. */
   sort: string;
   taxonomies: string[];
+  statusOptions: FacetOption[];
   termOptions: Record<string, { label: string; value: string; count: number }[]>;
   rowSelection: RowSelectionState;
   onRowSelectionChange: OnChangeFn<RowSelectionState>;
@@ -63,6 +74,7 @@ export function ContentsTable({
   onSearch,
   sort,
   taxonomies,
+  statusOptions,
   termOptions,
   rowSelection,
   onRowSelectionChange,
@@ -72,6 +84,7 @@ export function ContentsTable({
   empty,
   pagination,
 }: Props) {
+  const { t } = useI18n();
   const taxonomyLabel = useTaxonomyLabel();
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
@@ -86,9 +99,12 @@ export function ContentsTable({
   }, [query, search.q, onSearch]);
 
   const sorting: SortingState = sort ? [{ id: sort.replace(/^-/, ""), desc: sort.startsWith("-") }] : [];
-  const columnFilters: ColumnFiltersState = taxonomies
-    .map((taxonomy) => ({ id: taxonomy, value: termsOf(search.terms, taxonomy) }))
-    .filter((filter) => filter.value.length > 0);
+  const columnFilters: ColumnFiltersState = [
+    ...(search.status?.length ? [{ id: "status", value: search.status }] : []),
+    ...taxonomies
+      .map((taxonomy) => ({ id: taxonomy, value: termsOf(search.terms, taxonomy) }))
+      .filter((filter) => filter.value.length > 0),
+  ];
 
   const table = useReactTable({
     data: items,
@@ -106,12 +122,14 @@ export function ContentsTable({
     },
     onColumnFiltersChange: (updater) => {
       const next = apply(updater, columnFilters);
+      const chosen = (id: string) => {
+        const value = next.find((filter) => filter.id === id)?.value;
+        return Array.isArray(value) ? (value as string[]) : [];
+      };
       let terms = search.terms;
-      for (const taxonomy of taxonomies) {
-        const chosen = next.find((filter) => filter.id === taxonomy)?.value;
-        terms = withTerms(terms, taxonomy, Array.isArray(chosen) ? (chosen as string[]) : []);
-      }
-      onSearch({ terms });
+      for (const taxonomy of taxonomies) terms = withTerms(terms, taxonomy, chosen(taxonomy));
+      const status = chosen("status");
+      onSearch({ status: status.length > 0 ? status : undefined, terms });
     },
     onGlobalFilterChange: (updater) => setQuery(String(apply(updater, query) ?? "")),
     onRowSelectionChange,
@@ -131,13 +149,16 @@ export function ContentsTable({
       <DataTableToolbar
         table={table}
         searchPlaceholder={searchPlaceholder}
-        filters={taxonomies
-          .filter((taxonomy) => termOptions[taxonomy]?.length)
-          .map((taxonomy) => ({
-            columnId: taxonomy,
-            title: taxonomyLabel(taxonomy),
-            options: termOptions[taxonomy],
-          }))}
+        filters={[
+          { columnId: "status", title: t("list.status"), options: statusOptions },
+          ...taxonomies
+            .filter((taxonomy) => termOptions[taxonomy]?.length)
+            .map((taxonomy) => ({
+              columnId: taxonomy,
+              title: taxonomyLabel(taxonomy),
+              options: termOptions[taxonomy],
+            })),
+        ]}
       />
       <div className="overflow-hidden rounded-md border">
         <Table>

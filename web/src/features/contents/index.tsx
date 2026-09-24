@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import type { OnChangeFn, RowSelectionState } from "@tanstack/react-table";
-import { Plus, RotateCcw, Trash2, Upload, XCircle } from "lucide-react";
+import { ArrowLeft, Plus, RotateCcw, Trash2, Upload, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import type { Summary } from "@/api/client";
@@ -23,12 +23,12 @@ import { useKindLabel } from "@/hooks/useKindLabel";
 import { canPublish, useDelivery } from "@/hooks/usePublish";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IndexProblems } from "@/components/IndexProblems";
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { PublishDialog } from "@/components/publish/PublishDialog";
+import { statuses } from "@/components/StatusLabel";
 import { useContentsColumns } from "./components/contents-columns";
 import { ContentsTable } from "./components/contents-table";
 import { DEFAULT_PAGE_SIZE, defaultSort, termsOf, withTerms, type ContentSearch } from "./search";
@@ -64,13 +64,13 @@ export function ContentList() {
     [navigate],
   );
 
-  const trashed = search.status === "trash";
+  const trashed = search.trash === true;
   const sort = search.sort ?? (sortable[0] ? defaultSort(sortable[0]) : "");
   const pageSize = search.size ?? DEFAULT_PAGE_SIZE;
   const filters = useMemo(
     () => ({
       kind,
-      status: search.status && !trashed ? search.status : undefined,
+      status: search.status,
       deletedOnly: trashed,
       terms: search.terms,
       q: search.q,
@@ -190,17 +190,15 @@ export function ContentList() {
     [taxonomies, terms],
   );
 
-  const unfiltered = !search.status && !search.q && !search.terms?.length;
-  // Two statuses take a tab only while something is in them.
-  const tabs = (["all", ...STATUSES, "trash"] as const).filter(
-    (status) =>
-      status === "all" ||
-      status === "trash" ||
-      status === "published" ||
-      status === "draft" ||
-      Boolean(counts[status]) ||
-      search.status === status,
-  );
+  const unfiltered = !search.status?.length && !search.q && !search.terms?.length;
+  // The counts are of what is not deleted, so the trash's facet goes without.
+  const statusOptions = STATUSES.map((status) => ({
+    label: t(`status.${status}` as Key),
+    value: status,
+    icon: statuses[status].icon,
+    className: statuses[status].className,
+    count: trashed ? undefined : counts[status],
+  }));
   const total = page.data?.total;
 
   return (
@@ -210,36 +208,44 @@ export function ContentList() {
       <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">{kindLabel.many(kind)}</h2>
+            <h2 className="text-2xl font-bold tracking-tight">
+              {trashed ? t("status.trash") : kindLabel.many(kind)}
+            </h2>
             <p className="text-muted-foreground">
-              {t("list.description", { kind: kindLabel.many(kind) })}
+              {t(trashed ? "list.trashNote" : "list.description", { kind: kindLabel.many(kind) })}
             </p>
           </div>
-          <Button asChild>
-            <Link to="/content/$kind/$id" params={{ kind, id: "new" }}>
-              <Plus />
-              {t("list.newKind", { kind: kindLabel.one(kind) })}
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            {trashed ? (
+              <Button variant="outline" asChild>
+                <Link to="/content/$kind" params={{ kind }}>
+                  <ArrowLeft />
+                  {t("list.backTo", { kind: kindLabel.many(kind) })}
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" asChild>
+                  <Link to="/content/$kind" params={{ kind }} search={{ trash: true }}>
+                    <Trash2 />
+                    {t("status.trash")}
+                    {counts.trash ? (
+                      <span className="text-muted-foreground tabular-nums">{counts.trash}</span>
+                    ) : null}
+                  </Link>
+                </Button>
+                <Button asChild>
+                  <Link to="/content/$kind/$id" params={{ kind, id: "new" }}>
+                    <Plus />
+                    {t("list.newKind", { kind: kindLabel.one(kind) })}
+                  </Link>
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         <IndexProblems />
-
-        <Tabs
-          value={search.status ?? "all"}
-          onValueChange={(status) => onSearch({ status: status === "all" ? undefined : status })}
-        >
-          <TabsList className="max-w-full justify-start overflow-x-auto">
-            {tabs.map((status) => (
-              <TabsTrigger key={status} value={status} className="gap-1.5">
-                {status === "all" ? t("list.filterAny") : t(`status.${status}` as Key)}
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {counts[status] ?? ""}
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
 
         {batchResult && (
           <Alert variant="destructive">
@@ -292,13 +298,16 @@ export function ContentList() {
             onSearch={onSearch}
             sort={sort}
             taxonomies={taxonomies}
+            statusOptions={statusOptions}
             termOptions={termOptions}
             rowSelection={rowSelection}
             onRowSelectionChange={setRowSelection}
             entityName={kindLabel.many(kind)}
             searchPlaceholder={t("list.searchKind", { kind: kindLabel.many(kind) })}
             empty={
-              unfiltered ? (
+              trashed && unfiltered ? (
+                <span className="text-muted-foreground">{t("list.trashEmpty")}</span>
+              ) : unfiltered ? (
                 <div className="flex flex-col items-center gap-3">
                   <div>
                     <p className="font-medium">

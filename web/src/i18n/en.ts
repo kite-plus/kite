@@ -130,6 +130,9 @@ export const en = {
 
   // The listing.
   "list.description": "Create, edit and manage everything in this section.",
+  "list.trashNote": "Deleted items wait here, and can be restored.",
+  "list.trashEmpty": "The trash is empty.",
+  "list.backTo": "Back to {kind}",
   "list.newKind": "New {kind}",
   "list.searchKind": "Search title and body…",
   "list.title": "Title",
@@ -144,7 +147,6 @@ export const en = {
   "list.edit": "Edit",
   "list.actions": "Actions",
   "list.failed": "Could not load content",
-  "list.filterAny": "All",
   "list.selectAll": "Select all",
   "list.filter": "Filter…",
   "list.reset": "Reset",

@@ -5,8 +5,10 @@ import { STATUSES } from "@/hooks/useContents";
  * list survives a reload and can be shared as a link.
  */
 export interface ContentSearch {
-  /** A status, "trash" for what was deleted, or absent for everything else. */
-  status?: string;
+  /** The statuses an item has one of, or absent for any. */
+  status?: string[];
+  /** trash lists what was deleted instead. */
+  trash?: boolean;
   q?: string;
   /** A sortable field, with a leading "-" for descending. */
   sort?: string;
@@ -18,7 +20,7 @@ export interface ContentSearch {
 export const PAGE_SIZES = [10, 20, 30, 50];
 export const DEFAULT_PAGE_SIZE = 20;
 
-const views = new Set<string>([...STATUSES, "trash"]);
+const statuses = new Set<string>(STATUSES);
 
 /**
  * validateContentSearch keeps what it understands and drops the rest, so a
@@ -26,7 +28,11 @@ const views = new Set<string>([...STATUSES, "trash"]);
  */
 export function validateContentSearch(search: Record<string, unknown>): ContentSearch {
   const out: ContentSearch = {};
-  if (typeof search.status === "string" && views.has(search.status)) out.status = search.status;
+  const status = (Array.isArray(search.status) ? search.status : [search.status]).filter(
+    (each): each is string => typeof each === "string" && statuses.has(each),
+  );
+  if (status.length > 0) out.status = status;
+  if (search.trash === true) out.trash = true;
   if (typeof search.q === "string" && search.q.trim()) out.q = search.q;
   if (typeof search.sort === "string" && /^-?[a-z_]+$/.test(search.sort)) out.sort = search.sort;
 

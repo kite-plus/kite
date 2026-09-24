@@ -124,6 +124,9 @@ export const zhCN: Record<keyof typeof en, string> = {
   "dashboard.termCount_other": "{count} 个",
 
   "list.description": "创建、编辑与管理站点的全部{kind}",
+  "list.trashNote": "删除的{kind}会先放在这里，随时可以恢复。",
+  "list.trashEmpty": "回收站是空的。",
+  "list.backTo": "返回{kind}",
   "list.newKind": "新建{kind}",
   "list.searchKind": "搜索{kind}…",
   "list.title": "标题",
@@ -138,7 +141,6 @@ export const zhCN: Record<keyof typeof en, string> = {
   "list.edit": "编辑",
   "list.actions": "操作",
   "list.failed": "无法加载内容",
-  "list.filterAny": "全部",
   "list.selectAll": "全选",
   "list.filter": "筛选…",
   "list.reset": "重置",

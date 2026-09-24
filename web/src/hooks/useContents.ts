@@ -6,7 +6,8 @@ export type Status = (typeof STATUSES)[number];
 
 export interface Filters {
   kind?: string;
-  status?: string;
+  /** Statuses an item has one of. */
+  status?: string[];
   /** taxonomy:term pairs an item must carry all of. */
   terms?: string[];
   q?: string;
@@ -38,7 +39,7 @@ export function useContentPage(filters: Filters, cursor: string | undefined) {
               count: true,
               cursor,
               kind: filters.kind ? [filters.kind] : undefined,
-              status: filters.status ? [filters.status] : undefined,
+              status: filters.status?.length ? filters.status : undefined,
               term_all: filters.terms?.length ? filters.terms : undefined,
               q: filters.q || undefined,
               sort: filters.sort || undefined,
