@@ -540,6 +540,7 @@ func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page
 			Rendered: doc,
 			Resolver: b.opts.Resolver,
 			Terms:    b.termsOf(t.Item),
+			Location: b.opts.Site.Location,
 		}
 		// Assigned only when present: a nil *Summary stored in the interface
 		// field would not be nil to a template.
@@ -568,6 +569,7 @@ func (b *Builder) listedPage(out *Context, s content.Summary) render.Page {
 		Rendered: &markdown.Document{Excerpt: s.Excerpt},
 		Resolver: b.opts.Resolver,
 		Terms:    b.termsOfMap(s.Taxonomies),
+		Location: b.opts.Site.Location,
 	})
 }
 

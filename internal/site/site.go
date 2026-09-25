@@ -226,6 +226,8 @@ func (s *Site) Builder(opts BuildOptions) (*build.Builder, error) {
 }
 
 func (s *Site) newBuilder(opts BuildOptions, emitter *build.Emitter) (*build.Builder, error) {
+	// Checked when the configuration was loaded.
+	loc, _ := s.Config.Site.Location()
 	return build.New(build.Options{
 		Site: render.SiteInfo{
 			Title:         s.Config.Site.Title,
@@ -236,6 +238,12 @@ func (s *Site) newBuilder(opts BuildOptions, emitter *build.Emitter) (*build.Bui
 			ThemeSettings: s.ThemeSettings(),
 			Version:       buildinfo.Version,
 			Build:         emitter != nil,
+			Author:        s.Config.Site.Author,
+			Keywords:      s.Config.Site.Keywords,
+			NoIndex:       s.Config.Site.NoIndex,
+			HeadHTML:      s.Config.Site.HeadHTML,
+			FooterHTML:    s.Config.Site.FooterHTML,
+			Location:      loc,
 		},
 		Reader:        s.Reader,
 		Resolver:      s.Resolver,

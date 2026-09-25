@@ -48,9 +48,23 @@ type Site interface {
 	ThemeSettings() map[string]any
 	Taxonomies() []string
 
+	// Author, Keywords and NoIndex describe the site to search engines; a
+	// theme writes them into the head of a page.
+	Author() string
+	Keywords() []string
+	NoIndex() bool
+
+	// HeadHTML and FooterHTML are the site's own code for the end of the head
+	// and of the body, such as an analytics snippet, which a theme writes out
+	// as it is so that the code survives a change of theme.
+	HeadHTML() template.HTML
+	FooterHTML() template.HTML
+
 	// BuildTime is the only way a template can learn the time. The clock is
 	// frozen for the whole build, because a hidden input such as time.Now
-	// would make output uncacheable and incremental builds unsound.
+	// would make output uncacheable and incremental builds unsound. Like
+	// every date a template sees, it is in the site's time zone when the
+	// site names one.
 	BuildTime() time.Time
 
 	Version() string

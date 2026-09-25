@@ -60,3 +60,36 @@ func TestMissingNeighborsAreSkippedByWith(t *testing.T) {
 		}
 	}
 }
+
+// A post published just after midnight in Shanghai is stored in UTC, the day
+// before. In a site set to that zone, every date a template sees is shown
+// there, so the post reads as written on the day it was.
+func TestDatesAreShownInTheSitesZone(t *testing.T) {
+	shanghai, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := time.Date(2026, 9, 25, 16, 30, 0, 0, time.UTC)
+	item := &content.Content{
+		ID: "01J8KQ2P3R4S5T6V7W8X9YZ000", Title: "T", Slug: "t",
+		CreatedAt: stored, UpdatedAt: stored, PublishedAt: &stored,
+	}
+
+	shown := render.NewPage(item, render.PageOptions{Location: shanghai})
+	for name, got := range map[string]time.Time{
+		"Date": shown.Date(), "PublishDate": shown.PublishDate(), "Lastmod": shown.Lastmod(),
+	} {
+		if got.Day() != 26 || got.Location() != shanghai || !got.Equal(stored) {
+			t.Errorf("%s = %v, want the same instant on the 26th in Shanghai", name, got)
+		}
+	}
+	site := render.NewSite(render.SiteInfo{BuildTime: stored, Location: shanghai})
+	if got := site.BuildTime(); got.Day() != 26 {
+		t.Errorf("BuildTime = %v, want the 26th in Shanghai", got)
+	}
+
+	// With no zone named, a date is shown as it was written.
+	if got := render.NewPage(item, render.PageOptions{}).PublishDate(); got.Day() != 25 || got.Location() != time.UTC {
+		t.Errorf("with no zone, PublishDate = %v, want it as stored", got)
+	}
+}

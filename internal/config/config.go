@@ -14,6 +14,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	// Time zones are looked up by name on every system, Windows and a scratch
+	// container included, rather than only where a zoneinfo database exists.
+	_ "time/tzdata"
 
 	"gopkg.in/yaml.v3"
 )
@@ -45,11 +50,88 @@ const Name = "kite.yaml"
 
 // Site describes the site itself.
 type Site struct {
-	Title       string         `yaml:"title"`
-	Description string         `yaml:"description,omitempty"`
-	BaseURL     string         `yaml:"baseURL"`
-	Language    string         `yaml:"language,omitempty"`
-	Params      map[string]any `yaml:"params,omitempty"`
+	Title       string `yaml:"title"`
+	Description string `yaml:"description,omitempty"`
+	BaseURL     string `yaml:"baseURL"`
+	Language    string `yaml:"language,omitempty"`
+	Author      string `yaml:"author,omitempty"`
+
+	// Keywords describe the site to search engines.
+	Keywords Keywords `yaml:"keywords,omitempty"`
+
+	// Timezone is the IANA zone dates are shown in. Left empty, a date is
+	// shown in the zone it was written with, which for what the admin writes
+	// is UTC: a post published just after midnight in Shanghai would read as
+	// the day before.
+	Timezone string `yaml:"timezone,omitempty"`
+
+	// NoIndex asks search engines to leave the site out of their results.
+	NoIndex bool `yaml:"noindex,omitempty"`
+
+	// HeadHTML and FooterHTML are added to every page as written, for an
+	// analytics or verification snippet that should survive a change of
+	// theme.
+	HeadHTML   string `yaml:"headHTML,omitempty"`
+	FooterHTML string `yaml:"footerHTML,omitempty"`
+
+	Params map[string]any `yaml:"params,omitempty"`
+}
+
+// Location is the time zone dates are shown in, or nil to show each date in
+// the zone it was written with.
+func (s Site) Location() (*time.Location, error) {
+	switch s.Timezone {
+	case "":
+		return nil, nil
+	case "Local":
+		// Whatever zone the building machine is in: a CI runner and a
+		// laptop would publish different dates for the same site.
+		return nil, errors.New("the zone called Local depends on the machine; name a zone")
+	}
+	return time.LoadLocation(s.Timezone)
+}
+
+// Keywords is a list of keywords. Written by hand it may be one line,
+// separated by commas, and it reads as the same list.
+type Keywords []string
+
+// UnmarshalYAML accepts a list or a line of comma separated words.
+func (k *Keywords) UnmarshalYAML(node *yaml.Node) error {
+	var words []string
+	switch node.Kind {
+	case yaml.ScalarNode:
+		words = SplitKeywords(node.Value)
+	case yaml.SequenceNode:
+		if err := node.Decode(&words); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("line %d: keywords are a list or a line of words", node.Line)
+	}
+	*k = Keywords(cleanKeywords(words))
+	return nil
+}
+
+// SplitKeywords splits a line at commas, ASCII or full width.
+func SplitKeywords(line string) []string {
+	return cleanKeywords(strings.FieldsFunc(line, func(r rune) bool {
+		return r == ',' || r == '，' || r == '、'
+	}))
+}
+
+// cleanKeywords trims each word and drops the empty ones and repeats.
+func cleanKeywords(words []string) []string {
+	out := make([]string, 0, len(words))
+	seen := make(map[string]bool, len(words))
+	for _, word := range words {
+		word = strings.TrimSpace(word)
+		if word == "" || seen[word] {
+			continue
+		}
+		seen[word] = true
+		out = append(out, word)
+	}
+	return out
 }
 
 // Content selects the content store.
@@ -205,6 +287,10 @@ func (c *Config) Validate() error {
 	if !WellFormedLanguage(c.Site.Language) {
 		return fmt.Errorf("config: site.language %q is not a language tag (want something like en or zh-CN)",
 			c.Site.Language)
+	}
+	if _, err := c.Site.Location(); err != nil {
+		return fmt.Errorf("config: site.timezone %q is not a time zone (want something like Asia/Shanghai or UTC)",
+			c.Site.Timezone)
 	}
 	if strings.Contains(c.Build.Output, "..") {
 		return fmt.Errorf("config: build.output must stay inside the project")

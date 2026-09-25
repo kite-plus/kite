@@ -478,6 +478,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        BuildSettings: {
+            feed_limit: number;
+            page_size: number;
+        };
         Commit: {
             /** Format: date-time */
             at: string;
@@ -693,6 +697,7 @@ export interface components {
             user?: string;
         };
         Settings: {
+            build: components["schemas"]["BuildSettings"];
             site: components["schemas"]["SiteSettings"];
             theme: components["schemas"]["ThemeSettings"];
             writable: string[];
@@ -723,9 +728,15 @@ export interface components {
             version?: string;
         };
         SiteSettings: {
+            author?: string;
             base_url: string;
             description?: string;
+            footer_html?: string;
+            head_html?: string;
+            keywords?: string[];
             language?: string;
+            noindex?: boolean;
+            timezone?: string;
             title: string;
         };
         Summary: {

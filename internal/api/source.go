@@ -17,6 +17,7 @@ type View struct {
 	Resolver       *url.Resolver
 	Types          *content.Registry
 	Site           config.Site
+	Build          config.Build
 	Store          string
 	Runtime        string
 	Theme          string

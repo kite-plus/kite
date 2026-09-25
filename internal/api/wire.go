@@ -326,6 +326,7 @@ type Media struct {
 // Settings is what a project exposes to a configuration form.
 type Settings struct {
 	Site  SiteSettings  `json:"site"`
+	Build BuildSettings `json:"build"`
 	Theme ThemeSettings `json:"theme"`
 
 	// Writable lists the paths this API accepts, so a client can tell what it
@@ -335,10 +336,25 @@ type Settings struct {
 
 // SiteSettings is the site's own description.
 type SiteSettings struct {
-	Title       string `json:"title"`
-	Description string `json:"description,omitempty"`
-	BaseURL     string `json:"base_url"`
-	Language    string `json:"language,omitempty"`
+	Title       string   `json:"title"`
+	Description string   `json:"description,omitempty"`
+	BaseURL     string   `json:"base_url"`
+	Language    string   `json:"language,omitempty"`
+	Author      string   `json:"author,omitempty"`
+	Keywords    []string `json:"keywords,omitempty"`
+	// Timezone is an IANA zone dates are shown in, empty to show each date
+	// in the zone it was written with.
+	Timezone string `json:"timezone,omitempty"`
+	// NoIndex asks search engines to leave the site out of their results.
+	NoIndex    bool   `json:"noindex,omitempty"`
+	HeadHTML   string `json:"head_html,omitempty"`
+	FooterHTML string `json:"footer_html,omitempty"`
+}
+
+// BuildSettings is how the site's listings and feed are cut.
+type BuildSettings struct {
+	PageSize  int `json:"page_size"`
+	FeedLimit int `json:"feed_limit"`
 }
 
 // ThemeSettings carries a theme's declared settings and their current values.

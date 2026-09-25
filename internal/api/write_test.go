@@ -470,6 +470,7 @@ func newWritableServer(t *testing.T, root string, with ...func(*api.Options)) (h
 			Resolver:       current.Resolver,
 			Types:          current.Project.Types,
 			Site:           current.Config.Site,
+			Build:          current.Config.Build,
 			Store:          current.Config.Content.Store,
 			Runtime:        "test",
 			Theme:          current.Config.Theme.Name,
@@ -890,6 +891,116 @@ func TestASettingThatWouldBreakTheSiteIsRefusedBeforeItIsWritten(t *testing.T) {
 				t.Errorf("the file was written anyway:\n%s", after)
 			}
 		})
+	}
+}
+
+// A value of the wrong kind would be written as it came and leave the
+// project unable to open, and a zone that does not exist would have nowhere to
+// put the dates, so both are refused before anything is written.
+func TestTheSitesOwnSettingsAreCheckedBeforeTheyAreWritten(t *testing.T) {
+	root := newProject(t, 1)
+	config := filepath.Join(root, "kite.yaml")
+	before, err := os.ReadFile(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h, _ := newWritableServer(t, root)
+	tag := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil).Header().Get("ETag")
+
+	for _, tc := range []struct {
+		name, path string
+		value      any
+	}{
+		{"a zone that does not exist", "site.timezone", "Mars/Olympus"},
+		{"the zone of whatever machine builds", "site.timezone", "Local"},
+		{"keywords as one line", "site.keywords", "books, writing"},
+		{"a blank keyword", "site.keywords", []any{"books", "  "}},
+		{"indexing as a word", "site.noindex", "yes"},
+		{"an author as a number", "site.author", 7},
+		{"half a post to a page", "build.pageSize", 2.5},
+		{"no posts to a page", "build.pageSize", 0},
+		{"a feed of thousands", "build.feedLimit", 5000},
+		{"a feed limit as text", "build.feedLimit", "20"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
+				map[string]any{tc.path: tc.value}, map[string]string{"If-Match": tag})
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400\n%s", rec.Code, rec.Body.String())
+			}
+			if field := decode[api.ErrorBody](t, rec).Error.Field; field != tc.path {
+				t.Errorf("field = %q, want %q", field, tc.path)
+			}
+			after, err := os.ReadFile(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(after) != string(before) {
+				t.Errorf("the file was written anyway:\n%s", after)
+			}
+		})
+	}
+}
+
+// What the site tells search engines, the zone its dates are shown in and
+// its own code are written to kite.yaml and read back as they were set, and
+// a keyword list set to nothing leaves the file.
+func TestTheSitesOwnSettingsAreWrittenAndReadBack(t *testing.T) {
+	root := newProject(t, 1)
+	config := filepath.Join(root, "kite.yaml")
+	h, _ := newWritableServer(t, root)
+	tag := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil).Header().Get("ETag")
+
+	rec := send(t, h, http.MethodPut, api.Prefix+"/settings", map[string]any{
+		"site.author":     "Ada",
+		"site.keywords":   []any{"books", "写作"},
+		"site.timezone":   "Asia/Shanghai",
+		"site.noindex":    true,
+		"site.headHTML":   `<meta name="verify" content="abc">`,
+		"site.footerHTML": `<script>count()</script>`,
+		"build.feedLimit": 30,
+	}, map[string]string{"If-Match": tag})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body.String())
+	}
+
+	settings := decode[api.Settings](t, rec)
+	site := settings.Site
+	if site.Author != "Ada" || site.Timezone != "Asia/Shanghai" || !site.NoIndex ||
+		!slices.Equal(site.Keywords, []string{"books", "写作"}) ||
+		site.HeadHTML != `<meta name="verify" content="abc">` || site.FooterHTML != `<script>count()</script>` {
+		t.Errorf("the response says %+v", site)
+	}
+	if settings.Build.FeedLimit != 30 || settings.Build.PageSize == 0 {
+		t.Errorf("build = %+v", settings.Build)
+	}
+
+	data, err := os.ReadFile(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"author: Ada", "timezone: Asia/Shanghai", "noindex: true", "- 写作", "feedLimit: 30"} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("kite.yaml lacks %q:\n%s", want, data)
+		}
+	}
+
+	tag = rec.Header().Get("ETag")
+	cleared := send(t, h, http.MethodPut, api.Prefix+"/settings",
+		map[string]any{"site.keywords": nil}, map[string]string{"If-Match": tag})
+	if cleared.Code != http.StatusOK {
+		t.Fatalf("clearing: status = %d\n%s", cleared.Code, cleared.Body.String())
+	}
+	if got := decode[api.Settings](t, cleared).Site.Keywords; len(got) != 0 {
+		t.Errorf("keywords after clearing = %v", got)
+	}
+	data, err = os.ReadFile(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "keywords") {
+		t.Errorf("kite.yaml still holds keywords:\n%s", data)
 	}
 }
 

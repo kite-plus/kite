@@ -291,6 +291,7 @@ func (s *Server) view() api.View {
 		Resolver:       current.Resolver,
 		Types:          current.Project.Types,
 		Site:           current.Config.Site,
+		Build:          current.Config.Build,
 		Store:          current.Config.Content.Store,
 		Runtime:        "serve",
 		Theme:          current.Config.Theme.Name,

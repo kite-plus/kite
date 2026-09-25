@@ -2,11 +2,14 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"maps"
+	"math"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
@@ -24,9 +27,26 @@ var settable = []string{
 	"site.description",
 	"site.baseURL",
 	"site.language",
+	"site.author",
+	"site.keywords",
+	"site.timezone",
+	"site.noindex",
+	"site.headHTML",
+	"site.footerHTML",
 	"theme.name",
 	"build.pageSize",
+	"build.feedLimit",
 }
+
+// Limits on what a form may write. Each is well past any real use, and each
+// keeps a pasted mistake from making kite.yaml the size of a book.
+const (
+	maxKeywords     = 50
+	maxKeywordRunes = 50
+	maxCodeBytes    = 64 << 10
+	maxPageSize     = 100
+	maxFeedLimit    = 1000
+)
 
 // settablePrefix covers the keys a theme declares for itself, which cannot be
 // listed here because only the theme knows them. Each is checked against the
@@ -60,6 +80,70 @@ func checkSetting(path string, value any) string {
 		if strings.TrimSpace(text) == "" {
 			return "a site needs a name"
 		}
+	case "site.timezone":
+		if _, err := (config.Site{Timezone: text}).Location(); err != nil {
+			return "not a time zone; try something like Asia/Shanghai or UTC"
+		}
+	case "site.keywords":
+		return checkKeywords(value)
+	case "site.noindex":
+		if _, ok := value.(bool); value != nil && !ok {
+			return "want true or false"
+		}
+	case "site.headHTML", "site.footerHTML":
+		if len(text) > maxCodeBytes {
+			return fmt.Sprintf("longer than %d KiB", maxCodeBytes>>10)
+		}
+	case "build.pageSize":
+		return checkCount(value, maxPageSize)
+	case "build.feedLimit":
+		return checkCount(value, maxFeedLimit)
+	}
+	// A value of the wrong kind would be written as it came and then fail to
+	// load, leaving the project unable to open.
+	switch path {
+	case "site.description", "site.author", "site.timezone", "site.headHTML", "site.footerHTML":
+		if _, ok := value.(string); value != nil && !ok {
+			return "want text"
+		}
+	}
+	return ""
+}
+
+// checkKeywords reports why a value cannot be the site's keywords, which are
+// a list of words or nothing.
+func checkKeywords(value any) string {
+	if value == nil {
+		return ""
+	}
+	list, ok := value.([]any)
+	if !ok {
+		return "want a list of words"
+	}
+	if len(list) > maxKeywords {
+		return fmt.Sprintf("at most %d keywords", maxKeywords)
+	}
+	for _, item := range list {
+		word, ok := item.(string)
+		if !ok || strings.TrimSpace(word) == "" {
+			return "each keyword is a word"
+		}
+		if utf8.RuneCountInString(word) > maxKeywordRunes {
+			return fmt.Sprintf("a keyword is at most %d characters", maxKeywordRunes)
+		}
+	}
+	return ""
+}
+
+// checkCount reports why a value cannot be a count from 1 to most. Nothing
+// is allowed, and puts the default back.
+func checkCount(value any, most int) string {
+	if value == nil {
+		return ""
+	}
+	n, ok := value.(float64)
+	if !ok || n != math.Trunc(n) || n < 1 || n > float64(most) {
+		return fmt.Sprintf("want a whole number from 1 to %d", most)
 	}
 	return ""
 }
@@ -75,6 +159,16 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			Description: view.Site.Description,
 			BaseURL:     view.Site.BaseURL,
 			Language:    view.Site.Language,
+			Author:      view.Site.Author,
+			Keywords:    view.Site.Keywords,
+			Timezone:    view.Site.Timezone,
+			NoIndex:     view.Site.NoIndex,
+			HeadHTML:    view.Site.HeadHTML,
+			FooterHTML:  view.Site.FooterHTML,
+		},
+		Build: BuildSettings{
+			PageSize:  view.Build.PageSize,
+			FeedLimit: view.Build.FeedLimit,
 		},
 		Theme:    ThemeSettings{Name: view.Theme},
 		Writable: append(slices.Clone(settable), settablePrefix+"*"),

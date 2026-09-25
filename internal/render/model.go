@@ -33,6 +33,16 @@ type SiteInfo struct {
 	Taxonomies    []string
 	Version       string
 
+	Author     string
+	Keywords   []string
+	NoIndex    bool
+	HeadHTML   string
+	FooterHTML string
+
+	// Location is the zone dates are shown in, nil to show each in the zone
+	// it was written with.
+	Location *time.Location
+
 	// BuildTime is frozen for the lifetime of a build.
 	BuildTime time.Time
 
@@ -52,10 +62,26 @@ func (s siteModel) Language() string              { return s.info.Language }
 func (s siteModel) Params() map[string]any        { return maps.Clone(s.info.Params) }
 func (s siteModel) ThemeSettings() map[string]any { return maps.Clone(s.info.ThemeSettings) }
 func (s siteModel) Taxonomies() []string          { return slices.Clone(s.info.Taxonomies) }
-func (s siteModel) BuildTime() time.Time          { return s.info.BuildTime }
+func (s siteModel) Author() string                { return s.info.Author }
+func (s siteModel) Keywords() []string            { return slices.Clone(s.info.Keywords) }
+func (s siteModel) NoIndex() bool                 { return s.info.NoIndex }
+func (s siteModel) BuildTime() time.Time          { return in(s.info.BuildTime, s.info.Location) }
 func (s siteModel) Version() string               { return s.info.Version }
 func (s siteModel) IsBuild() bool                 { return s.info.Build }
 func (s siteModel) IsServe() bool                 { return !s.info.Build }
+
+// The site's own code is written by whoever runs it, so it is trusted as the
+// theme's templates are.
+func (s siteModel) HeadHTML() template.HTML   { return template.HTML(s.info.HeadHTML) }   //nolint:gosec // the site's own markup
+func (s siteModel) FooterHTML() template.HTML { return template.HTML(s.info.FooterHTML) } //nolint:gosec // the site's own markup
+
+// in shows a time in a zone, or as it is when there is none.
+func in(t time.Time, loc *time.Location) time.Time {
+	if loc == nil || t.IsZero() {
+		return t
+	}
+	return t.In(loc)
+}
 
 type headingModel struct{ h markdown.Heading }
 
@@ -71,6 +97,7 @@ type pageModel struct {
 	url        string
 	terms      map[string][]Term
 	prev, next Page
+	loc        *time.Location
 }
 
 // PageOptions carries what a page needs beyond the stored item.
@@ -79,6 +106,9 @@ type PageOptions struct {
 	Rendered *markdown.Document
 	Resolver *url.Resolver
 	Terms    map[string][]Term
+
+	// Location is the zone the page's dates are shown in, as in SiteInfo.
+	Location *time.Location
 
 	// URL is the page's link when it is not an item's own, as for a listing.
 	URL string
@@ -102,6 +132,7 @@ func NewPage(item *content.Content, opts PageOptions) Page {
 		terms:    opts.Terms,
 		prev:     opts.Prev,
 		next:     opts.Next,
+		loc:      opts.Location,
 	}
 }
 
@@ -184,16 +215,16 @@ func (p *pageModel) ReadingTime() time.Duration {
 	return time.Duration(minutes) * time.Minute
 }
 
-func (p *pageModel) Date() time.Time { return p.item.CreatedAt }
+func (p *pageModel) Date() time.Time { return in(p.item.CreatedAt, p.loc) }
 
 func (p *pageModel) PublishDate() time.Time {
 	if p.item.PublishedAt == nil {
-		return p.item.CreatedAt
+		return in(p.item.CreatedAt, p.loc)
 	}
-	return *p.item.PublishedAt
+	return in(*p.item.PublishedAt, p.loc)
 }
 
-func (p *pageModel) Lastmod() time.Time     { return p.item.UpdatedAt }
+func (p *pageModel) Lastmod() time.Time     { return in(p.item.UpdatedAt, p.loc) }
 func (p *pageModel) Draft() bool            { return p.item.Status == content.StatusDraft }
 func (p *pageModel) Params() map[string]any { return maps.Clone(p.item.Meta) }
 
