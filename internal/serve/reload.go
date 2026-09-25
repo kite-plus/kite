@@ -59,6 +59,13 @@ func (h *reloadHub) broadcast() {
 	}
 }
 
+// current is the generation a page that loads now is greeted with.
+func (h *reloadHub) current() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.generation
+}
+
 // handleReload streams change notifications to one page.
 func (h *reloadHub) handleReload(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
@@ -89,7 +96,9 @@ func (h *reloadHub) handleReload(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-events:
-			_, _ = fmt.Fprint(w, "event: reload\ndata: 1\n\n")
+			// It names the generation the reloaded page will be greeted
+			// with, which is how that page knows it is not behind.
+			_, _ = fmt.Fprintf(w, "event: reload\ndata: %d\n\n", h.current())
 			flusher.Flush()
 		case <-ping.C:
 			_, _ = fmt.Fprint(w, ": ping\n\n")
@@ -104,14 +113,20 @@ func (h *reloadHub) handleReload(w http.ResponseWriter, r *http.Request) {
 const reloadScript = `<script>
 (function () {
   var es, retry = 0;
+  // The generation is stored before reloading, or the page that loads would
+  // find itself behind and reload again, and again.
+  function reload(gen) {
+    sessionStorage.setItem("kite:gen", gen);
+    location.reload();
+  }
   function connect() {
     es = new EventSource(%q);
-    es.addEventListener("reload", function () { location.reload(); });
+    es.addEventListener("reload", function (e) { reload(e.data); });
     es.addEventListener("hello", function (e) {
-      // A generation ahead of ours means a change was missed while the
+      // A generation other than ours means a change was missed while the
       // connection was down, so catch up instead of waiting for the next one.
       var seen = sessionStorage.getItem("kite:gen");
-      if (seen !== null && seen !== e.data) { location.reload(); return; }
+      if (seen !== null && seen !== e.data) { reload(e.data); return; }
       sessionStorage.setItem("kite:gen", e.data);
       retry = 0;
     });
