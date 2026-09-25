@@ -393,20 +393,24 @@ func (s *Server) reconfigureIfChanged() error {
 	return nil
 }
 
-// templatesStamp fingerprints the site's own layouts and the files of an
-// installed theme, by path, size and modification time.
+// templatesStamp fingerprints the site's own layouts and what an installed
+// theme is assembled from, its manifest, layouts and language packs, by path,
+// size and modification time. Its static files are read on every request.
 func (s *Server) templatesStamp(themeName string) string {
-	dirs := []string{filepath.Join(s.root, theme.LayoutsDir)}
+	paths := []string{filepath.Join(s.root, theme.LayoutsDir)}
 	if themeName != "" && themeName != site.BuiltinTheme && content.ValidThemeName(themeName) {
-		dirs = append(dirs, filepath.Join(s.root, site.ThemesDir, themeName))
-	}
-	sum := sha256.New()
-	for _, dir := range dirs {
+		dir := filepath.Join(s.root, site.ThemesDir, themeName)
 		// A theme linked in from elsewhere is fingerprinted where it lives.
 		if resolved, err := filepath.EvalSymlinks(dir); err == nil {
 			dir = resolved
 		}
-		_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		for _, name := range []string{theme.ManifestName, theme.LayoutsDir, theme.PacksDir} {
+			paths = append(paths, filepath.Join(dir, name))
+		}
+	}
+	sum := sha256.New()
+	for _, path := range paths {
+		_ = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return nil
 			}

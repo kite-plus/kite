@@ -44,12 +44,37 @@ func newWatcher(root string, log *slog.Logger) (*watcher, error) {
 	for _, dir := range []string{"content", "layouts", "themes", "static"} {
 		w.addTree(filepath.Join(root, dir))
 	}
+	if entries, err := os.ReadDir(filepath.Join(root, "themes")); err == nil {
+		for _, e := range entries {
+			if e.Type()&fs.ModeSymlink != 0 {
+				w.addLinkedTheme(filepath.Join(root, "themes", e.Name()))
+			}
+		}
+	}
 	// The config and the git HEAD are single files whose directory is the
 	// project root, which is watched non-recursively for exactly this.
 	_ = fsw.Add(root)
 	_ = fsw.Add(filepath.Join(root, ".git"))
 
 	return w, nil
+}
+
+// addLinkedTheme watches a theme that themes/ links to rather than holds,
+// as one being written in its own repository is: a walk does not follow the
+// link. Only the theme's own folders are walked, since its repository often
+// holds the very site being served.
+func (w *watcher) addLinkedTheme(link string) {
+	target, err := filepath.EvalSymlinks(link)
+	if err != nil {
+		return
+	}
+	if info, err := os.Stat(target); err != nil || !info.IsDir() {
+		return
+	}
+	_ = w.fsw.Add(target)
+	for _, dir := range []string{"layouts", "i18n", "static", "assets"} {
+		w.addTree(filepath.Join(target, dir))
+	}
 }
 
 func (w *watcher) addTree(root string) {
@@ -91,7 +116,11 @@ func (w *watcher) run(ctx context.Context, onChange func()) {
 			// A new directory has to be watched too, or content created
 			// inside it would never be noticed.
 			if event.Op&fsnotify.Create != 0 {
-				if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+				if info, err := os.Lstat(event.Name); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+					if filepath.Dir(event.Name) == filepath.Join(w.root, "themes") {
+						w.addLinkedTheme(event.Name)
+					}
+				} else if err == nil && info.IsDir() {
 					w.addTree(event.Name)
 				}
 			}
