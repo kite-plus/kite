@@ -9,7 +9,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ExternalLink, List, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, ExternalLink, List, Merge, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import type { components } from "@/api/client";
 import { useI18n } from "@/i18n";
@@ -22,6 +22,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ import { PageTitle } from "@/components/layout/page-title";
 import { QueryError } from "@/components/query-error";
 import { TermBadge } from "@/components/TermBadge";
 import { DEFAULT_PAGE_SIZE } from "@/features/contents/search";
+import { TermDialog, type TermAction, type TermMode } from "./term-dialog";
 
 type Term = components["schemas"]["TermCount"];
 type Order = "count" | "name";
@@ -56,7 +58,8 @@ const grid = "grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3";
  * delete here: each one leads to its items, which are where it changes.
  *
  * A term is only a name and a count, so each gets a card in a grid rather
- * than a table row stretched across the page.
+ * than a table row stretched across the page. Renaming, merging or deleting
+ * one rewrites every item that carries it.
  */
 export function Terms() {
   const { taxonomy } = route.useParams();
@@ -75,6 +78,7 @@ export function Terms() {
   const many = kindLabel.many(kind);
   useDocumentTitle(name);
 
+  const [action, setAction] = useState<TermAction | null>(null);
   const [order, setOrder] = useState<Order>("count");
   const [search, setSearch] = useState("");
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE });
@@ -177,6 +181,8 @@ export function Terms() {
                     unit={t("terms.unit", {
                       kind: row.original.count === 1 ? kindLabel.one(kind) : many,
                     })}
+                    canMerge={(terms.data?.items.length ?? 0) > 1}
+                    onAction={(mode) => setAction({ mode, term: row.original.term })}
                   />
                 ))}
               </div>
@@ -211,21 +217,40 @@ export function Terms() {
           </div>
         )}
       </Main>
+
+      {action && (
+        <TermDialog
+          key={`${action.mode}:${action.term}`}
+          taxonomy={taxonomy}
+          terms={terms.data?.items ?? []}
+          one={kindLabel.one(kind)}
+          many={many}
+          action={action}
+          onClose={() => setAction(null)}
+        />
+      )}
     </>
   );
 }
 
-/** TermCard is one term: a click opens its items, the menu also its page on the site. */
+/**
+ * TermCard is one term: a click opens its items, the menu also its page on
+ * the site and the changes to the term itself.
+ */
 function TermCard({
   term,
   kind,
   taxonomy,
   unit,
+  canMerge,
+  onAction,
 }: {
   term: Term;
   kind: string;
   taxonomy: string;
   unit: string;
+  canMerge: boolean;
+  onAction: (mode: TermMode) => void;
 }) {
   const { t } = useI18n();
   const kindLabel = useKindLabel();
@@ -262,6 +287,20 @@ function TermCard({
                 <ExternalLink />
                 {t("list.open")}
               </a>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => onAction("rename")}>
+              <Pencil />
+              {t("terms.rename")}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!canMerge} onSelect={() => onAction("merge")}>
+              <Merge />
+              {t("terms.merge")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={() => onAction("remove")}>
+              <Trash2 />
+              {t("terms.remove")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
