@@ -2,6 +2,7 @@ import { Outlet } from "@tanstack/react-router";
 import { Palette, SlidersHorizontal, UserCog } from "lucide-react";
 
 import { useI18n } from "@/i18n";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Separator } from "@/components/ui/separator";
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
@@ -9,6 +10,7 @@ import { SidebarNav } from "./components/sidebar-nav";
 
 export function Settings() {
   const { t } = useI18n();
+  useDocumentTitle(t("settings.title"));
   const items = [
     { title: t("nav.site"), href: "/settings", icon: <SlidersHorizontal size={18} /> },
     { title: t("nav.theme"), href: "/settings/theme", icon: <Palette size={18} /> },

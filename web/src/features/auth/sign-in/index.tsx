@@ -4,6 +4,7 @@ import { Loader2, LogIn, XCircle } from "lucide-react";
 
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSignIn } from "@/hooks/useSession";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { AuthLayout } from "../auth-layout";
 
 export function SignIn() {
   const { t } = useI18n();
+  useDocumentTitle(t("login.title"));
   const problem = useProblem();
   const navigate = useNavigate();
   const { redirect } = useSearch({ from: "/(auth)/sign-in" });

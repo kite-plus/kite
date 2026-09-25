@@ -1,6 +1,7 @@
 import { useNavigate, useRouter, type ErrorComponentProps } from '@tanstack/react-router'
 import { ApiError } from '@/api/client'
 import { useI18n, useProblem } from '@/i18n'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -24,6 +25,7 @@ export function GeneralError({
   const problem = useProblem()
   const navigate = useNavigate()
   const router = useRouter()
+  useDocumentTitle(t('error.general'))
 
   const retry = () => {
     reset?.()

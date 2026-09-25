@@ -4,6 +4,7 @@ import { ExternalLink, Plus } from "lucide-react";
 import { useI18n, type Key } from "@/i18n";
 import { useContentTypes, useSite, useTaxonomies } from "@/hooks/useContents";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSession } from "@/hooks/useSession";
 import { siteHome } from "@/lib/links";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ export function Dashboard() {
   const taxonomies = useTaxonomies();
   const kindLabel = useKindLabel();
   const taxonomyLabel = useTaxonomyLabel();
+  useDocumentTitle(t("nav.dashboard"));
 
   const kinds = types.data?.items.map((type) => type.kind) ?? ["post", "page"];
   const primary = kinds[0] ?? "post";

@@ -1,9 +1,11 @@
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useI18n } from '@/i18n'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { Button } from '@/components/ui/button'
 
 export function NotFoundError() {
   const { t } = useI18n()
+  useDocumentTitle(t('error.notFound'))
   const navigate = useNavigate()
   const { history } = useRouter()
   return (

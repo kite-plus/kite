@@ -15,6 +15,7 @@ import { ExternalLink, List, MoreHorizontal } from "lucide-react";
 import type { components } from "@/api/client";
 import { useI18n } from "@/i18n";
 import { useContentTypes, useTaxonomies, useTerms } from "@/hooks/useContents";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { followRowLink } from "@/lib/row-link";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ export function Terms() {
     types.data?.items.find((type) => type.taxonomies?.includes(taxonomy))?.kind ?? "post";
   const name = taxonomyLabel(taxonomy);
   const many = kindLabel.many(kind);
+  useDocumentTitle(name);
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE });

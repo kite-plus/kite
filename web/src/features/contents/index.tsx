@@ -19,6 +19,7 @@ import {
   type BatchResult,
   type Target,
 } from "@/hooks/useDeleteItems";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useKindLabel } from "@/hooks/useKindLabel";
 import { canPublish, useDelivery } from "@/hooks/usePublish";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -67,6 +68,7 @@ export function ContentList() {
   );
 
   const trashed = search.trash === true;
+  useDocumentTitle(trashed ? t("status.trash") : kindLabel.many(kind));
   const sort = search.sort ?? (sortable[0] ? defaultSort(sortable[0]) : "");
   const pageSize = search.size ?? DEFAULT_PAGE_SIZE;
   const filters = useMemo(

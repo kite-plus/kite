@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Loader2, XCircle } from "lucide-react";
 
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useInstall, useSetup } from "@/hooks/useSetup";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -34,6 +35,7 @@ export function Setup() {
   const install = useInstall();
 
   const [step, setStep] = useState<"site" | "account">("site");
+  useDocumentTitle(t(step === "site" ? "setup.site.title" : "setup.account.title"));
 
   const [title, setTitle] = useState(state?.site?.title ?? "");
   const [baseURL, setBaseURL] = useState(state?.site?.base_url ?? "");

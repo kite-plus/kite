@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem, type Key } from "@/i18n";
 import { useContentTypes } from "@/hooks/useContents";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useItem } from "@/hooks/useItem";
 import { useKindLabel } from "@/hooks/useKindLabel";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -103,6 +104,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const guard = useUnsavedGuard(item.dirty);
 
   const draft = item.draft;
+  useDocumentTitle(draft ? draft.title || t("editor.untitled") : undefined);
   const type = types.data?.items.find((entry) => entry.kind === (draft?.kind ?? kind));
 
   // A document that uses what the visual editor would damage opens as

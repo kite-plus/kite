@@ -95,11 +95,14 @@ export function useLatest(kind: string, limit: number, sort: string) {
   });
 }
 
+/** siteQuery is shared with the tab title, which reads it without asking for it. */
+export const siteQuery = {
+  queryKey: ["site"],
+  queryFn: async () => unwrap(await api.GET("/site", {})),
+};
+
 export function useSite() {
-  return useQuery({
-    queryKey: ["site"],
-    queryFn: async () => unwrap(await api.GET("/site", {})),
-  });
+  return useQuery(siteQuery);
 }
 
 /** contentTypesQuery is shared with the route that turns away a kind the project lacks. */
