@@ -2,6 +2,7 @@ import { Outlet } from "@tanstack/react-router";
 import { Palette, SlidersHorizontal, UserCog } from "lucide-react";
 
 import { useI18n } from "@/i18n";
+import { Separator } from "@/components/ui/separator";
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { SidebarNav } from "./components/sidebar-nav";
@@ -23,7 +24,8 @@ export function Settings() {
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{t("settings.title")}</h1>
           <p className="text-muted-foreground">{t("settings.description")}</p>
         </div>
-        <div className="mt-4 flex flex-1 flex-col space-y-2 overflow-hidden rounded-xl border bg-card p-4 shadow-xs md:space-y-2 lg:mt-6 lg:flex-row lg:space-y-0 lg:space-x-12">
+        <Separator className="my-4 lg:my-6" />
+        <div className="flex flex-1 flex-col space-y-2 overflow-hidden md:space-y-2 lg:flex-row lg:space-y-0 lg:space-x-12">
           <aside className="top-0 lg:sticky lg:w-1/5">
             <SidebarNav items={items} />
           </aside>

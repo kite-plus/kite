@@ -282,7 +282,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     return (
       <>
         <Header />
-        <div className="flex flex-1 items-center justify-center gap-2 bg-background py-24 text-sm text-muted-foreground">
+        <div className="flex flex-1 items-center justify-center gap-2 py-24 text-sm text-muted-foreground">
           <Spinner />
           {t("editor.loading")}
         </div>
@@ -356,9 +356,8 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
 
   return (
     // Fixed: the layout gives this page the viewport's height, and the text
-    // scrolls inside it rather than the page. White, as a sheet of paper
-    // rather than the canvas the other screens sit on.
-    <div data-layout="fixed" className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+    // scrolls inside it rather than the page.
+    <div data-layout="fixed" className="flex min-h-0 min-w-0 flex-1 flex-col">
       <Header>
         <Tooltip>
           <TooltipTrigger asChild>

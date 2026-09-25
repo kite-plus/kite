@@ -24,9 +24,6 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
           <AppSidebar />
           <SidebarInset
             className={cn(
-              // Kite: pages sit on the gray canvas; cards and bars are white.
-              'bg-canvas',
-
               // Set content container, so we can use container queries
               '@container/content',
 

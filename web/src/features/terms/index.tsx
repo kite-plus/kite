@@ -177,7 +177,7 @@ export function Terms() {
               searchKey="term"
               searchPlaceholder={t("terms.search", { name })}
             />
-            <div className="overflow-hidden rounded-md border bg-card">
+            <div className="overflow-hidden rounded-md border">
               <Table>
                 <TableHeader>
                   {table.getHeaderGroups().map((group) => (
