@@ -198,10 +198,13 @@ func loadTheme(root, name string) (*theme.Theme, []theme.Source, error) {
 }
 
 func themeFS(root, name string) (fs.FS, string, error) {
-	if name == "" || name == "default" {
+	if name == "" || name == BuiltinTheme {
 		return themes.Default(), "built-in theme", nil
 	}
-	dir := filepath.Join(root, "themes", name)
+	if !ValidThemeName(name) {
+		return nil, "", fmt.Errorf("site: %q cannot name a theme, which is one directory under themes/", name)
+	}
+	dir := filepath.Join(root, ThemesDir, name)
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		return nil, "", fmt.Errorf("site: theme %q not found in themes/", name)
 	}
