@@ -192,5 +192,9 @@ func (s *Server) routes() []route {
 		{http.MethodGet, "/themes/{name}", s.handleTheme},
 		{http.MethodDelete, "/themes/{name}", s.handleRemoveTheme},
 		{http.MethodGet, "/themes/{name}/screenshot", s.handleThemeScreenshot},
+		{http.MethodPost, "/previews", s.handleOpenPreview},
+		{http.MethodPut, "/previews/{token}", s.handleUpdatePreview},
+		{http.MethodDelete, "/previews/{token}", s.handleClosePreview},
+		{http.MethodGet, "/previews/{token}/{path...}", s.handlePreviewPage},
 	}
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
@@ -33,6 +34,9 @@ type View struct {
 	// Themes lists every theme the project could switch to. It is nil where
 	// themes cannot be switched.
 	Themes func() []InstalledTheme
+	// Previews keeps the sites being drawn with a theme or settings that are
+	// being tried. It is nil where none can be drawn.
+	Previews Previews
 
 	// Writer is nil when this deployment may not be written to, which is the
 	// difference between a preview an author is typing into and a read-only
@@ -74,6 +78,29 @@ type InstalledTheme struct {
 	Theme    *theme.Theme
 	Manifest *theme.Manifest
 	Problem  string
+}
+
+// Trial is what a preview draws: a theme, by name, and the settings it is
+// given in place of the stored ones.
+type Trial struct {
+	Theme    string
+	Settings map[string]any
+}
+
+// Previews keeps sites drawn with a theme or settings being tried, each at an
+// address of its own, until it is closed or left unused for long enough.
+type Previews interface {
+	// Open draws a trial as a site whose address is prefix followed by the
+	// token it returns, and every link in it leads there.
+	Open(ctx context.Context, trial Trial, prefix string) (token string, err error)
+	// Update draws an open preview again with another trial. It reports false
+	// for a token that is not open, as when it was left unused and forgotten.
+	Update(ctx context.Context, token string, trial Trial) (bool, error)
+	// Close forgets a preview.
+	Close(token string)
+	// Serve answers a request for one of a preview's pages or files, at its
+	// full path, reporting false for a token that is not open.
+	Serve(w http.ResponseWriter, r *http.Request, token, path string) bool
 }
 
 // SiteSource supplies the project's current state.

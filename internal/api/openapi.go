@@ -527,6 +527,46 @@ func openAPI() *document {
 					"404": {Description: "Failed.", Content: jsonOf(errorRef)},
 				},
 			}},
+			"/previews": {Post: &operation{
+				OperationID: "openPreview",
+				Summary: "Draw the site with a theme or settings being tried, without writing " +
+					"anything. The preview is kept while it is used.",
+				RequestBody: body(ref(PreviewBody{})),
+				Responses:   created(ref(Preview{}), "The open preview.", "400", "501"),
+			}},
+			"/previews/{token}": {
+				Put: &operation{
+					OperationID: "updatePreview",
+					Summary:     "Draw an open preview again with another theme or other settings.",
+					Parameters:  []parameter{pathParam("token")},
+					RequestBody: body(ref(PreviewBody{})),
+					Responses:   ok(ref(Preview{}), "The preview, at the same address.", "400", "404", "501"),
+				},
+				Delete: &operation{
+					OperationID: "closePreview",
+					Summary:     "Forget a preview.",
+					Parameters:  []parameter{pathParam("token")},
+					Responses:   map[string]response{"204": {Description: "Forgotten."}},
+				},
+			},
+			"/previews/{token}/{path}": {Get: &operation{
+				OperationID: "getPreviewPage",
+				Summary: "Read a page or a file of a preview. Its links lead to its other pages, " +
+					"drawn the same way.",
+				Parameters: []parameter{pathParam("token"), {
+					Name: "path", In: "path", Required: true,
+					Description: "Where the page or file is in the site; it may hold slashes.",
+					Schema:      &jsonSchema{Type: "string"},
+				}},
+				Responses: map[string]response{
+					"200": {
+						Description: "The page or file.",
+						Content:     map[string]mediaType{"text/html": {Schema: &jsonSchema{Type: "string"}}},
+					},
+					"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+					"501": {Description: "Failed.", Content: jsonOf(errorRef)},
+				},
+			}},
 		},
 		Components: components{
 			Schemas: schemas,

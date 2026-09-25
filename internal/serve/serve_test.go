@@ -1019,3 +1019,133 @@ func TestAnEditedTemplateIsDrawnWithoutARestart(t *testing.T) {
 		t.Errorf("the edited template was not used:\n%s", got)
 	}
 }
+
+// installPaper puts a small theme into a project: its pages say the accent
+// they are given and link home, and it brings a stylesheet of its own.
+func installPaper(t *testing.T, root string) {
+	t.Helper()
+	for name, body := range map[string]string{
+		"theme.yaml": "name: paper\nversion: 1.0.0\napiVersion: kite/v1\nsettings:\n" +
+			"  - {key: accent, type: color, default: \"#2563eb\"}\n",
+		"layouts/baseof.html": `<!DOCTYPE html><html><head><link rel="stylesheet" href="{{ url.Rel "paper.css" }}"></head>` +
+			`<body data-accent="{{ .Site.ThemeSettings.accent }}"><a class="home" href="{{ url.For "home" }}">home</a>{{ block "main" . }}{{ end }}</body></html>`,
+		"layouts/single.html": `{{ define "main" }}<h1>{{ .Page.Title }}</h1>{{ end }}`,
+		"layouts/list.html":   `{{ define "main" }}list{{ end }}`,
+		"layouts/home.html":   `{{ define "main" }}paper home{{ end }}`,
+		"layouts/404.html":    `{{ define "main" }}lost{{ end }}`,
+		"static/paper.css":    "body { color: black }",
+	} {
+		path := filepath.Join(root, "themes", "paper", filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func call(t *testing.T, h http.Handler, method, url string, body any) *httptest.ResponseRecorder {
+	t.Helper()
+	var data []byte
+	if body != nil {
+		var err error
+		if data, err = json.Marshal(body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	req := httptest.NewRequest(method, url, bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// A theme, or a setting, is tried on the whole site before anything is saved:
+// the preview's pages link to each other rather than to the site, load the
+// theme's own files, and the site itself goes on as it was.
+func TestAPreviewTriesAThemeOnTheWholeSite(t *testing.T) {
+	root := newProject(t, 3)
+	installPaper(t, root)
+	config, err := os.ReadFile(filepath.Join(root, "kite.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := newServer(t, root, serve.Options{Admin: true}).Handler()
+
+	rec := call(t, handler, http.MethodPost, "/api/v1/previews", map[string]any{
+		"theme":    "paper",
+		"settings": map[string]any{"accent": "#a3473b"},
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("open: status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	var preview struct{ Token, URL string }
+	if err := json.Unmarshal(rec.Body.Bytes(), &preview); err != nil {
+		t.Fatal(err)
+	}
+
+	home := call(t, handler, http.MethodGet, preview.URL, nil)
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "paper home") ||
+		!strings.Contains(home.Body.String(), `data-accent="#a3473b"`) {
+		t.Fatalf("home: %d\n%s", home.Code, home.Body.String())
+	}
+	if !strings.Contains(home.Body.String(), `href="`+preview.URL+`paper.css"`) ||
+		!strings.Contains(home.Body.String(), `class="home" href="`+preview.URL+`"`) {
+		t.Errorf("the preview's links lead out of it:\n%s", home.Body.String())
+	}
+	post := call(t, handler, http.MethodGet, preview.URL+"posts/post-01/", nil)
+	if post.Code != http.StatusOK || !strings.Contains(post.Body.String(), "<h1>Post 01</h1>") {
+		t.Errorf("a post in the preview: %d\n%s", post.Code, post.Body.String())
+	}
+	css := call(t, handler, http.MethodGet, preview.URL+"paper.css", nil)
+	if css.Code != http.StatusOK || css.Body.String() != "body { color: black }" {
+		t.Errorf("the theme's stylesheet: %d %q", css.Code, css.Body.String())
+	}
+	if lost := call(t, handler, http.MethodGet, preview.URL+"no/such/page/", nil); lost.Code != http.StatusNotFound ||
+		!strings.Contains(lost.Body.String(), "lost") {
+		t.Errorf("a missing page: %d\n%s", lost.Code, lost.Body.String())
+	}
+
+	// The site itself is untouched.
+	if site := call(t, handler, http.MethodGet, "/posts/post-01/", nil); strings.Contains(site.Body.String(), "data-accent") {
+		t.Error("the site is drawn with the theme being tried")
+	}
+	if after, _ := os.ReadFile(filepath.Join(root, "kite.yaml")); string(after) != string(config) {
+		t.Errorf("kite.yaml changed:\n%s", after)
+	}
+
+	// Another setting redraws it at the same address.
+	rec = call(t, handler, http.MethodPut, "/api/v1/previews/"+preview.Token, map[string]any{
+		"theme":    "paper",
+		"settings": map[string]any{"accent": "#46617c"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update: status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if again := call(t, handler, http.MethodGet, preview.URL, nil); !strings.Contains(again.Body.String(), `data-accent="#46617c"`) {
+		t.Errorf("after the update:\n%s", again.Body.String())
+	}
+
+	if rec := call(t, handler, http.MethodDelete, "/api/v1/previews/"+preview.Token, nil); rec.Code != http.StatusNoContent {
+		t.Errorf("close: status = %d", rec.Code)
+	}
+	if gone := call(t, handler, http.MethodGet, preview.URL, nil); gone.Code != http.StatusNotFound {
+		t.Errorf("a closed preview: status = %d", gone.Code)
+	}
+}
+
+func TestOnlyAThemeThatCanBeUsedIsPreviewed(t *testing.T) {
+	root := newProject(t, 1)
+	handler := newServer(t, root, serve.Options{Admin: true}).Handler()
+	for _, theme := range []string{"missing", "../escape"} {
+		rec := call(t, handler, http.MethodPost, "/api/v1/previews", map[string]any{"theme": theme})
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", theme, rec.Code)
+		}
+	}
+	// With no theme named, the one in use is drawn with the stored settings.
+	if rec := call(t, handler, http.MethodPost, "/api/v1/previews", map[string]any{}); rec.Code != http.StatusCreated {
+		t.Errorf("the theme in use: status = %d\n%s", rec.Code, rec.Body.String())
+	}
+}

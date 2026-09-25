@@ -403,6 +403,23 @@ type ThemeExists struct {
 	Uploaded  ThemeInfo   `json:"uploaded"`
 }
 
+// PreviewBody says what a preview draws.
+type PreviewBody struct {
+	// Theme names the theme; empty draws the one in use.
+	Theme string `json:"theme,omitempty"`
+	// Settings stand in for the theme settings kite.yaml holds. Left out,
+	// the stored ones are used.
+	Settings map[string]any `json:"settings,omitempty"`
+}
+
+// Preview is a site drawn with a theme or settings being tried.
+type Preview struct {
+	Token string `json:"token"`
+	// URL is the preview's home page. Its links lead to its other pages,
+	// all drawn the same way, and nothing is written.
+	URL string `json:"url"`
+}
+
 // PublishBody names what to publish.
 type PublishBody struct {
 	// IDs name items; Paths name files directly, for anything that is not an

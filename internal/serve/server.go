@@ -117,6 +117,8 @@ type Server struct {
 	// keeps every template it has parsed, so an edited or replaced one needs
 	// the site assembled again, as a settings change does.
 	templates string
+
+	previews *previews
 }
 
 // Setup is the first run this server is waiting on, or nil when it is not
@@ -183,6 +185,7 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 		log:    opts.Logger,
 		now:    now,
 	}
+	srv.previews = newPreviews(srv)
 	srv.configHash = srv.readConfigHash()
 	srv.templates = srv.templatesStamp(s.Config.Theme.Name)
 	if err := srv.Reload(ctx); err != nil {
@@ -298,6 +301,7 @@ func (s *Server) view() api.View {
 		ActiveTheme:   current.Theme,
 		ThemeSettings: current.Config.Theme.Settings,
 		Themes:        s.themes,
+		Previews:      s.previews,
 	}
 	if s.opts.Write {
 		v.Writer = current.Project.Writer()
