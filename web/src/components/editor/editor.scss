@@ -250,6 +250,31 @@
 }
 
 /* =====================
+     TASK LISTS
+     ===================== */
+// The admin's checkbox, centered on the first line of its item, whose text
+// sits 0.25rem down as every list paragraph here does.
+.simple-editor-content .tiptap.ProseMirror.simple-editor ul[data-type="taskList"] li label {
+  padding-top: calc(0.25rem + 0.4em);
+
+  &::before {
+    border-color: var(--input);
+    border-radius: 4px;
+    background-color: var(--background);
+  }
+
+  &::after {
+    top: calc(0.25rem + 0.525em);
+    background-color: var(--primary-foreground);
+  }
+
+  &:has(input[type="checkbox"]:checked)::before {
+    border-color: var(--primary);
+    background-color: var(--primary);
+  }
+}
+
+/* =====================
      TABLES
      ===================== */
 .tiptap.ProseMirror {
