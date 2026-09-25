@@ -10,6 +10,7 @@ package theme
 import (
 	"fmt"
 	"io/fs"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -79,6 +80,11 @@ type Manifest struct {
 	License     string   `yaml:"license,omitempty"`
 	Homepage    string   `yaml:"homepage,omitempty"`
 	Tags        []string `yaml:"tags,omitempty"`
+
+	// Screenshot is a picture of a site drawn with the theme, relative to
+	// the theme directory. Left empty, screenshot.png, .jpg or .webp is
+	// used when there is one.
+	Screenshot string `yaml:"screenshot,omitempty"`
 
 	// Capabilities lists the runtimes the theme supports: static, dynamic.
 	Capabilities []string `yaml:"capabilities,omitempty"`
@@ -152,25 +158,42 @@ func (m *Manifest) DefaultSettings() map[string]any { return m.Settings.Defaults
 type Theme struct {
 	Manifest Manifest
 
+	// Root is the theme directory itself.
+	Root fs.FS
+
 	// Layouts is rooted at the theme's layouts directory.
 	Layouts fs.FS
 
 	// Assets and Static are optional and may be nil.
 	Assets fs.FS
 	Static fs.FS
+
+	// Packs holds the theme's language packs by lowercased language tag,
+	// each a flat table of dotted keys, as zh-cn: {theme.title: ...}.
+	Packs map[string]map[string]string
 }
 
-// Load reads a theme from a filesystem rooted at the theme directory.
-func Load(fsys fs.FS) (*Theme, error) {
+// ReadManifest parses a theme's manifest without checking it, for saying
+// what a theme is even when it cannot be used.
+func ReadManifest(fsys fs.FS) (*Manifest, error) {
 	data, err := fs.ReadFile(fsys, ManifestName)
 	if err != nil {
 		return nil, fmt.Errorf("theme: read %s: %w", ManifestName, err)
 	}
-
 	var m Manifest
 	if err := yaml.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("theme: parse %s: %w", ManifestName, err)
 	}
+	return &m, nil
+}
+
+// Load reads a theme from a filesystem rooted at the theme directory.
+func Load(fsys fs.FS) (*Theme, error) {
+	manifest, err := ReadManifest(fsys)
+	if err != nil {
+		return nil, err
+	}
+	m := *manifest
 	if err := m.Validate(); err != nil {
 		return nil, err
 	}
@@ -185,8 +208,12 @@ func Load(fsys fs.FS) (*Theme, error) {
 	if err := checkLayouts(&m, layouts); err != nil {
 		return nil, err
 	}
+	packs, err := loadPacks(fsys, m.Name)
+	if err != nil {
+		return nil, err
+	}
 
-	t := &Theme{Manifest: m, Layouts: layouts}
+	t := &Theme{Manifest: m, Root: fsys, Layouts: layouts, Packs: packs}
 	if sub, err := fs.Sub(fsys, "assets"); err == nil {
 		t.Assets = sub
 	}
@@ -194,6 +221,27 @@ func Load(fsys fs.FS) (*Theme, error) {
 		t.Static = sub
 	}
 	return t, nil
+}
+
+// ScreenshotPath finds the theme's screenshot in its directory, reporting
+// false when it has none.
+func (t *Theme) ScreenshotPath() (string, bool) {
+	if t.Root == nil {
+		return "", false
+	}
+	candidates := []string{"screenshot.png", "screenshot.jpg", "screenshot.jpeg", "screenshot.webp"}
+	if t.Manifest.Screenshot != "" {
+		candidates = []string{path.Clean(t.Manifest.Screenshot)}
+	}
+	for _, name := range candidates {
+		if !fs.ValidPath(name) {
+			continue
+		}
+		if info, err := fs.Stat(t.Root, name); err == nil && !info.IsDir() {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 // checkLayouts makes sure every layout a theme offers has a template it can
