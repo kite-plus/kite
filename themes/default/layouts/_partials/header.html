@@ -8,15 +8,11 @@
     <nav>
       <a href="{{ url.For "home" }}"{{ if eq $kind "home" }} aria-current="page"{{ end }}>{{ partial "t.html" (dict "k" "home" "lang" $lang) }}</a>
       <a href="{{ url.For "list" "post" }}"{{ if and (eq $kind "list") (eq $type "post") }} aria-current="page"{{ end }}>{{ partial "t.html" (dict "k" "archive" "lang" $lang) }}</a>
-      {{- /* Extra links are one "Label | /path/" per line; a path is within
-             the site, under its base path. */ -}}
-      {{- with .Site.ThemeSettings.nav }}
-      {{- range str.Split "\n" (printf "%v" .) }}
-      {{- $parts := str.Split "|" . }}
-      {{- if eq (len $parts) 2 }}
-      {{- $url := url.Rel (str.Trim (index $parts 1)) }}
-      <a href="{{ $url }}"{{ if eq $url $here }} aria-current="page"{{ end }}>{{ str.Trim (index $parts 0) }}</a>
-      {{- end }}
+      {{- /* A path in an extra link is within the site, under its base path. */ -}}
+      {{- range .Site.ThemeSettings.nav }}
+      {{- if and .label .url }}
+      {{- $url := url.Rel .url }}
+      <a href="{{ $url }}"{{ if eq $url $here }} aria-current="page"{{ end }}>{{ .label }}</a>
       {{- end }}
       {{- end }}
       {{ $toggle := partial "t.html" (dict "k" "toggle" "lang" $lang) -}}

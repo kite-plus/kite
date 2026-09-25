@@ -1,0 +1,62 @@
+# What the default theme says about itself in the admin, in Chinese. The
+# keys follow theme.yaml; anything missing here is shown as written there.
+theme:
+  title: Kite 默认主题
+  description: Kite 自带的主题。安静的衬线排版，适合个人写作；不依赖任何外部资源，支持浅色与深色。
+
+  settings:
+    look:
+      label: 外观
+    accent:
+      label: 强调色
+      help: 用于链接与标记。主题以赭石色绘制，另外几种建议色与它同样协调。
+      options:
+        "#7d5c3c": 赭石
+        "#4f6b52": 苔绿
+        "#a3473b": 朱砂
+        "#46617c": 黛蓝
+    favicon:
+      label: 站点图标
+      help: 显示在浏览器标签页和书签里。建议使用至少 64 像素的正方形图片。
+    font_stylesheet:
+      label: 网页字体样式表
+      help: 提供思源宋体（Noto Serif SC）的样式表地址，可以来自字体服务，也可以是自己托管的副本。留空时使用读者设备上已有的衬线字体，不向任何第三方发起请求。
+
+    navigation:
+      label: 导航
+    nav:
+      label: 额外链接
+      help: 排在首页和归档之后，显示在页头。站内地址以斜杠开头。
+      fields:
+        label:
+          label: 名称
+          placeholder: 关于
+        url:
+          label: 地址
+
+    home:
+      label: 首页
+    show_summary:
+      label: 在每篇标题下显示摘要
+
+    posts:
+      label: 文章
+    show_toc:
+      label: 显示目录
+      help: 标题足够多的文章会在旁边显示目录。
+    show_word_count:
+      label: 显示字数与阅读时间
+
+    footer:
+      label: 页脚
+    footer_text:
+      label: 页脚文字
+      help: 版权信息上方额外的一行，例如许可协议或备案号。
+    copyright:
+      label: 版权信息
+      help: 留空时，署名为站点本身，年份为最后一次构建的年份。
+
+  layouts:
+    links:
+      label: 友链
+      description: 把页面里的链接列表排成卡片，适合友链或博客圈。

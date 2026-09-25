@@ -1,10 +1,16 @@
 name: default
 title: Kite Default
-version: 0.3.0
+version: 0.4.0
 apiVersion: kite/v1
 requires: ">=0.1.0 <2.0.0"
 description: The theme Kite ships with. Quiet serif typography for personal writing, dependency free, light and dark.
+author:
+  name: Kite
+  url: https://github.com/kite-plus
 license: Apache-2.0
+homepage: https://github.com/kite-plus/kite/tree/main/themes/default
+tags: [blog, serif, dark mode]
+screenshot: screenshot.webp
 
 capabilities: [static, dynamic]
 contentTypes: [post, page]
@@ -17,41 +23,74 @@ layouts:
     types: [page]
 
 settings:
-  - key: accent
-    type: color
-    label: Accent colour
-    help: "Links and marks. The theme was drawn with #7d5c3c; #4f6b52, #a3473b and #46617c sit well beside it."
-    default: "#7d5c3c"
-  - key: show_summary
-    type: boolean
-    label: Show a summary under each title on the home page
-    default: true
-  - key: show_toc
-    type: boolean
-    label: Show a table of contents on posts
-    default: true
-  - key: show_word_count
-    type: boolean
-    label: Show the word count and reading time on posts
-    default: true
-  - key: nav
-    type: text
-    label: Extra navigation links
-    help: One per line, written as "Label | /path/". They follow the home page and the archive.
-    placeholder: About | /about/
-    default: ""
-  - key: font_stylesheet
-    type: string
-    label: Web font stylesheet
-    help: Address of a stylesheet that provides Noto Serif SC, from a font service or a copy you host. Left empty, the theme uses the serif fonts already on the reader's device and asks nothing of a third party.
-    default: ""
-  - key: footer_text
-    type: string
-    label: Footer text
-    help: An extra line above the copyright, such as a licence or a registration number.
-    default: ""
-  - key: copyright
-    type: string
-    label: Copyright
-    help: Left empty, the site is credited to itself for the year it was last built.
-    default: ""
+  - key: look
+    type: section
+    label: Look
+    fields:
+      - key: accent
+        type: color
+        label: Accent color
+        help: Links and marks. The theme was drawn with umber; the others suggested sit well beside it.
+        default: "#7d5c3c"
+        options:
+          - {value: "#7d5c3c", label: Umber}
+          - {value: "#4f6b52", label: Moss}
+          - {value: "#a3473b", label: Vermilion}
+          - {value: "#46617c", label: Slate blue}
+      - key: favicon
+        type: image
+        label: Site icon
+        help: Shown in browser tabs and bookmarks. A square picture of at least 64 pixels suits it best.
+      - key: font_stylesheet
+        type: url
+        label: Web font stylesheet
+        help: Address of a stylesheet that provides Noto Serif SC, from a font service or a copy you host. Left empty, the theme uses the serif fonts already on the reader's device and asks nothing of a third party.
+        placeholder: https://fonts.example.com/css?family=Noto+Serif+SC
+
+  - key: navigation
+    type: section
+    label: Navigation
+    fields:
+      - key: nav
+        type: repeat
+        label: Extra links
+        help: They follow the home page and the archive in the header. An address within the site starts with a slash.
+        fields:
+          - {key: label, type: string, label: Label, placeholder: About}
+          - {key: url, type: url, label: Address, placeholder: /about/}
+
+  - key: home
+    type: section
+    label: Home page
+    fields:
+      - key: show_summary
+        type: boolean
+        label: Show a summary under each title
+        default: true
+
+  - key: posts
+    type: section
+    label: Posts
+    fields:
+      - key: show_toc
+        type: boolean
+        label: Show a table of contents
+        help: Drawn beside a post with enough headings to need one.
+        default: true
+      - key: show_word_count
+        type: boolean
+        label: Show the word count and reading time
+        default: true
+
+  - key: footer
+    type: section
+    label: Footer
+    fields:
+      - key: footer_text
+        type: string
+        label: Footer text
+        help: An extra line above the copyright, such as a licence or a registration number.
+      - key: copyright
+        type: string
+        label: Copyright
+        help: Left empty, the site is credited to itself for the year it was last built.

@@ -6,6 +6,8 @@ import (
 	"testing/fstest"
 
 	"github.com/kite-plus/kite/internal/render/theme"
+	"github.com/kite-plus/kite/internal/schema"
+	"github.com/kite-plus/kite/themes"
 )
 
 const packedManifest = `name: x
@@ -157,5 +159,44 @@ func TestAScreenshotIsFoundByNameOrByTheManifest(t *testing.T) {
 		if got, _ := th.ScreenshotPath(); got != tc.want {
 			t.Errorf("ScreenshotPath = %q, want %q", got, tc.want)
 		}
+	}
+}
+
+// The admin speaks English and Chinese, and so does the theme built into
+// Kite: a setting added to it without a translation would show up as the
+// one English line in a Chinese form.
+func TestTheBuiltInThemeSpeaksTheAdminsLanguages(t *testing.T) {
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	english, chinese := th.Manifest, th.Localized("zh-CN")
+
+	same := func(what, a, b string) {
+		if a != "" && a == b {
+			t.Errorf("%s is not translated: %q", what, a)
+		}
+	}
+	same("title", english.Title, chinese.Title)
+	same("description", english.Description, chinese.Description)
+	var walk func(prefix string, en, zh schema.Schema)
+	walk = func(prefix string, en, zh schema.Schema) {
+		for i, f := range en {
+			key := prefix + f.Key
+			same(key+" label", f.Label, zh[i].Label)
+			same(key+" help", f.Help, zh[i].Help)
+			for j, o := range f.Options {
+				same(key+" option "+o.Value, o.Label, zh[i].Options[j].Label)
+			}
+			walk(key+".", f.Fields, zh[i].Fields)
+		}
+	}
+	walk("", english.Settings, chinese.Settings)
+	for i, l := range english.Layouts {
+		same("layout "+l.Name, l.Label, chinese.Layouts[i].Label)
+		same("layout "+l.Name+" description", l.Description, chinese.Layouts[i].Description)
+	}
+	if _, ok := th.ScreenshotPath(); !ok {
+		t.Error("the built-in theme has no screenshot")
 	}
 }
