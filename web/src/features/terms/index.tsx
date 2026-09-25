@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import {
-  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
@@ -10,7 +9,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { ExternalLink, List, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, ExternalLink, List, MoreHorizontal } from "lucide-react";
 
 import type { components } from "@/api/client";
 import { useI18n } from "@/i18n";
@@ -25,20 +24,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DataTableColumnHeader,
-  DataTablePagination,
-  DataTableToolbar,
-} from "@/components/data-table";
+import { DataTablePagination } from "@/components/data-table";
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
@@ -47,17 +42,25 @@ import { TermBadge } from "@/components/TermBadge";
 import { DEFAULT_PAGE_SIZE } from "@/features/contents/search";
 
 type Term = components["schemas"]["TermCount"];
+type Order = "count" | "name";
 
 const route = getRouteApi("/_authenticated/taxonomies/$taxonomy");
+
+// As many cards to a row as the column has room for, each wide enough for a
+// long term beside its menu.
+const grid = "grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3";
 
 /**
  * Terms lists one taxonomy, as a blog's categories or tags page does. Terms
  * are gathered from the items that carry them, so there is nothing to add or
  * delete here: each one leads to its items, which are where it changes.
+ *
+ * A term is only a name and a count, so each gets a card in a grid rather
+ * than a table row stretched across the page.
  */
 export function Terms() {
   const { taxonomy } = route.useParams();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const kindLabel = useKindLabel();
   const taxonomyLabel = useTaxonomyLabel();
   const types = useContentTypes();
@@ -72,79 +75,38 @@ export function Terms() {
   const many = kindLabel.many(kind);
   useDocumentTitle(name);
 
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [order, setOrder] = useState<Order>("count");
+  const [search, setSearch] = useState("");
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE });
 
   const columns = useMemo<ColumnDef<Term>[]>(
     () => [
       {
         accessorKey: "term",
-        header: ({ column }) => <DataTableColumnHeader column={column} title={t("terms.name")} />,
-        cell: ({ row }) => (
-          <Link
-            to="/content/$kind"
-            params={{ kind }}
-            search={{ terms: [`${taxonomy}:${row.original.term}`] }}
-            data-row-link
-          >
-            <TermBadge term={row.original.term} className="transition-opacity hover:opacity-80" />
-          </Link>
-        ),
         filterFn: "includesString",
-        enableHiding: false,
-        meta: { title: t("terms.name") },
+        sortingFn: (a, b) => a.original.term.localeCompare(b.original.term, locale),
       },
       {
         accessorKey: "count",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title={t("terms.count", { kind: many })} />
-        ),
-        cell: ({ row }) => <span className="tabular-nums">{row.original.count}</span>,
-        meta: { title: t("terms.count", { kind: many }), className: "w-32" },
-      },
-      {
-        id: "actions",
-        cell: ({ row }) => (
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex size-8 p-0 data-[state=open]:bg-muted">
-                <MoreHorizontal className="size-4" />
-                <span className="sr-only">{t("list.actions")}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem asChild>
-                <Link
-                  to="/content/$kind"
-                  params={{ kind }}
-                  search={{ terms: [`${taxonomy}:${row.original.term}`] }}
-                >
-                  <List />
-                  {t("terms.viewItems", { kind: many })}
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a href={row.original.url} target="_blank" rel="noreferrer">
-                  <ExternalLink />
-                  {t("list.open")}
-                </a>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-        enableSorting: false,
-        enableHiding: false,
-        meta: { className: "w-10", skipRowLink: true },
+        // Sorted descending, so terms used alike fall back to reverse name order.
+        sortingFn: (a, b) =>
+          a.original.count - b.original.count ||
+          b.original.term.localeCompare(a.original.term, locale),
       },
     ],
-    [t, kind, taxonomy, many],
+    [locale],
   );
+
+  const sorting = useMemo<SortingState>(
+    () => [order === "count" ? { id: "count", desc: true } : { id: "term", desc: false }],
+    [order],
+  );
+  const columnFilters = useMemo(() => (search ? [{ id: "term", value: search }] : []), [search]);
 
   const table = useReactTable({
     data: terms.data?.items ?? [],
     columns,
-    state: { sorting, pagination },
-    onSortingChange: setSorting,
+    state: { sorting, columnFilters, pagination },
     onPaginationChange: setPagination,
     getRowId: (term) => term.term,
     getCoreRowModel: getCoreRowModel(),
@@ -176,72 +138,63 @@ export function Terms() {
           <QueryError error={terms.error} onRetry={() => void terms.refetch()} />
         ) : (
           <div className="flex flex-1 flex-col gap-4">
-            <DataTableToolbar
-              table={table}
-              searchKey="term"
-              searchPlaceholder={t("terms.search", { name })}
-            />
-            <div className="overflow-hidden rounded-md border">
-              <Table>
-                <TableHeader>
-                  {table.getHeaderGroups().map((group) => (
-                    <TableRow key={group.id}>
-                      {group.headers.map((header) => (
-                        <TableHead key={header.id} className={header.column.columnDef.meta?.className}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(header.column.columnDef.header, header.getContext())}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableHeader>
-                <TableBody>
-                  {terms.isPending ? (
-                    Array.from({ length: 5 }, (_, i) => (
-                      <TableRow key={i}>
-                        <TableCell colSpan={columns.length} className="py-3">
-                          <Skeleton className="h-5 w-1/3" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : rows.length ? (
-                    rows.map((row) => (
-                      <TableRow
-                        key={row.id}
-                        onClick={followRowLink}
-                        className="has-[a[data-row-link]]:cursor-pointer"
-                      >
-                        {row.getVisibleCells().map((cell) => (
-                          <TableCell
-                            key={cell.id}
-                            data-row-skip={cell.column.columnDef.meta?.skipRowLink || undefined}
-                            className={cell.column.columnDef.meta?.className}
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={columns.length} className="h-32 text-center">
-                        {terms.data?.items.length ? (
-                          <span className="text-muted-foreground">{t("list.empty")}</span>
-                        ) : (
-                          <div>
-                            <p className="font-medium">{t("terms.empty", { name })}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {t("terms.emptyNote", { name, kind: kindLabel.one(kind) })}
-                            </p>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  table.firstPage();
+                }}
+                placeholder={t("terms.search", { name })}
+                className="h-8 w-37.5 lg:w-62.5"
+              />
+              <Select value={order} onValueChange={(value) => setOrder(value as Order)}>
+                <SelectTrigger size="sm" aria-label={t("terms.order")}>
+                  <ArrowUpDown />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="count">{t("terms.byCount", { kind: many })}</SelectItem>
+                  <SelectItem value="name">{t("terms.byName")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {terms.isPending ? (
+              <div className={grid}>
+                {Array.from({ length: 8 }, (_, i) => (
+                  <Skeleton key={i} className="h-24 rounded-xl" />
+                ))}
+              </div>
+            ) : rows.length ? (
+              <div className={grid}>
+                {rows.map((row) => (
+                  <TermCard
+                    key={row.id}
+                    term={row.original}
+                    kind={kind}
+                    taxonomy={taxonomy}
+                    unit={t("terms.unit", {
+                      kind: row.original.count === 1 ? kindLabel.one(kind) : many,
+                    })}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-32 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-center">
+                {terms.data?.items.length ? (
+                  <span className="text-muted-foreground">{t("list.empty")}</span>
+                ) : (
+                  <>
+                    <p className="font-medium">{t("terms.empty", { name })}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("terms.emptyNote", { name, kind: kindLabel.one(kind) })}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
             <DataTablePagination
               page={pagination.pageIndex + 1}
               pageSize={pagination.pageSize}
@@ -259,5 +212,64 @@ export function Terms() {
         )}
       </Main>
     </>
+  );
+}
+
+/** TermCard is one term: a click opens its items, the menu also its page on the site. */
+function TermCard({
+  term,
+  kind,
+  taxonomy,
+  unit,
+}: {
+  term: Term;
+  kind: string;
+  taxonomy: string;
+  unit: string;
+}) {
+  const { t } = useI18n();
+  const kindLabel = useKindLabel();
+  const items = { terms: [`${taxonomy}:${term.term}`] };
+
+  return (
+    <div
+      onClick={followRowLink}
+      className="flex cursor-pointer flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground shadow-xs transition-colors hover:bg-accent/40"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <Link to="/content/$kind" params={{ kind }} search={items} data-row-link className="min-w-0">
+          <TermBadge term={term.term} className="max-w-full truncate text-sm" />
+        </Link>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="-me-2 -mt-1.5 size-8 shrink-0 p-0 data-[state=open]:bg-muted"
+            >
+              <MoreHorizontal className="size-4" />
+              <span className="sr-only">{t("list.actions")}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem asChild>
+              <Link to="/content/$kind" params={{ kind }} search={items}>
+                <List />
+                {t("terms.viewItems", { kind: kindLabel.many(kind) })}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a href={term.url} target="_blank" rel="noreferrer">
+                <ExternalLink />
+                {t("list.open")}
+              </a>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        <span className="me-1 text-2xl font-semibold text-foreground tabular-nums">{term.count}</span>
+        {unit}
+      </p>
+    </div>
   );
 }
