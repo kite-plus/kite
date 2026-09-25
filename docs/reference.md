@@ -14,7 +14,7 @@ with the server.
 | **Content** | posts and pages, filtered and searched through the index rather than the filesystem |
 | **Editor** | A visual editor that reads and writes Markdown, with the source one click away, a live preview, front matter as a form, terms, slug, word count, and files dropped straight into the bundle |
 | **Taxonomies** | tags and categories as they actually exist across the content |
-| **Theme** | the settings the active theme declares in its `theme.yaml`, rendered as a form |
+| **Theme** | every theme the project has, each previewed on the whole site before it is used; a theme installed from its zip archive; the active theme's settings edited beside a live preview |
 | **Settings** | title, description, base URL and language |
 
 An item that changed on disk since it was loaded is refused rather than
@@ -80,11 +80,72 @@ Kite ships with one theme, compiled into the binary: quiet serif typography for
 personal writing, light and dark, and no web fonts unless you ask for them, so
 a page asks nothing of a third party.
 
+Other themes live in `themes/`, one folder each, and `theme.name` in
+`kite.yaml` chooses one by its folder's name; `default` is always the built-in
+one. The studio lists them all, says why one cannot be used, and installs a
+theme from a zip archive holding `theme.yaml` at its top or in the one folder
+it contains. An installed theme is checked the way a site checks one it loads,
+and one of the same name is replaced only when you confirm it. Before a theme
+is used it can be tried on the whole site: the preview is drawn with it and
+with the settings as you edit them, its links lead through the preview, and
+nothing is written until you save. What a switch writes, `kite.yaml` and the
+theme's folder, is published from the settings screen like any item.
+
 A theme declares its own settings in `theme.yaml`, and the studio renders them
 as a form — an option is a declaration rather than a documentation problem.
 Templates live under `layouts/` in a theme and in a site alike, and the same
 relative path in the site wins, so a single template can be replaced without
 forking the theme.
+
+```yaml
+settings:
+  - key: look
+    type: section          # a heading in the form; its fields are stored beside it
+    label: Look
+    fields:
+      - key: accent
+        type: color
+        label: Accent color
+        default: "#7d5c3c"
+        options:           # on a color, colors to suggest rather than a limit
+          - {value: "#7d5c3c", label: Umber}
+      - {key: favicon, type: image, label: Site icon}
+  - key: nav
+    type: repeat           # a list of entries, each with these fields
+    label: Extra links
+    fields:
+      - {key: label, type: string, label: Label}
+      - {key: url, type: url, label: Address}
+```
+
+The types are `string`, `text`, `number`, `boolean`, `color`, `select`,
+`multiselect`, `image`, `url`, `date`, `code`, `group`, `repeat` and
+`section`. Values are stored under `theme.settings` in `kite.yaml`, and a
+setting put back to its default is removed from it. A template reads each one
+as the type its field declares, `.Site.ThemeSettings.accent`, and falls back
+to the default for a value it cannot read as one; a `repeat` also reads text
+written one `Label | /path/` a line, so a theme can turn a text setting into a
+list without losing what sites filled in.
+
+What a theme says about itself in the studio is translated by language packs
+in its `i18n/` folder, one file per language, under the key `theme`; anything
+a pack leaves out is shown as `theme.yaml` writes it:
+
+```yaml
+# i18n/zh-CN.yaml
+theme:
+  title: 纸
+  settings:
+    accent: {label: 强调色, options: {"#7d5c3c": 赭石}}
+    nav:
+      label: 额外链接
+      fields: {url: {label: 地址}}
+  layouts:
+    links: {label: 友链}
+```
+
+A theme can show itself with `screenshot.png`, `.jpg` or `.webp` in its
+folder, or name another file with `screenshot:` in `theme.yaml`.
 
 A theme can also offer templates for an author to choose page by page, such
 as a page of links, by declaring them in `theme.yaml`:

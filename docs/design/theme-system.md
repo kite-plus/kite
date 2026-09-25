@@ -568,10 +568,15 @@ settings:
 | `code` | 代码编辑器（`language`） | string |
 | `group` | 嵌套分组（`fields`） | ParamMap |
 | `repeat` | 可增删的重复项（`fields`） | []ParamMap |
+| `section` | 表单里的分组标题（`fields`），自己不存值 | —（其中的字段存在同一层） |
 
-通用可选属性：`label` / `help` / `default` / `required` / `placeholder` / `showIf`（条件显示）。
+通用可选属性：`label` / `help` / `default` / `required` / `placeholder` / `showIf`（条件显示）。`color` 字段的 `options` 是推荐色，不限制取值。
 
 **主题里的取值**：`{{ .Site.ThemeSettings.primary_color }}`
+
+模板读到的是按字段类型解析过的值（`schema.Resolve`）：存储的值能读成声明的类型就用它，读不成就用默认值；`group` 总是一个 map，模板可以直接取 `.social.github`；主题没声明的键原样保留。`repeat` 还能读每行一条、字段按声明顺序用 `|` 分隔的文本，这样主题把一个 `text` 设置改成列表时，已经填好的站点不会丢内容（默认主题的 `nav` 就是这样从 `关于 | /about/` 升级过来的）。
+
+通过 API 写入时按字段严格校验（`Field.Check`），写不进去的值在写文件之前就被拒绝；`null` 删除这个键，让主题的默认值重新生效，并跟随主题以后对默认值的修改。主题只能写自己声明过的键；同一个请求里切换了主题时，按新主题的 schema 校验。
 
 > 同一套 schema 定义与渲染器被 **ContentType.Fields** 与 **Plugin Settings** 复用。一次投入，三处受益——这是"每加一种内容类型就要写一个 Admin 页面"的唯一解药。
 
@@ -583,6 +588,14 @@ settings:
 - `requires` 不满足 → 拒绝并给出明确的升级/降级提示
 
 Halo 的 `requires` 是已验证有效的模式 `[EV]`。
+
+### 8.4 安装、切换与预览
+
+- **来源**：内置的 `default`，加上项目 `themes/` 下的每个目录；`theme.name` 用目录名选主题，`default` 永远指内置主题。无法使用的主题也会列出来，并说明原因。
+- **安装**：后台上传 zip，`theme.yaml` 在最外层或压缩包里唯一的文件夹中。按站点加载主题的标准检查（`apiVersion`、`requires`、布局模板、语言包），主题名必须能当目录名且不能是 `default`；链接、跳出主题目录的路径一律拒绝，解压大小按实际字节计。同名主题要确认后才替换，替换时删掉新版本没有的文件；通过符号链接接入的主题不会被写穿。安装和删除都是 ChangeSet 里的操作（`PutTheme` / `DeleteTheme`），发布器因此像对待文章一样暂存 `themes/`。之后的 Git 地址安装复用同一个 `PutTheme`。
+- **切换**：写 `theme.name`，写入前确认主题可用。设置统一放在 `theme.settings` 下、各主题共用，新主题只读取自己声明过的键，所以换回原主题时之前的设置还在。
+- **预览**：`POST /api/v1/previews` 按主题和草稿设置组装一个变体站点（`site.With`），挂在 `/api/v1/previews/<token>/` 下，按构建的方式规划整站：链接在预览里互相跳转，样式表和图片用的是这套主题自己的。设置变化时原地重绘（`PUT`），30 分钟没人访问就回收，最多保留 8 个。
+- **截图**：主题目录里的 `screenshot.png`、`.jpg` 或 `.webp`，或 manifest 里的 `screenshot:`；建议 1280×800。
 
 ---
 
@@ -730,6 +743,8 @@ posts_count:
   one: "{{.Count}} 篇文章"
   other: "{{.Count}} 篇文章"
 ```
+
+**主题在后台里的文字已经用上这套目录**：`theme` 键下放 `theme.yaml` 里给后台看的文字——`title`、`description`、`settings.<key>.label` / `help` / `placeholder` / `options.<value>`、`group` 和 `repeat` 的 `settings.<key>.fields.<子键>...`、`layouts.<name>.label` / `description`；`section` 里的字段与 section 同层，直接用自己的键。API 按请求的 `Accept-Language` 选最接近的语言包（完全匹配 → 基础语言 → 同一语言的其他地区），语言包里没有的回退到 `theme.yaml` 原文。`theme` 以外的键留给模板的 `T`，函数本身仍按上面第 2 条待定。
 
 ---
 

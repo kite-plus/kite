@@ -13,7 +13,7 @@
 | **内容** | 文章和页面，通过索引而不是文件系统来过滤和搜索 |
 | **编辑器** | 可视化编辑，读写的都是 Markdown，一键切到源码；实时预览、front matter 表单、分类标签、slug、字数，图片直接拖进 bundle |
 | **分类法** | 标签和分类在全部内容里的真实分布 |
-| **主题** | 当前主题在 `theme.yaml` 里声明的设置项，渲染成表单 |
+| **主题** | 项目里的全部主题，启用前都能在整站上预览；上传 zip 安装主题；在实时预览旁边调整当前主题的设置 |
 | **设置** | 标题、描述、baseURL 和语言 |
 
 加载之后又在磁盘上变过的内容，会被拒绝写入而不是覆盖，后台会明说这件事。后台
@@ -70,9 +70,62 @@ kite openapi > openapi.json
 Kite 自带一套主题，编译进二进制：为个人写作准备的安静衬线排版，深浅两色，不主动
 引入任何 Web 字体 —— 除非你自己指定，否则页面不向第三方请求任何东西。
 
+其他主题放在 `themes/` 下，每套一个目录，`kite.yaml` 里的 `theme.name` 用目录名
+选择它；`default` 永远指内置主题。后台会列出全部主题，说明哪些无法使用以及原因；也可以
+上传 zip 压缩包安装主题，`theme.yaml` 放在最外层或压缩包里唯一的文件夹中。安装时按站点
+加载主题的标准检查，同名主题只有在你确认后才会被替换。启用之前可以先在整站上试用：预览
+用这套主题和正在编辑的设置绘制，页面里的链接都留在预览中，保存之前什么都不会写入。切换
+写下的 `kite.yaml` 和主题目录，在设置页里像内容一样发布。
+
 主题在 `theme.yaml` 里声明自己的设置项，后台把它们渲染成表单 —— 一个选项是一处
 声明，而不是一个文档问题。主题和站点的模板都放在 `layouts/` 下，同名相对路径以
 站点的为准，所以替换单个模板不需要 fork 整套主题。
+
+```yaml
+settings:
+  - key: look
+    type: section          # 表单里的一个分组标题；其中的字段仍存在同一层
+    label: Look
+    fields:
+      - key: accent
+        type: color
+        label: Accent color
+        default: "#7d5c3c"
+        options:           # 颜色字段的 options 是推荐色，不是限制
+          - {value: "#7d5c3c", label: Umber}
+      - {key: favicon, type: image, label: Site icon}
+  - key: nav
+    type: repeat           # 由若干项组成的列表，每项有下面这些字段
+    label: Extra links
+    fields:
+      - {key: label, type: string, label: Label}
+      - {key: url, type: url, label: Address}
+```
+
+字段类型有 `string`、`text`、`number`、`boolean`、`color`、`select`、`multiselect`、
+`image`、`url`、`date`、`code`、`group`、`repeat` 和 `section`。设置值存在 `kite.yaml`
+的 `theme.settings` 下，恢复成默认值的设置会从中删除。模板按字段声明的类型读取每个值，
+写作 `.Site.ThemeSettings.accent`，读不成该类型的值就用默认值；`repeat` 还能读取每行
+一条 `名称 | /路径/` 的文本，所以主题把文本设置改成列表时，已经填好的站点不会丢内容。
+
+主题在后台里的说明文字由主题 `i18n/` 目录下的语言包翻译，每种语言一个文件，放在
+`theme` 键下；语言包里没有的部分按 `theme.yaml` 的原文显示：
+
+```yaml
+# i18n/zh-CN.yaml
+theme:
+  title: 纸
+  settings:
+    accent: {label: 强调色, options: {"#7d5c3c": 赭石}}
+    nav:
+      label: 额外链接
+      fields: {url: {label: 地址}}
+  layouts:
+    links: {label: 友链}
+```
+
+主题目录里放 `screenshot.png`、`.jpg` 或 `.webp` 作为截图，也可以在 `theme.yaml` 里用
+`screenshot:` 指定其他文件。
 
 主题还可以提供让作者按页面选用的模板，比如友链页，在 `theme.yaml` 里声明：
 
