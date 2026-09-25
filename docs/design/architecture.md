@@ -1018,7 +1018,7 @@ kite: 1.0.0
 theme:
   paper:
     version: 1.2.0
-    resolved: https://github.com/kite-plus/themes/releases/download/paper-1.2.0/paper.tar.gz
+    resolved: https://github.com/kite-plus/theme-paper/releases/download/v1.2.0/paper-1.2.0.zip
     checksum: sha256-xxxx
 plugins:
   seo:
@@ -1095,12 +1095,14 @@ kite/
 | kite-plus/website | kite.plus 官网 + 文档（**用 Kite 自己搭 —— dogfooding**） | M4 |
 | kite-plus/starters | Starter 模板（blog / docs / portfolio） | M4 |
 | kite-plus/setup-kite | GitHub Action | M4 |
-| kite-plus/themes | 官方主题集合 | M5 |
+| kite-plus/theme-sinan | 文档站主题「司南」，官网也用它搭（本地已建） | 骨架能用时 |
 | kite-plus/theme-sdk | 主题开发工具链 + 脚手架 | M5 |
 | kite-plus/plugin-sdk | 插件 SDK（Go / Rust / Zig） | M8 |
 | kite-plus/plugins | 官方插件集合 | M8 |
 
 **一个例外说明**：React Admin 放在 `kite-plus/kite` 内而非独立仓库——它必须 `go:embed` 进二进制、与 Go 版本强绑定，拆仓会立刻产生版本对齐地狱。**它是"主程序"的一部分，不是生态组件。**
+
+**主题只内置默认的一套**：默认主题 `go:embed` 进二进制，保证下载一个二进制就能用。其余官方主题一套一个仓库，叫 `theme-<主题名>`，单独开发、单独发版，站点按需安装；它们不打进二进制，也不放进主程序仓库，只依赖公开的主题契约。`theme-` 前缀因此只留给主题，`theme-sdk` 建仓前要换个不会被当成主题的名字，或者并进 `kite theme` 子命令 `[待定]`。
 
 **建仓时机原则：有第一个真实用户之前不要建仓。** 空仓库是维护负担。
 

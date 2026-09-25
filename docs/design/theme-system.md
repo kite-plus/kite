@@ -481,7 +481,7 @@ author:
   name: Someone
   url: https://example.com
 license: MIT
-homepage: https://github.com/kite-plus/themes/tree/main/paper
+homepage: https://github.com/kite-plus/theme-paper
 tags: [blog, minimal, dark-mode]
 screenshot: screenshot.png
 
@@ -592,6 +592,7 @@ Halo 的 `requires` 是已验证有效的模式 `[EV]`。
 ### 8.4 安装、切换与预览
 
 - **来源**：内置的 `default`，加上项目 `themes/` 下的每个目录；`theme.name` 用目录名选主题，`default` 永远指内置主题。无法使用的主题也会列出来，并说明原因。
+- **分发**：主程序只内置 `default`。其余主题，包括官方主题，各自一个仓库（官方的叫 `kite-plus/theme-<主题名>`），打 tag 发版并附上能直接在后台安装的 zip；站点装的是发布出来的版本，改主题回到主题自己的仓库去改。
 - **安装**：后台上传 zip，`theme.yaml` 在最外层或压缩包里唯一的文件夹中。按站点加载主题的标准检查（`apiVersion`、`requires`、布局模板、语言包），主题名必须能当目录名且不能是 `default`；链接、跳出主题目录的路径一律拒绝，解压大小按实际字节计。同名主题要确认后才替换，替换时删掉新版本没有的文件；通过符号链接接入的主题不会被写穿。安装和删除都是 ChangeSet 里的操作（`PutTheme` / `DeleteTheme`），发布器因此像对待文章一样暂存 `themes/`。之后的 Git 地址安装复用同一个 `PutTheme`。
 - **切换**：写 `theme.name`，写入前确认主题可用。设置统一放在 `theme.settings` 下、各主题共用，新主题只读取自己声明过的键，所以换回原主题时之前的设置还在。
 - **预览**：`POST /api/v1/previews` 按主题和草稿设置组装一个变体站点（`site.With`），挂在 `/api/v1/previews/<token>/` 下，按构建的方式规划整站：链接在预览里互相跳转，样式表和图片用的是这套主题自己的。设置变化时原地重绘（`PUT`），30 分钟没人访问就回收，最多保留 8 个。
@@ -702,8 +703,8 @@ resource_hash = SHA256( source_bytes ‖ transform_chain_spec ‖ transform_para
 |---|---|---|
 | **M0** | 引擎可用，契约**内部** | 实现查找顺序、RenderContext、funcmap、`kite theme verify`。文档标注"内部 API，可能变更" |
 | **M1~M4** | 随实现演进 | 遇到不顺手就改，不承担任何兼容义务 |
-| **M5** | **写第二套主题** | 用第一套主题的契约去写一套风格完全不同的主题。**每一处别扭都是契约缺陷的证据** |
-| **M5 末** | **冻结，发布 `kite/v1`** | 打版本、写文档、发 theme-sdk、上官方主题仓库 |
+| **M5** | **写第二套主题** | 用第一套主题的契约去写一套风格完全不同的主题。**每一处别扭都是契约缺陷的证据**。第二套是文档站主题司南，在它自己的仓库 `theme-sinan` 里写 |
+| **M5 末** | **冻结，发布 `kite/v1`** | 打版本、写文档、发 theme-sdk、司南发布 1.0 |
 | M5 之后 | 只增不改 | 新增方法/函数可以；改名/改语义要走 `kite/v2` |
 
 > **为什么必须等第二套主题：** Hugo 在 v0.146 做了一次**彻底的模板系统重写**——`_default/` 去掉、`layouts/partials` → `layouts/_partials`、`index.html` → `home.html`、`list-baseof.html` → `baseof.list.html`。即便做了新旧映射，仍然打断了包括 Docsy 在内的大量主题 `[EV]`。

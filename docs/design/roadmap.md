@@ -90,7 +90,7 @@
 | 阶段 | 版本 | 范围 | 已有基础 |
 |---|---|---|---|
 | **1. v1.0 收尾** | v1.0 | §4 的 P0 和 P1 项；另外可以顺手做两个低成本占位：「存储空间」（统计内容目录大小）、版本号旁的「最新」（查询 GitHub Releases）；最后打 `v1.0.0` 标签 | — |
-| **2. M5 主题契约** | v1.1 | 写第二套风格完全不同的主题，并用 `kite theme verify`（已有）检查它；`kite theme list/add/new`；检查 `requires`；菜单（`.Site.Menus`）写入契约；冻结之前要把 [theme-system.md](theme-system.md) §12 i18n 的三件事（尤其是多语言 URL 策略）和 §14 的开放问题定下来；发布 `kite/v1`，建 themes 仓库和主题开发文档 | 查找顺序、带方法的 RenderContext、命名空间函数、`apiVersion` 校验、由 settings schema 生成的配置页都已经有了 |
+| **2. M5 主题契约** | v1.1 | 写第二套风格完全不同的主题，并用 `kite theme verify`（已有）检查它：文档站主题司南，在它自己的仓库 `kite-plus/theme-sinan` 里写（本地已建，规划在那边的 `docs/design/README.md`），主程序只内置默认主题；`kite theme list/add/new`；菜单（`.Site.Menus`）写入契约；冻结之前要把 [theme-system.md](theme-system.md) §12 i18n 的三件事（尤其是多语言 URL 策略）和 §14 的开放问题定下来；发布 `kite/v1` 和主题开发文档 | 查找顺序、带方法的 RenderContext、命名空间函数、`apiVersion` 和 `requires` 校验、由 settings schema 生成的配置页都已经有了 |
 | **3. M6 可重现构建** | v1.2 | `kite.lock`、`kitew`、Cloudflare Pages 部署模板；启用增量构建里的跳过判断 | 依赖记录和缓存键已经有了 |
 | **4. 媒体库**（新增） | v1.5 | 在现有索引上汇总所有 page bundle 里的文件：媒体列表、跨文章复用、找出没人引用的文件、上传入口 | 单篇的附件上传和删除 API 已经有了 |
 | **5. M7 动态模式** | v2.0 | SQLite 作为真相源，写入同一套读模型；`kite migrate` 在文件和数据库之间互转；多用户和角色；私密文章；数据库备份和 `kite export`；Kite 自己存储的评论 | 读模型、单账号认证、Docker 都已经有了 |
