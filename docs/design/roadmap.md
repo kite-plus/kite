@@ -38,7 +38,7 @@
 - 命令面板（⌘K）；
 - 分类和标签页面（每种词条一页）；
 - 独立页面可以选用主题提供的模板（`theme.yaml` 的 `layouts`，front matter 的 `layout`），默认主题自带友链模板；
-- 后台界面基于 [shadcn-admin](https://github.com/satnaing/shadcn-admin) 重建：TanStack Router 文件路由，列表用服务端分页的 TanStack Table，筛选状态写在地址里。之后参考 explore 的后台做了统一的状态配色、一键切换主题、按状态区分的提示框、状态卡式仪表盘，以及读取失败时的重试和布局内的错误页。组件保持 shadcn 的样式，配色参照 Halo 的后台改成明亮风格：页面、侧边栏、顶栏和卡片都是白色，用细线分隔，文字用中性灰，Kite 的品牌蓝 #4A77D6 是唯一的强调色（主按钮、开关、勾选框、图表、当前菜单项）。
+- 后台界面基于 [shadcn-admin](https://github.com/satnaing/shadcn-admin) 重建：TanStack Router 文件路由，列表用服务端分页的 TanStack Table，筛选状态写在地址里。之后参考 explore 的后台做了统一的状态配色、一键切换主题、按状态区分的提示框、状态卡式仪表盘，以及读取失败时的重试和布局内的错误页。组件保持 shadcn 的样式，配色参照 Halo 的后台改成明亮风格：页面、侧边栏、顶栏和卡片都是白色，用细线分隔，正文用接近纯黑的中性色、次要文字用深灰，Kite 的品牌蓝 #4A77D6 是唯一的强调色（主按钮、开关、勾选框、图表、当前菜单项）。
 
 ## 3. 验收标准核对
 

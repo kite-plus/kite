@@ -1,22 +1,23 @@
 :root {
   --radius: 0.625rem;
   /* Kite: a bright palette after Halo's console. Pages, rail, bars and cards
-     are white and split by thin lines, text is Tailwind's gray, and the
-     mark's blue is the one accent. */
+     are white and split by thin lines, and the mark's blue is the one
+     accent. Text is a neutral near-black with a darker than usual secondary
+     gray: the blue-tinted grays read as washed out. */
   --background: #ffffff;
-  --foreground: #1f2937;
+  --foreground: #171717;
   --card: #ffffff;
-  --card-foreground: #1f2937;
+  --card-foreground: #171717;
   --popover: #ffffff;
-  --popover-foreground: #1f2937;
+  --popover-foreground: #171717;
   --primary: #4a77d6;
   --primary-foreground: #ffffff;
   --secondary: #f3f4f6;
-  --secondary-foreground: #1f2937;
+  --secondary-foreground: #171717;
   --muted: #f3f4f6;
-  --muted-foreground: #6b7280;
+  --muted-foreground: #595959;
   --accent: #f3f4f6;
-  --accent-foreground: #1f2937;
+  --accent-foreground: #171717;
   --destructive: oklch(0.577 0.245 27.325);
   --border: #eaecf0;
   --input: #d1d5db;
@@ -28,7 +29,7 @@
   --chart-5: oklch(0.769 0.188 70.08);
 
   --sidebar: var(--background);
-  --sidebar-foreground: #374151;
+  --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--accent);
@@ -51,19 +52,19 @@
 
 .dark {
   --background: #131417;
-  --foreground: #e5e7eb;
+  --foreground: #ededed;
   --card: #17181c;
-  --card-foreground: #e5e7eb;
+  --card-foreground: #ededed;
   --popover: #1c1d22;
-  --popover-foreground: #e5e7eb;
+  --popover-foreground: #ededed;
   --primary: #4a77d6;
   --primary-foreground: #ffffff;
   --secondary: #26272d;
-  --secondary-foreground: #e5e7eb;
+  --secondary-foreground: #ededed;
   --muted: #26272d;
-  --muted-foreground: #9ca3af;
+  --muted-foreground: #a3a3a3;
   --accent: #26272d;
-  --accent-foreground: #f3f4f6;
+  --accent-foreground: #fafafa;
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 15%);
@@ -73,8 +74,6 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-
-  --sidebar-foreground: #c9ccd2;
 
   --brand: oklch(0.646 0.143 262.5);
   --success: oklch(0.723 0.219 149.579);
