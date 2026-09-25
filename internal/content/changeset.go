@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -62,6 +63,8 @@ const (
 	OpDeleteMedia    OpKind = "delete_media"
 	OpPutSettings    OpKind = "put_settings"
 	OpChangeTerm     OpKind = "change_term"
+	OpPutTheme       OpKind = "put_theme"
+	OpDeleteTheme    OpKind = "delete_theme"
 )
 
 // Op is a single typed operation inside a [ChangeSet].
@@ -172,6 +175,38 @@ func (o ChangeTerm) Kind() OpKind { return OpChangeTerm }
 func (o ChangeTerm) Describe() string {
 	return string(o.ID) + " " + o.Taxonomy + ": " + o.Term + " -> " + o.To
 }
+
+var themeName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// ValidThemeName reports whether a name can stand for an installed theme: one
+// directory under themes/, never a path that leads anywhere else.
+func ValidThemeName(name string) bool { return themeName.MatchString(name) }
+
+// PutTheme installs a theme as the directory themes/<Name>.
+//
+// A theme goes through a change set like anything else the admin writes, so
+// the git publisher stages it the way it stages a post, and the commit that
+// brought a theme in can be reverted like any other.
+type PutTheme struct {
+	Name string
+	// Files maps each path inside the theme directory, written with forward
+	// slashes, to its bytes.
+	Files map[string][]byte
+	// Replace lets the theme take the place of an installed one of the same
+	// name. A file the old one had and the new one lacks is removed.
+	Replace bool
+}
+
+func (o PutTheme) Kind() OpKind     { return OpPutTheme }
+func (o PutTheme) Describe() string { return "themes/" + o.Name }
+
+// DeleteTheme removes an installed theme and everything in its directory.
+type DeleteTheme struct {
+	Name string
+}
+
+func (o DeleteTheme) Kind() OpKind     { return OpDeleteTheme }
+func (o DeleteTheme) Describe() string { return "themes/" + o.Name }
 
 // DeleteMedia removes a media file.
 type DeleteMedia struct {

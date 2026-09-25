@@ -833,3 +833,131 @@ Body stays put.
 		t.Errorf("the file is no longer TOML:\n%s", got)
 	}
 }
+
+// A theme is installed the way everything else is written, so the result
+// names every file for the publisher to stage.
+func TestInstallingAThemeReportsEveryFile(t *testing.T) {
+	root, _, w := newTestProject(t)
+
+	res, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.PutTheme{
+		Name: "paper",
+		Files: map[string][]byte{
+			"theme.yaml":          []byte("name: paper\n"),
+			"layouts/single.html": []byte("x"),
+		},
+	}}})
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	want := []string{"themes/paper/layouts/single.html", "themes/paper/theme.yaml"}
+	if !slices.Equal(res.Written, want) {
+		t.Errorf("Written = %v, want %v", res.Written, want)
+	}
+	if got := readFile(t, root, "themes/paper/theme.yaml"); got != "name: paper\n" {
+		t.Errorf("theme.yaml = %q", got)
+	}
+
+	// Installing over it again is a replacement, which has to be asked for.
+	_, err = w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.PutTheme{
+		Name: "paper", Files: map[string][]byte{"theme.yaml": []byte("x")},
+	}}})
+	if !errors.Is(err, content.ErrInvalid) {
+		t.Errorf("a second install = %v, want it refused", err)
+	}
+}
+
+// A new version of a theme replaces the old one whole: a template the new
+// version dropped would otherwise stay behind and go on being used.
+func TestReplacingAThemeTakesAwayWhatTheNewOneLacks(t *testing.T) {
+	root, _, w := newTestProject(t)
+	writeFile(t, root, "themes/paper/theme.yaml", "version: 1\n")
+	writeFile(t, root, "themes/paper/layouts/old/single.html", "old")
+	writeFile(t, root, "themes/paper/layouts/list.html", "list")
+
+	res, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.PutTheme{
+		Name:    "paper",
+		Replace: true,
+		Files: map[string][]byte{
+			"theme.yaml":        []byte("version: 2\n"),
+			"layouts/list.html": []byte("list"),
+		},
+	}}})
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if !slices.Equal(res.Removed, []string{"themes/paper/layouts/old/single.html"}) {
+		t.Errorf("Removed = %v", res.Removed)
+	}
+	if _, err := os.Stat(filepath.Join(root, "themes", "paper", "layouts", "old")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the emptied directory is still there: %v", err)
+	}
+	if got := readFile(t, root, "themes/paper/theme.yaml"); got != "version: 2\n" {
+		t.Errorf("theme.yaml = %q", got)
+	}
+}
+
+func TestAThemeStaysInsideItsDirectory(t *testing.T) {
+	_, _, w := newTestProject(t)
+	for _, op := range []content.PutTheme{
+		{Name: "../escaped", Files: map[string][]byte{"theme.yaml": nil}},
+		{Name: "paper", Files: map[string][]byte{"../../escaped.yaml": nil}},
+		{Name: "paper", Files: map[string][]byte{"/etc/passwd": nil}},
+		{Name: "paper"},
+	} {
+		if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{op}}); !errors.Is(err, content.ErrInvalid) {
+			t.Errorf("%+v: err = %v, want it refused", op, err)
+		}
+	}
+}
+
+func TestRemovingAThemeReportsEveryFile(t *testing.T) {
+	root, _, w := newTestProject(t)
+	writeFile(t, root, "themes/paper/theme.yaml", "x")
+	writeFile(t, root, "themes/paper/layouts/single.html", "x")
+
+	res, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.DeleteTheme{Name: "paper"}}})
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if want := []string{"themes/paper/layouts/single.html", "themes/paper/theme.yaml"}; !slices.Equal(res.Removed, want) {
+		t.Errorf("Removed = %v, want %v", res.Removed, want)
+	}
+	if _, err := os.Stat(filepath.Join(root, "themes", "paper")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the theme is still there: %v", err)
+	}
+	_, err = w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.DeleteTheme{Name: "paper"}}})
+	if !errors.Is(err, content.ErrNotFound) {
+		t.Errorf("removing it again = %v, want not found", err)
+	}
+}
+
+// A theme linked in from elsewhere, as a theme author works on one, belongs
+// to wherever the link points: installing over it would write there.
+func TestALinkedThemeIsNotWrittenThrough(t *testing.T) {
+	root, _, w := newTestProject(t)
+	elsewhere := t.TempDir()
+	writeFile(t, elsewhere, "theme.yaml", "mine")
+	if err := os.MkdirAll(filepath.Join(root, "themes"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(elsewhere, filepath.Join(root, "themes", "paper")); err != nil {
+		t.Skipf("no symbolic links here: %v", err)
+	}
+
+	_, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.PutTheme{
+		Name: "paper", Replace: true, Files: map[string][]byte{"theme.yaml": []byte("theirs")},
+	}}})
+	if !errors.Is(err, content.ErrInvalid) {
+		t.Errorf("err = %v, want the link refused", err)
+	}
+	if got := readFile(t, elsewhere, "theme.yaml"); got != "mine" {
+		t.Errorf("the linked theme was written: %q", got)
+	}
+
+	if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.DeleteTheme{Name: "paper"}}}); err != nil {
+		t.Fatalf("removing the link: %v", err)
+	}
+	if got := readFile(t, elsewhere, "theme.yaml"); got != "mine" {
+		t.Errorf("removing the link removed what it pointed at")
+	}
+}

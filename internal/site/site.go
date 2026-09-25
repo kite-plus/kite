@@ -15,6 +15,7 @@ import (
 	"github.com/kite-plus/kite/internal/build"
 	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/config"
+	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/hook"
 	"github.com/kite-plus/kite/internal/hook/builtin"
 	"github.com/kite-plus/kite/internal/index"
@@ -201,7 +202,7 @@ func themeFS(root, name string) (fs.FS, string, error) {
 	if name == "" || name == BuiltinTheme {
 		return themes.Default(), "built-in theme", nil
 	}
-	if !ValidThemeName(name) {
+	if !content.ValidThemeName(name) {
 		return nil, "", fmt.Errorf("site: %q cannot name a theme, which is one directory under themes/", name)
 	}
 	dir := filepath.Join(root, ThemesDir, name)

@@ -5,9 +5,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
+	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/themes"
 )
@@ -17,12 +17,6 @@ const ThemesDir = "themes"
 
 // BuiltinTheme is the name that chooses the theme built into Kite.
 const BuiltinTheme = "default"
-
-var themeName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
-
-// ValidThemeName reports whether a name can stand for a theme: one directory
-// under themes/, never a path that leads anywhere else.
-func ValidThemeName(name string) bool { return themeName.MatchString(name) }
 
 // Installed is a theme a project could use.
 type Installed struct {
@@ -63,7 +57,7 @@ func Themes(root string) []Installed {
 		case name == BuiltinTheme:
 			one.Theme = nil
 			one.Problem = "the name default always chooses the theme built into Kite, so this directory is never used; rename it to choose it"
-		case !ValidThemeName(name):
+		case !content.ValidThemeName(name):
 			one.Theme = nil
 			one.Problem = "a theme's directory name may hold only letters, digits, dots, - and _"
 		}

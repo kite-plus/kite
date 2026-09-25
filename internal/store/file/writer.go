@@ -100,6 +100,10 @@ func (w *Writer) Apply(ctx context.Context, cs content.ChangeSet) (content.Resul
 			err = w.putSettings(o, &res)
 		case content.ChangeTerm:
 			err = w.changeTerm(o, located, &res)
+		case content.PutTheme:
+			err = w.putTheme(o, &res)
+		case content.DeleteTheme:
+			err = w.deleteTheme(o, &res)
 		default:
 			err = fmt.Errorf("file store: unsupported operation %q", op.Kind())
 		}
@@ -476,6 +480,129 @@ func (w *Writer) putSettings(op content.PutSettings, res *content.Result) error 
 	}
 	res.Revision = RevisionOf(data)
 	appendUnique(&res.Written, ConfigName)
+	return nil
+}
+
+// ThemesDir is where installed themes live, one directory each.
+const ThemesDir = "themes"
+
+// putTheme writes a theme's files into its directory, and on a replace takes
+// away the files the old version had that the new one does not.
+func (w *Writer) putTheme(op content.PutTheme, res *content.Result) error {
+	if !content.ValidThemeName(op.Name) {
+		return fmt.Errorf("%w: theme name %q", content.ErrInvalid, op.Name)
+	}
+	if len(op.Files) == 0 {
+		return fmt.Errorf("%w: theme %s has no files", content.ErrInvalid, op.Name)
+	}
+	names := slices.Sorted(maps.Keys(op.Files))
+	for _, name := range names {
+		if !fs.ValidPath(name) || name == "." {
+			return fmt.Errorf("%w: theme file %q", content.ErrInvalid, name)
+		}
+	}
+
+	dir := path.Join(ThemesDir, op.Name)
+	old, err := w.themeFiles(dir)
+	if err != nil {
+		return err
+	}
+	if len(old) > 0 && !op.Replace {
+		return fmt.Errorf("%w: theme %s is already installed", content.ErrInvalid, op.Name)
+	}
+
+	for _, name := range names {
+		target := path.Join(dir, name)
+		if err := w.write(target, op.Files[name]); err != nil {
+			return err
+		}
+		appendUnique(&res.Written, target)
+	}
+	for _, target := range old {
+		if _, kept := op.Files[strings.TrimPrefix(target, dir+"/")]; kept {
+			continue
+		}
+		if err := w.remove(target); err != nil {
+			return err
+		}
+		appendUnique(&res.Removed, target)
+	}
+	pruneEmpty(abs(w.root, dir))
+	return nil
+}
+
+// themeFiles lists the files of an installed theme, none when it is not
+// installed. A link to a theme kept elsewhere is refused rather than written
+// through, since its files belong to wherever it points.
+func (w *Writer) themeFiles(dir string) ([]string, error) {
+	info, err := os.Lstat(abs(w.root, dir))
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	case info.Mode()&fs.ModeSymlink != 0:
+		return nil, fmt.Errorf("%w: %s links to a theme kept elsewhere; change it there", content.ErrInvalid, dir)
+	case !info.IsDir():
+		return nil, fmt.Errorf("%w: %s is a file, not a theme", content.ErrInvalid, dir)
+	}
+	var files []string
+	err = filepath.WalkDir(abs(w.root, dir), func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		r, err := rel(w.root, p)
+		if err != nil {
+			return err
+		}
+		files = append(files, r)
+		return nil
+	})
+	return files, err
+}
+
+// pruneEmpty removes the directories under root that removals left empty.
+func pruneEmpty(root string) {
+	var dirs []string
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && d.IsDir() && p != root {
+			dirs = append(dirs, p)
+		}
+		return nil
+	})
+	// Deepest first, so a parent is empty by the time it is tried.
+	for i := len(dirs) - 1; i >= 0; i-- {
+		_ = os.Remove(dirs[i])
+	}
+}
+
+// deleteTheme removes an installed theme. A link to a theme kept elsewhere
+// is removed itself, leaving what it pointed at alone.
+func (w *Writer) deleteTheme(op content.DeleteTheme, res *content.Result) error {
+	if !content.ValidThemeName(op.Name) {
+		return fmt.Errorf("%w: theme name %q", content.ErrInvalid, op.Name)
+	}
+	dir := path.Join(ThemesDir, op.Name)
+	info, err := os.Lstat(abs(w.root, dir))
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return fmt.Errorf("%w: theme %s", content.ErrNotFound, op.Name)
+	case err != nil:
+		return err
+	case info.Mode()&fs.ModeSymlink != 0 || !info.IsDir():
+		if err := w.remove(dir); err != nil {
+			return err
+		}
+		appendUnique(&res.Removed, dir)
+		return nil
+	}
+	removed, err := w.removeTree(dir)
+	if err != nil {
+		return err
+	}
+	for _, p := range removed {
+		appendUnique(&res.Removed, p)
+	}
 	return nil
 }
 
