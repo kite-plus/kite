@@ -335,6 +335,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/wordcount": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Count a draft's words as its page will: paragraphs, list items, headings and table cells, without code blocks or image alt text. */
+        post: operations["countWords"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -669,6 +686,9 @@ export interface components {
             values?: {
                 [key: string]: unknown;
             };
+        };
+        WordCount: {
+            words: number;
         };
     };
     responses: never;
@@ -2266,6 +2286,69 @@ export interface operations {
             };
             /** @description Failed. */
             428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    countWords: {
+        parameters: {
+            query?: {
+                /** @description The item being edited, so it is counted where it lives. */
+                id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Draft"];
+            };
+        };
+        responses: {
+            /** @description The count. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WordCount"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };

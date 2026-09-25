@@ -736,6 +736,38 @@ func TestPreviewOfSavedContentIsByteIdenticalToTheBuiltPage(t *testing.T) {
 	}
 }
 
+// The editor shows the count the server gives, which is the one a draft's page
+// will show: the heading and list are read, the code and the picture are not.
+func TestADraftIsCountedAsItsPageWillBe(t *testing.T) {
+	handler := newServer(t, newProject(t, 1), serve.Options{Admin: true, Write: true}).Handler()
+
+	draft, err := json.Marshal(map[string]any{
+		"kind":  "post",
+		"title": "Counted",
+		"body":  "## Two words\n\n- one\n- two three\n\n```go\nfunc main() {}\n```\n\n![alt text here](a.png)\n",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/wordcount", bytes.NewReader(draft))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("wordcount returned %d\n%s", rec.Code, rec.Body.String())
+	}
+	var got struct {
+		Words int `json:"words"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Words != 5 {
+		t.Errorf("words = %d, want 5", got.Words)
+	}
+}
+
 func findID(t *testing.T, h http.Handler, slug string) string {
 	t.Helper()
 	rec := httptest.NewRecorder()

@@ -118,6 +118,17 @@ func (b *Builder) Render(ctx context.Context, t Target, req render.Request) ([]b
 	return b.renderTarget(ctx, b.buildCtx.ForOutput(), t, req)
 }
 
+// WordCount counts an item's words as its page does, through the same
+// markdown hooks and renderer, so an editor can show the site's number before
+// the item is saved.
+func (b *Builder) WordCount(ctx context.Context, item *content.Content) (int, error) {
+	doc, err := b.renderBody(ctx, item)
+	if err != nil {
+		return 0, err
+	}
+	return doc.WordCount, nil
+}
+
 // Run plans and renders the whole site.
 func (b *Builder) Run(ctx context.Context) (Stats, error) {
 	start := time.Now()

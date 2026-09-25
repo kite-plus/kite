@@ -40,6 +40,9 @@ type View struct {
 	// theme and resolver a build uses.
 	Preview func(context.Context, *content.Content) ([]byte, error)
 
+	// WordCount counts an item that is not on disk the way its page will.
+	WordCount func(context.Context, *content.Content) (int, error)
+
 	// Publisher moves committed content onward. It is nil when the project
 	// has none configured, which is a perfectly ordinary way to run: an
 	// author may prefer to commit themselves.

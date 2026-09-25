@@ -355,6 +355,18 @@ func openAPI() *document {
 					"501": {Description: "Failed.", Content: jsonOf(errorRef)},
 				},
 			}},
+			"/wordcount": {Post: &operation{
+				OperationID: "countWords",
+				Summary: "Count a draft's words as its page will: paragraphs, list items, " +
+					"headings and table cells, without code blocks or image alt text.",
+				Parameters: []parameter{{
+					Name: "id", In: "query",
+					Description: "The item being edited, so it is counted where it lives.",
+					Schema:      &jsonSchema{Type: "string"},
+				}},
+				RequestBody: body(ref(Draft{})),
+				Responses:   ok(ref(WordCount{}), "The count.", "400", "501"),
+			}},
 			"/contents/{id}/media": {Post: &operation{
 				OperationID: "uploadMedia",
 				Summary:     "Store a file beside a page and report the link that reaches it.",

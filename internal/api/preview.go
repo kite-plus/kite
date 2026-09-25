@@ -32,15 +32,9 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// An id, when the client has one, is what lets a draft's own images
-	// resolve: the item keeps the bundle it already lives in.
-	item := draft.contentOf(content.ID(r.URL.Query().Get("id")))
+	item := draftItem(r, view, draft)
 	if item.Slug == "" {
 		item.Slug = "preview"
-	}
-	if existing, err := view.Reader.Get(r.Context(), item.ID); err == nil {
-		item.Locator = existing.Locator
-		item.CreatedAt = existing.CreatedAt
 	}
 
 	html, err := view.Preview(r.Context(), item)
@@ -54,4 +48,40 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(html)
+}
+
+// handleWordCount counts an unsaved draft's words as its page will.
+//
+// The count is made here for the reason the preview is: an editor counting
+// the markdown itself would be a second reading of it, and would show a
+// number the site does not.
+func (s *Server) handleWordCount(w http.ResponseWriter, r *http.Request) {
+	view := s.src()
+	if view.WordCount == nil {
+		fail(w, http.StatusNotImplemented, CodeInternal, "this server cannot count words")
+		return
+	}
+
+	draft, ok := s.decodeDraft(w, r)
+	if !ok {
+		return
+	}
+	words, err := view.WordCount(r.Context(), draftItem(r, view, draft))
+	if err != nil {
+		s.failErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, WordCount{Words: words})
+}
+
+// draftItem is the item a draft will be once saved. An id, when the client
+// has one, keeps it in the bundle it already lives in, which is what lets its
+// own images resolve.
+func draftItem(r *http.Request, view View, draft Draft) *content.Content {
+	item := draft.contentOf(content.ID(r.URL.Query().Get("id")))
+	if existing, err := view.Reader.Get(r.Context(), item.ID); err == nil {
+		item.Locator = existing.Locator
+		item.CreatedAt = existing.CreatedAt
+	}
+	return item
 }

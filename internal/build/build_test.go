@@ -683,6 +683,34 @@ func TestExtrasRefuseWhatABuildRefuses(t *testing.T) {
 	}
 }
 
+// An editor shows a count before its item is saved, and it has to be the one
+// the page will show, so the markdown hooks run first, as they do for a page.
+func TestAWordCountGoesThroughTheMarkdownHooks(t *testing.T) {
+	f := newFixture(t, 1)
+	bus := hook.NewBus()
+	bus.Register(signing{hook.Base{HookName: "signing", HookPhase: hook.PhaseBuild}}, hook.DefaultPriority)
+	b := f.builder(t, nil, func(o *build.Options) { o.Hooks = bus })
+
+	item := &content.Content{
+		Kind: "post",
+		Body: content.Body{Format: content.FormatMarkdown, Raw: "Two words\n"},
+	}
+	words, err := b.WordCount(t.Context(), item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if words != 5 {
+		t.Errorf("WordCount = %d, want 5 with the three words the hook signs", words)
+	}
+}
+
+type signing struct{ hook.Base }
+
+func (signing) TransformMarkdown(_ context.Context, doc *hook.MarkdownDoc) error {
+	doc.Source += "\nSigned by Kite.\n"
+	return nil
+}
+
 type retitling struct{ hook.Base }
 
 func (retitling) PageRendered(_ context.Context, p *hook.PageInfo) error {

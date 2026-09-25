@@ -299,6 +299,7 @@ func (s *Server) view() api.View {
 		v.Publisher = current.Publisher()
 	}
 	v.Preview = s.preview
+	v.WordCount = s.wordCount
 	return v
 }
 
@@ -327,6 +328,14 @@ func (s *Server) preview(ctx context.Context, item *content.Content) ([]byte, er
 	}
 	html, _, err := builder.Render(ctx, target, nil)
 	return html, err
+}
+
+// wordCount counts an item that is not on disk as its page will.
+func (s *Server) wordCount(ctx context.Context, item *content.Content) (int, error) {
+	s.mu.RLock()
+	builder := s.builder
+	s.mu.RUnlock()
+	return builder.WordCount(ctx, item)
 }
 
 // reconfigureIfChanged rebuilds the configuration-derived half of the site

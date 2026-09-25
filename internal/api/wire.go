@@ -301,6 +301,11 @@ func (d Draft) contentOf(id content.ID) *content.Content {
 	return item
 }
 
+// WordCount is how many words a draft's page will say it has.
+type WordCount struct {
+	Words int `json:"words"`
+}
+
 // Media is a file stored beside a page.
 type Media struct {
 	Name string `json:"name"`
