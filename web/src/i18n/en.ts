@@ -526,6 +526,9 @@ export const en = {
   "themes.removeTitle": "Remove {theme}?",
   "themes.removeNote": "Its folder, themes/{name}, is deleted, and the deletion reaches the repository with your next publish.",
   "themes.removed": "Removed {theme}",
+  "publish.settingsPending": "Not published yet:",
+  "publish.settingsTitle": "Publish settings and themes",
+  "publish.settingsNote": "Commits {paths} and pushes them, so the site built from the repository changes too.",
 
   // Customizing a theme.
   "customize.title": "Customize {theme}",

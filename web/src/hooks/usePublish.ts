@@ -68,6 +68,8 @@ export function usePublish(
   onDone?: (result: Result) => void,
   /** onRefused hears a refusal where the panel that shows it may be shut. */
   onRefused?: (failure: Failure, confirmable: boolean) => void,
+  /** paths names files that are not items, such as kite.yaml or a theme. */
+  paths: string[] = [],
 ) {
   const queryClient = useQueryClient();
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -105,7 +107,7 @@ export function usePublish(
 
   const mutation = useMutation({
     mutationFn: ({ ids, force, skipHooks }: { ids: string[]; force: boolean; skipHooks?: boolean }) =>
-      post("/api/v1/publish", { ids, push: true, force, skip_hooks: skipHooks }),
+      post("/api/v1/publish", { ids, paths, push: true, force, skip_hooks: skipHooks }),
     onSuccess: settled,
     onError: (refusal: Refusal) =>
       refused(refusal, Boolean(refusal.plan?.warnings?.length) && !refusal.plan?.problems?.length),

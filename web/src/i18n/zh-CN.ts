@@ -505,6 +505,9 @@ export const zhCN: Record<keyof typeof en, string> = {
   "themes.removeTitle": "删除 {theme}？",
   "themes.removeNote": "它的目录 themes/{name} 会被删除，下一次发布时仓库里也会删除。",
   "themes.removed": "已删除 {theme}",
+  "publish.settingsPending": "尚未发布：",
+  "publish.settingsTitle": "发布设置与主题",
+  "publish.settingsNote": "提交 {paths} 并推送，让从仓库构建的站点也随之更新。",
 
   "customize.title": "自定义 {theme}",
   "customize.back": "主题",

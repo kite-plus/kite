@@ -18,20 +18,29 @@ import { Spinner } from "@/components/ui/spinner";
 
 interface Props {
   ids: string[];
+  /** paths names files that are not items, such as kite.yaml. */
+  paths?: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDone: () => void;
+  title?: string;
+  description?: string;
 }
 
 /** Publishing several items at once, with the reasons it might be refused. */
-export function PublishDialog({ ids, open, onOpenChange, onDone }: Props) {
+export function PublishDialog({ ids, paths, open, onOpenChange, onDone, title, description }: Props) {
   const { t } = useI18n();
   const delivery = useDelivery();
-  const publish = usePublish(ids, (result) => {
-    toast.success(t(result.rebased ? "publish.rebased" : "publish.done"));
-    onOpenChange(false);
-    onDone();
-  });
+  const publish = usePublish(
+    ids,
+    (result) => {
+      toast.success(t(result.rebased ? "publish.rebased" : "publish.done"));
+      onOpenChange(false);
+      onDone();
+    },
+    undefined,
+    paths,
+  );
 
   return (
     <Dialog
@@ -43,8 +52,8 @@ export function PublishDialog({ ids, open, onOpenChange, onDone }: Props) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("publish.selectedTitle", { count: ids.length })}</DialogTitle>
-          <DialogDescription>{t("publish.selectedNote")}</DialogDescription>
+          <DialogTitle>{title ?? t("publish.selectedTitle", { count: ids.length })}</DialogTitle>
+          <DialogDescription>{description ?? t("publish.selectedNote")}</DialogDescription>
         </DialogHeader>
 
         <DeliveryStages delivery={delivery.data} publish={publish} />
