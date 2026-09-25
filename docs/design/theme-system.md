@@ -704,7 +704,7 @@ resource_hash = SHA256( source_bytes ‖ transform_chain_spec ‖ transform_para
 | **M0** | 引擎可用，契约**内部** | 实现查找顺序、RenderContext、funcmap、`kite theme verify`。文档标注"内部 API，可能变更" |
 | **M1~M4** | 随实现演进 | 遇到不顺手就改，不承担任何兼容义务 |
 | **M5** | **写第二套主题** | 用第一套主题的契约去写一套风格完全不同的主题。**每一处别扭都是契约缺陷的证据**。第二套是文档站主题司南，在它自己的仓库 `theme-sinan` 里写 |
-| **M5 末** | **冻结，发布 `kite/v1`** | 打版本、写文档、发 theme-sdk、司南发布 1.0 |
+| **M5 末** | **冻结，发布 `kite/v1`** | 打版本、写文档、司南发布 1.0 |
 | M5 之后 | 只增不改 | 新增方法/函数可以；改名/改语义要走 `kite/v2` |
 
 > **为什么必须等第二套主题：** Hugo 在 v0.146 做了一次**彻底的模板系统重写**——`_default/` 去掉、`layouts/partials` → `layouts/_partials`、`index.html` → `home.html`、`list-baseof.html` → `baseof.list.html`。即便做了新旧映射，仍然打断了包括 Docsy 在内的大量主题 `[EV]`。
