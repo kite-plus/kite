@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useState } from "react"
+import { Type } from "lucide-react"
 
 import { useI18n } from "@/i18n"
 
@@ -110,6 +111,20 @@ export const HeadingDropdownMenu = forwardRef<
 
         <DropdownMenuContent align="start">
           <DropdownMenuGroup>
+            {/* Kite: the way back to plain text, which the slash menu offers too. */}
+            <DropdownMenuItem asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                data-active-state={editor?.isActive("paragraph") ? "on" : "off"}
+                role="button"
+                tabIndex={-1}
+                onClick={() => editor?.chain().focus().setParagraph().run()}
+              >
+                <Type className="tiptap-button-icon" />
+                <span className="tiptap-button-text">{t("editor.paragraph")}</span>
+              </Button>
+            </DropdownMenuItem>
             {levels.map((level) => (
               <DropdownMenuItem key={`heading-${level}`} asChild>
                 <HeadingButton
