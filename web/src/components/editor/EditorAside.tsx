@@ -7,7 +7,6 @@ import { STATUSES } from "@/hooks/useContents";
 import { useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { canPublish, type DeliveryState, type usePublish } from "@/hooks/usePublish";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -20,6 +19,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageField, SchemaForm, type Uploads } from "@/components/SchemaForm";
+import { DateTimePicker } from "@/components/DateTimePicker";
 import { TermsInput } from "@/components/editor/TermsInput";
 import { DeliveryStages, PublishProblems } from "@/components/publish/Delivery";
 
@@ -115,17 +115,11 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
         </div>
         <div className="grid gap-2">
           <Label htmlFor="published_at">{t("editor.publishedAt")}</Label>
-          <Input
+          <DateTimePicker
             id="published_at"
-            type="datetime-local"
-            value={toLocalInput(draft.published_at)}
-            onChange={(event) =>
-              onEdit({
-                published_at: event.target.value
-                  ? new Date(event.target.value).toISOString()
-                  : undefined,
-              })
-            }
+            value={draft.published_at}
+            onChange={(published_at) => onEdit({ published_at })}
+            placeholder={t("editor.pickPublishDate")}
           />
           {waitsForDate(draft) && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -290,10 +284,3 @@ function waitsForDate(draft: Draft): boolean {
   return !!draft.published_at && new Date(draft.published_at).getTime() > Date.now();
 }
 
-/** toLocalInput formats an instant for a datetime-local control. */
-function toLocalInput(iso?: string): string {
-  if (!iso) return "";
-  const at = new Date(iso);
-  const local = new Date(at.getTime() - at.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}

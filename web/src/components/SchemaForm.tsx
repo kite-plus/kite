@@ -20,6 +20,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { DateTimePicker } from "@/components/DateTimePicker";
 
 /** SchemaField is one declared field; Field is the control it is drawn in. */
 type SchemaField = components["schemas"]["Field"];
@@ -178,6 +179,13 @@ function FieldRow({
         </div>
       ) : field.type === "image" && uploads ? (
         <ImageField id={field.key} value={asString(value)} onChange={onChange} uploads={uploads} />
+      ) : field.type === "date" ? (
+        <DateTimePicker
+          id={field.key}
+          value={fromLocal(asString(value))}
+          onChange={(iso) => onChange(iso ? toLocal(iso) : undefined)}
+          placeholder={field.placeholder ?? t("form.pickDate")}
+        />
       ) : (
         <Input
           id={field.key}
@@ -311,8 +319,6 @@ export function ImageField({
 
 function inputType(type: string): string {
   switch (type) {
-    case "date":
-      return "datetime-local";
     case "number":
       return "number";
     case "url":
@@ -320,6 +326,19 @@ function inputType(type: string): string {
     default:
       return "text";
   }
+}
+
+// A date field keeps the local "2026-09-01T10:00" it has always been written
+// as, so a theme that reads one sees no change of format.
+function toLocal(iso: string): string {
+  const at = new Date(iso);
+  return new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function fromLocal(value: string): string | undefined {
+  if (!value) return undefined;
+  const at = new Date(value);
+  return Number.isNaN(at.getTime()) ? undefined : at.toISOString();
 }
 
 function asString(value: unknown): string {
