@@ -1,15 +1,33 @@
-import { useEffect, useRef, useState } from "react";
-import { XCircle } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ExternalLink, Monitor, Smartphone, X, XCircle } from "lucide-react";
 
 import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Draft } from "@/api/client";
 import { useI18n } from "@/i18n";
+import { cn } from "@/lib/utils";
 
 interface Props {
   draft: Draft | null;
   id: string | null;
   /** base is the item's own address, which its images are linked relative to. */
   base?: string;
+  /** live is the page the site serves for the saved item, when it serves one. */
+  live?: string;
+  onClose: () => void;
+}
+
+type Width = "desktop" | "phone";
+
+const widthKey = "kite:preview-width";
+
+function preferredWidth(): Width {
+  try {
+    return localStorage.getItem(widthKey) === "phone" ? "phone" : "desktop";
+  } catch {
+    return "desktop";
+  }
 }
 
 /**
@@ -21,11 +39,21 @@ interface Props {
  * match the site" would be a complaint with no end. What is shown here is the
  * page the build would write.
  */
-export function Preview({ draft, id, base }: Props) {
+export function Preview({ draft, id, base, live, onClose }: Props) {
   const { t } = useI18n();
   const [html, setHtml] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
+  const [width, setWidth] = useState<Width>(preferredWidth);
   const frame = useRef<HTMLIFrameElement>(null);
+
+  const chooseWidth = (next: Width) => {
+    setWidth(next);
+    try {
+      localStorage.setItem(widthKey, next);
+    } catch {
+      // Remembering the choice is a convenience, not a requirement.
+    }
+  };
 
   useEffect(() => {
     if (!draft) return;
@@ -84,20 +112,108 @@ export function Preview({ draft, id, base }: Props) {
     doc.documentElement.scrollTop = scroll;
   }, [html, base]);
 
+  const phone = width === "phone";
+
   return (
-    <div className="relative h-full">
-      {failed && (
-        <Alert variant="destructive" className="absolute inset-x-0 top-0 z-10 rounded-none">
-          <XCircle />
-          <AlertTitle>{failed}</AlertTitle>
-        </Alert>
-      )}
-      <iframe
-        ref={frame}
-        title="Preview"
-        className="h-full w-full border-0 bg-white"
-        sandbox="allow-same-origin"
-      />
+    <div className="flex h-full flex-col">
+      {/* The toolbar's height, so the rule under both runs straight across. */}
+      <div className="flex h-[49px] shrink-0 items-center gap-1 border-b px-3.5">
+        <span className="me-auto text-[13px] font-medium">{t("editor.preview")}</span>
+        <div
+          role="group"
+          aria-label={t("editor.previewWidth")}
+          className="flex items-center gap-0.5 rounded-md bg-muted p-0.5"
+        >
+          <WidthButton
+            label={t("editor.previewDesktop")}
+            pressed={!phone}
+            onClick={() => chooseWidth("desktop")}
+          >
+            <Monitor />
+          </WidthButton>
+          <WidthButton
+            label={t("editor.previewPhone")}
+            pressed={phone}
+            onClick={() => chooseWidth("phone")}
+          >
+            <Smartphone />
+          </WidthButton>
+        </div>
+        {live && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8" asChild>
+                <a href={live} target="_blank" rel="noreferrer" aria-label={t("list.open")}>
+                  <ExternalLink />
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("list.open")}</TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              aria-label={t("editor.previewClose")}
+              onClick={onClose}
+            >
+              <X />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("editor.previewClose")}</TooltipContent>
+        </Tooltip>
+      </div>
+
+      {/* One frame in both widths: a new one would lose the page written into it. */}
+      <div className={cn("relative min-h-0 flex-1", phone && "bg-muted/60 p-4")}>
+        {failed && (
+          <Alert variant="destructive" className="absolute inset-x-0 top-0 z-10 rounded-none">
+            <XCircle />
+            <AlertTitle>{failed}</AlertTitle>
+          </Alert>
+        )}
+        <iframe
+          ref={frame}
+          title={t("editor.preview")}
+          className={cn(
+            "block h-full w-full border-0 bg-white",
+            phone && "mx-auto max-w-[390px] rounded-lg shadow-sm ring-1 ring-border",
+          )}
+          sandbox="allow-same-origin"
+        />
+      </div>
     </div>
+  );
+}
+
+function WidthButton({
+  label,
+  pressed,
+  onClick,
+  children,
+}: {
+  label: string;
+  pressed: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          aria-pressed={pressed}
+          onClick={onClick}
+          className="flex size-7 items-center justify-center rounded-[5px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-xs [&_svg]:size-4"
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }

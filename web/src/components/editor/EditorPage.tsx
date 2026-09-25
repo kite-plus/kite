@@ -557,7 +557,13 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
 
         {preview && (
           <div className="min-w-0 flex-1 md:border-s">
-            <Preview draft={draft} id={id} base={item.base?.url} />
+            <Preview
+              draft={draft}
+              id={id}
+              base={item.base?.url}
+              live={item.base?.status === "published" ? item.base.url : undefined}
+              onClose={() => setPreview(false)}
+            />
           </div>
         )}
 
