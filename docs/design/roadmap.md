@@ -25,7 +25,7 @@
 | **M2** 只读后台 | 完成 | REST API，并从代码生成 OpenAPI；前端请求一律用生成的客户端；React 后台嵌入二进制；列表的筛选、排序、游标分页和搜索；索引一致性的三层机制：文件监听、stat 全树扫描、Git HEAD 哨兵（切分支时只重新索引变化的路径） |
 | **M3** 可写后台 | 完成 | `PUT` + `If-Match` 走 `Apply(ChangeSet)`；在旧版本上保存时返回 409，并给出三方对比；由 schema 驱动的表单，内容字段、主题设置、站点设置共用；可视化编辑器（Tiptap）加 Markdown 源码模式（CodeMirror）；服务端渲染的预览；拖图进 page bundle；站点设置和主题设置页（改 `kite.yaml` 时保留注释和顺序）；`kite doctor --fix-ids` |
 | **M4** Git 发布 | 完成 | 发布前检查：不是仓库、子模块、游离 HEAD、有进行中的 merge/rebase/cherry-pick、缺 git-lfs、文件超出托管平台限制；`git commit --only` 只提交指定路径；`GIT_TERMINAL_PROMPT=0` 加空的 `GIT_ASKPASS`，缺凭据时立刻报错；`.kite/publish.lock` 加 `index.lock` 退避重试；从不强推；DeliveryState 和发布面板；`kite publish` 命令行；`kite init` 生成 GitHub Pages 部署 workflow 和发布定时文章的 `scheduled.yml`；远端有新提交且没有改到同样的文件时一键接到后面推送；hook 拒绝后可跳过 hooks 发布；「已部署」对接 GitHub Pages 的部署状态 |
-| **M5** 主题契约 | 部分提前完成 | `apiVersion` 硬校验和 `requires` 检查；命名空间化的函数；由 `theme.yaml` 生成的主题设置页；`kite theme verify`。其余见 §5 |
+| **M5** 主题契约 | 部分提前完成 | `apiVersion` 硬校验和 `requires` 检查；命名空间化的函数；由 `theme.yaml` 生成的主题设置页；`kite theme verify`；后台的主题列表、zip 安装、切换和整站实时预览，以及主题自带的语言包。其余见 §5 |
 | **M6** | 未开始 | 构建时已经按 OutputTarget 记录依赖和缓存键，只是跳过判断还没启用 |
 | **M7** | 未开始 | 读模型已按双 Store 设计；单账号认证和 Docker 已提前完成 |
 | **M8** | 未开始 | HookBus 已被内置功能使用 |
