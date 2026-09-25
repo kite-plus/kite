@@ -138,9 +138,9 @@
   field-sizing: content;
   background: transparent;
   color: inherit;
-  font-size: 1.4375rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  line-height: normal;
+  line-height: 1.35;
   letter-spacing: -0.3px;
 
   &::placeholder {
@@ -152,30 +152,30 @@
   }
 }
 
-// The design's article: 13.5px on 1.9, 14px between blocks, 26px above a
-// heading and 10px below it.
+// The article at 16px, the size the markdown view already writes in: the
+// design's 13.5px read too small. Space between blocks and around headings
+// scales with it.
 .simple-editor-content .tiptap.ProseMirror.simple-editor {
   min-height: 40vh;
   color: var(--prose);
-  font-size: 0.84375rem;
-  line-height: 1.9;
+  font-size: 1rem;
+  line-height: 1.8;
 
   p:not(td p):not(th p) {
     font-size: inherit;
     line-height: inherit;
-    margin-top: 14px;
+    margin-top: 1em;
   }
 
   h2, h3, h4 {
-    margin-top: 26px;
-    margin-bottom: 10px;
+    margin-top: 1.75em;
+    margin-bottom: 0.75em;
     font-weight: 600;
     line-height: 1.5;
   }
 
   h2 {
-    font-size: 17px;
-    line-height: 1.9;
+    font-size: 1.25em;
     letter-spacing: -0.2px;
   }
 
@@ -184,7 +184,7 @@
   }
 
   blockquote {
-    margin: 14px 0;
+    margin: 1em 0;
     border-left: 3px solid var(--brand);
     padding: 2px 0 2px 14px;
     color: var(--foreground-3);
@@ -200,7 +200,7 @@
   }
 
   pre {
-    margin: 14px 0;
+    margin: 1em 0;
   }
 
   li p:not(td p):not(th p) {
@@ -223,7 +223,7 @@
     background-color: var(--muted);
     color: inherit;
     padding: 1px 6px;
-    font-size: 12px;
+    font-size: 0.875em;
   }
 
   // Dark in both themes, as the design draws it.
@@ -233,7 +233,7 @@
     background-color: #18181b;
     color: #e4e4e7;
     padding: 14px 16px;
-    font-size: 12px;
+    font-size: 0.875rem;
     line-height: 1.7;
 
     code {
