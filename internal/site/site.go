@@ -300,15 +300,9 @@ func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []str
 	return stats, emitter.Files(), nil
 }
 
-// ThemeSettings merges the theme's declared defaults with the site's overrides,
-// so a template can read a setting the site never mentioned.
+// ThemeSettings is what templates read as .Site.ThemeSettings: the stored
+// settings taken as the types the theme declares them to be, and the theme's
+// defaults for whatever the site never set.
 func (s *Site) ThemeSettings() map[string]any {
-	out := s.Theme.Manifest.DefaultSettings()
-	if out == nil {
-		out = make(map[string]any)
-	}
-	for k, v := range s.Config.Theme.Settings {
-		out[k] = v
-	}
-	return out
+	return s.Theme.Manifest.Settings.Resolve(s.Config.Theme.Settings)
 }
