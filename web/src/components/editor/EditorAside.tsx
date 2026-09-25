@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageField, SchemaForm, type Uploads } from "@/components/SchemaForm";
 import { DateTimePicker } from "@/components/DateTimePicker";
@@ -85,7 +84,8 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
   const offered = layouts.find((each) => each.name === chosen);
 
   return (
-    <div className="flex flex-col gap-5 p-4">
+    // A rule between sections, so their titles stand apart from the labels.
+    <div className="flex flex-col divide-y px-4">
       <Section title={t("publish.title")}>
         <div className="grid gap-2">
           <Label htmlFor="status">{t("list.status")}</Label>
@@ -258,13 +258,17 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
       )}
 
       {onDelete && (
-        <>
-          <Separator />
-          <Button variant="destructive" onClick={onDelete}>
+        // Outlined, so it does not outshout the page's one filled button.
+        <div className="grid py-5">
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={onDelete}
+          >
             <Trash2 />
             {t("editor.delete")}
           </Button>
-        </>
+        </div>
       )}
     </div>
   );
@@ -272,7 +276,7 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="grid gap-3">
+    <section className="grid gap-3 py-5">
       <h3 className="text-sm font-semibold">{title}</h3>
       {children}
     </section>
