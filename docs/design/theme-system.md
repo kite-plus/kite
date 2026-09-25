@@ -252,12 +252,21 @@ type Site interface {
     Pages() PageList                        // 全站内容（惰性）
     Taxonomies() []string                   // ["tag", "category"]
     Taxonomy(name string) Taxonomy
+    Author() string                         // site.author
+    Keywords() []string                     // site.keywords，给搜索引擎
+    NoIndex() bool                          // site.noindex，要求搜索引擎不收录
+    HeadHTML() template.HTML                // site.headHTML，原样写到 </head> 前
+    FooterHTML() template.HTML              // site.footerHTML，原样写到 </body> 前
     BuildTime() time.Time                   // 冻结的构建时间戳
     Kite() BuildInfo                        // Version / IsBuild / IsServe
 }
 ```
 
 **`Site.BuildTime()` 是模板获取时间的唯一途径。** funcmap 里**没有** `time.Now`——见 [§7.1](#71-命名空间设计-已冻结)。
+
+**日期按站点的时区给出。** `site.timezone` 设置后，`BuildTime` 和页面的 `Date`、`PublishDate`、`Lastmod` 都换算到这个时区，模板直接格式化即可；不设置时，日期保持写入时的时区。时区属于站点而不是主题：同一篇文章落在哪一天，不应随换主题而变。
+
+**站点的关键词、作者、`noindex` 和自定义代码由主题写进页面。** 它们跟着站点保存，换主题不丢；主题负责把它们放到 `<head>` 和 `</body>` 前。自动注入更多 SEO 标签（如 Open Graph）留给插件（[plugin-system.md](plugin-system.md)）。
 
 ### 6.4 `Page`
 

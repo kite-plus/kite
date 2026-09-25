@@ -195,8 +195,15 @@ optional, and the values below are the defaults.
 ```yaml
 site:
   title: My Site
+  description: ""      # search results and feeds; themes often show it too
   baseURL: https://example.com
   language: en
+  author: ""
+  keywords: []         # a list, or one line separated by commas
+  timezone: ""         # an IANA zone such as Asia/Shanghai
+  noindex: false       # true asks search engines to leave the site out
+  headHTML: ""         # added before </head> on every page
+  footerHTML: ""       # added before </body> on every page
 
 content:
   store: file          # where content lives
@@ -222,6 +229,16 @@ publish:
   publisher: git
   branch: main
 ```
+
+`timezone` decides which day a date falls on. Left empty, a date is shown in
+the zone it was written in, which for what the studio writes is UTC, so a post
+published just after midnight in Shanghai would read as the day before. The
+site's keywords, author and `noindex`, and its own code, reach every page
+through the theme, which writes them into the page as `.Site.Keywords`,
+`.Site.Author`, `.Site.NoIndex`, `.Site.HeadHTML` and `.Site.FooterHTML`; the
+default theme does. A page can give its own keywords with `keywords` in its
+front matter. The studio edits all of these, and the page size and feed limit,
+under Settings → Site.
 
 A few keys can be overridden from the environment, for a build whose output
 depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,

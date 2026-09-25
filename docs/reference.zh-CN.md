@@ -166,8 +166,15 @@ RSS 和 sitemap，逐字节比较。通过检查的主题，发布出去的就�
 ```yaml
 site:
   title: My Site
+  description: ""      # 用于搜索结果和订阅，主题也常把它显示出来
   baseURL: https://example.com
   language: en
+  author: ""
+  keywords: []         # 列表，或者用逗号隔开写成一行
+  timezone: ""         # IANA 时区，例如 Asia/Shanghai
+  noindex: false       # 设为 true 时要求搜索引擎不要收录
+  headHTML: ""         # 插到每个页面的 </head> 之前
+  footerHTML: ""       # 插到每个页面的 </body> 之前
 
 content:
   store: file          # 内容存在哪里
@@ -193,6 +200,13 @@ publish:
   publisher: git
   branch: main
 ```
+
+`timezone` 决定日期落在哪一天。不设置时，日期按写入时的时区显示，后台写入的是 UTC，
+所以在上海刚过零点发布的文章会显示成前一天。站点的关键词、作者、`noindex` 和自定义代码
+由主题写进每个页面，模板里对应 `.Site.Keywords`、`.Site.Author`、`.Site.NoIndex`、
+`.Site.HeadHTML` 和 `.Site.FooterHTML`，默认主题都写了。单个页面可以在 front matter 里
+用 `keywords` 写自己的关键词。这些设置，连同每页文章数和订阅文章数，都可以在后台的
+设置 → 站点里修改。
 
 少数几个键可以用环境变量覆盖，供产出依赖运行环境的构建使用：`KITE_SITE_TITLE`、
 `KITE_SITE_BASEURL`、`KITE_SITE_LANGUAGE`、`KITE_THEME`、`KITE_BUILD_OUTPUT`、
