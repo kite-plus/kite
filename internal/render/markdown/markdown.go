@@ -16,6 +16,7 @@ import (
 	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
+	east "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
@@ -61,11 +62,14 @@ type Heading struct {
 
 // Document is the result of rendering one body.
 type Document struct {
-	HTML      string
-	TOC       []Heading
-	Excerpt   string
-	Links     []string
-	Images    []string
+	HTML    string
+	TOC     []Heading
+	Excerpt string
+	Links   []string
+	Images  []string
+
+	// WordCount is how many words a reader reads: those of paragraphs, list
+	// items, headings and table cells, but not of code blocks or alt text.
 	WordCount int
 
 	// CJKCount is how many of the words are single CJK characters. They are
@@ -155,15 +159,28 @@ func collect(root ast.Node, src []byte, doc *Document) error {
 			doc.Images = append(doc.Images, string(node.Destination))
 		case *ast.Paragraph:
 			text := strings.TrimSpace(plainText(node, src))
-			words, cjk := countWords(text)
-			doc.WordCount += words
-			doc.CJKCount += cjk
 			if doc.Excerpt == "" && text != "" {
 				doc.Excerpt = truncate(text, 200)
 			}
 		}
+		if prose(n) {
+			words, cjk := countWords(readText(n, src))
+			doc.WordCount += words
+			doc.CJKCount += cjk
+		}
 		return ast.WalkContinue, nil
 	})
+}
+
+// prose reports a block whose text is read: a paragraph wherever it sits, the
+// text of a tight list item, a heading, a table cell or a defined term. A code
+// block is skimmed rather than read, and raw HTML is markup, so neither is.
+func prose(n ast.Node) bool {
+	switch n.(type) {
+	case *ast.Paragraph, *ast.TextBlock, *ast.Heading, *east.TableCell, *east.DefinitionTerm:
+		return true
+	}
+	return false
 }
 
 func headingID(h *ast.Heading) string {
@@ -179,14 +196,24 @@ func headingID(h *ast.Heading) string {
 }
 
 // plainText concatenates the literal text under a node, which is what a table
-// of contents entry and a word count need.
-func plainText(n ast.Node, src []byte) string {
+// of contents entry and an excerpt need.
+func plainText(n ast.Node, src []byte) string { return literal(n, src, false) }
+
+// readText is the text under a node that a reader reads: an image is seen, so
+// its alt text is left out of a word count.
+func readText(n ast.Node, src []byte) string { return literal(n, src, true) }
+
+func literal(n ast.Node, src []byte, withoutImages bool) string {
 	var b strings.Builder
 	_ = ast.Walk(n, func(child ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
 		switch t := child.(type) {
+		case *ast.Image:
+			if withoutImages {
+				return ast.WalkSkipChildren, nil
+			}
 		case *ast.Text:
 			b.Write(t.Segment.Value(src))
 			if t.SoftLineBreak() || t.HardLineBreak() {

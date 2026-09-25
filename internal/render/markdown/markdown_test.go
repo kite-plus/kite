@@ -119,8 +119,51 @@ Second paragraph here.
 	if doc.Excerpt != "First paragraph with five words." {
 		t.Errorf("Excerpt = %q", doc.Excerpt)
 	}
-	if doc.WordCount != 8 {
-		t.Errorf("WordCount = %d, want 8", doc.WordCount)
+	// The heading is read as well as the two paragraphs.
+	if doc.WordCount != 9 {
+		t.Errorf("WordCount = %d, want 9", doc.WordCount)
+	}
+}
+
+// A word count is of what a reader reads, and lists, headings and tables are
+// read like any paragraph. A tight list keeps its items' text outside of
+// paragraphs, so counting paragraphs alone called a page of links empty.
+func TestWordCountReadsEveryKindOfText(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		src   string
+		words int
+	}{
+		{"tight list", "- one two\n- three\n", 3},
+		{"loose list", "- one two\n\n- three\n", 3},
+		{"heading", "## Two words\n", 2},
+		{"table", "| a | b |\n|---|---|\n| c d | e |\n", 5},
+		{"quote", "> quoted words here\n", 3},
+		{"definition", "Term\n: Its description\n", 3},
+		{"footnote", "Text[^1].\n\n[^1]: A note.\n", 3},
+		{"inline code and links", "Run `kite build` from [the root](/docs/) or https://example.com/x.\n", 8},
+	} {
+		if got := render(t, tc.src, nil).WordCount; got != tc.words {
+			t.Errorf("%s: WordCount = %d, want %d", tc.name, got, tc.words)
+		}
+	}
+}
+
+// Code is skimmed rather than read, raw HTML is markup, and a picture is
+// looked at; none of them makes a page longer to read.
+func TestWordCountLeavesOutCodeAndPictures(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+	}{
+		{"fenced code", "Two words\n\n```go\nfunc main() { fmt.Println(\"hi\") }\n```\n"},
+		{"indented code", "Two words\n\n    kite build --verify\n"},
+		{"image", "![a cherry tree in bloom](cherry.jpg)\n\nTwo words\n"},
+		{"html block", "<div>\nhidden words\n</div>\n\nTwo words\n"},
+	} {
+		if got := render(t, tc.src, nil).WordCount; got != 2 {
+			t.Errorf("%s: WordCount = %d, want 2", tc.name, got)
+		}
 	}
 }
 
