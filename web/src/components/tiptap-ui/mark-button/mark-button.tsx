@@ -101,6 +101,8 @@ export const MarkButton = forwardRef<HTMLButtonElement, MarkButtonProps>(
         aria-label={label}
         aria-pressed={isActive}
         tooltip={label}
+        // Kite: the tooltip names the shortcut, as the search button's does.
+        shortcutKeys={shortcutKeys}
         onClick={handleClick}
         {...buttonProps}
         ref={ref}

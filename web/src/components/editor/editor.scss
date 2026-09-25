@@ -391,6 +391,13 @@
 /* =====================
      MENUS
      ===================== */
+// A name and its shortcut on one line, as the admin's own tooltips read.
+.tiptap-tooltip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .kite-slash-popup {
   z-index: 60;
 }

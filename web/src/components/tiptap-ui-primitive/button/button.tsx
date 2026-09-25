@@ -11,7 +11,7 @@ import {
 import { CheckIcon } from "@/components/tiptap-icons/check-icon"
 
 // --- Lib ---
-import { cn, parseShortcutKeys } from "@/lib/tiptap-utils"
+import { cn, isMac, parseShortcutKeys } from "@/lib/tiptap-utils"
 
 import "@/components/tiptap-ui-primitive/button/button-colors.scss"
 import "@/components/tiptap-ui-primitive/button/button.scss"
@@ -59,11 +59,13 @@ export const ShortcutDisplay: React.FC<{ shortcuts: string[] }> = ({
 }) => {
   if (shortcuts.length === 0) return null
 
+  // Kite: a Mac writes a chord as its symbols run together, as its menus do.
+  const joined = isMac()
   return (
     <div>
       {shortcuts.map((key, index) => (
         <Fragment key={index}>
-          {index > 0 && <kbd>+</kbd>}
+          {index > 0 && !joined && <kbd>+</kbd>}
           <kbd>{key}</kbd>
         </Fragment>
       ))}
