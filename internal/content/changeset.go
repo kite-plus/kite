@@ -61,6 +61,7 @@ const (
 	OpPutMedia       OpKind = "put_media"
 	OpDeleteMedia    OpKind = "delete_media"
 	OpPutSettings    OpKind = "put_settings"
+	OpChangeTerm     OpKind = "change_term"
 )
 
 // Op is a single typed operation inside a [ChangeSet].
@@ -148,6 +149,27 @@ func (o PutSettings) Kind() OpKind { return OpPutSettings }
 
 func (o PutSettings) Describe() string {
 	return strings.Join(slices.Sorted(maps.Keys(o.Values)), ", ")
+}
+
+// ChangeTerm renames or removes one term on one item and leaves the rest of
+// its file alone. Renaming or removing a term everywhere is a set of these,
+// one per item that carries it: a PutContent of each item would also write
+// back every value the reader derived for it, such as a timestamp its file
+// never declared.
+type ChangeTerm struct {
+	ID         ID
+	IfRevision Revision
+	Taxonomy   string
+	Term       string
+	// To is the term's new name; empty removes the term. An item that already
+	// carries To keeps it once.
+	To string
+}
+
+func (o ChangeTerm) Kind() OpKind { return OpChangeTerm }
+
+func (o ChangeTerm) Describe() string {
+	return string(o.ID) + " " + o.Taxonomy + ": " + o.Term + " -> " + o.To
 }
 
 // DeleteMedia removes a media file.

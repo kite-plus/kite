@@ -182,5 +182,8 @@ func (s *Server) routes() []route {
 		{http.MethodDelete, "/contents/{id}/media/{name}", s.handleDeleteMedia},
 		{http.MethodGet, "/taxonomies", s.handleTaxonomies},
 		{http.MethodGet, "/taxonomies/{taxonomy}/terms", s.handleTerms},
+		{http.MethodGet, "/taxonomies/{taxonomy}/terms/{term}", s.handleTerm},
+		{http.MethodPut, "/taxonomies/{taxonomy}/terms/{term}", s.handleRenameTerm},
+		{http.MethodDelete, "/taxonomies/{taxonomy}/terms/{term}", s.handleRemoveTerm},
 	}
 }

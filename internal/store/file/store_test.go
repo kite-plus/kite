@@ -256,6 +256,115 @@ func TestRevisionConflict(t *testing.T) {
 	}
 }
 
+// A set that conflicts on a later item must not have written the earlier
+// ones: renaming a term across many items is all or nothing.
+func TestASetThatConflictsAnywhereWritesNothing(t *testing.T) {
+	root, types, w := newTestProject(t)
+	writeFile(t, root, "content/posts/a/index.md", "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZAAA\ntitle: A\nslug: a\n---\nbody\n")
+	writeFile(t, root, "content/posts/b/index.md", "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZBBB\ntitle: B\nslug: b\n---\nbody\n")
+	before := readFile(t, root, "content/posts/a/index.md")
+
+	scan, err := NewScanner(root, types).Scan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ops []content.Op
+	for _, e := range scan.Entries {
+		item := e.Item
+		item.Title += " edited"
+		revision := e.Hash
+		if item.Slug == "b" {
+			revision = "sha256:stale"
+		}
+		ops = append(ops, content.PutContent{Content: item, IfRevision: revision})
+	}
+	slices.SortFunc(ops, func(x, y content.Op) int {
+		return strings.Compare(x.(content.PutContent).Content.Slug, y.(content.PutContent).Content.Slug)
+	})
+
+	_, err = w.Apply(t.Context(), content.ChangeSet{Ops: ops})
+	if !errors.Is(err, content.ErrConflict) {
+		t.Fatalf("expected ErrConflict, got %v", err)
+	}
+	if after := readFile(t, root, "content/posts/a/index.md"); after != before {
+		t.Errorf("the first item was written although the set conflicted:\n%s", after)
+	}
+}
+
+// A term change is applied to every item that carries the term, so it must
+// change the one line that holds it and nothing the author wrote around it.
+func TestChangingATermTouchesOnlyItsLine(t *testing.T) {
+	const doc = "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZABC\ntitle: A\nslug: a\n" +
+		"created_at: 2026-03-02T01:00:00Z\npublished_at: 2026-03-02T01:00:00Z\n" +
+		"cover: cover.png # the photo\ntags: [Blog, Kite, Notes]\n---\n\nBody.\n"
+
+	for _, tc := range []struct {
+		name, term, to, want string
+	}{
+		{"rename keeps the order", "Blog", "Journal", "tags: [Journal, Kite, Notes]"},
+		{"merge keeps one copy", "Blog", "Kite", "tags: [Kite, Notes]"},
+		{"remove", "Kite", "", "tags: [Blog, Notes]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, types, w := newTestProject(t)
+			writeFile(t, root, "content/posts/a/index.md", doc)
+			scan, err := NewScanner(root, types).Scan()
+			if err != nil {
+				t.Fatal(err)
+			}
+			e := scan.Entries[0]
+
+			res, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.ChangeTerm{
+				ID: e.Item.ID, IfRevision: e.Hash, Taxonomy: "tags", Term: tc.term, To: tc.to,
+			}}})
+			if err != nil {
+				t.Fatalf("Apply: %v", err)
+			}
+			if !slices.Equal(res.Written, []string{"content/posts/a/index.md"}) {
+				t.Errorf("Written = %v", res.Written)
+			}
+			got := readFile(t, root, "content/posts/a/index.md")
+			if want := strings.Replace(doc, "tags: [Blog, Kite, Notes]", tc.want, 1); got != want {
+				t.Errorf("file = %q\nwant %q", got, want)
+			}
+		})
+	}
+}
+
+func TestChangingATermKeepsTheRestOfTheItem(t *testing.T) {
+	root, types, w := newTestProject(t)
+	writeFile(t, root, "content/posts/a/index.md", "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZAAA\ntitle: A\nslug: a\n"+
+		"updated_at: 2026-01-01T00:00:00Z\ndeleted_at: 2026-02-01T00:00:00Z\ntags: Go\ncategories: [Tech]\n---\nbody\n")
+	scan, err := NewScanner(root, types).Scan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := scan.Entries[0]
+	w.now = func() time.Time { return time.Date(2026, 9, 25, 8, 0, 0, 0, time.UTC) }
+
+	if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.ChangeTerm{
+		ID: e.Item.ID, IfRevision: e.Hash, Taxonomy: "tags", Term: "Go",
+	}}}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	got := readFile(t, root, "content/posts/a/index.md")
+	for _, want := range []string{"updated_at: 2026-09-25T08:00:00Z", "deleted_at: 2026-02-01T00:00:00Z", "categories: [Tech]"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("file lost %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "tags") {
+		t.Errorf("the emptied list kept its key:\n%s", got)
+	}
+
+	_, err = w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.ChangeTerm{
+		ID: e.Item.ID, Taxonomy: "series", Term: "x",
+	}}})
+	if !errors.Is(err, content.ErrInvalid) {
+		t.Errorf("a taxonomy the kind lacks: err = %v, want ErrInvalid", err)
+	}
+}
+
 func TestDuplicateIDIsHardError(t *testing.T) {
 	root, types, _ := newTestProject(t)
 	const fm = "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZABC\ntitle: A\nslug: %s\n---\nbody\n"

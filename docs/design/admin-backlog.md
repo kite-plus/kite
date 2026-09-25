@@ -34,7 +34,7 @@
 |---|---|---|---|
 | B01 | P1 | **管理文章附件。** 在编辑器列出当前 bundle 文件，支持复制链接、替换、删除，并提示正文或封面仍在引用的文件。全站附件库按路线图放到 v1.5；先让作者能处理自己上传的文件。 | 已有上传和删除 API：`internal/api/media.go`；缺列表 API 与页面：`web/src/components/editor/EditorAside.tsx` |
 | B02 | P2 | **已完成。** 状态、搜索词、排序、分类/标签和每页条数都写在地址里，刷新或复制地址后复现同一列表；游标不进地址，刷新后回到第一页。 | `web/src/features/contents/search.ts`、`web/src/features/contents/index.tsx` |
-| B03 | P2 | **分类与标签批量整理。** 保持“词条从内容派生”的模型，提供词条重命名/合并预览：先列出受影响内容和将修改的文件，再走有冲突保护的批量写入。 | `web/src/features/terms/index.tsx` 只读；`internal/api/meta.go` 只提供聚合读取 |
+| B03 | P2 | **已完成。** 词条仍从内容派生。分类、标签页的卡片菜单可以重命名、合并（改成已有的名称即合并，同时带两者的内容只留一个）和删除（从内容上去掉，内容本身保留）。确认框先列出受影响的内容（含回收站里的），`GET /taxonomies/{taxonomy}/terms/{term}` 的 ETag 指纹覆盖这些内容及其版本；改名（PUT）或删除（DELETE）时带回 If-Match，期间有内容变化就整体拒绝（409）。写入是一个 ChangeSet，每篇一个只改该分类法那一行的 `ChangeTerm`；文件存储在写之前核对整组版本，冲突时一个文件都不动。 | `internal/api/terms.go`、`internal/store/file/writer.go`、`web/src/features/terms/` |
 | B04 | P2 | **补齐内置主题字段的中文说明。** 后台切为中文时，`default` 主题的字段名与帮助文本仍显示英文；为内置主题提供双语文案，第三方主题在没有译文时回退原文。 | 本地 `/admin/settings/theme` 观察；`web/src/components/SchemaForm.tsx` 直接使用 schema 的 `label/help` |
 | B05 | P2 | **为核心后台流程建立浏览器回归测试。** 覆盖新建/保存、保存中继续输入、冲突、筛选与翻页、上传、删除部分成功、设置并发、发布拒绝与 401。测试站点使用临时目录和本地 Git 仓库，不操作真实 `website`。 | `web/package.json` 只有 `lint`/`build`；CI 的 web job 只做类型检查、构建和 schema 对比 |
 | B06 | P2 | **完善账号自助维护。** 单账号登录已可用，修改密码仅有 CLI 命令；决定是否需要在后台提供当前密码验证、修改密码、会话管理。验收前先补 API 与安全测试。 | `internal/cli/auth_cmd.go`；`internal/api/auth.go` 只有 session/login/logout |

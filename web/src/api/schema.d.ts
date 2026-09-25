@@ -316,6 +316,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/taxonomies/{taxonomy}/terms/{term}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one term with every item that carries it, trashed ones included. */
+        get: operations["getTerm"];
+        /** Rename a term on every item that carries it, merging it into another term when the new name is already in use. */
+        put: operations["renameTerm"];
+        post?: never;
+        /** Take a term off every item that carries it. The items stay. */
+        delete: operations["removeTerm"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -605,6 +624,38 @@ export interface components {
             items: components["schemas"]["TermCount"][];
             next_cursor?: string;
             total?: number;
+        };
+        TermDetail: {
+            count: number;
+            items: components["schemas"]["TermItem"][];
+            term: string;
+            url: string;
+        };
+        TermItem: {
+            /** Format: date-time */
+            created_at: string;
+            excerpt?: string;
+            id: string;
+            kind: string;
+            locale?: string;
+            locator?: string;
+            pinned?: boolean;
+            /** Format: date-time */
+            published_at?: string;
+            revision: string;
+            slug: string;
+            status: string;
+            taxonomies?: {
+                [key: string]: string[];
+            };
+            title: string;
+            trashed?: boolean;
+            /** Format: date-time */
+            updated_at: string;
+            url: string;
+        };
+        TermRename: {
+            name: string;
         };
         ThemeSettings: {
             name: string;
@@ -1997,6 +2048,218 @@ export interface operations {
             };
             /** @description Failed. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    getTerm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taxonomy: string;
+                term: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The term and its items. ETag fingerprints them for a rename or removal. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDetail"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    renameTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The revision this edit was made against, as returned in ETag. Required: without it a save would overwrite whatever is there. */
+                "If-Match": string;
+            };
+            path: {
+                taxonomy: string;
+                term: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TermRename"];
+            };
+        };
+        responses: {
+            /** @description The term under its new name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDetail"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    removeTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The revision this edit was made against, as returned in ETag. Required: without it a save would overwrite whatever is there. */
+                "If-Match": string;
+            };
+            path: {
+                taxonomy: string;
+                term: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Taken off every item. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };

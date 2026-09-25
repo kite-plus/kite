@@ -151,6 +151,32 @@ type Taxonomy struct {
 	URL   string `json:"url"`
 }
 
+// TermDetail is one term with every item that carries it: what renaming or
+// removing the term would change.
+type TermDetail struct {
+	Term string `json:"term"`
+	// Count is how many items outside the trash carry the term, as the term
+	// list counts it.
+	Count int    `json:"count"`
+	URL   string `json:"url"`
+	// Items lists every item carrying the term, trashed ones included and
+	// marked: a change to the term reaches them too, so that restoring one
+	// does not bring back a term that was renamed or removed.
+	Items []TermItem `json:"items"`
+}
+
+// TermItem is one item that carries a term.
+type TermItem struct {
+	Summary
+	Trashed bool `json:"trashed,omitempty"`
+}
+
+// TermRename is the request that renames a term.
+type TermRename struct {
+	// Name is the term's new name. Naming a term that exists merges the two.
+	Name string `json:"name"`
+}
+
 // summaryOf projects a domain summary onto the wire.
 func summaryOf(s content.Summary, r *url.Resolver) Summary {
 	out := Summary{

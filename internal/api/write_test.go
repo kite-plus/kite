@@ -432,6 +432,8 @@ func TestAReadOnlyServerRefusesEveryWrite(t *testing.T) {
 		{http.MethodPost, api.Prefix + "/contents", api.Draft{Kind: "post", Title: "x", Status: "draft"}},
 		{http.MethodPut, api.Prefix + "/contents/" + id, api.Draft{Kind: "post", Title: "x", Status: "draft"}},
 		{http.MethodDelete, api.Prefix + "/contents/" + id, nil},
+		{http.MethodPut, api.Prefix + "/taxonomies/tags/terms/Go", api.TermRename{Name: "Golang"}},
+		{http.MethodDelete, api.Prefix + "/taxonomies/tags/terms/Go", nil},
 	} {
 		rec := send(t, h, tc.method, tc.path, tc.body, map[string]string{"If-Match": `"whatever"`})
 		if rec.Code != http.StatusMethodNotAllowed {

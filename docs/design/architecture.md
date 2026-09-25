@@ -394,6 +394,8 @@ type ChangeSet struct {
 
 **没有 `UpdateTitle`，没有 `SetTags`。**
 
+（后来加的 `ChangeTerm` 是 ChangeSet 里的一种 op，不是 Writer 上的方法：给一个词条改名或删除时，每篇内容各一个 op，只改该分类法那一行，下面五件事照样成立。）
+
 理由：ChangeSet 同时是——
 
 - Git 的 **commit 单元**

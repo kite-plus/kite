@@ -75,6 +75,9 @@ func (w *Writer) Apply(ctx context.Context, cs content.ChangeSet) (content.Resul
 	if err != nil {
 		return res, err
 	}
+	if err := w.precheck(cs, located); err != nil {
+		return res, err
+	}
 
 	for _, op := range cs.Ops {
 		if err := ctx.Err(); err != nil {
@@ -95,6 +98,8 @@ func (w *Writer) Apply(ctx context.Context, cs content.ChangeSet) (content.Resul
 			err = w.deleteMedia(o, located, &res)
 		case content.PutSettings:
 			err = w.putSettings(o, &res)
+		case content.ChangeTerm:
+			err = w.changeTerm(o, located, &res)
 		default:
 			err = fmt.Errorf("file store: unsupported operation %q", op.Kind())
 		}
@@ -103,6 +108,47 @@ func (w *Writer) Apply(ctx context.Context, cs content.ChangeSet) (content.Resul
 		}
 	}
 	return res, nil
+}
+
+// precheck compares every revision a set names with the file on disk before
+// anything is written, so a set that would conflict partway through, such as
+// a term renamed across many items, leaves every file as it was rather than
+// half changed. Each operation still checks its own revision as it runs.
+func (w *Writer) precheck(cs content.ChangeSet, located map[content.ID]*Entry) error {
+	checked := make(map[content.ID]bool)
+	for _, op := range cs.Ops {
+		var id content.ID
+		var want content.Revision
+		switch o := op.(type) {
+		case content.PutContent:
+			if o.Content != nil {
+				id, want = o.Content.ID, o.IfRevision
+			}
+		case content.DeleteContent:
+			id, want = o.ID, o.IfRevision
+		case content.RestoreContent:
+			id, want = o.ID, o.IfRevision
+		case content.ChangeTerm:
+			id, want = o.ID, o.IfRevision
+		}
+		// Only the first operation on an item can be checked here: a later
+		// one meets the file the earlier one writes.
+		if id == "" || want == "" || checked[id] {
+			continue
+		}
+		checked[id] = true
+
+		e, ok := located[id]
+		if !ok || e.Hash == want {
+			continue // a missing item is the operation's own error to report
+		}
+		current, err := os.ReadFile(abs(w.root, e.Path))
+		if err != nil {
+			return fmt.Errorf("file store: read %s: %w", e.Path, err)
+		}
+		return checkRevision(id, want, RevisionOf(current), current)
+	}
+	return nil
 }
 
 // locate indexes the current tree by ID.
@@ -197,6 +243,37 @@ func (w *Writer) stamp(item *content.Content, current []byte) {
 	if w.codec.Declares(current, keyUpdatedAt) {
 		item.UpdatedAt = now
 	}
+}
+
+// changeTerm rewrites the one taxonomy key of an item's file that holds the
+// term. updated_at moves along where the file keeps one, as any edit moves it.
+func (w *Writer) changeTerm(op content.ChangeTerm, located map[content.ID]*Entry, res *content.Result) error {
+	e, ok := located[op.ID]
+	if !ok {
+		return fmt.Errorf("%w: %s", content.ErrNotFound, op.ID)
+	}
+	if !slices.Contains(e.Type.Taxonomies, op.Taxonomy) {
+		return fmt.Errorf("%w: %s items have no taxonomy %q", content.ErrInvalid, e.Type.Kind, op.Taxonomy)
+	}
+	current, err := os.ReadFile(abs(w.root, e.Path))
+	if err != nil {
+		return fmt.Errorf("file store: read %s: %w", e.Path, err)
+	}
+	if err := checkRevision(op.ID, op.IfRevision, RevisionOf(current), current); err != nil {
+		return err
+	}
+
+	data, err := w.codec.ChangeTerm(current, op.Taxonomy, op.Term, op.To, w.now())
+	if err != nil {
+		return fmt.Errorf("%s: %w", e.Path, err)
+	}
+	if err := w.write(e.Path, data); err != nil {
+		return err
+	}
+	res.Revision = RevisionOf(data)
+	res.IDs = append(res.IDs, op.ID)
+	appendUnique(&res.Written, e.Path)
+	return nil
 }
 
 func (w *Writer) deleteContent(op content.DeleteContent, located map[content.ID]*Entry, res *content.Result) error {

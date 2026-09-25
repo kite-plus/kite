@@ -395,6 +395,36 @@ func openAPI() *document {
 				Parameters:  append([]parameter{pathParam("taxonomy")}, listParameters()...),
 				Responses:   ok(ref(List[TermCount]{}), "Term counts, most used first.", "400", "404"),
 			}},
+			"/taxonomies/{taxonomy}/terms/{term}": {
+				Get: &operation{
+					OperationID: "getTerm",
+					Summary:     "Read one term with every item that carries it, trashed ones included.",
+					Parameters:  []parameter{pathParam("taxonomy"), pathParam("term")},
+					Responses: ok(ref(TermDetail{}),
+						"The term and its items. ETag fingerprints them for a rename or removal.", "404"),
+				},
+				Put: &operation{
+					OperationID: "renameTerm",
+					Summary: "Rename a term on every item that carries it, merging it into " +
+						"another term when the new name is already in use.",
+					Parameters:  []parameter{pathParam("taxonomy"), pathParam("term"), ifMatch(true)},
+					RequestBody: body(ref(TermRename{})),
+					Responses: ok(ref(TermDetail{}), "The term under its new name.",
+						"400", "404", "405", "409", "428"),
+				},
+				Delete: &operation{
+					OperationID: "removeTerm",
+					Summary:     "Take a term off every item that carries it. The items stay.",
+					Parameters:  []parameter{pathParam("taxonomy"), pathParam("term"), ifMatch(true)},
+					Responses: map[string]response{
+						"204": {Description: "Taken off every item."},
+						"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+						"405": {Description: "Failed.", Content: jsonOf(errorRef)},
+						"409": {Description: "Failed.", Content: jsonOf(errorRef)},
+						"428": {Description: "Failed.", Content: jsonOf(errorRef)},
+					},
+				},
+			},
 		},
 		Components: components{
 			Schemas: schemas,

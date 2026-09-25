@@ -211,6 +211,48 @@ func (c *Codec) Encode(t *content.Type, item *content.Content, existing []byte) 
 	return doc.Bytes()
 }
 
+// ChangeTerm renames one term in a file's list for a taxonomy, or takes it
+// out when to is empty, keeping the list's order and a single copy of to.
+// No other key changes but updated_at, which moves to now where the file
+// keeps one; a list left empty takes its key out of the file.
+func (c *Codec) ChangeTerm(existing []byte, taxonomy, term, to string, now time.Time) ([]byte, error) {
+	doc, err := frontmatter.Parse(existing)
+	if err != nil {
+		return nil, err
+	}
+
+	terms := doc.StringSlice(taxonomy)
+	if len(terms) == 0 {
+		if s := doc.String(taxonomy); s != "" {
+			terms = []string{s}
+		}
+	}
+	next := make([]string, 0, len(terms))
+	for _, t := range terms {
+		if t == term {
+			if to == "" {
+				continue
+			}
+			t = to
+		}
+		if !slices.Contains(next, t) {
+			next = append(next, t)
+		}
+	}
+	if len(next) == 0 {
+		doc.Delete(taxonomy)
+	} else if err := doc.Set(taxonomy, next); err != nil {
+		return nil, err
+	}
+
+	if _, ok := doc.Get(keyUpdatedAt); ok {
+		if err := doc.Set(keyUpdatedAt, now.UTC().Truncate(time.Second)); err != nil {
+			return nil, err
+		}
+	}
+	return doc.Bytes()
+}
+
 // layoutBody lays a body out the way a hand keeps a markdown file: a blank
 // line after the front matter and a newline at the end. The blank lines are
 // the file's, not the body's; Decode takes them off again, so a body that
