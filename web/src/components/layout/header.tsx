@@ -26,7 +26,8 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
   return (
     <header
       className={cn(
-        'z-50 h-16',
+        // Kite: a white bar over the gray canvas, rounded with an inset rail.
+        'z-50 h-16 border-b bg-background md:group-has-data-[variant=inset]/sidebar-wrapper:rounded-t-xl',
         fixed && 'header-fixed peer/header sticky top-0 w-[inherit]',
         offset > 10 && fixed ? 'shadow' : 'shadow-none',
         className

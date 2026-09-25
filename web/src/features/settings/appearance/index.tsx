@@ -12,18 +12,18 @@ import { ContentSection } from "../components/content-section";
 
 function LightPreview() {
   return (
-    <div className="space-y-2 rounded-sm bg-[#ecedef] p-2">
+    <div className="space-y-2 rounded-sm bg-[#f5f5f5] p-2">
       <div className="space-y-2 rounded-md bg-white p-2 shadow-xs">
-        <div className="h-2 w-20 rounded-lg bg-[#ecedef]" />
-        <div className="h-2 w-25 rounded-lg bg-[#ecedef]" />
+        <div className="h-2 w-20 rounded-lg bg-[#e5e7eb]" />
+        <div className="h-2 w-25 rounded-lg bg-[#e5e7eb]" />
       </div>
       <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-xs">
-        <div className="h-4 w-4 rounded-full bg-[#ecedef]" />
-        <div className="h-2 w-25 rounded-lg bg-[#ecedef]" />
+        <div className="h-4 w-4 rounded-full bg-[#e5e7eb]" />
+        <div className="h-2 w-25 rounded-lg bg-[#e5e7eb]" />
       </div>
       <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-xs">
-        <div className="h-4 w-4 rounded-full bg-[#ecedef]" />
-        <div className="h-2 w-25 rounded-lg bg-[#ecedef]" />
+        <div className="h-4 w-4 rounded-full bg-[#e5e7eb]" />
+        <div className="h-2 w-25 rounded-lg bg-[#e5e7eb]" />
       </div>
     </div>
   );
@@ -31,18 +31,18 @@ function LightPreview() {
 
 function DarkPreview() {
   return (
-    <div className="space-y-2 rounded-sm bg-slate-950 p-2">
-      <div className="space-y-2 rounded-md bg-slate-800 p-2 shadow-xs">
-        <div className="h-2 w-20 rounded-lg bg-slate-400" />
-        <div className="h-2 w-25 rounded-lg bg-slate-400" />
+    <div className="space-y-2 rounded-sm bg-[#0f1013] p-2">
+      <div className="space-y-2 rounded-md bg-[#17181c] p-2 shadow-xs">
+        <div className="h-2 w-20 rounded-lg bg-[#6b7280]" />
+        <div className="h-2 w-25 rounded-lg bg-[#6b7280]" />
       </div>
-      <div className="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-xs">
-        <div className="h-4 w-4 rounded-full bg-slate-400" />
-        <div className="h-2 w-25 rounded-lg bg-slate-400" />
+      <div className="flex items-center space-x-2 rounded-md bg-[#17181c] p-2 shadow-xs">
+        <div className="h-4 w-4 rounded-full bg-[#6b7280]" />
+        <div className="h-2 w-25 rounded-lg bg-[#6b7280]" />
       </div>
-      <div className="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-xs">
-        <div className="h-4 w-4 rounded-full bg-slate-400" />
-        <div className="h-2 w-25 rounded-lg bg-slate-400" />
+      <div className="flex items-center space-x-2 rounded-md bg-[#17181c] p-2 shadow-xs">
+        <div className="h-4 w-4 rounded-full bg-[#6b7280]" />
+        <div className="h-2 w-25 rounded-lg bg-[#6b7280]" />
       </div>
     </div>
   );

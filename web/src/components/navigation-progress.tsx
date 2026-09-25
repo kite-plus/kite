@@ -16,7 +16,8 @@ export function NavigationProgress() {
 
   return (
     <LoadingBar
-      color='var(--muted-foreground)'
+      // Kite: the accent blue, like the rest of the studio's highlights.
+      color='var(--primary)'
       ref={ref}
       shadow={true}
       height={2}

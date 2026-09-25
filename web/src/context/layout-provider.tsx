@@ -10,7 +10,8 @@ const LAYOUT_VARIANT_COOKIE_NAME = 'layout_variant'
 const LAYOUT_COOKIE_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
 
 // Default values
-const DEFAULT_VARIANT = 'inset'
+// Kite: a full-height rail beside the canvas, as in Halo's console.
+const DEFAULT_VARIANT = 'sidebar'
 const DEFAULT_COLLAPSIBLE = 'icon'
 
 type LayoutContextType = {

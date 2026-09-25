@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import {
   Collapsible,
   CollapsibleContent,
@@ -62,21 +63,35 @@ function NavBadge({ children }: { children: ReactNode }) {
   return <Badge className='rounded-full px-1 py-0 text-xs'>{children}</Badge>
 }
 
+/**
+ * Kite: ActiveBar marks the current page with a short bar at the item's
+ * start, as Halo's console marks its menu.
+ */
+function ActiveBar({ className }: { className: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'pointer-events-none absolute top-1/2 w-[3px] -translate-y-1/2 rounded-full bg-primary',
+        className
+      )}
+    />
+  )
+}
+
 function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
   const { setOpenMobile } = useSidebar()
+  const active = checkIsActive(href, item)
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={checkIsActive(href, item)}
-        tooltip={item.title}
-      >
+      <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
         <Link to={item.url} onClick={() => setOpenMobile(false)}>
           {item.icon && <item.icon />}
           <span>{item.title}</span>
           {item.badge && <NavBadge>{item.badge}</NavBadge>}
         </Link>
       </SidebarMenuButton>
+      {active && <ActiveBar className='-start-1.5 h-5' />}
     </SidebarMenuItem>
   )
 }
@@ -106,20 +121,22 @@ function SidebarMenuCollapsible({
         </CollapsibleTrigger>
         <CollapsibleContent className='CollapsibleContent'>
           <SidebarMenuSub>
-            {item.items.map((subItem) => (
-              <SidebarMenuSubItem key={subItem.title}>
-                <SidebarMenuSubButton
-                  asChild
-                  isActive={checkIsActive(href, subItem)}
-                >
-                  <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
-                    {subItem.icon && <subItem.icon />}
-                    <span>{subItem.title}</span>
-                    {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
-                  </Link>
-                </SidebarMenuSubButton>
-              </SidebarMenuSubItem>
-            ))}
+            {item.items.map((subItem) => {
+              const active = checkIsActive(href, subItem)
+              return (
+                <SidebarMenuSubItem key={subItem.title}>
+                  <SidebarMenuSubButton asChild isActive={active}>
+                    <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
+                      {subItem.icon && <subItem.icon />}
+                      <span>{subItem.title}</span>
+                      {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
+                    </Link>
+                  </SidebarMenuSubButton>
+                  {/* Over the submenu's rule: its padding plus its 1px border. */}
+                  {active && <ActiveBar className='-start-3 h-4' />}
+                </SidebarMenuSubItem>
+              )
+            })}
           </SidebarMenuSub>
         </CollapsibleContent>
       </SidebarMenuItem>
