@@ -435,6 +435,51 @@
   z-index: 60;
 }
 
+// The grid a new table is sized on, from the toolbar's table button.
+.kite-table-size {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.25rem;
+}
+
+.kite-table-size-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+
+  span:last-child {
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.kite-table-size-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1.125rem);
+  gap: 3px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px color-mix(in oklab, var(--ring) 50%, transparent);
+  }
+
+  span {
+    aspect-ratio: 1;
+    border: 1px solid var(--input);
+    border-radius: 3px;
+    background-color: var(--background);
+  }
+
+  span[data-on] {
+    border-color: var(--primary);
+    background-color: color-mix(in oklab, var(--primary) 18%, var(--background));
+  }
+}
+
 .tiptap-card.kite-slash {
   align-items: stretch;
   width: 15rem;
