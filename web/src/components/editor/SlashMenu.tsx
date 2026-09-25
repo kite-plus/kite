@@ -25,6 +25,9 @@ interface Options {
   empty: () => string;
 }
 
+/** slashKey reads whether the menu is open, when a key it uses may mean something else. */
+export const slashKey = new PluginKey("slash");
+
 function matches(item: SlashItem, query: string): boolean {
   const q = query.toLowerCase();
   return `${item.label} ${item.keywords ?? ""}`.toLowerCase().includes(q);
@@ -47,7 +50,7 @@ export const Slash = Extension.create<Options>({
     return [
       Suggestion<SlashItem, SlashItem>({
         editor: this.editor,
-        pluginKey: new PluginKey("slash"),
+        pluginKey: slashKey,
         char: "/",
         allowSpaces: false,
         startOfLine: false,

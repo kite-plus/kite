@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
+import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 
 import { extensions, type Env } from "@/components/editor/extensions";
 import { ImageBubble } from "@/components/editor/ImageBubble";
-import type { SlashItem } from "@/components/editor/SlashMenu";
+import { slashKey, type SlashItem } from "@/components/editor/SlashMenu";
 import type { UploadFunction } from "@/components/tiptap-node/image-upload-node";
 
 import "@/components/tiptap-node/blockquote-node/blockquote-node.scss";
@@ -27,6 +28,8 @@ interface Props {
   upload: UploadFunction;
   /** onUploadError hears of a file refused before it was sent, too large or one too many. */
   onUploadError: (message: string) => void;
+  /** onExitTop is up from the first line, which leaves the body for what is above it. */
+  onExitTop?: () => void;
   onReady?: (editor: Editor | null) => void;
 }
 
@@ -50,11 +53,13 @@ export function RichEditor({
   labels,
   upload,
   onUploadError,
+  onExitTop,
   onReady,
 }: Props) {
   // Read through a ref so the extensions, built once, always see the latest.
-  const latest = useRef({ placeholder, base, slash, labels, upload, onUploadError, onChange, onReady });
-  latest.current = { placeholder, base, slash, labels, upload, onUploadError, onChange, onReady };
+  const current = { placeholder, base, slash, labels, upload, onUploadError, onChange, onExitTop, onReady };
+  const latest = useRef(current);
+  latest.current = current;
 
   const instance = useRef<Editor | null>(null);
   // The last markdown handed out, which is what a value prop is compared against.
@@ -101,6 +106,18 @@ export function RichEditor({
         if (moved || files.length === 0) return false;
         event.preventDefault();
         insert(files, view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos);
+        return true;
+      },
+      handleKeyDown: (view, event) => {
+        const { onExitTop } = latest.current;
+        if (!onExitTop || event.key !== "ArrowUp") return false;
+        if (event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return false;
+        // The menu a "/" opened moves through its items with the same key.
+        const { selection, doc } = view.state;
+        if (!selection.empty || slashKey.getState(view.state)?.active) return false;
+        const first = selection.$from.parent === Selection.atStart(doc).$from.parent;
+        if (!first || !view.endOfTextblock("up")) return false;
+        onExitTop();
         return true;
       },
       handlePaste: (_view, event) => {

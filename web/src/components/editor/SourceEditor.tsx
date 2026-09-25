@@ -17,6 +17,8 @@ interface Props {
   onChange: (value: string) => void;
   placeholder?: string;
   onDropFiles?: (files: File[]) => void;
+  /** onExitTop is up from the first line, which leaves the text for what is above it. */
+  onExitTop?: () => void;
   onReady?: (handle: SourceHandle | null) => void;
 }
 
@@ -60,7 +62,7 @@ const theme = EditorView.theme({
  * It formats nothing on the author's behalf: this is where footnotes, raw
  * html and anything else the visual editor cannot hold are edited by hand.
  */
-export function SourceEditor({ value, onChange, placeholder, onDropFiles, onReady }: Props) {
+export function SourceEditor({ value, onChange, placeholder, onDropFiles, onExitTop, onReady }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView>(null);
 
@@ -69,6 +71,8 @@ export function SourceEditor({ value, onChange, placeholder, onDropFiles, onRead
   emit.current = onChange;
   const ready = useRef(onReady);
   ready.current = onReady;
+  const exitTop = useRef(onExitTop);
+  exitTop.current = onExitTop;
   // The last text handed out, which is what a value prop is compared against.
   const emitted = useRef(value);
 
@@ -81,7 +85,21 @@ export function SourceEditor({ value, onChange, placeholder, onDropFiles, onRead
         doc: value,
         extensions: [
           history(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
+          keymap.of([
+            {
+              key: "ArrowUp",
+              // Only from the first line as drawn: a long first line wraps.
+              run: (view) => {
+                const { main } = view.state.selection;
+                if (!exitTop.current || !main.empty) return false;
+                if (view.moveToLineBoundary(main, false).head !== 0) return false;
+                exitTop.current();
+                return true;
+              },
+            },
+            ...defaultKeymap,
+            ...historyKeymap,
+          ]),
           markdown(),
           syntaxHighlighting(highlight),
           placeholderText(placeholder ?? ""),

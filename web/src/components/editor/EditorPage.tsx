@@ -97,6 +97,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   // one editor is torn down and the other comes up.
   const [rich, setRich] = useState<Editor | null>(null);
   const source = useRef<SourceHandle | null>(null);
+  const title = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const dirty = useRef(false);
   dirty.current = item.dirty;
@@ -346,6 +347,11 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     if (rich) rich.commands.focus("start");
     else source.current?.focus();
   };
+  const focusTitle = () => {
+    const field = title.current;
+    field?.focus();
+    field?.setSelectionRange(field.value.length, field.value.length);
+  };
 
   const aside = (
     <EditorAside
@@ -484,6 +490,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             <div className="kite-editor-page">
               {/* A textarea so a long title wraps; it still holds one line of text. */}
               <textarea
+                ref={title}
                 rows={1}
                 autoFocus={!id}
                 value={draft.title}
@@ -492,7 +499,13 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                   // While an input method composes, Enter and the arrows pick
                   // its candidates.
                   if (composing(event)) return;
-                  if (event.key === "Enter") {
+                  const field = event.currentTarget;
+                  // Down leaves from the end of the title, as up comes back
+                  // from the first line of the body.
+                  const atEnd =
+                    field.selectionStart === field.value.length &&
+                    field.selectionEnd === field.value.length;
+                  if (event.key === "Enter" || (event.key === "ArrowDown" && atEnd && !event.shiftKey)) {
                     event.preventDefault();
                     focusBody();
                   }
@@ -515,6 +528,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                   }}
                   upload={upload}
                   onUploadError={setUploadError}
+                  onExitTop={focusTitle}
                   onReady={setRich}
                 />
               ) : (
@@ -523,6 +537,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                   onChange={(body) => item.edit({ body })}
                   placeholder={t("editor.bodyPlaceholder")}
                   onDropFiles={attach}
+                  onExitTop={focusTitle}
                   onReady={(handle) => {
                     source.current = handle;
                   }}
