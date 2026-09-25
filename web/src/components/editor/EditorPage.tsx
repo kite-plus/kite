@@ -35,6 +35,7 @@ import {
 } from "@/components/editor/markdown";
 import { Preview } from "@/components/editor/Preview";
 import { RichEditor } from "@/components/editor/RichEditor";
+import { renderedBlocks, useScrollSync } from "@/components/editor/scrollSync";
 import type { SlashItem } from "@/components/editor/SlashMenu";
 import { SourceEditor, type SourceHandle } from "@/components/editor/SourceEditor";
 import { BlockquoteIcon } from "@/components/tiptap-icons/blockquote-icon";
@@ -98,6 +99,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const [rich, setRich] = useState<Editor | null>(null);
   const source = useRef<SourceHandle | null>(null);
   const title = useRef<HTMLTextAreaElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const dirty = useRef(false);
   dirty.current = item.dirty;
@@ -108,6 +110,10 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const draft = item.draft;
   useDocumentTitle(draft ? draft.title || t("editor.untitled") : undefined);
   const words = useWordCount(draft, id);
+  // The preview follows the text as it scrolls, and the text the preview.
+  const followPreview = useScrollSync(preview, scroller, () =>
+    rich ? renderedBlocks(rich.view.dom) : (source.current?.blocks() ?? []),
+  );
   const type = types.data?.items.find((entry) => entry.kind === (draft?.kind ?? kind));
 
   // A document that uses what the visual editor would damage opens as
@@ -486,7 +492,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             </div>
           )}
 
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div ref={scroller} className="min-h-0 flex-1 overflow-auto">
             <div className="kite-editor-page">
               {/* A textarea so a long title wraps; it still holds one line of text. */}
               <textarea
@@ -564,6 +570,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
               base={item.base?.url}
               live={item.base?.status === "published" ? item.base.url : undefined}
               onClose={() => setPreview(false)}
+              onFrame={followPreview}
             />
           </div>
         )}

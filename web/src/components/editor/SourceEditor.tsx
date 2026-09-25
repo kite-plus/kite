@@ -6,10 +6,14 @@ import { markdown } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 
+import { sourceBlocks, type Block } from "@/components/editor/scrollSync";
+
 /** What the page can ask of the source view. */
 export interface SourceHandle {
   insert: (text: string) => void;
   focus: () => void;
+  /** blocks is where the markdown's blocks are, for the preview to follow. */
+  blocks: () => Block[];
 }
 
 interface Props {
@@ -122,6 +126,7 @@ export function SourceEditor({ value, onChange, placeholder, onDropFiles, onExit
         editor.focus();
       },
       focus: () => editor.focus(),
+      blocks: () => sourceBlocks(editor),
     });
 
     return () => {

@@ -16,6 +16,8 @@ interface Props {
   /** live is the page the site serves for the saved item, when it serves one. */
   live?: string;
   onClose: () => void;
+  /** onFrame hears of the frame each time a page has been written into it. */
+  onFrame?: (frame: HTMLIFrameElement) => void;
 }
 
 type Width = "desktop" | "phone";
@@ -39,12 +41,14 @@ function preferredWidth(): Width {
  * match the site" would be a complaint with no end. What is shown here is the
  * page the build would write.
  */
-export function Preview({ draft, id, base, live, onClose }: Props) {
+export function Preview({ draft, id, base, live, onClose, onFrame }: Props) {
   const { t } = useI18n();
   const [html, setHtml] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
   const [width, setWidth] = useState<Width>(preferredWidth);
   const frame = useRef<HTMLIFrameElement>(null);
+  const written = useRef(onFrame);
+  written.current = onFrame;
 
   const chooseWidth = (next: Width) => {
     setWidth(next);
@@ -110,6 +114,7 @@ export function Preview({ draft, id, base, live, onClose }: Props) {
     doc.write(located);
     doc.close();
     doc.documentElement.scrollTop = scroll;
+    if (frame.current) written.current?.(frame.current);
   }, [html, base]);
 
   const phone = width === "phone";
