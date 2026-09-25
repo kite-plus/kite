@@ -108,6 +108,12 @@ type Summary struct {
 	// Pinned is the one field a listing reads from an item's metadata: an
 	// author who pins a post expects to see which one it is in a list.
 	Pinned bool
+
+	// ModifiedAt is when the item's source last changed on disk, for a list
+	// to show when the item declares no time of its own. It is the store's
+	// knowledge rather than the item's, and a build never reads it: output
+	// must not depend on when a file happened to be touched.
+	ModifiedAt time.Time
 }
 
 // Summarize projects a full item into a [Summary].

@@ -126,7 +126,8 @@ func (r *Reader) Query(ctx context.Context, q content.Query) (content.Page[conte
 	// Only a JSON true pins an item, which is what Summarize reads too.
 	sqlText := `SELECT id, kind, slug, title, status, locale, locator, revision, excerpt,
 		created_at, updated_at, published_at,
-		COALESCE(json_type(meta_json, '$.pinned') = 'true', 0)
+		COALESCE(json_type(meta_json, '$.pinned') = 'true', 0),
+		COALESCE((SELECT mtime_ns FROM files WHERE files.path = contents.path), 0)
 		FROM contents` + where + order + ` LIMIT ?`
 	rows, err := r.db.QueryContext(ctx, sqlText, append(args, q.Limit+1)...)
 	if err != nil {
@@ -137,15 +138,19 @@ func (r *Reader) Query(ctx context.Context, q content.Query) (content.Page[conte
 	var ids []string
 	for rows.Next() {
 		var s content.Summary
-		var createdAt, updatedAt int64
+		var createdAt, updatedAt, modifiedNS int64
 		var publishedAt sql.NullInt64
 		if err := rows.Scan(&s.ID, &s.Kind, &s.Slug, &s.Title, &s.Status, &s.Locale,
-			&s.Locator, &s.Revision, &s.Excerpt, &createdAt, &updatedAt, &publishedAt, &s.Pinned); err != nil {
+			&s.Locator, &s.Revision, &s.Excerpt, &createdAt, &updatedAt, &publishedAt, &s.Pinned,
+			&modifiedNS); err != nil {
 			return page, err
 		}
 		s.CreatedAt = fromUnix(createdAt)
 		s.UpdatedAt = fromUnix(updatedAt)
 		s.PublishedAt = fromNullUnix(publishedAt)
+		if modifiedNS > 0 {
+			s.ModifiedAt = time.Unix(0, modifiedNS).UTC()
+		}
 		page.Items = append(page.Items, s)
 		ids = append(ids, string(s.ID))
 	}

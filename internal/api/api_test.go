@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/render/theme"
@@ -445,6 +446,35 @@ func TestTaxonomyTermsAreCountedAndLinked(t *testing.T) {
 	}
 
 	get[api.ErrorBody](t, h, api.Prefix+"/taxonomies/nonsense/terms", http.StatusNotFound)
+}
+
+// A page written by hand often records no time at all. The list must not
+// invent one, and says when its file last changed instead.
+func TestAnItemThatRecordsNoTimeListsItsFileTime(t *testing.T) {
+	root := newProject(t, 1)
+	touched := time.Date(2026, 9, 20, 8, 30, 0, 0, time.UTC)
+	if err := os.Chtimes(filepath.Join(root, "content", "pages", "about.md"), touched, touched); err != nil {
+		t.Fatal(err)
+	}
+	h, _ := newServer(t, root)
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, api.Prefix+"/contents?kind=page", nil))
+	if strings.Contains(rec.Body.String(), "0001-01-01") {
+		t.Errorf("an unset time went out as the year 1:\n%s", rec.Body.String())
+	}
+
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=page", http.StatusOK)
+	if len(list.Items) != 1 {
+		t.Fatalf("pages = %d, want 1", len(list.Items))
+	}
+	page := list.Items[0]
+	if !page.UpdatedAt.IsZero() || !page.PublishedAt.IsZero() {
+		t.Errorf("the page records no time but got updated %v, published %v", page.UpdatedAt, page.PublishedAt)
+	}
+	if !page.ModifiedAt.Equal(touched) {
+		t.Errorf("modified_at = %v, want the file's %v", page.ModifiedAt, touched)
+	}
 }
 
 func TestSiteReportsWhatTheIndexRefused(t *testing.T) {

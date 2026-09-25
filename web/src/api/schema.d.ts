@@ -439,7 +439,7 @@ export interface components {
             body: string;
             body_format: string;
             /** Format: date-time */
-            created_at: string;
+            created_at?: string;
             /** Format: date-time */
             deleted_at?: string;
             excerpt?: string;
@@ -450,6 +450,8 @@ export interface components {
             meta?: {
                 [key: string]: unknown;
             };
+            /** Format: date-time */
+            modified_at?: string;
             pinned?: boolean;
             /** Format: date-time */
             published_at?: string;
@@ -461,7 +463,7 @@ export interface components {
             };
             title: string;
             /** Format: date-time */
-            updated_at: string;
+            updated_at?: string;
             url: string;
         };
         LayoutOption: {
@@ -577,12 +579,14 @@ export interface components {
         };
         Summary: {
             /** Format: date-time */
-            created_at: string;
+            created_at?: string;
             excerpt?: string;
             id: string;
             kind: string;
             locale?: string;
             locator?: string;
+            /** Format: date-time */
+            modified_at?: string;
             pinned?: boolean;
             /** Format: date-time */
             published_at?: string;
@@ -594,7 +598,7 @@ export interface components {
             };
             title: string;
             /** Format: date-time */
-            updated_at: string;
+            updated_at?: string;
             url: string;
         };
         SummaryList: {
@@ -633,12 +637,14 @@ export interface components {
         };
         TermItem: {
             /** Format: date-time */
-            created_at: string;
+            created_at?: string;
             excerpt?: string;
             id: string;
             kind: string;
             locale?: string;
             locator?: string;
+            /** Format: date-time */
+            modified_at?: string;
             pinned?: boolean;
             /** Format: date-time */
             published_at?: string;
@@ -651,7 +657,7 @@ export interface components {
             title: string;
             trashed?: boolean;
             /** Format: date-time */
-            updated_at: string;
+            updated_at?: string;
             url: string;
         };
         TermRename: {

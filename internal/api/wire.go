@@ -37,10 +37,16 @@ type Summary struct {
 	URL     string `json:"url"`
 	Locator string `json:"locator,omitempty"`
 
-	Revision    string    `json:"revision"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Revision string `json:"revision"`
+	// A time the item does not record is left out rather than sent as the
+	// year 1.
+	CreatedAt   time.Time `json:"created_at,omitzero"`
+	UpdatedAt   time.Time `json:"updated_at,omitzero"`
 	PublishedAt time.Time `json:"published_at,omitzero"`
+	// ModifiedAt is when the source file last changed, which a list can show
+	// for an item that records no time of its own. A single item leaves it
+	// out.
+	ModifiedAt time.Time `json:"modified_at,omitzero"`
 
 	// Pinned marks an item its author pinned, for a list to show as such.
 	Pinned bool `json:"pinned,omitempty"`
@@ -193,6 +199,7 @@ func summaryOf(s content.Summary, r *url.Resolver) Summary {
 		Revision:   string(s.Revision),
 		CreatedAt:  s.CreatedAt,
 		UpdatedAt:  s.UpdatedAt,
+		ModifiedAt: s.ModifiedAt,
 		Pinned:     s.Pinned,
 	}
 	if s.PublishedAt != nil {
