@@ -1149,3 +1149,54 @@ func TestOnlyAThemeThatCanBeUsedIsPreviewed(t *testing.T) {
 		t.Errorf("the theme in use: status = %d\n%s", rec.Code, rec.Body.String())
 	}
 }
+
+// What the site tells search engines, and its own code, reach the pages the
+// default theme draws, a page's own keywords stand in for the site's, and
+// dates are shown in the site's zone: a post published at midnight UTC on New
+// Year's Day was written on New Year's Eve in Los Angeles.
+func TestTheSitesOwnSettingsReachItsPages(t *testing.T) {
+	root := newProject(t, 2)
+	configured := strings.Replace(config, "  language: en\n", `  language: en
+  author: Ada
+  keywords: [books, 写作]
+  timezone: America/Los_Angeles
+  noindex: true
+  headHTML: '<meta name="verify" content="abc">'
+  footerHTML: '<script>count()</script>'
+`, 1)
+	if err := os.WriteFile(filepath.Join(root, "kite.yaml"), []byte(configured), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	colophon := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ901\ntitle: Colophon\nslug: colophon\nstatus: published\nkeywords: fonts, paper\n---\n\nHow this site is made.\n"
+	if err := os.WriteFile(filepath.Join(root, "content", "pages", "colophon.md"), []byte(colophon), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := newServer(t, root, serve.Options{})
+	page := func(path string) string {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET %s: status %d", path, rec.Code)
+		}
+		return rec.Body.String()
+	}
+
+	post := page("/posts/post-00/")
+	for _, want := range []string{
+		`<meta name="keywords" content="books,写作">`,
+		`<meta name="author" content="Ada">`,
+		`<meta name="robots" content="noindex, nofollow">`,
+		`<meta name="verify" content="abc">`,
+		`<script>count()</script>`,
+		"December 31, 2025",
+	} {
+		if !strings.Contains(post, want) {
+			t.Errorf("the post lacks %q", want)
+		}
+	}
+	if !strings.Contains(page("/colophon/"), `<meta name="keywords" content="fonts, paper">`) {
+		t.Error("a page's own keywords did not stand in for the site's")
+	}
+}

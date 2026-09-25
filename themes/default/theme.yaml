@@ -1,6 +1,6 @@
 name: default
 title: Kite Default
-version: 0.4.0
+version: 0.5.0
 apiVersion: kite/v1
 requires: ">=0.1.0 <2.0.0"
 description: The theme Kite ships with. Quiet serif typography for personal writing, dependency free, light and dark.

@@ -9,6 +9,18 @@
   {{- $description := .Site.Description }}
   {{- with .Page }}{{ with .Description }}{{ $description = . }}{{ end }}{{ end }}
   {{ with $description }}<meta name="description" content="{{ . }}">{{ end }}
+  {{- /* A page's own keywords, a list or a line, stand in for the site's. */ -}}
+  {{- $keywords := .Site.Keywords }}
+  {{- with .Page }}{{ with .Params.keywords }}{{ $keywords = . }}{{ end }}{{ end }}
+  {{- with $keywords }}
+  <meta name="keywords" content="{{ if eq (printf "%T" .) "string" }}{{ . }}{{ else }}{{ range $i, $k := . }}{{ if $i }},{{ end }}{{ $k }}{{ end }}{{ end }}">
+  {{- end }}
+  {{- with .Site.Author }}
+  <meta name="author" content="{{ . }}">
+  {{- end }}
+  {{- if .Site.NoIndex }}
+  <meta name="robots" content="noindex, nofollow">
+  {{- end }}
   <link rel="alternate" type="application/rss+xml" title="{{ .Site.Title }}" href="{{ url.Rel "rss.xml" }}">
   {{- with .Site.ThemeSettings.favicon }}
   <link rel="icon" href="{{ url.Rel . }}">
@@ -20,6 +32,7 @@
   <noscript><link rel="stylesheet" href="{{ . }}"></noscript>
   {{- end }}
   {{ block "head" . }}{{ end }}
+  {{ .Site.HeadHTML }}
 </head>
 <body>
   <a class="skip" href="#main">{{ partial "t.html" (dict "k" "skip" "lang" .Site.Language) }}</a>
@@ -27,5 +40,6 @@
   <main id="main">{{ block "main" . }}{{ end }}</main>
   {{ partial "footer.html" . }}
   {{ partial "theme-toggle.html" . }}
+  {{ .Site.FooterHTML }}
 </body>
 </html>
