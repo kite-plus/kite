@@ -66,6 +66,19 @@
     }
   }
 
+  // Beside the preview the column is narrow, and the tools draw closer
+  // together before any of them has to move into the More menu.
+  @container (max-width: 720px) {
+    .tiptap-separator[data-orientation="vertical"] {
+      margin: 0 3px;
+    }
+
+    .tiptap-button {
+      min-width: 30px;
+      padding: 0 6px;
+    }
+  }
+
   // The template docks the toolbar to the bottom of a phone screen, which
   // assumes it owns the page; here it stays under the header.
   @media (max-width: 480px) {
@@ -433,6 +446,15 @@
 
 .kite-slash-popup {
   z-index: 60;
+}
+
+// A shortcut, after a menu item's name.
+.kite-menu-keys {
+  margin-left: auto;
+  padding-left: 1.5rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
 }
 
 // The grid a new table is sized on, from the toolbar's table button.

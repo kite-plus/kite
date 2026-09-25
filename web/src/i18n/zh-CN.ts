@@ -331,6 +331,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "editor.deleteColumn": "删除这一列",
   "editor.deleteTable": "删除表格",
   "editor.divider": "分割线",
+  "editor.clearFormatting": "清除格式",
   "editor.slashHint": "输入 / 插入内容",
   "editor.slashEmpty": "没有匹配的内容",
   "editor.slash.style": "样式",

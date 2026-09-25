@@ -344,6 +344,7 @@ export const en = {
   "editor.deleteColumn": "Delete column",
   "editor.deleteTable": "Delete table",
   "editor.divider": "Divider",
+  "editor.clearFormatting": "Clear formatting",
   "editor.slashHint": "Type / for blocks",
   "editor.slashEmpty": "Nothing matches",
   "editor.slash.style": "Style",

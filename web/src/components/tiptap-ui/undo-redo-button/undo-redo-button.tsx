@@ -101,6 +101,8 @@ export const UndoRedoButton = forwardRef<
         tabIndex={-1}
         aria-label={label}
         tooltip={label}
+        // Kite: the tooltip names the shortcut, as the search button's does.
+        shortcutKeys={shortcutKeys}
         onClick={handleClick}
         {...buttonProps}
         ref={ref}
