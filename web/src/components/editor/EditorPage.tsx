@@ -13,6 +13,7 @@ import { useKindLabel } from "@/hooks/useKindLabel";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { canPublish, useDelivery, usePublish } from "@/hooks/usePublish";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
+import { useWordCount } from "@/hooks/useWordCount";
 import { isoDate } from "@/lib/dates";
 import { composing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,6 @@ import { ConflictDialog } from "@/components/editor/ConflictDialog";
 import { EditorAside } from "@/components/editor/EditorAside";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import {
-  countWords,
   losses,
   preferredMode,
   rememberMode,
@@ -107,6 +107,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
 
   const draft = item.draft;
   useDocumentTitle(draft ? draft.title || t("editor.untitled") : undefined);
+  const words = useWordCount(draft, id);
   const type = types.data?.items.find((entry) => entry.kind === (draft?.kind ?? kind));
 
   // A document that uses what the visual editor would damage opens as
@@ -334,7 +335,6 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
               : t("editor.notSaved");
   const settled = uploading === 0 && !saving && !item.dirty;
 
-  const words = countWords(draft.body);
   // A save from today reads as a time; an older one needs its date too.
   const stamp = (at: Date) =>
     at.toDateString() === new Date().toDateString()
@@ -548,8 +548,9 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
 
           <footer className="flex shrink-0 items-center justify-between gap-3 border-t px-4 py-1.5 text-xs text-muted-foreground">
             <span className="truncate">
-              {t("editor.words", { count: words, n: new Intl.NumberFormat(locale).format(words) })}
-              {" · Markdown"}
+              {words !== undefined &&
+                `${t("editor.words", { count: words, n: new Intl.NumberFormat(locale).format(words) })} · `}
+              Markdown
             </span>
             <span className="shrink-0">{lastSaved}</span>
           </footer>

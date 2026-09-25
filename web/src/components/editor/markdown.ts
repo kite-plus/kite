@@ -20,14 +20,6 @@ export function losses(body: string): Loss[] {
   return checks.filter(([, pattern]) => pattern.test(prose)).map(([name]) => name);
 }
 
-/** countWords counts a CJK character as a word, and a run of letters as one. */
-export function countWords(text: string): number {
-  const cjk = /[぀-ヿ㐀-鿿가-힯]/g;
-  const characters = text.match(cjk)?.length ?? 0;
-  const words = text.replace(cjk, " ").match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
-  return characters + words;
-}
-
 const modeKey = "kite:editor-mode";
 
 /** preferredMode is the mode last chosen in this browser. */
