@@ -7,6 +7,9 @@ import {
   type ReactNode,
 } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
+
+import { speak } from "@/api/client";
 import { en } from "./en";
 import { zhCN } from "./zh-CN";
 
@@ -68,18 +71,32 @@ interface Context {
 
 const I18nContext = createContext<Context | null>(null);
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(detect);
+// What a theme says about itself is fetched in the admin's language, so it
+// is fetched again when the language changes.
+const worded = [["themes"], ["theme"], ["settings"], ["content-types"]];
 
-  const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
-    document.documentElement.lang = next;
-    try {
-      localStorage.setItem(storageKey, next);
-    } catch {
-      // Remembering the choice is a convenience, not a requirement.
-    }
-  }, []);
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const client = useQueryClient();
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    const detected = detect();
+    speak(detected);
+    return detected;
+  });
+
+  const setLocale = useCallback(
+    (next: Locale) => {
+      speak(next);
+      setLocaleState(next);
+      document.documentElement.lang = next;
+      try {
+        localStorage.setItem(storageKey, next);
+      } catch {
+        // Remembering the choice is a convenience, not a requirement.
+      }
+      for (const queryKey of worded) void client.invalidateQueries({ queryKey });
+    },
+    [client],
+  );
 
   const value = useMemo<Context>(() => {
     const catalog = locales[locale].catalog as Record<string, string>;

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Clock, Trash2 } from "lucide-react";
 
 import type { components, ContentType, Draft } from "@/api/client";
-import { locales, useI18n, type Key } from "@/i18n";
+import { useI18n } from "@/i18n";
 import { STATUSES } from "@/hooks/useContents";
 import { useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { canPublish, type DeliveryState, type usePublish } from "@/hooks/usePublish";
@@ -30,18 +30,11 @@ type LayoutOption = components["schemas"]["LayoutOption"];
 const DEFAULT_LAYOUT = "@default";
 
 /**
- * layoutText is a layout's label and note as the operator reads them. The
- * built-in theme's are translated when they are its stock English words; a
- * theme's own are shown as it wrote them.
+ * layoutText is a layout's label and note, which the theme gives in the
+ * admin's language when its language pack has them.
  */
-function layoutText(layout: LayoutOption, t: (key: Key) => string) {
-  const stock = locales.en.catalog as Record<string, string>;
-  const translated = (key: string, text: string | undefined) =>
-    text !== undefined && stock[key] === text ? t(key as Key) : text;
-  return {
-    label: translated(`layout.${layout.name}`, layout.label) ?? layout.name,
-    note: translated(`layoutNote.${layout.name}`, layout.description),
-  };
+function layoutText(layout: LayoutOption) {
+  return { label: layout.label || layout.name, note: layout.description };
 }
 
 interface Props {
@@ -162,7 +155,7 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
                   <SelectItem value={DEFAULT_LAYOUT}>{t("editor.templateDefault")}</SelectItem>
                   {layouts.map((layout) => (
                     <SelectItem key={layout.name} value={layout.name}>
-                      {layoutText(layout, t).label}
+                      {layoutText(layout).label}
                     </SelectItem>
                   ))}
                   {chosen && !offered && <SelectItem value={chosen}>{chosen}</SelectItem>}
@@ -173,7 +166,7 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
               {chosen && !offered
                 ? t("editor.templateMissing", { name: chosen })
                 : offered
-                  ? layoutText(offered, t).note
+                  ? layoutText(offered).note
                   : t("editor.templateDefaultNote")}
             </p>
           </div>

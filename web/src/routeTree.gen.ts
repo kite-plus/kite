@@ -23,6 +23,7 @@ import { Route as AuthenticatedTaxonomiesIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedTaxonomiesTaxonomyRouteImport } from './routes/_authenticated/taxonomies/$taxonomy'
 import { Route as AuthenticatedContentKindIndexRouteImport } from './routes/_authenticated/content/$kind/index'
 import { Route as AuthenticatedContentKindIdRouteImport } from './routes/_authenticated/content/$kind/$id'
+import { Route as AuthenticatedSettingsThemeNameRouteImport } from './routes/_authenticated/settings_/theme/$name'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -102,6 +103,12 @@ const AuthenticatedContentKindIdRoute =
     path: '/$id',
     getParentRoute: () => AuthenticatedContentKindRouteRoute,
   } as any)
+const AuthenticatedSettingsThemeNameRoute =
+  AuthenticatedSettingsThemeNameRouteImport.update({
+    id: '/settings_/theme/$name',
+    path: '/settings/theme/$name',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -116,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/taxonomies/': typeof AuthenticatedTaxonomiesIndexRoute
   '/content/$kind/$id': typeof AuthenticatedContentKindIdRoute
+  '/settings/theme/$name': typeof AuthenticatedSettingsThemeNameRoute
   '/content/$kind/': typeof AuthenticatedContentKindIndexRoute
 }
 export interface FileRoutesByTo {
@@ -129,6 +137,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/taxonomies': typeof AuthenticatedTaxonomiesIndexRoute
   '/content/$kind/$id': typeof AuthenticatedContentKindIdRoute
+  '/settings/theme/$name': typeof AuthenticatedSettingsThemeNameRoute
   '/content/$kind': typeof AuthenticatedContentKindIndexRoute
 }
 export interface FileRoutesById {
@@ -146,6 +155,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/taxonomies/': typeof AuthenticatedTaxonomiesIndexRoute
   '/_authenticated/content/$kind/$id': typeof AuthenticatedContentKindIdRoute
+  '/_authenticated/settings_/theme/$name': typeof AuthenticatedSettingsThemeNameRoute
   '/_authenticated/content/$kind/': typeof AuthenticatedContentKindIndexRoute
 }
 export interface FileRouteTypes {
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/taxonomies/'
     | '/content/$kind/$id'
+    | '/settings/theme/$name'
     | '/content/$kind/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/taxonomies'
     | '/content/$kind/$id'
+    | '/settings/theme/$name'
     | '/content/$kind'
   id:
     | '__root__'
@@ -192,6 +204,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/'
     | '/_authenticated/taxonomies/'
     | '/_authenticated/content/$kind/$id'
+    | '/_authenticated/settings_/theme/$name'
     | '/_authenticated/content/$kind/'
   fileRoutesById: FileRoutesById
 }
@@ -301,6 +314,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedContentKindIdRouteImport
       parentRoute: typeof AuthenticatedContentKindRouteRoute
     }
+    '/_authenticated/settings_/theme/$name': {
+      id: '/_authenticated/settings_/theme/$name'
+      path: '/settings/theme/$name'
+      fullPath: '/settings/theme/$name'
+      preLoaderRoute: typeof AuthenticatedSettingsThemeNameRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -345,6 +365,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedContentKindRouteRoute: typeof AuthenticatedContentKindRouteRouteWithChildren
   AuthenticatedTaxonomiesTaxonomyRoute: typeof AuthenticatedTaxonomiesTaxonomyRoute
   AuthenticatedTaxonomiesIndexRoute: typeof AuthenticatedTaxonomiesIndexRoute
+  AuthenticatedSettingsThemeNameRoute: typeof AuthenticatedSettingsThemeNameRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -355,6 +376,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedContentKindRouteRouteWithChildren,
   AuthenticatedTaxonomiesTaxonomyRoute: AuthenticatedTaxonomiesTaxonomyRoute,
   AuthenticatedTaxonomiesIndexRoute: AuthenticatedTaxonomiesIndexRoute,
+  AuthenticatedSettingsThemeNameRoute: AuthenticatedSettingsThemeNameRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

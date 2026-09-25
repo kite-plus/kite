@@ -20,7 +20,7 @@ interface Props {
   onFrame?: (frame: HTMLIFrameElement) => void;
 }
 
-type Width = "desktop" | "phone";
+export type Width = "desktop" | "phone";
 
 const widthKey = "kite:preview-width";
 
@@ -30,6 +30,43 @@ function preferredWidth(): Width {
   } catch {
     return "desktop";
   }
+}
+
+/** usePreviewWidth is the width previews are shown at, remembered in this browser. */
+export function usePreviewWidth(): [Width, (width: Width) => void] {
+  const [width, setWidth] = useState<Width>(preferredWidth);
+  const choose = (next: Width) => {
+    setWidth(next);
+    try {
+      localStorage.setItem(widthKey, next);
+    } catch {
+      // Remembering the choice is a convenience, not a requirement.
+    }
+  };
+  return [width, choose];
+}
+
+/** WidthToggle switches a preview between a desktop's width and a phone's. */
+export function WidthToggle({ width, onChange }: { width: Width; onChange: (width: Width) => void }) {
+  const { t } = useI18n();
+  return (
+    <div
+      role="group"
+      aria-label={t("editor.previewWidth")}
+      className="flex items-center gap-0.5 rounded-md bg-muted p-0.5"
+    >
+      <WidthButton
+        label={t("editor.previewDesktop")}
+        pressed={width === "desktop"}
+        onClick={() => onChange("desktop")}
+      >
+        <Monitor />
+      </WidthButton>
+      <WidthButton label={t("editor.previewPhone")} pressed={width === "phone"} onClick={() => onChange("phone")}>
+        <Smartphone />
+      </WidthButton>
+    </div>
+  );
 }
 
 /**
@@ -45,19 +82,10 @@ export function Preview({ draft, id, base, live, onClose, onFrame }: Props) {
   const { t } = useI18n();
   const [html, setHtml] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
-  const [width, setWidth] = useState<Width>(preferredWidth);
+  const [width, chooseWidth] = usePreviewWidth();
   const frame = useRef<HTMLIFrameElement>(null);
   const written = useRef(onFrame);
   written.current = onFrame;
-
-  const chooseWidth = (next: Width) => {
-    setWidth(next);
-    try {
-      localStorage.setItem(widthKey, next);
-    } catch {
-      // Remembering the choice is a convenience, not a requirement.
-    }
-  };
 
   useEffect(() => {
     if (!draft) return;
@@ -124,26 +152,7 @@ export function Preview({ draft, id, base, live, onClose, onFrame }: Props) {
       {/* The toolbar's height, so the rule under both runs straight across. */}
       <div className="flex h-[49px] shrink-0 items-center gap-1 border-b px-3.5">
         <span className="me-auto text-[13px] font-medium">{t("editor.preview")}</span>
-        <div
-          role="group"
-          aria-label={t("editor.previewWidth")}
-          className="flex items-center gap-0.5 rounded-md bg-muted p-0.5"
-        >
-          <WidthButton
-            label={t("editor.previewDesktop")}
-            pressed={!phone}
-            onClick={() => chooseWidth("desktop")}
-          >
-            <Monitor />
-          </WidthButton>
-          <WidthButton
-            label={t("editor.previewPhone")}
-            pressed={phone}
-            onClick={() => chooseWidth("phone")}
-          >
-            <Smartphone />
-          </WidthButton>
-        </div>
+        <WidthToggle width={width} onChange={chooseWidth} />
         {live && (
           <Tooltip>
             <TooltipTrigger asChild>

@@ -34,7 +34,22 @@ export function onRefused(listener: () => void): () => void {
   };
 }
 
+/**
+ * The language the admin is shown in. A theme describes itself in it, from
+ * its own language pack, and the browser's Accept-Language would name the
+ * browser's language rather than the one chosen here.
+ */
+let language = "";
+
+export function speak(locale: string) {
+  language = locale;
+}
+
 api.use({
+  onRequest({ request }) {
+    if (language) request.headers.set("Accept-Language", language);
+    return request;
+  },
   onResponse({ response }) {
     if (response.status === 401) {
       for (const listener of refused) listener();
