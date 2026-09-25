@@ -14,6 +14,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { canPublish, useDelivery, usePublish } from "@/hooks/usePublish";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { isoDate } from "@/lib/dates";
+import { composing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -488,6 +489,9 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                 value={draft.title}
                 onChange={(event) => item.edit({ title: event.target.value.replace(/\n/g, " ") })}
                 onKeyDown={(event) => {
+                  // While an input method composes, Enter and the arrows pick
+                  // its candidates.
+                  if (composing(event)) return;
                   if (event.key === "Enter") {
                     event.preventDefault();
                     focusBody();

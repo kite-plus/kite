@@ -4,6 +4,7 @@ import { forwardRef, useCallback, useEffect, useState } from "react"
 import type { Editor } from "@tiptap/react"
 
 import { useI18n } from "@/i18n"
+import { composing } from "@/lib/ime"
 
 // --- Hooks ---
 import { useIsBreakpoint } from "@/hooks/use-is-breakpoint"
@@ -119,6 +120,8 @@ const LinkMain: React.FC<LinkMainProps> = ({
   const { t } = useI18n()
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    // Kite: an Enter that picks an input method's candidate is not the link.
+    if (composing(event)) return
     if (event.key === "Enter") {
       event.preventDefault()
       setLink()

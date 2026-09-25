@@ -2,6 +2,7 @@ import { useEditorState, type Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 
 import { useI18n } from "@/i18n";
+import { composing } from "@/lib/ime";
 import { TrashIcon } from "@/components/tiptap-icons/trash-icon";
 import { Button } from "@/components/tiptap-ui-primitive/button";
 import { Input } from "@/components/tiptap-ui-primitive/input";
@@ -41,6 +42,8 @@ export function ImageBubble({ editor }: { editor: Editor }) {
           className="kite-alt-input"
           onChange={(event) => editor.commands.updateAttributes("image", { alt: event.target.value })}
           onKeyDown={(event) => {
+            // Alt text is often composed, and the input method needs both keys.
+            if (composing(event)) return;
             if (event.key === "Enter" || event.key === "Escape") {
               event.preventDefault();
               editor.commands.focus();
