@@ -29,10 +29,11 @@
   }
 
   /* Prevent focus zoom on mobile devices */
+  /* Kite: the editor's title is set well above 16px, so it keeps its own size. */
   @media screen and (max-width: 767px) {
     input,
     select,
-    textarea {
+    textarea:not(.kite-title) {
       font-size: 16px !important;
     }
   }
