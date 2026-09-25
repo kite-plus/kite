@@ -108,20 +108,23 @@ type LayoutOption struct {
 	Name        string `json:"name"`
 	Label       string `json:"label"`
 	Description string `json:"description,omitempty"`
+	// Types are the content types it is offered to; empty means every one.
+	Types []string `json:"types,omitempty"`
 }
 
-// layoutsFor lists the layouts a theme offers items of one kind.
+// layoutsFor lists the layouts a theme offers items of one kind, or every
+// layout when kind is empty.
 func layoutsFor(layouts []theme.Layout, kind string) []LayoutOption {
 	var out []LayoutOption
 	for _, l := range layouts {
-		if !l.ForType(kind) {
+		if kind != "" && !l.ForType(kind) {
 			continue
 		}
 		label := l.Label
 		if label == "" {
 			label = l.Name
 		}
-		out = append(out, LayoutOption{Name: l.Name, Label: label, Description: l.Description})
+		out = append(out, LayoutOption{Name: l.Name, Label: label, Description: l.Description, Types: l.Types})
 	}
 	return out
 }
@@ -343,6 +346,61 @@ type ThemeSettings struct {
 	Name   string         `json:"name"`
 	Schema schema.Schema  `json:"schema,omitempty"`
 	Values map[string]any `json:"values,omitempty"`
+}
+
+// ThemeInfo describes an installed theme.
+type ThemeInfo struct {
+	// Name is what theme.name in kite.yaml chooses the theme by.
+	Name        string       `json:"name"`
+	Title       string       `json:"title"`
+	Version     string       `json:"version,omitempty"`
+	Description string       `json:"description,omitempty"`
+	Author      *ThemeAuthor `json:"author,omitempty"`
+	License     string       `json:"license,omitempty"`
+	Homepage    string       `json:"homepage,omitempty"`
+	Tags        []string     `json:"tags,omitempty"`
+	// Requires is the range of Kite versions the theme is made for.
+	Requires string `json:"requires,omitempty"`
+
+	// Builtin marks the theme built into Kite, which cannot be removed.
+	Builtin bool `json:"builtin"`
+	// Active marks the theme in use.
+	Active bool `json:"active"`
+	// Screenshot is where a picture of the theme is served, if it has one.
+	Screenshot string `json:"screenshot,omitempty"`
+	// Problem says why the theme cannot be used. One with a problem cannot
+	// be switched to or previewed.
+	Problem string `json:"problem,omitempty"`
+}
+
+// ThemeAuthor is who made a theme.
+type ThemeAuthor struct {
+	Name string `json:"name"`
+	URL  string `json:"url,omitempty"`
+}
+
+// ThemeDetail is a theme with what it can be configured with, and what it
+// would be configured to.
+type ThemeDetail struct {
+	ThemeInfo
+
+	Schema schema.Schema `json:"schema,omitempty"`
+	// Values is what the theme would read from theme.settings in kite.yaml:
+	// the stored values it can use, and its own defaults for the rest.
+	Values map[string]any `json:"values"`
+	// Stored names the settings kite.yaml holds a value for. The others are
+	// the theme's defaults, and follow the theme when it changes them.
+	Stored []string `json:"stored"`
+	// Layouts are the templates the theme offers items to choose.
+	Layouts []LayoutOption `json:"layouts,omitempty"`
+}
+
+// ThemeExists answers an install of a theme that is already installed,
+// without the request to replace it, with both versions to choose between.
+type ThemeExists struct {
+	Error     ErrorDetail `json:"error"`
+	Installed ThemeInfo   `json:"installed"`
+	Uploaded  ThemeInfo   `json:"uploaded"`
 }
 
 // PublishBody names what to publish.

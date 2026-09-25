@@ -33,14 +33,27 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if !s.writable(w, view) {
 		return
 	}
-
-	id := content.ID(r.PathValue("id"))
-	owner, err := view.Reader.Get(r.Context(), id)
+	owner, err := view.Reader.Get(r.Context(), content.ID(r.PathValue("id")))
 	if err != nil {
 		s.failErr(w, err)
 		return
 	}
+	s.upload(w, r, view, owner)
+}
 
+// handleUploadSiteMedia puts a file among the site's own, for something that
+// belongs to no one item, such as a logo a theme setting names.
+func (s *Server) handleUploadSiteMedia(w http.ResponseWriter, r *http.Request) {
+	view := s.src()
+	if !s.writable(w, view) {
+		return
+	}
+	s.upload(w, r, view, nil)
+}
+
+// upload stores the file a request carries, beside an item or, with no
+// owner, among the site's own files.
+func (s *Server) upload(w http.ResponseWriter, r *http.Request, view View, owner *content.Content) {
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		failField(w, http.StatusBadRequest, CodeInvalidRequest, "file",
@@ -53,7 +66,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	ext := strings.ToLower(path.Ext(name))
 	if !allowedMedia[ext] {
 		failField(w, http.StatusUnsupportedMediaType, CodeInvalidRequest, "file",
-			"this kind of file cannot be stored beside a page: "+ext)
+			"this kind of file cannot be uploaded: "+ext)
 		return
 	}
 
@@ -67,6 +80,10 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var id content.ID
+	if owner != nil {
+		id = owner.ID
+	}
 	res, err := s.apply(r, view, content.ChangeSet{
 		Ops:     []content.Op{content.PutMedia{Owner: id, Name: name, Data: data}},
 		Message: "media: " + name,
@@ -83,17 +100,25 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	// The store may have chosen another name rather than replace a file, so
 	// the link is built from what it actually wrote.
 	stored := res.Written[len(res.Written)-1]
-	writeJSON(w, http.StatusCreated, Media{
+	media := Media{
 		Name: path.Base(stored),
 		Path: stored,
+		Size: len(data),
+		Type: mime.TypeByExtension(ext),
+	}
+	if owner != nil {
 		// A bundle publishes its files beside the page, so the markdown links
 		// them by name alone. That is what keeps the source readable in an
 		// editor and on GitHub.
-		Link: path.Base(stored),
-		URL:  path.Join(view.Resolver.For(owner), path.Base(stored)),
-		Size: len(data),
-		Type: mime.TypeByExtension(ext),
-	})
+		media.Link = path.Base(stored)
+		media.URL = path.Join(view.Resolver.For(owner), path.Base(stored))
+	} else {
+		// static/ is published at the root of the site, so a file of the
+		// site's own is named by its path there.
+		media.Link = "/" + strings.TrimPrefix(stored, "static/")
+		media.URL = view.Resolver.Rel(media.Link)
+	}
+	writeJSON(w, http.StatusCreated, media)
 }
 
 // handleDeleteMedia removes a file from an item's bundle.

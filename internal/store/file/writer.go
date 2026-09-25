@@ -401,14 +401,22 @@ func (w *Writer) moveContent(op content.MoveContent, located map[content.ID]*Ent
 	return nil
 }
 
+// UploadsDir holds the files that belong to the site rather than to one
+// item, such as a logo a theme setting names. It sits in static/, which a
+// build publishes at the root of the site.
+const UploadsDir = "static/uploads"
+
 func (w *Writer) putMedia(op content.PutMedia, located map[content.ID]*Entry, res *content.Result) error {
-	e, ok := located[op.Owner]
-	if !ok {
-		return fmt.Errorf("%w: media owner %s", content.ErrNotFound, op.Owner)
-	}
-	dir := MediaDir(e.Type, e.Locator)
-	if dir == "" {
-		return fmt.Errorf("file store: content type %q stores items as single files and cannot hold media", e.Type.Kind)
+	dir := UploadsDir
+	if op.Owner != "" {
+		e, ok := located[op.Owner]
+		if !ok {
+			return fmt.Errorf("%w: media owner %s", content.ErrNotFound, op.Owner)
+		}
+		dir = MediaDir(e.Type, e.Locator)
+		if dir == "" {
+			return fmt.Errorf("file store: content type %q stores items as single files and cannot hold media", e.Type.Kind)
+		}
 	}
 	name := filepath.Base(filepath.FromSlash(op.Name))
 	if name == "." || name == string(filepath.Separator) {

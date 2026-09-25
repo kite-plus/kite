@@ -295,9 +295,9 @@ func (s *Server) view() api.View {
 		ConfigRevision: content.Revision("sha256:" + configHash),
 		Problems:       problems,
 
-		ThemeSchema:  current.Theme.Manifest.Settings,
-		ThemeValues:  current.ThemeSettings(),
-		ThemeLayouts: current.Theme.Manifest.Layouts,
+		ActiveTheme:   current.Theme,
+		ThemeSettings: current.Config.Theme.Settings,
+		Themes:        s.themes,
 	}
 	if s.opts.Write {
 		v.Writer = current.Project.Writer()
@@ -307,6 +307,22 @@ func (s *Server) view() api.View {
 	v.Preview = s.preview
 	v.WordCount = s.wordCount
 	return v
+}
+
+// themes lists the themes the project could switch to.
+func (s *Server) themes() []api.InstalledTheme {
+	installed := site.Themes(s.root)
+	out := make([]api.InstalledTheme, 0, len(installed))
+	for _, one := range installed {
+		out = append(out, api.InstalledTheme{
+			Name:     one.Name,
+			Builtin:  one.Builtin,
+			Theme:    one.Theme,
+			Manifest: one.Manifest,
+			Problem:  one.Problem,
+		})
+	}
+	return out
 }
 
 // preview renders an item that is not on disk.
@@ -557,6 +573,12 @@ func (s *Server) renderTarget(w http.ResponseWriter, r *http.Request, t build.Ta
 // serveStatic answers for files a build would copy rather than render. within
 // is the request's path inside the site.
 func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request, within string) bool {
+	return serveFile(w, r, within, s.root, s.router, staticRoots(s.root, s.project()))
+}
+
+// serveFile answers for a file a build would copy rather than render: one a
+// page bundle owns, or one from the roots in the order a build copies them.
+func serveFile(w http.ResponseWriter, r *http.Request, within, root string, routes *router, roots []fs.FS) bool {
 	rel := strings.TrimPrefix(path.Clean("/"+within), "/")
 	if rel == "" || rel == "." || strings.HasPrefix(rel, "..") {
 		return false
@@ -564,8 +586,8 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request, within stri
 
 	// A page bundle's own files are looked up first, because they are the
 	// ones whose address depends on where the page went.
-	if src, ok := s.router.bundleFile(rel); ok {
-		if data, modTime, found := readFile(os.DirFS(s.root), src); found {
+	if src, ok := routes.bundleFile(rel); ok {
+		if data, modTime, found := readFile(os.DirFS(root), src); found {
 			if ctype := mime.TypeByExtension(path.Ext(rel)); ctype != "" {
 				w.Header().Set("Content-Type", ctype)
 			}
@@ -575,8 +597,8 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request, within stri
 		}
 	}
 
-	for _, root := range s.staticRoots() {
-		data, modTime, ok := readFile(root, rel)
+	for _, fsys := range roots {
+		data, modTime, ok := readFile(fsys, rel)
 		if !ok {
 			continue
 		}
@@ -592,10 +614,8 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request, within stri
 
 // staticRoots lists where unprocessed files live, in the order a build copies
 // them: the project's own static directory wins over the theme's.
-func (s *Server) staticRoots() []fs.FS {
-	current := s.project()
-
-	roots := []fs.FS{os.DirFS(filepath.Join(s.root, "static"))}
+func staticRoots(root string, current *site.Site) []fs.FS {
+	roots := []fs.FS{os.DirFS(filepath.Join(root, "static"))}
 	if current.Theme.Static != nil {
 		roots = append(roots, current.Theme.Static)
 	}

@@ -437,6 +437,96 @@ func openAPI() *document {
 					},
 				},
 			},
+			"/media": {Post: &operation{
+				OperationID: "uploadSiteMedia",
+				Summary: "Store a file that belongs to the site rather than one page, such as " +
+					"a logo a theme setting names, in static/uploads.",
+				RequestBody: &requestBody{
+					Required: true,
+					Content: map[string]mediaType{"multipart/form-data": {Schema: &jsonSchema{
+						Type: "object",
+						Properties: map[string]*jsonSchema{
+							"file": {Type: "string", Format: "binary"},
+						},
+						Required: []string{"file"},
+					}}},
+				},
+				Responses: created(ref(Media{}),
+					"The stored file. Link is its path in the site, which is what a setting holds.",
+					"400", "405", "413", "415"),
+			}},
+			"/themes": {
+				Get: &operation{
+					OperationID: "listThemes",
+					Summary: "List the themes the project could use: the one built into Kite, then " +
+						"each directory of themes/, including the ones that cannot be used, with why. " +
+						"What a theme says about itself is in the language Accept-Language asks for, " +
+						"when the theme has a language pack for it.",
+					Responses: ok(ref(List[ThemeInfo]{}), "The themes.", "501"),
+				},
+				Post: &operation{
+					OperationID: "installTheme",
+					Summary: "Install a theme from a zip archive holding theme.yaml at its top or in " +
+						"one folder. It is checked the way a theme is checked when a site loads it.",
+					Parameters: []parameter{{
+						Name: "replace", In: "query",
+						Description: "Replace an installed theme of the same name. Without it, one " +
+							"already installed is answered with 409 and both versions.",
+						Schema: &jsonSchema{Type: "boolean"},
+					}},
+					RequestBody: &requestBody{
+						Required: true,
+						Content: map[string]mediaType{"multipart/form-data": {Schema: &jsonSchema{
+							Type: "object",
+							Properties: map[string]*jsonSchema{
+								"file": {Type: "string", Format: "binary"},
+							},
+							Required: []string{"file"},
+						}}},
+					},
+					Responses: func() map[string]response {
+						out := created(ref(ThemeInfo{}), "The installed theme.", "400", "405", "413", "501")
+						out["409"] = response{
+							Description: "A theme of that name is installed already.",
+							Content:     jsonOf(ref(ThemeExists{})),
+						}
+						return out
+					}(),
+				},
+			},
+			"/themes/{name}": {
+				Get: &operation{
+					OperationID: "getTheme",
+					Summary: "Describe a theme with what it can be configured with and what it would " +
+						"read from kite.yaml. ETag carries the revision of kite.yaml, for saving.",
+					Parameters: []parameter{pathParam("name")},
+					Responses:  ok(ref(ThemeDetail{}), "The theme.", "404", "501"),
+				},
+				Delete: &operation{
+					OperationID: "removeTheme",
+					Summary:     "Remove an installed theme. The built-in theme and the one in use stay.",
+					Parameters:  []parameter{pathParam("name")},
+					Responses: map[string]response{
+						"204": {Description: "Removed."},
+						"400": {Description: "Failed.", Content: jsonOf(errorRef)},
+						"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+						"405": {Description: "Failed.", Content: jsonOf(errorRef)},
+						"409": {Description: "Failed.", Content: jsonOf(errorRef)},
+					},
+				},
+			},
+			"/themes/{name}/screenshot": {Get: &operation{
+				OperationID: "getThemeScreenshot",
+				Summary:     "Read a theme's picture of itself.",
+				Parameters:  []parameter{pathParam("name")},
+				Responses: map[string]response{
+					"200": {
+						Description: "The picture.",
+						Content:     map[string]mediaType{"image/*": {Schema: &jsonSchema{Type: "string", Format: "binary"}}},
+					},
+					"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+				},
+			}},
 		},
 		Components: components{
 			Schemas: schemas,

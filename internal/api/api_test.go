@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"slices"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -389,10 +389,10 @@ func TestContentTypesOfferTheLayoutsTheThemeMadeForThem(t *testing.T) {
 		plain := o.Site
 		o.Site = func() api.View {
 			v := plain()
-			v.ThemeLayouts = []theme.Layout{
+			v.ActiveTheme = &theme.Theme{Manifest: theme.Manifest{Layouts: []theme.Layout{
 				{Name: "links", Label: "Links", Types: []string{"page"}},
 				{Name: "plain"},
-			}
+			}}}
 			return v
 		}
 	})
@@ -403,11 +403,11 @@ func TestContentTypesOfferTheLayoutsTheThemeMadeForThem(t *testing.T) {
 	}
 
 	want := map[string][]api.LayoutOption{
-		"page": {{Name: "links", Label: "Links"}, {Name: "plain", Label: "plain"}},
+		"page": {{Name: "links", Label: "Links", Types: []string{"page"}}, {Name: "plain", Label: "plain"}},
 		"post": {{Name: "plain", Label: "plain"}},
 	}
 	for kind, layouts := range want {
-		if !slices.Equal(offered[kind], layouts) {
+		if !reflect.DeepEqual(offered[kind], layouts) {
 			t.Errorf("%s is offered %v, want %v", kind, offered[kind], layouts)
 		}
 	}

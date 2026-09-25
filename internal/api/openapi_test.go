@@ -67,6 +67,9 @@ func TestEveryServedEndpointIsDescribed(t *testing.T) {
 		if rt == http.MethodGet+" "+api.OpenAPIPath {
 			continue // the document does not describe itself
 		}
+		// A wildcard that takes the rest of a path is described as a plain
+		// parameter, which is the only way OpenAPI has to spell it.
+		rt = strings.ReplaceAll(rt, "...}", "}")
 		if !described[rt] {
 			t.Errorf("%s is served but not described", rt)
 		}

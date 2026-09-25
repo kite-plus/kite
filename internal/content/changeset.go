@@ -117,7 +117,8 @@ type MoveContent struct {
 func (o MoveContent) Kind() OpKind     { return OpMoveContent }
 func (o MoveContent) Describe() string { return string(o.ID) + " -> " + string(o.To) }
 
-// PutMedia writes a media file, usually into the owning item's bundle.
+// PutMedia writes a media file, usually into the owning item's bundle. With
+// no owner it belongs to the site, as a logo a theme setting names does.
 type PutMedia struct {
 	Owner ID
 	Name  string

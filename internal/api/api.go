@@ -186,5 +186,11 @@ func (s *Server) routes() []route {
 		{http.MethodGet, "/taxonomies/{taxonomy}/terms/{term}", s.handleTerm},
 		{http.MethodPut, "/taxonomies/{taxonomy}/terms/{term}", s.handleRenameTerm},
 		{http.MethodDelete, "/taxonomies/{taxonomy}/terms/{term}", s.handleRemoveTerm},
+		{http.MethodPost, "/media", s.handleUploadSiteMedia},
+		{http.MethodGet, "/themes", s.handleThemes},
+		{http.MethodPost, "/themes", s.handleInstallTheme},
+		{http.MethodGet, "/themes/{name}", s.handleTheme},
+		{http.MethodDelete, "/themes/{name}", s.handleRemoveTheme},
+		{http.MethodGet, "/themes/{name}/screenshot", s.handleThemeScreenshot},
 	}
 }

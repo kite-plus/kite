@@ -8,7 +8,6 @@ import (
 	"github.com/kite-plus/kite/internal/publish"
 	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/render/url"
-	"github.com/kite-plus/kite/internal/schema"
 )
 
 // View is one consistent look at an open project.
@@ -23,13 +22,17 @@ type View struct {
 	Version        string
 	ConfigRevision content.Revision
 
-	// ThemeSchema is what the theme declares it can be configured with, and
-	// ThemeValues what it is configured to. A theme author gets a settings
-	// form out of the first without writing any admin code.
-	ThemeSchema schema.Schema
-	ThemeValues map[string]any
-	// ThemeLayouts are the templates the theme offers items to choose.
-	ThemeLayouts []theme.Layout
+	// ActiveTheme is the theme in use, nil for a view that has none. It
+	// declares what it can be configured with, so a theme author gets a
+	// settings form without writing any admin code.
+	ActiveTheme *theme.Theme
+	// ThemeSettings is what kite.yaml holds under theme.settings, as written.
+	// It is kept raw because each theme reads it through its own schema, and
+	// the admin may be looking at a theme other than the one in use.
+	ThemeSettings map[string]any
+	// Themes lists every theme the project could switch to. It is nil where
+	// themes cannot be switched.
+	Themes func() []InstalledTheme
 
 	// Writer is nil when this deployment may not be written to, which is the
 	// difference between a preview an author is typing into and a read-only
@@ -59,6 +62,18 @@ type View struct {
 
 	// Problems is the content the index refused, as of this view.
 	Problems []string
+}
+
+// InstalledTheme is a theme a project could switch to.
+type InstalledTheme struct {
+	// Name is what theme.name chooses it by.
+	Name    string
+	Builtin bool
+	// Theme is nil when the theme cannot be used. Problem then says why, and
+	// Manifest holds what could be read of it, if anything.
+	Theme    *theme.Theme
+	Manifest *theme.Manifest
+	Problem  string
 }
 
 // SiteSource supplies the project's current state.

@@ -10,6 +10,7 @@ import (
 
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/render/theme"
 )
 
 // settable is every configuration path this API will write.
@@ -28,7 +29,8 @@ var settable = []string{
 }
 
 // settablePrefix covers the keys a theme declares for itself, which cannot be
-// listed here because only the theme knows them.
+// listed here because only the theme knows them. Each is checked against the
+// theme's own schema instead.
 const settablePrefix = "theme.settings."
 
 // checkSetting reports why a value cannot be stored, or "" when it can.
@@ -63,26 +65,66 @@ func checkSetting(path string, value any) string {
 }
 
 // handleSettings describes what can be configured and what it is set to.
-func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	view := s.src()
 	w.Header().Set("ETag", etag(view.ConfigRevision))
 
-	writeJSON(w, http.StatusOK, Settings{
+	settings := Settings{
 		Site: SiteSettings{
 			Title:       view.Site.Title,
 			Description: view.Site.Description,
 			BaseURL:     view.Site.BaseURL,
 			Language:    view.Site.Language,
 		},
-		Theme: ThemeSettings{
-			Name: view.Theme,
-			// The schema comes from the theme's own manifest, so a theme
-			// author gets a settings form without writing any admin code.
-			Schema: view.ThemeSchema,
-			Values: view.ThemeValues,
-		},
+		Theme:    ThemeSettings{Name: view.Theme},
 		Writable: append(slices.Clone(settable), settablePrefix+"*"),
-	})
+	}
+	if th := view.ActiveTheme; th != nil {
+		// The schema comes from the theme's own manifest, so a theme author
+		// gets a settings form without writing any admin code.
+		settings.Theme.Schema = described(th, r).Settings
+		settings.Theme.Values = th.Manifest.Settings.Resolve(view.ThemeSettings)
+	}
+	writeJSON(w, http.StatusOK, settings)
+}
+
+// usableTheme finds the installed theme a name chooses, or says why there is
+// none to switch to.
+func usableTheme(view View, value any) (*theme.Theme, string) {
+	name, ok := value.(string)
+	if !ok || name == "" {
+		return nil, "name a theme"
+	}
+	if view.Themes == nil {
+		return nil, "this server cannot switch themes"
+	}
+	for _, one := range view.Themes() {
+		if one.Name != name {
+			continue
+		}
+		if one.Theme == nil {
+			return nil, "this theme cannot be used: " + one.Problem
+		}
+		return one.Theme, ""
+	}
+	return nil, "no theme of that name is installed"
+}
+
+// checkThemeSetting reports why a value cannot be stored under a theme
+// setting, given as the path after theme.settings. Removing one, which puts
+// the theme's default back, is always allowed.
+func checkThemeSetting(th *theme.Theme, path string, value any) string {
+	if value == nil {
+		return ""
+	}
+	if th == nil {
+		return "there is no theme to check this setting against"
+	}
+	field := th.Manifest.Settings.Lookup(strings.Split(path, "."))
+	if field == nil {
+		return "the theme " + th.Manifest.Name + " declares no such setting"
+	}
+	return field.Check(value)
 }
 
 // handleUpdateSettings writes configuration values.
@@ -100,8 +142,21 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// A theme's settings are checked against the theme they will belong to:
+	// the one this request switches to, if it switches, and otherwise the one
+	// in use.
+	target := view.ActiveTheme
+	if name, switching := values["theme.name"]; switching {
+		th, problem := usableTheme(view, name)
+		if problem != "" {
+			failField(w, http.StatusBadRequest, CodeInvalidRequest, "theme.name", problem)
+			return
+		}
+		target = th
+	}
 	for _, path := range slices.Sorted(maps.Keys(values)) {
-		if !slices.Contains(settable, path) && !strings.HasPrefix(path, settablePrefix) {
+		rest, themed := strings.CutPrefix(path, settablePrefix)
+		if !slices.Contains(settable, path) && !themed {
 			failField(w, http.StatusBadRequest, CodeInvalidRequest, path,
 				"this setting cannot be changed through the API")
 			return
@@ -109,7 +164,11 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		// Checked before anything is written, not after. Validating on the
 		// reload that follows a write would leave the bad value in the file
 		// and the project unable to open.
-		if problem := checkSetting(path, values[path]); problem != "" {
+		problem := checkSetting(path, values[path])
+		if problem == "" && themed {
+			problem = checkThemeSetting(target, rest, values[path])
+		}
+		if problem != "" {
 			failField(w, http.StatusBadRequest, CodeInvalidRequest, path, problem)
 			return
 		}

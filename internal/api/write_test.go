@@ -473,8 +473,9 @@ func newWritableServer(t *testing.T, root string, with ...func(*api.Options)) (h
 			Store:          current.Config.Content.Store,
 			Runtime:        "test",
 			Theme:          current.Config.Theme.Name,
-			ThemeSchema:    current.Theme.Manifest.Settings,
-			ThemeValues:    current.ThemeSettings(),
+			ActiveTheme:    current.Theme,
+			ThemeSettings:  current.Config.Theme.Settings,
+			Themes:         func() []api.InstalledTheme { return installedThemes(root) },
 			ConfigRevision: configRevision,
 			Problems:       current.Problems,
 			Writer:         current.Project.Writer(),
@@ -503,6 +504,18 @@ func newWritableServer(t *testing.T, root string, with ...func(*api.Options)) (h
 	mux := http.NewServeMux()
 	srv.Mount(mux)
 	return mux, s
+}
+
+// installedThemes is what a running server lists as the themes a project
+// could switch to.
+func installedThemes(root string) []api.InstalledTheme {
+	var out []api.InstalledTheme
+	for _, one := range site.Themes(root) {
+		out = append(out, api.InstalledTheme{
+			Name: one.Name, Builtin: one.Builtin, Theme: one.Theme, Manifest: one.Manifest, Problem: one.Problem,
+		})
+	}
+	return out
 }
 
 // The other half of the timestamp rule: a value the author does keep must go

@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/render/theme"
 )
 
 // handleSite describes the open project.
@@ -43,10 +44,14 @@ func (s *Server) handleContentTypes(w http.ResponseWriter, r *http.Request) {
 	view := s.src()
 	types := view.Types.Types()
 
+	var layouts []theme.Layout
+	if view.ActiveTheme != nil {
+		layouts = described(view.ActiveTheme, r).Layouts
+	}
 	out := make([]ContentType, 0, len(types))
 	for _, t := range types {
 		ct := contentTypeOf(t)
-		ct.Layouts = layoutsFor(view.ThemeLayouts, string(t.Kind))
+		ct.Layouts = layoutsFor(layouts, string(t.Kind))
 		out = append(out, ct)
 	}
 	writeJSON(w, http.StatusOK, List[ContentType]{Items: out})
