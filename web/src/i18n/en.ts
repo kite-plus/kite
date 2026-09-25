@@ -239,8 +239,6 @@ export const en = {
   // The editor.
   "editor.back": "Back",
   "editor.untitled": "Untitled",
-  "editor.editing": "Edit",
-  "editor.creating": "New",
   "editor.titlePlaceholder": "Title",
   "editor.bodyPlaceholder": "Start writing…",
   "editor.save": "Save",
@@ -248,6 +246,7 @@ export const en = {
   "editor.saved": "Saved",
   "editor.savedAt": "Saved at {time}",
   "editor.unsaved": "Unsaved changes",
+  "editor.notSaved": "Not saved yet",
   "editor.uploading": "Uploading {count}",
   "editor.loading": "Loading",
   "editor.nothingToEdit": "Nothing to edit",

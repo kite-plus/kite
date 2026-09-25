@@ -229,8 +229,6 @@ export const zhCN: Record<keyof typeof en, string> = {
 
   "editor.back": "返回",
   "editor.untitled": "无标题",
-  "editor.editing": "编辑",
-  "editor.creating": "新建",
   "editor.titlePlaceholder": "标题",
   "editor.bodyPlaceholder": "开始写作…",
   "editor.save": "保存",
@@ -238,6 +236,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "editor.saved": "已保存",
   "editor.savedAt": "已保存 {time}",
   "editor.unsaved": "有未保存的更改",
+  "editor.notSaved": "尚未保存",
   "editor.uploading": "上传中 {count}",
   "editor.loading": "加载中",
   "editor.nothingToEdit": "没有可编辑的内容",

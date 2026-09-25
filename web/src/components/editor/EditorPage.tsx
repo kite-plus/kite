@@ -327,7 +327,9 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           ? t("editor.unsaved")
           : savedAt
             ? t("editor.savedAt", { time: clock.format(savedAt) })
-            : t("editor.saved");
+            : id
+              ? t("editor.saved")
+              : t("editor.notSaved");
   const settled = uploading === 0 && !saving && !item.dirty;
 
   const words = countWords(draft.body);
@@ -378,8 +380,6 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             <Link to="/content/$kind" params={{ kind }} className="hover:text-foreground">
               {kindLabel.many(kind)}
             </Link>
-            {" / "}
-            {id ? t("editor.editing") : t("editor.creating")}
             {" · "}
             <span className={cn(!settled && "text-warning")}>{state}</span>
           </div>
