@@ -100,6 +100,10 @@ type Server struct {
 	// every server that is not one.
 	setup *setup.Flow
 
+	// account changes the account the guard checks, and the profile of the
+	// person using the studio.
+	account *auth.Keeper
+
 	// reloading lets one reload run at a time, whoever asked for it.
 	reloading sync.Mutex
 
@@ -148,6 +152,11 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 	if opts.Logger == nil {
 		opts.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
+	// One guard for the API to check and the account to change: two would
+	// disagree the first time a password was set.
+	if opts.Auth == nil {
+		opts.Auth = auth.New(nil)
+	}
 	// A studio with no account on an address other than localhost used to be
 	// refused outright. A container has no terminal to run
 	// `kite auth set-password` in, so that left whoever deployed it with a
@@ -176,14 +185,15 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 	}
 
 	srv := &Server{
-		opts:   opts,
-		site:   s,
-		root:   s.Project.Root,
-		setup:  flow,
-		router: newRouter(),
-		hub:    newReloadHub(),
-		log:    opts.Logger,
-		now:    now,
+		opts:    opts,
+		site:    s,
+		root:    s.Project.Root,
+		setup:   flow,
+		account: auth.NewKeeper(s.Project.Root, opts.Auth, opts.Addr),
+		router:  newRouter(),
+		hub:     newReloadHub(),
+		log:     opts.Logger,
+		now:     now,
 	}
 	srv.previews = newPreviews(srv)
 	srv.configHash = srv.readConfigHash()
@@ -264,10 +274,11 @@ func (s *Server) Handler() http.Handler {
 	}
 	if s.opts.Admin {
 		api.New(api.Options{
-			Site:   s.view,
-			Logger: s.log,
-			Auth:   s.opts.Auth,
-			Setup:  s.setup,
+			Site:    s.view,
+			Logger:  s.log,
+			Auth:    s.opts.Auth,
+			Setup:   s.setup,
+			Account: s.account,
 		}).Mount(mux)
 		mux.Handle(web.Path+"/", web.Handler())
 		mux.Handle(web.Path, http.RedirectHandler(web.Path+"/", http.StatusMovedPermanently))

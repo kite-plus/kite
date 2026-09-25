@@ -59,9 +59,9 @@ func (g *Guard) current() *Account {
 // stops being open the moment first-run setup finishes rather than at the
 // next restart.
 //
-// It refuses to replace an existing account: changing a password is a
-// deliberate act with a command of its own, and letting it happen here would
-// turn setup into a way to take a configured server over.
+// It refuses to replace an existing account: changing a password takes the
+// current one, through [Keeper], and letting it happen here would turn setup
+// into a way to take a configured server over.
 func (g *Guard) Adopt(account *Account) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -74,6 +74,10 @@ func (g *Guard) Adopt(account *Account) error {
 
 // Required reports whether requests have to be signed in.
 func (g *Guard) Required() bool { return g.current() != nil }
+
+// Account is the account in use, or nil for an open server. It is what a
+// change through [Keeper] names as the one it expects to replace.
+func (g *Guard) Account() *Account { return g.current() }
 
 // User is the name that can sign in, or "" when nobody can.
 func (g *Guard) User() string {
@@ -131,14 +135,74 @@ func (g *Guard) SignIn(w http.ResponseWriter, r *http.Request, user, password st
 	if remember {
 		lifetime = RememberLifetime
 	}
-	token, expires, err := account.Issue(now, lifetime)
+	token, expires, err := account.issue(now.Add(lifetime), remember)
 	if err != nil {
 		return Session{}, err
 	}
 
 	g.attempts.Accepted()
-	http.SetCookie(w, cookie(token, expires, remember, secureRequest(r)))
-	return Session{User: account.user, Expires: expires}, nil
+	http.SetCookie(w, cookie(token, now, expires, remember, secureRequest(r)))
+	return Session{User: account.user, Expires: expires, Remember: remember}, nil
+}
+
+// Confirm checks the password of the account in use and returns that
+// account.
+//
+// It is for a change that has to need more than a session: whoever sits down
+// at a signed-in browser may use the studio, but must not be able to lock its
+// owner out of it. A wrong password counts against the same allowance as a
+// wrong sign-in, so this is not a second door to guess at.
+func (g *Guard) Confirm(password string) (*Account, error) {
+	account := g.current()
+	if account == nil {
+		return nil, ErrNoAccount
+	}
+
+	now := g.now()
+	if err := g.attempts.Check(now); err != nil {
+		return nil, err
+	}
+
+	g.verifying.Lock()
+	err := account.Verify(account.user, password)
+	g.verifying.Unlock()
+	if err != nil {
+		g.attempts.Refused(now)
+		return nil, err
+	}
+	g.attempts.Accepted()
+	return account, nil
+}
+
+// Replace swaps the account a running guard checks, provided it is still the
+// one the caller confirmed. A nil next leaves the server open.
+func (g *Guard) Replace(old, next *Account) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.account != old {
+		return ErrAccountChanged
+	}
+	g.account = next
+	return nil
+}
+
+// Renew issues a session again under the account now in use, running out
+// when it did and kept as it was.
+//
+// Changing the name or password, or the secret, ends every session, the one
+// that asked for the change included. This is how the browser that made the
+// change stays signed in while every other one does not.
+func (g *Guard) Renew(w http.ResponseWriter, r *http.Request, s Session) (Session, error) {
+	account := g.current()
+	if account == nil {
+		return Session{}, ErrNoAccount
+	}
+	token, expires, err := account.issue(s.Expires, s.Remember)
+	if err != nil {
+		return Session{}, err
+	}
+	http.SetCookie(w, cookie(token, g.now(), expires, s.Remember, secureRequest(r)))
+	return Session{User: account.user, Expires: expires, Remember: s.Remember}, nil
 }
 
 // Start issues a session without checking a password, for a caller that has
@@ -149,11 +213,12 @@ func (g *Guard) Start(w http.ResponseWriter, r *http.Request) (Session, error) {
 	if account == nil {
 		return Session{}, ErrNoAccount
 	}
-	token, expires, err := account.Issue(g.now(), SessionLifetime)
+	now := g.now()
+	token, expires, err := account.issue(now.Add(SessionLifetime), false)
 	if err != nil {
 		return Session{}, err
 	}
-	http.SetCookie(w, cookie(token, expires, false, secureRequest(r)))
+	http.SetCookie(w, cookie(token, now, expires, false, secureRequest(r)))
 	return Session{User: account.user, Expires: expires}, nil
 }
 
@@ -161,7 +226,7 @@ func (g *Guard) Start(w http.ResponseWriter, r *http.Request) (Session, error) {
 // signature rather than a row, so the browser forgetting it is the whole of
 // signing out, and the token expires on its own regardless.
 func (g *Guard) SignOut(w http.ResponseWriter, r *http.Request) {
-	c := cookie("", time.Time{}, false, secureRequest(r))
+	c := cookie("", time.Time{}, time.Time{}, false, secureRequest(r))
 	c.MaxAge = -1
 	c.Expires = time.Unix(1, 0)
 	http.SetCookie(w, c)

@@ -101,9 +101,9 @@ func serveCommand(shape commandShape) *cobra.Command {
 			}
 
 			// The account is read once, here, so that the server is handed a
-			// decision rather than a file to consult: a password changed
-			// while the server runs takes effect at the next start, which is
-			// also when a restart is the honest way to end open sessions.
+			// decision rather than a file to consult. A change made in the
+			// studio reaches the running guard too; one made with this
+			// command while the server runs takes effect at the next start.
 			account, err := auth.Open(s.Project.Root)
 			if err != nil && !errors.Is(err, auth.ErrNoAccount) {
 				return err

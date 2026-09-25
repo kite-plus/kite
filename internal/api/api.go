@@ -32,14 +32,20 @@ type Options struct {
 	// every server that is not: one with an account, and a local preview
 	// where an open studio is nobody else's business.
 	Setup *setup.Flow
+
+	// Account changes the account and profile of the person using the
+	// studio. Nil leaves them as they are, and the endpoints that would
+	// change them answer that this server cannot.
+	Account *auth.Keeper
 }
 
 // Server answers API requests.
 type Server struct {
-	src   SiteSource
-	log   *slog.Logger
-	auth  *auth.Guard
-	setup *setup.Flow
+	src    SiteSource
+	log    *slog.Logger
+	auth   *auth.Guard
+	setup  *setup.Flow
+	keeper *auth.Keeper
 }
 
 // Routes lists the endpoints this server registers, for tests that check the
@@ -66,7 +72,7 @@ func New(opts Options) *Server {
 		// exactly the one that would do as it was told.
 		guard = auth.New(nil)
 	}
-	return &Server{src: opts.Site, log: log, auth: guard, setup: opts.Setup}
+	return &Server{src: opts.Site, log: log, auth: guard, setup: opts.Setup, keeper: opts.Account}
 }
 
 // Handler returns the API's own routes, addressed without [Prefix].
@@ -163,6 +169,14 @@ func (s *Server) routes() []route {
 		{http.MethodGet, "/auth/session", s.handleSession},
 		{http.MethodPost, "/auth/login", s.handleLogin},
 		{http.MethodPost, "/auth/logout", s.handleLogout},
+		{http.MethodGet, "/account", s.handleAccount},
+		{http.MethodPut, "/account/profile", s.handleUpdateProfile},
+		{http.MethodGet, "/account/avatar", s.handleAvatar},
+		{http.MethodPut, "/account/avatar", s.handleUploadAvatar},
+		{http.MethodDelete, "/account/avatar", s.handleRemoveAvatar},
+		{http.MethodPut, "/account/credentials", s.handleSetCredentials},
+		{http.MethodDelete, "/account/credentials", s.handleRemoveCredentials},
+		{http.MethodDelete, "/account/sessions", s.handleEndSessions},
 		{http.MethodGet, "/site", s.handleSite},
 		{http.MethodGet, "/content-types", s.handleContentTypes},
 		{http.MethodGet, "/publish", s.handlePublishState},

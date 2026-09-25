@@ -108,16 +108,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, CodeUnauthorized, "incorrect user name or password")
 		return
 	case err != nil:
-		if wait, is := errors.AsType[*auth.TooManyAttempts](err); is {
-			retry := max(wait.RetryAfter.Round(time.Second), time.Second)
-			w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())))
-			// Said in the API's own words rather than the package's: this
-			// sentence is read by whoever is locked out.
-			fail(w, http.StatusTooManyRequests, CodeTooManyAttempts,
-				"too many attempts; try again in "+retry.String())
-			return
+		if !s.failThrottled(w, err) {
+			s.failErr(w, err)
 		}
-		s.failErr(w, err)
 		return
 	}
 
@@ -128,6 +121,22 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		User:          session.User,
 		ExpiresAt:     session.Expires,
 	})
+}
+
+// failThrottled answers an attempt refused because of earlier failures, and
+// reports whether err was one.
+func (s *Server) failThrottled(w http.ResponseWriter, err error) bool {
+	wait, is := errors.AsType[*auth.TooManyAttempts](err)
+	if !is {
+		return false
+	}
+	retry := max(wait.RetryAfter.Round(time.Second), time.Second)
+	w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())))
+	// Said in the API's own words rather than the package's: this sentence
+	// is read by whoever is locked out.
+	fail(w, http.StatusTooManyRequests, CodeTooManyAttempts,
+		"too many attempts; try again in "+retry.String())
+	return true
 }
 
 // handleLogout clears the cookie, and says nothing about whether there was

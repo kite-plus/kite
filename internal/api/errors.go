@@ -24,6 +24,13 @@ const (
 	CodeTooManyAttempts = "too_many_attempts"
 	CodeCrossOrigin     = "cross_origin"
 
+	// Refusals of a change to the account itself: the password confirming it
+	// was wrong, the account is set by the environment rather than stored,
+	// or the server is one a password has to stay on.
+	CodeWrongPassword    = "wrong_password"
+	CodeAccountFixed     = "account_fixed"
+	CodePasswordRequired = "password_required"
+
 	// Refusals that are about the server: it has not been set up yet, or it
 	// has and the caller is trying to set it up again.
 	CodeSetupRequired = "setup_required"

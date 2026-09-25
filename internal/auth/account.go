@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -51,6 +52,39 @@ var ErrAlreadyConfigured = errors.New("auth: this project already has an account
 // only property worth enforcing: composition rules push people towards
 // "Passw0rd!" and away from a passphrase.
 const MinPasswordLength = 8
+
+// MaxPasswordLength bounds a password so that hashing one cannot be made to
+// cost what hashing a whole request body would.
+const MaxPasswordLength = 1024
+
+// MaxUserLength bounds the name an account signs in with.
+const MaxUserLength = 64
+
+// CheckUser reports why a name cannot sign in, or nil when it can.
+func CheckUser(user string) error {
+	switch {
+	case strings.TrimSpace(user) == "":
+		return errors.New("auth: a user name is required")
+	case strings.TrimSpace(user) != user:
+		return errors.New("auth: a user name cannot start or end with a space")
+	case len([]rune(user)) > MaxUserLength:
+		return fmt.Errorf("auth: a user name can have at most %d characters", MaxUserLength)
+	case strings.ContainsFunc(user, unicode.IsControl):
+		return errors.New("auth: a user name cannot hold control characters")
+	}
+	return nil
+}
+
+// CheckPassword reports why a password cannot be stored, or nil when it can.
+func CheckPassword(password string) error {
+	switch n := len([]rune(password)); {
+	case n < MinPasswordLength:
+		return fmt.Errorf("auth: a password needs at least %d characters", MinPasswordLength)
+	case n > MaxPasswordLength:
+		return fmt.Errorf("auth: a password can have at most %d characters", MaxPasswordLength)
+	}
+	return nil
+}
 
 // Argon2id parameters, chosen so a single verification costs roughly a tenth
 // of a second on a small server. They travel inside every stored hash, so
@@ -190,15 +224,15 @@ func Configured(root string) bool {
 // identity, and every existing session still ends, because a session is
 // signed with a key derived from the secret and the password together.
 func SetPassword(root, user, password string) (*Account, error) {
-	if strings.TrimSpace(user) == "" {
-		return nil, errors.New("auth: a user name is required")
+	if err := CheckUser(user); err != nil {
+		return nil, err
 	}
-	if len([]rune(password)) < MinPasswordLength {
-		return nil, fmt.Errorf("auth: a password needs at least %d characters", MinPasswordLength)
+	if err := CheckPassword(password); err != nil {
+		return nil, err
 	}
 
-	secret := make([]byte, 32)
-	if _, err := rand.Read(secret); err != nil {
+	secret, err := newSecret()
+	if err != nil {
 		return nil, err
 	}
 	if existing, err := Load(root); err == nil {
@@ -212,33 +246,53 @@ func SetPassword(root, user, password string) (*Account, error) {
 		return nil, err
 	}
 	account := &Account{user: user, password: hash, secret: secret, source: File}
-
-	body, err := json.MarshalIndent(stored{
-		Version:   1,
-		User:      user,
-		Password:  hash,
-		Secret:    base64.RawStdEncoding.EncodeToString(secret),
-		UpdatedAt: time.Now().UTC(),
-	}, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-
-	path := filepath.Join(root, filepath.FromSlash(File))
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return nil, err
-	}
-	// Written through a temporary file so that an interrupted write cannot
-	// leave a project with an account nobody can sign in to.
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append(body, '\n'), 0o600); err != nil {
-		return nil, err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
+	if err := account.save(root); err != nil {
 		return nil, err
 	}
 	return account, nil
+}
+
+func newSecret() ([]byte, error) {
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return nil, err
+	}
+	return secret, nil
+}
+
+// save writes this account to a project.
+func (a *Account) save(root string) error {
+	body, err := json.MarshalIndent(stored{
+		Version:   1,
+		User:      a.user,
+		Password:  a.password,
+		Secret:    base64.RawStdEncoding.EncodeToString(a.secret),
+		UpdatedAt: time.Now().UTC(),
+	}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writePrivate(root, File, append(body, '\n'))
+}
+
+// writePrivate writes a file under .kite/secrets that only its owner can read.
+//
+// It goes through a temporary file so that an interrupted write cannot leave
+// a project with an account nobody can sign in to, or half a picture.
+func writePrivate(root, name string, data []byte) error {
+	path := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // Remove deletes the stored account, leaving the admin open on a loopback

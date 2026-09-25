@@ -166,6 +166,15 @@ func openAPI() *document {
 		out["409"] = response{Description: "The publish did not fully happen.", Content: jsonOf(schema)}
 		return out
 	}
+	// A change that asks for the current password is refused with 403 when
+	// it is wrong: a 401 would tell the client its session had ended.
+	wrongPassword := func(out map[string]response) map[string]response {
+		out["403"] = response{
+			Description: "The current password is wrong, or the request came from another site.",
+			Content:     jsonOf(errorRef),
+		}
+		return out
+	}
 	// public marks an endpoint that answers without a session. It is a
 	// variable rather than a literal because OpenAPI needs the empty list to
 	// be present, and a pointer to it is the only way to say that in Go.
@@ -229,6 +238,76 @@ func openAPI() *document {
 				Summary:     "Discard the session cookie.",
 				Security:    &public,
 				Responses:   map[string]response{"204": {Description: "Signed out."}},
+			}},
+			"/account": {Get: &operation{
+				OperationID: "getAccount",
+				Summary:     "Describe the person using the studio and how they sign in.",
+				Responses:   ok(ref(AccountInfo{}), "The account and profile."),
+			}},
+			"/account/profile": {Put: &operation{
+				OperationID: "updateProfile",
+				Summary: "Change the name and email address the studio shows. They are kept " +
+					"in .kite/secrets, never published.",
+				RequestBody: body(ref(Profile{})),
+				Responses:   ok(ref(AccountInfo{}), "The account as it now is.", "400", "405", "501"),
+			}},
+			"/account/avatar": {
+				Get: &operation{
+					OperationID: "getAvatar",
+					Summary:     "Read the picture shown beside the name.",
+					Responses: map[string]response{
+						"200": {
+							Description: "The picture.",
+							Content:     map[string]mediaType{"image/*": {Schema: &jsonSchema{Type: "string", Format: "binary"}}},
+						},
+						"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+					},
+				},
+				Put: &operation{
+					OperationID: "uploadAvatar",
+					Summary:     "Choose the picture: PNG, JPEG, GIF or WebP, up to 1 MB.",
+					RequestBody: &requestBody{
+						Required: true,
+						Content: map[string]mediaType{"multipart/form-data": {Schema: &jsonSchema{
+							Type: "object",
+							Properties: map[string]*jsonSchema{
+								"file": {Type: "string", Format: "binary"},
+							},
+							Required: []string{"file"},
+						}}},
+					},
+					Responses: ok(ref(AccountInfo{}), "The account as it now is.", "400", "405", "413", "415", "501"),
+				},
+				Delete: &operation{
+					OperationID: "removeAvatar",
+					Summary:     "Go back to initials.",
+					Responses:   ok(ref(AccountInfo{}), "The account as it now is.", "405", "501"),
+				},
+			},
+			"/account/credentials": {
+				Put: &operation{
+					OperationID: "setCredentials",
+					Summary: "Give a studio with no password one, or change the name and password " +
+						"of a guarded one. A change ends every other session; the caller's is issued " +
+						"again in Set-Cookie.",
+					RequestBody: body(ref(CredentialsChange{})),
+					Responses: wrongPassword(ok(ref(AccountInfo{}), "The account as it now is.",
+						"400", "405", "409", "429", "501")),
+				},
+				Delete: &operation{
+					OperationID: "removeCredentials",
+					Summary: "Take the password away, leaving the studio open. Only a server that " +
+						"listens on this machine alone allows it.",
+					RequestBody: body(ref(PasswordConfirmation{})),
+					Responses: wrongPassword(ok(ref(AccountInfo{}), "The account as it now is.",
+						"400", "405", "409", "429", "501")),
+				},
+			},
+			"/account/sessions": {Delete: &operation{
+				OperationID: "endOtherSessions",
+				Summary: "Sign out every browser but the caller's, whose session is issued again " +
+					"in Set-Cookie.",
+				Responses: ok(ref(AccountInfo{}), "The account as it now is.", "400", "405", "409", "501"),
 			}},
 			"/site": {Get: &operation{
 				OperationID: "getSite",
@@ -599,7 +678,7 @@ func openAPI() *document {
 					Description: "Not signed in.", Content: jsonOf(errorRef),
 				}
 			}
-			if method != http.MethodGet {
+			if _, described := op.Responses["403"]; method != http.MethodGet && !described {
 				op.Responses["403"] = response{
 					Description: "The request came from another site.", Content: jsonOf(errorRef),
 				}

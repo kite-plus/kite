@@ -36,6 +36,10 @@ var ErrBadSession = errors.New("auth: the session is not valid")
 type Session struct {
 	User    string    `json:"-"`
 	Expires time.Time `json:"-"`
+
+	// Remember is whether the browser was asked to keep the session past
+	// the window it was opened in.
+	Remember bool `json:"-"`
 }
 
 // claims is the signed payload, kept short because it travels on every
@@ -45,25 +49,35 @@ type claims struct {
 	User    string `json:"u"`
 	Expires int64  `json:"x"`
 	Nonce   string `json:"n"`
+
+	// Remember travels with the token so that one issued again, after a
+	// change of password, goes back into the same kind of cookie.
+	Remember bool `json:"r,omitempty"`
 }
 
 // Issue mints a token for this account.
+func (a *Account) Issue(now time.Time, lifetime time.Duration) (string, time.Time, error) {
+	return a.issue(now.Add(lifetime), false)
+}
+
+// issue mints a token that runs out at expires.
 //
 // The nonce makes two tokens issued in the same second differ, so that
 // signing in again replaces the cookie rather than reproducing it -- a
 // session that is byte-identical to one already captured is a session that
 // cannot be told apart from a replay.
-func (a *Account) Issue(now time.Time, lifetime time.Duration) (string, time.Time, error) {
+func (a *Account) issue(expires time.Time, remember bool) (string, time.Time, error) {
 	nonce := make([]byte, 8)
 	if _, err := rand.Read(nonce); err != nil {
 		return "", time.Time{}, err
 	}
-	expires := now.Add(lifetime).Truncate(time.Second)
+	expires = expires.Truncate(time.Second)
 
 	payload, err := json.Marshal(claims{
-		User:    a.user,
-		Expires: expires.Unix(),
-		Nonce:   base64.RawURLEncoding.EncodeToString(nonce),
+		User:     a.user,
+		Expires:  expires.Unix(),
+		Nonce:    base64.RawURLEncoding.EncodeToString(nonce),
+		Remember: remember,
 	})
 	if err != nil {
 		return "", time.Time{}, err
@@ -109,7 +123,7 @@ func (a *Account) Parse(token string, now time.Time) (Session, error) {
 	if c.User != a.user {
 		return Session{}, ErrBadSession
 	}
-	return Session{User: c.User, Expires: expires}, nil
+	return Session{User: c.User, Expires: expires, Remember: c.Remember}, nil
 }
 
 func sign(key []byte, body string) string {
@@ -123,7 +137,7 @@ func sign(key []byte, body string) string {
 // A remembered session is persistent; one that was not asked to be
 // remembered has no Max-Age and so lives as long as the browser window,
 // while the token inside it expires on its own schedule either way.
-func cookie(value string, expires time.Time, remember, secure bool) *http.Cookie {
+func cookie(value string, now, expires time.Time, remember, secure bool) *http.Cookie {
 	c := &http.Cookie{
 		Name:  CookieName,
 		Value: value,
@@ -139,7 +153,7 @@ func cookie(value string, expires time.Time, remember, secure bool) *http.Cookie
 	}
 	if remember {
 		c.Expires = expires
-		c.MaxAge = int(time.Until(expires).Seconds())
+		c.MaxAge = int(expires.Sub(now).Seconds())
 	}
 	return c
 }
