@@ -34,6 +34,7 @@ import (
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render"
+	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/setup"
 	"github.com/kite-plus/kite/internal/site"
 	"github.com/kite-plus/kite/web"
@@ -112,6 +113,10 @@ type Server struct {
 	extras *extras
 	// configHash detects a settings change, which needs more than a reindex.
 	configHash string
+	// templates fingerprints the templates the site draws with. The engine
+	// keeps every template it has parsed, so an edited or replaced one needs
+	// the site assembled again, as a settings change does.
+	templates string
 }
 
 // Setup is the first run this server is waiting on, or nil when it is not
@@ -179,6 +184,7 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 		now:    now,
 	}
 	srv.configHash = srv.readConfigHash()
+	srv.templates = srv.templatesStamp(s.Config.Theme.Name)
 	if err := srv.Reload(ctx); err != nil {
 		return nil, err
 	}
@@ -339,7 +345,7 @@ func (s *Server) wordCount(ctx context.Context, item *content.Content) (int, err
 }
 
 // reconfigureIfChanged rebuilds the configuration-derived half of the site
-// when kite.yaml has changed.
+// when kite.yaml or a template has changed.
 //
 // The index is kept: nothing in it depends on configuration, and replacing it
 // would pull the database out from under requests already in flight.
@@ -347,10 +353,9 @@ func (s *Server) reconfigureIfChanged() error {
 	hash := s.readConfigHash()
 
 	s.mu.RLock()
-	unchanged := hash == s.configHash
-	current := s.site
+	current, known, stamp := s.site, s.configHash, s.templates
 	s.mu.RUnlock()
-	if unchanged {
+	if hash == known && s.templatesStamp(current.Config.Theme.Name) == stamp {
 		return nil
 	}
 
@@ -358,13 +363,40 @@ func (s *Server) reconfigureIfChanged() error {
 	if err != nil {
 		return err
 	}
+	stamp = s.templatesStamp(next.Config.Theme.Name)
 
 	s.mu.Lock()
-	s.site, s.configHash = next, hash
+	s.site, s.configHash, s.templates = next, hash, stamp
 	s.mu.Unlock()
 
 	s.log.Info("configuration reloaded")
 	return nil
+}
+
+// templatesStamp fingerprints the site's own layouts and the files of an
+// installed theme, by path, size and modification time.
+func (s *Server) templatesStamp(themeName string) string {
+	dirs := []string{filepath.Join(s.root, theme.LayoutsDir)}
+	if themeName != "" && themeName != site.BuiltinTheme && content.ValidThemeName(themeName) {
+		dirs = append(dirs, filepath.Join(s.root, site.ThemesDir, themeName))
+	}
+	sum := sha256.New()
+	for _, dir := range dirs {
+		// A theme linked in from elsewhere is fingerprinted where it lives.
+		if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+			dir = resolved
+		}
+		_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
+			}
+			if info, err := d.Info(); err == nil {
+				_, _ = fmt.Fprintf(sum, "%s %d %d\n", p, info.Size(), info.ModTime().UnixNano())
+			}
+			return nil
+		})
+	}
+	return hex.EncodeToString(sum.Sum(nil))
 }
 
 func (s *Server) readConfigHash() string {

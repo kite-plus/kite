@@ -983,3 +983,39 @@ func TestAServerThatNeedsNoSetupHasNoFlow(t *testing.T) {
 		t.Error("a server that already has an account is waiting to be set up")
 	}
 }
+
+// A running server draws with a template as it is now, not as it was when
+// the page was first asked for: a theme being written, or one replaced from
+// the admin, would otherwise need a restart to be seen.
+func TestAnEditedTemplateIsDrawnWithoutARestart(t *testing.T) {
+	root := newProject(t, 1)
+	template := filepath.Join(root, "layouts", "page", "single.html")
+	if err := os.MkdirAll(filepath.Dir(template), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	draw := func(text string) {
+		t.Helper()
+		if err := os.WriteFile(template, []byte(`{{ define "main" }}`+text+`{{ end }}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page := func(srv *serve.Server) string {
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/about/", nil))
+		return rec.Body.String()
+	}
+
+	draw("first draft")
+	srv := newServer(t, root, serve.Options{})
+	if got := page(srv); !strings.Contains(got, "first draft") {
+		t.Fatalf("page does not use the site's template:\n%s", got)
+	}
+
+	draw("second draft, a little longer")
+	if err := srv.Reload(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := page(srv); !strings.Contains(got, "second draft") {
+		t.Errorf("the edited template was not used:\n%s", got)
+	}
+}
