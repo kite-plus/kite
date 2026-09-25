@@ -56,6 +56,11 @@ export type ContentType = components["schemas"]["ContentType"];
 export type Taxonomy = components["schemas"]["Taxonomy"];
 export type TermCount = components["schemas"]["TermCount"];
 export type Settings = components["schemas"]["Settings"];
+export type Field = components["schemas"]["Field"];
+export type ThemeInfo = components["schemas"]["ThemeInfo"];
+export type ThemeDetail = components["schemas"]["ThemeDetail"];
+export type ThemeExists = components["schemas"]["ThemeExists"];
+export type Media = components["schemas"]["Media"];
 export type ErrorBody = components["schemas"]["ErrorBody"];
 
 /** ApiError carries the server's machine-readable code, not just a message. */
