@@ -9,6 +9,8 @@
 .kite-editor {
   --tt-toolbar-bg-color: var(--background);
   --tt-toolbar-border-color: var(--divider);
+  // The bar below, which the search panel opens under.
+  --tt-toolbar-height: 48px;
 
   position: relative;
   // The toolbar reads the column's width, not the window's.
@@ -18,41 +20,47 @@
 /* =====================
      TOOLBAR
      ===================== */
-// Sized as the admin design draws its toolbar: 28px buttons on a 43px bar,
-// in the grey of the rest of its chrome.
+// 32px buttons with 18px icons on a 48px bar, in the color of the text:
+// the admin design's 28px grey tools were too faint and small to read.
 .tiptap-toolbar.kite-toolbar[data-variant="fixed"] {
   flex-shrink: 0;
   min-height: 0;
   gap: 2px;
-  padding: 7px 14px;
+  padding: 8px 14px;
 
   .tiptap-toolbar-group {
     gap: 2px;
   }
 
   .tiptap-separator[data-orientation="vertical"] {
-    height: 16px;
-    margin: 0 5px;
+    height: 20px;
+    margin: 0 6px;
     background-color: var(--border);
   }
 
   .tiptap-button {
-    --tt-button-default-icon-color: var(--foreground-3);
-    --tt-button-default-text-color: var(--foreground-3);
-    --tt-button-default-dropdown-arrows-color: var(--foreground-3);
+    --tt-button-default-icon-color: var(--foreground);
+    --tt-button-default-text-color: var(--foreground);
+    --tt-button-default-dropdown-arrows-color: var(--foreground);
     --tt-button-hover-bg-color: var(--muted);
     --tt-button-hover-icon-color: var(--foreground);
     --tt-button-hover-text-color: var(--foreground);
+    --tt-button-hover-dropdown-arrows-color: var(--foreground);
 
-    height: 28px;
-    min-width: 28px;
-    padding: 0 6px;
+    height: 32px;
+    min-width: 32px;
+    padding: 0 7px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 13px;
 
     .tiptap-button-icon {
-      width: 15px;
-      height: 15px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .tiptap-button-dropdown-small {
+      width: 12px;
+      height: 12px;
     }
   }
 
@@ -81,7 +89,7 @@
 
 .kite-toolbar-note {
   padding: 0 0.5rem;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   white-space: nowrap;
   color: var(--tt-gray-light-a-500);
 

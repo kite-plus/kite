@@ -76,7 +76,7 @@ export function EditorToolbar({ editor, mode, onMode, onPickImage, base }: Props
         type="button"
         aria-pressed={mode === "source"}
         onClick={() => onMode(mode === "source" ? "visual" : "source")}
-        className="h-[26px] shrink-0 rounded-[6px] bg-muted px-2.5 text-xs whitespace-nowrap text-muted-foreground outline-none transition-colors hover:bg-border focus-visible:ring-2 focus-visible:ring-ring/50 aria-pressed:bg-input aria-pressed:font-medium aria-pressed:text-foreground"
+        className="h-8 shrink-0 rounded-md bg-muted px-3 text-[13px] whitespace-nowrap text-foreground outline-none transition-colors hover:bg-border focus-visible:ring-2 focus-visible:ring-ring/50 aria-pressed:bg-input aria-pressed:font-medium"
       >
         {t("editor.source")}
       </button>
