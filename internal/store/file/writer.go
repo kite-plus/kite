@@ -452,7 +452,14 @@ func (w *Writer) putSettings(op content.PutSettings, res *content.Result) error 
 		if len(parts) < 1 || slices.Contains(parts, "") {
 			return fmt.Errorf("%w: setting path %q", content.ErrInvalid, dotted)
 		}
-		if err := doc.SetNested(parts[:len(parts)-1], parts[len(parts)-1], op.Values[dotted]); err != nil {
+		section, key := parts[:len(parts)-1], parts[len(parts)-1]
+		if op.Values[dotted] == nil {
+			if err := doc.DeleteNested(section, key); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := doc.SetNested(section, key, op.Values[dotted]); err != nil {
 			return err
 		}
 	}

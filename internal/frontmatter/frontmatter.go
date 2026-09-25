@@ -566,10 +566,25 @@ func (d *Document) applyEdits() ([]string, error) {
 // reorder its keys and drop the comments inside it, which is the one thing
 // this package exists to prevent.
 func (d *Document) SetNested(path []string, key string, value any) error {
+	return d.editNested(path, key, value, false)
+}
+
+// DeleteNested removes a key inside a nested mapping, as a theme setting
+// does when it goes back to the theme's default. A section the removal
+// leaves empty goes too. Removing a key that is not there changes nothing.
+func (d *Document) DeleteNested(path []string, key string) error {
+	return d.editNested(path, key, nil, true)
+}
+
+func (d *Document) editNested(path []string, key string, value any, remove bool) error {
 	if d.toml != nil {
 		return fmt.Errorf("frontmatter: nested keys in TOML are not edited")
 	}
 	if len(path) == 0 {
+		if remove {
+			d.Delete(key)
+			return nil
+		}
 		return d.Set(key, value)
 	}
 
@@ -582,16 +597,29 @@ func (d *Document) SetNested(path []string, key string, value any) error {
 		block, indent, ok = d.block(path[0])
 	}
 	if !ok {
-		// Nothing is there to preserve, so building the section whole costs
-		// nothing.
-		return d.Set(path[0], nest(path[1:], key, value))
+		// No block is there to preserve: the section is missing, or written
+		// on one line as {a: b}, and is rewritten whole with the edit in it.
+		var section map[string]any
+		if node := d.effectiveValue(path[0]); node != nil {
+			_ = node.Decode(&section)
+		}
+		if section == nil {
+			if remove {
+				return nil
+			}
+			section = make(map[string]any)
+		}
+		if !editMap(section, path[1:], key, value, remove) {
+			return nil
+		}
+		return d.Set(path[0], section)
 	}
 
 	sub, err := ParseYAML([]byte(strings.Join(block, "\n") + "\n"))
 	if err != nil {
 		return fmt.Errorf("frontmatter: %s: %w", path[0], err)
 	}
-	if err := sub.SetNested(path[1:], key, value); err != nil {
+	if err := sub.editNested(path[1:], key, value, remove); err != nil {
 		return err
 	}
 	if !sub.Dirty() {
@@ -601,6 +629,10 @@ func (d *Document) SetNested(path []string, key string, value any) error {
 	out, err := sub.Bytes()
 	if err != nil {
 		return err
+	}
+	if remove && strings.TrimSpace(string(out)) == "" {
+		d.Delete(path[0])
+		return nil
 	}
 	edited := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
 
@@ -615,6 +647,31 @@ func (d *Document) SetNested(path []string, key string, value any) error {
 	}
 	d.edits = append(d.edits, pendingEdit{kind: editLines, key: path[0], lines: lines, indent: indent})
 	return nil
+}
+
+// editMap makes an edit in a decoded section, reporting whether it changed
+// anything.
+func editMap(section map[string]any, path []string, key string, value any, remove bool) bool {
+	if len(path) == 0 {
+		if remove {
+			if _, ok := section[key]; !ok {
+				return false
+			}
+			delete(section, key)
+			return true
+		}
+		section[key] = value
+		return true
+	}
+	next, _ := section[path[0]].(map[string]any)
+	if next == nil {
+		if remove {
+			return false
+		}
+		next = make(map[string]any)
+		section[path[0]] = next
+	}
+	return editMap(next, path[1:], key, value, remove)
 }
 
 // pendingBlock returns a section as an edit already made in this batch left
@@ -670,14 +727,6 @@ func (d *Document) block(key string) ([]string, string, bool) {
 		out = append(out, strings.TrimPrefix(l, indent))
 	}
 	return out, indent, true
-}
-
-// nest builds the mapping a missing section would have to hold.
-func nest(path []string, key string, value any) map[string]any {
-	if len(path) == 0 {
-		return map[string]any{key: value}
-	}
-	return map[string]any{path[0]: nest(path[1:], key, value)}
 }
 
 func (d *Document) keyNode(key string) *yaml.Node {

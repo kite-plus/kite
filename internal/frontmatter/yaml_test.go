@@ -1,8 +1,11 @@
 package frontmatter_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/kite-plus/kite/internal/frontmatter"
 )
@@ -263,5 +266,101 @@ build:
 		if strings.Contains(got, gone) {
 			t.Errorf("%q was not replaced:\n%s", gone, got)
 		}
+	}
+}
+
+// A theme setting that goes back to its default is removed from the file,
+// so that the theme's default applies again, including a default the theme
+// changes later. The keys and comments around it stay as they were.
+func TestDeletingANestedKeyLeavesItsNeighbours(t *testing.T) {
+	const src = `theme:
+  name: default   # the one built in
+  settings:
+    # Brand color, picked to match the logo.
+    accent: "#4a77d6"
+    show_toc: false
+`
+	doc, err := frontmatter.ParseYAML([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.DeleteNested([]string{"theme", "settings"}, "show_toc"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := doc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `theme:
+  name: default   # the one built in
+  settings:
+    # Brand color, picked to match the logo.
+    accent: "#4a77d6"
+`
+	if string(out) != want {
+		t.Errorf("got\n%s\nwant\n%s", out, want)
+	}
+}
+
+func TestDeletingTheLastKeyRemovesTheSection(t *testing.T) {
+	doc, err := frontmatter.ParseYAML([]byte("theme:\n  name: paper\n  settings:\n    accent: blue\nbuild:\n  pageSize: 5\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.DeleteNested([]string{"theme", "settings"}, "accent"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := doc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "theme:\n  name: paper\nbuild:\n  pageSize: 5\n"; string(out) != want {
+		t.Errorf("got\n%s\nwant\n%s", out, want)
+	}
+}
+
+func TestDeletingWhatIsNotThereChangesNothing(t *testing.T) {
+	const src = "theme:\n  name: paper\n"
+	doc, err := frontmatter.ParseYAML([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range [][]string{{"theme", "settings"}, {"site"}, {"theme"}} {
+		if err := doc.DeleteNested(path, "accent"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if doc.Dirty() {
+		t.Error("removing absent keys marked the document changed")
+	}
+}
+
+// A section written on one line has no block to edit in place. Setting a key
+// in it used to replace the whole section with just that key.
+func TestAnEditKeepsTheRestOfASectionWrittenOnOneLine(t *testing.T) {
+	doc, err := frontmatter.ParseYAML([]byte("theme: {name: paper, settings: {accent: blue, show_toc: true}}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.SetNested([]string{"theme", "settings"}, "columns", 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.DeleteNested([]string{"theme", "settings"}, "show_toc"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := doc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{"theme": map[string]any{
+		"name":     "paper",
+		"settings": map[string]any{"accent": "blue", "columns": 2},
+	}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v\nwant %v\n%s", got, want, out)
 	}
 }

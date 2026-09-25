@@ -141,7 +141,8 @@ type PutSettings struct {
 	IfRevision Revision
 	// Values maps a dotted path to its new value, such as "site.title" or
 	// "theme.settings.primary_color". Only the named leaves change: the keys
-	// around them, and the comments explaining them, are left alone.
+	// around them, and the comments explaining them, are left alone. A nil
+	// value removes its key, so that the default applies again.
 	Values map[string]any
 }
 
