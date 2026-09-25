@@ -20,7 +20,8 @@ export function StatusLabel({ status, className }: { status: string; className?:
   const { icon: Icon, className: tone } = statuses[status] ?? statuses.draft;
   return (
     <span className={cn("inline-flex items-center gap-2 whitespace-nowrap", tone, className)}>
-      <Icon className="size-4 shrink-0" />
+      {/* text-current keeps the status color where a parent grays out plain icons, as a select does. */}
+      <Icon className="size-4 shrink-0 text-current" />
       {t(`status.${status}` as Key)}
     </span>
   );

@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageField, SchemaForm, type Uploads } from "@/components/SchemaForm";
 import { DateTimePicker } from "@/components/DateTimePicker";
+import { StatusLabel } from "@/components/StatusLabel";
 import { TermsInput } from "@/components/editor/TermsInput";
 import { DeliveryStages, PublishProblems } from "@/components/publish/Delivery";
 
@@ -106,7 +107,7 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
               <SelectGroup>
                 {STATUSES.map((status) => (
                   <SelectItem key={status} value={status}>
-                    {t(`status.${status}` as Key)}
+                    <StatusLabel status={status} />
                   </SelectItem>
                 ))}
               </SelectGroup>
