@@ -461,9 +461,8 @@ export const en = {
 
   // Settings.
   "settings.title": "Settings",
-  "settings.description": "Written to kite.yaml, leaving everything else in it alone.",
   "settings.site": "Site",
-  "settings.siteNote": "What the site is called and where it lives, what it tells search engines, and its own code.",
+  "settings.siteNote": "What the site is called and where it lives, what it tells search engines, and its own code. Written to kite.yaml, leaving everything else in it alone.",
   "settings.interface": "Interface",
   "settings.interfaceNote": "Kept in this browser, not in the project.",
   "settings.languageNote": "The language the studio speaks, which need not be the site's.",

@@ -1,5 +1,6 @@
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import { PublishBar } from './publish-bar'
 
 type ContentSectionProps = {
   title: string
@@ -9,16 +10,19 @@ type ContentSectionProps = {
   wide?: boolean
 }
 
+// Kite: a section heads the page, with what is waiting to be published under
+// its title, since the app sidebar is the menu of the sections.
 export function ContentSection({ title, desc, children, wide }: ContentSectionProps) {
   return (
-    <div className='flex flex-1 flex-col'>
-      <div className='flex-none'>
-        <h3 className='text-lg font-medium'>{title}</h3>
-        <p className='text-sm text-muted-foreground'>{desc}</p>
+    <div className='flex flex-1 flex-col overflow-hidden'>
+      <div className='flex-none space-y-0.5'>
+        <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>{title}</h1>
+        <p className='text-muted-foreground'>{desc}</p>
       </div>
-      <Separator className='my-4 flex-none' />
+      <Separator className='my-4 flex-none lg:my-6' />
+      <PublishBar />
       <div className='faded-bottom h-full w-full overflow-y-auto scroll-smooth pe-4 pb-12'>
-        <div className={cn('-mx-1 px-1.5', !wide && 'lg:max-w-xl')}>{children}</div>
+        <div className={cn('-mx-1 px-1.5', !wide && 'lg:max-w-2xl')}>{children}</div>
       </div>
     </div>
   )

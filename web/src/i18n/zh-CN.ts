@@ -441,9 +441,8 @@ export const zhCN: Record<keyof typeof en, string> = {
   "publish.remote.diff": "查看远端的改动",
 
   "settings.title": "设置",
-  "settings.description": "写入 kite.yaml，文件里其它内容原封不动。",
   "settings.site": "站点",
-  "settings.siteNote": "站点的基本信息、给搜索引擎的信息，以及站点自己的代码。",
+  "settings.siteNote": "站点的基本信息、给搜索引擎的信息和站点自己的代码，写入 kite.yaml，文件里其它内容原封不动。",
   "settings.interface": "界面",
   "settings.interfaceNote": "保存在当前浏览器，不写入项目。",
   "settings.languageNote": "后台使用的语言，可以与站点语言不同。",
