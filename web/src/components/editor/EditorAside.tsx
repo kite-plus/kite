@@ -88,7 +88,17 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
       <Section title={t("publish.title")}>
         <div className="grid gap-2">
           <Label htmlFor="status">{t("list.status")}</Label>
-          <Select value={draft.status} onValueChange={(status) => onEdit({ status })}>
+          <Select
+            value={draft.status}
+            onValueChange={(status) =>
+              // Publishing is when the date is taken, unless one is set already.
+              onEdit(
+                status === "published" && !draft.published_at
+                  ? { status, published_at: new Date().toISOString() }
+                  : { status },
+              )
+            }
+          >
             <SelectTrigger id="status" className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -121,6 +131,18 @@ export function EditorAside({ draft, type, onEdit, delivery, publish, uploads, o
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="size-3 shrink-0" />
               {t("editor.waitsForDate", { date: date(draft.published_at, "long") })}
+            </p>
+          )}
+          {draft.status === "published" && !draft.published_at && (
+            <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+              {t("editor.noPublishDate")}
+              <button
+                type="button"
+                className="font-medium text-primary hover:underline"
+                onClick={() => onEdit({ published_at: new Date().toISOString() })}
+              >
+                {t("editor.useNow")}
+              </button>
             </p>
           )}
         </div>

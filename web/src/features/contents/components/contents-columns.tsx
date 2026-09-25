@@ -150,11 +150,24 @@ export function useContentsColumns({
               title={t(field === "published_at" ? "list.publishedAt" : "list.updatedAt")}
             />
           ),
-          cell: ({ row }) => (
-            <span className="text-muted-foreground tabular-nums">
-              {isoDate(row.original[field])}
-            </span>
-          ),
+          cell: ({ row }) => {
+            const item = row.original;
+            if (field === "updated_at") {
+              // An item that records no time shows when its file last changed.
+              return (
+                <span className="text-muted-foreground tabular-nums">
+                  {isoDate(item.updated_at ?? item.modified_at)}
+                </span>
+              );
+            }
+            // Published without a date is missing something; a draft is not.
+            if (!item.published_at && item.status === "published") {
+              return <span className="text-muted-foreground">{t("list.noDate")}</span>;
+            }
+            return (
+              <span className="text-muted-foreground tabular-nums">{isoDate(item.published_at)}</span>
+            );
+          },
           enableSorting: sortable.includes(field),
           meta: {
             title: t(field === "published_at" ? "list.publishedAt" : "list.updatedAt"),
