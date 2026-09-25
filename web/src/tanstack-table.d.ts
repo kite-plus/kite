@@ -8,5 +8,7 @@ declare module '@tanstack/react-table' {
     thClassName?: string
     /** Kite: the column's name in the view menu, in the operator's language. */
     title?: string
+    /** Kite: a click in this column's cells does not open the row's link. */
+    skipRowLink?: boolean
   }
 }

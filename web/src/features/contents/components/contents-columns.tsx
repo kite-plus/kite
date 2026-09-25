@@ -63,7 +63,7 @@ export function useContentsColumns({
         ),
         enableSorting: false,
         enableHiding: false,
-        meta: { className: "w-10" },
+        meta: { className: "w-10", skipRowLink: true },
       },
       {
         id: "title",
@@ -81,6 +81,7 @@ export function useContentsColumns({
                 <Link
                   to="/content/$kind/$id"
                   params={{ kind: item.kind, id: item.id }}
+                  data-row-link
                   className="line-clamp-1 font-medium whitespace-normal wrap-anywhere hover:underline"
                 >
                   {name}
@@ -168,7 +169,7 @@ export function useContentsColumns({
         ),
         enableSorting: false,
         enableHiding: false,
-        meta: { className: "w-10" },
+        meta: { className: "w-10", skipRowLink: true },
       },
     ],
     [t, taxonomyLabel, sortable, taxonomies, trashed, chosenTerms, onTerm, onDelete, onRestore],

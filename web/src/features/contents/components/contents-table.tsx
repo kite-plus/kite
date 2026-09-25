@@ -15,6 +15,7 @@ import {
 import type { Summary } from "@/api/client";
 import { useI18n } from "@/i18n";
 import { useTaxonomyLabel } from "@/hooks/useKindLabel";
+import { followRowLink } from "@/lib/row-link";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -193,10 +194,16 @@ export function ContentsTable({
               ))
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  onClick={followRowLink}
+                  className="has-[a[data-row-link]]:cursor-pointer"
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
+                      data-row-skip={cell.column.columnDef.meta?.skipRowLink || undefined}
                       className={cn(
                         cell.column.columnDef.meta?.className,
                         cell.column.columnDef.meta?.tdClassName,

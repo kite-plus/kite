@@ -16,6 +16,7 @@ import type { components } from "@/api/client";
 import { useI18n } from "@/i18n";
 import { useContentTypes, useTaxonomies, useTerms } from "@/hooks/useContents";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
+import { followRowLink } from "@/lib/row-link";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -82,6 +83,7 @@ export function Terms() {
             to="/content/$kind"
             params={{ kind }}
             search={{ terms: [`${taxonomy}:${row.original.term}`] }}
+            data-row-link
           >
             <TermBadge term={row.original.term} className="transition-opacity hover:opacity-80" />
           </Link>
@@ -130,7 +132,7 @@ export function Terms() {
         ),
         enableSorting: false,
         enableHiding: false,
-        meta: { className: "w-10" },
+        meta: { className: "w-10", skipRowLink: true },
       },
     ],
     [t, kind, taxonomy, many],
@@ -203,9 +205,17 @@ export function Terms() {
                     ))
                   ) : rows.length ? (
                     rows.map((row) => (
-                      <TableRow key={row.id}>
+                      <TableRow
+                        key={row.id}
+                        onClick={followRowLink}
+                        className="has-[a[data-row-link]]:cursor-pointer"
+                      >
                         {row.getVisibleCells().map((cell) => (
-                          <TableCell key={cell.id} className={cell.column.columnDef.meta?.className}>
+                          <TableCell
+                            key={cell.id}
+                            data-row-skip={cell.column.columnDef.meta?.skipRowLink || undefined}
+                            className={cell.column.columnDef.meta?.className}
+                          >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </TableCell>
                         ))}
