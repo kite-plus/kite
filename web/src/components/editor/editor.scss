@@ -23,10 +23,12 @@
 // 32px buttons with 18px icons on a 48px bar, in the color of the text:
 // the admin design's 28px grey tools were too faint and small to read.
 .tiptap-toolbar.kite-toolbar[data-variant="fixed"] {
+  --kite-toolbar-inset: 14px;
+
   flex-shrink: 0;
   min-height: 0;
   gap: 2px;
-  padding: 8px 14px;
+  padding: 8px var(--kite-toolbar-inset);
 
   .tiptap-toolbar-group {
     gap: 2px;
@@ -67,24 +69,30 @@
   // The template docks the toolbar to the bottom of a phone screen, which
   // assumes it owns the page; here it stays under the header.
   @media (max-width: 480px) {
+    --kite-toolbar-inset: 0.5rem;
+
     position: sticky;
     top: 0;
     height: auto;
     border-top: none;
     border-bottom: 1px solid var(--tt-toolbar-border-color);
-    padding: 0 0.5rem;
+    padding: 0 var(--kite-toolbar-inset);
   }
 }
 
 // Search and the mode switch stay in reach when the tools scroll sideways.
+// They cover the bar out to its edge, or a tool shows through the inset
+// beside them, and the tools fade out as they pass beneath.
 .kite-toolbar-end {
   position: sticky;
-  right: 0;
+  right: calc(-1 * var(--kite-toolbar-inset));
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  padding-left: 0.25rem;
-  background: var(--tt-toolbar-bg-color);
+  margin-right: calc(-1 * var(--kite-toolbar-inset));
+  padding-right: var(--kite-toolbar-inset);
+  padding-left: 0.75rem;
+  background: linear-gradient(to right, transparent, var(--tt-toolbar-bg-color) 0.75rem);
 }
 
 .kite-toolbar-note {
