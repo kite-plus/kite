@@ -1,6 +1,6 @@
 # Kite 插件系统设计
 
-> 状态：设计中，运行时实现计划于 **M8** · 最近更新：2026-09-21
+> 状态：第一版实施中，范围见 [§0.1](#01-第一版实施方案2026-09-26-定)，第一版正式发布前完成 · 最近更新：2026-09-26
 > 上级文档：[architecture.md](architecture.md) · 姊妹文档：[theme-system.md](theme-system.md)
 > `[EV]` 标记的结论有既有项目的实证支撑，来源见 [证据来源](#证据来源)。
 
@@ -13,6 +13,34 @@
 但 [§12 V1 必须预留的东西](#12-v1-必须预留的东西) 里的三件事**必须在 M0 就做**，总成本约 200 行代码。不做它们，M8 就是一次 Core 重写。
 
 如果你只有五分钟，读 §12。
+
+### 0.1 第一版实施方案（2026-09-26 定）
+
+插件从 M8 提前到第一版正式发布之前。第一版只做两种能力，其余按本文后面的设计留到以后：
+
+| 能力 | 第一版 | 说明 |
+|---|---|---|
+| `client`：往页面注入代码和资源 | ✅ | 在 `plugin.yaml` 里声明，不写 WASM 也能做：统计、评论组件、公式渲染这一类插件大多只需要这个 |
+| `build`：构建期处理内容 | ✅ | WASM，挂在已有的 HookBus 上：`transform_markdown`、`transform_html`、`build_complete` |
+| `runtime`：服务端接口和存储 | ❌ | 依赖服务端部署，之后再做；因此第一版没有 `network`、`storage` 权限 |
+| `admin`：后台扩展 | ❌ | 插件的设置页不算，它由 `settings` 自动生成 |
+
+**和前文设计不同的决定：**
+
+1. **直接采用 Extism 的 ABI 和它的 Go 宿主 SDK**（`github.com/extism/go-sdk`，底层是 wazero），不再自定义 `kite_alloc` / `kite_free`。§5.1 本来就要求照抄 Extism；直接用它，Rust、JS、Go、AssemblyScript 等语言现成的 PDK 就都能写 Kite 插件，Kite 不必先自己做 SDK。§5.2 的导出名作废，`PluginABIVersion` 改为标识 Kite 的钩子约定（函数名和 JSON 形状）。
+2. **官方插件用标准 Go 写**（Go 1.24 起支持 `//go:wasmexport`，`GOOS=wasip1 -buildmode=c-shared`），不需要 TinyGo。2026-09-26 实测：2.3 MB 的模块编译约 0.5 秒（有编译缓存后只发生一次），实例化约 1 ms，调用约 16 µs。
+3. **第一版不做 `kite.lock` 的插件表**。插件和主题一样放在站点仓库的 `plugins/<id>/` 里、随仓库提交，来源和版本由 git 记录；构建期插件没有任何权限，被替换也拿不走东西。等有了 `runtime` 能力和网络权限，再按 §10 把授予的权限钉进 lock。
+4. **构建期插件拿不到真实时间和随机数**：wazero 默认给的是假时钟和固定种子，正好满足 §6.3 对纯函数的要求。
+
+**插件包**：`plugins/<id>/` 下的 `plugin.yaml`（身份、`inject` 注入规则、`hooks`、`settings`）、可选的 `plugin.wasm`、可选的 `assets/`（发布到站点的 `plugins/<id>/` 下）。`settings` 的字段类型和后台表单与主题完全共用。
+
+**站点配置**：`kite.yaml` 的 `plugins.enabled` 是启用的插件列表，顺序即执行顺序；`plugins.settings.<id>` 是各插件的设置。停用插件不会丢掉它的设置。
+
+**后台与命令行**：「系统 → 插件」列出、上传 zip 安装、启用和停用、设置、删除；安装时说明插件会往页面里加什么、从哪些网站加载内容。命令行 `kite plugin list / add / remove / verify / new`。
+
+**官方插件**（各自独立仓库 `kite-plus/plugin-<name>`，和主题的规则一致）：评论（Giscus / Waline / Twikoo）、统计（百度统计 / Umami / Google Analytics）、站内搜索（构建期生成索引 + 页面搜索框，纯静态可用）、公式与图表（KaTeX / Mermaid）。它们同时是检验插件接口够不够用的测试品。
+
+**分三步**：① 插件包、配置、注入与资源、设置、后台和命令行；② WASM 运行时和构建期钩子；③ 官方插件。
 
 ---
 
