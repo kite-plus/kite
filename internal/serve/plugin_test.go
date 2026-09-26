@@ -1,6 +1,7 @@
 package serve_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kite-plus/kite/internal/plugin"
+	"github.com/kite-plus/kite/internal/plugin/plugintest"
 	"github.com/kite-plus/kite/internal/serve"
 	"github.com/kite-plus/kite/internal/site"
 )
@@ -103,6 +106,66 @@ func TestAPluginReachesBuiltAndServedPagesAlike(t *testing.T) {
 
 	handler := newServer(t, root, serve.Options{}).Handler()
 	for _, rel := range []string{"posts/post-00/index.html", "index.html", "about/index.html", "plugins/hello/hello.css"} {
+		rec := fetch(t, handler, "/blog/"+rel)
+		if rec.Code != http.StatusOK {
+			t.Errorf("/blog/%s: status %d", rel, rec.Code)
+			continue
+		}
+		if want := read(rel); rec.Body.String() != want {
+			t.Errorf("/blog/%s differs between build and serve\n%s", rel, firstDifference(want, rec.Body.String()))
+		}
+	}
+}
+
+// A plugin's module rewrites sources and pages and writes files of its own,
+// the same in a build as in a preview.
+func TestAModuleReachesBuiltAndServedPagesAlike(t *testing.T) {
+	root := newProjectAt(t, 3, "https://example.github.io/blog/")
+	dir := filepath.Join(root, "plugins", "guest")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := plugintest.Manifest("guest", plugin.HookTransformMarkdown, plugin.HookTransformHTML, plugin.HookBuildComplete)
+	for name, body := range map[string][]byte{"plugin.yaml": []byte(manifest), "plugin.wasm": plugintest.Wasm(t)} {
+		if err := os.WriteFile(filepath.Join(dir, name), body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	about := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ900\ntitle: About\nslug: about\nstatus: published\n---\n\nFlying :kite:.\n"
+	if err := os.WriteFile(filepath.Join(root, "content", "pages", "about.md"), []byte(about), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	appendConfig(t, root, "plugins:\n  enabled: [guest]\n  settings:\n    guest: {sign: built}\n")
+
+	out := filepath.Join(root, "public")
+	if _, _, err := openSite(t, root).Build(t.Context(), site.BuildOptions{OutDir: out, Now: frozen}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	read := func(rel string) string {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(out, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+
+	if page := read("about/index.html"); !strings.Contains(page, "Flying a kite at /blog/about/.") {
+		t.Error("the page's source was not rewritten by the module")
+	}
+	if post := read("posts/post-00/index.html"); !strings.Contains(post, `<meta name="signed" content="built single /blog/posts/post-00/">`) {
+		t.Errorf("the post was not rewritten by the module with the site's settings:\n%s", post)
+	}
+	var index []struct{ URL, Title, Text string }
+	if err := json.Unmarshal([]byte(read("plugins/guest/index.json")), &index); err != nil {
+		t.Fatal(err)
+	}
+	if len(index) != 4 {
+		t.Errorf("index = %+v, want the three posts and the page", index)
+	}
+
+	handler := newServer(t, root, serve.Options{}).Handler()
+	for _, rel := range []string{"about/index.html", "posts/post-00/index.html", "index.html", "plugins/guest/index.json"} {
 		rec := fetch(t, handler, "/blog/"+rel)
 		if rec.Code != http.StatusOK {
 			t.Errorf("/blog/%s: status %d", rel, rec.Code)

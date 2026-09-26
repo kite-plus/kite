@@ -10,7 +10,9 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/hook"
 )
 
@@ -36,37 +38,62 @@ func compile(m Manifest) ([]injection, error) {
 	return out, nil
 }
 
-// Site is what injected code is told about the site.
+// Site is what a plugin is told about the site: injected code as .Site, a
+// module as site.
 type Site struct {
-	Title    string
-	BaseURL  string
-	Language string
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	BaseURL     string `json:"base_url"`
+	Language    string `json:"language"`
 }
 
-// Page is what injected code is told about the page it goes into.
+// Page is what a plugin is told about a page: injected code as .Page, a
+// module as page.
 type Page struct {
 	// URL is the page's address within the site, and Permalink the whole of
 	// it, which is what a comment thread is usually keyed on.
-	URL       string
-	Permalink string
+	URL       string `json:"url"`
+	Permalink string `json:"permalink"`
 
 	// Kind is home, single, list, taxonomy, term or notFound.
-	Kind string
+	Kind string `json:"kind"`
 
-	// ID, Title and Type are the item's, on a single page: its id, which
-	// survives a change of address, its title and its content kind.
-	ID    string
-	Title string
-	Type  string
+	// Title is the page's: its item's on a single page, and the listing's
+	// otherwise, where the page has one.
+	Title string `json:"title,omitempty"`
+
+	// The rest are the item's, on a single page: its id, which survives a
+	// change of address, its content kind, its fields and its terms.
+	ID          string              `json:"id,omitempty"`
+	Type        string              `json:"type,omitempty"`
+	Params      map[string]any      `json:"params,omitempty"`
+	Taxonomies  map[string][]string `json:"taxonomies,omitempty"`
+	PublishedAt *time.Time          `json:"published_at,omitempty"`
 }
 
-// Links tells an injector where things are published.
+// Links tells a plugin where things are published.
 type Links struct {
 	// Asset is the address of a file of the plugin's own, by its path under
 	// assets/.
 	Asset func(name string) string
 	// Absolute turns an address within the site into a whole one.
 	Absolute func(url string) string
+	// Item is the address of an item's page within the site.
+	Item func(item *content.Content) string
+}
+
+// pageOf describes a page to a plugin.
+func pageOf(url, kind string, item *content.Content, links Links) Page {
+	page := Page{URL: url, Kind: kind}
+	if links.Absolute != nil {
+		page.Permalink = links.Absolute(url)
+	}
+	if item != nil {
+		page.Title = item.Title
+		page.ID, page.Type = string(item.ID), string(item.Kind)
+		page.Params, page.Taxonomies, page.PublishedAt = item.Meta, item.Taxonomies, item.PublishedAt
+	}
+	return page
 }
 
 // Injector puts a plugin's code into the pages it covers.
@@ -143,13 +170,7 @@ func matches(have, want any) bool {
 
 // TransformHTML adds the plugin's code to a page.
 func (i *Injector) TransformHTML(_ context.Context, doc *hook.HTMLDoc) error {
-	page := Page{URL: doc.URL, Kind: doc.Kind}
-	if i.links.Absolute != nil {
-		page.Permalink = i.links.Absolute(doc.URL)
-	}
-	if doc.Item != nil {
-		page.ID, page.Title, page.Type = string(doc.Item.ID), doc.Item.Title, string(doc.Item.Kind)
-	}
+	page := pageOf(doc.URL, doc.Kind, doc.Item, i.links)
 	data := map[string]any{"Settings": i.settings, "Site": i.site, "Page": page}
 
 	var head, body bytes.Buffer

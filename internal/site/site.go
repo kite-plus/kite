@@ -166,8 +166,17 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 // loadPlugins loads the enabled plugins and puts their hooks on the bus,
 // after Kite's own and in the order the site lists them. One that does not
 // load is reported and left out rather than taking the site down with it.
+//
+// A plugin's module rewrites a page before its injections are added, so that
+// what it rewrites is the page and not another plugin's code.
 func loadPlugins(root string, cfg *config.Config, links *kurl.Resolver, bus *hook.Bus) ([]*plugin.Plugin, []string) {
-	site := plugin.Site{Title: cfg.Site.Title, BaseURL: cfg.Site.BaseURL, Language: cfg.Site.Language}
+	site := plugin.Site{
+		Title:       cfg.Site.Title,
+		Description: cfg.Site.Description,
+		BaseURL:     cfg.Site.BaseURL,
+		Language:    cfg.Site.Language,
+	}
+	cache := filepath.Join(root, filepath.FromSlash(plugin.CacheDir))
 
 	var loaded []*plugin.Plugin
 	var problems []string
@@ -177,16 +186,27 @@ func loadPlugins(root string, cfg *config.Config, links *kurl.Resolver, bus *hoo
 			problems = append(problems, err.Error())
 			continue
 		}
-		injector, err := p.Injector(cfg.Plugins.Settings[id], site, plugin.Links{
+		settings := cfg.Plugins.Settings[id]
+		at := plugin.Links{
 			Asset:    func(name string) string { return links.Rel(path.Join(plugin.Dir, id, name)) },
 			Absolute: links.Absolute,
-		})
+			Item:     links.For,
+		}
+		hooks, err := p.Hooks(context.Background(), settings, site, at, cache)
+		if err != nil {
+			problems = append(problems, err.Error())
+			continue
+		}
+		injector, err := p.Injector(settings, site, at)
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("plugin %s: %v", id, err))
 			continue
 		}
 		if injector != nil {
-			bus.Register(injector, hook.DefaultPriority+1+i)
+			hooks = append(hooks, injector)
+		}
+		for _, h := range hooks {
+			bus.Register(h, hook.DefaultPriority+1+i)
 		}
 		loaded = append(loaded, p)
 	}

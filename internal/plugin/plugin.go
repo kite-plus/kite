@@ -37,6 +37,9 @@ const (
 	AssetsDir = "assets"
 	// WasmName is the module whose exports run as build hooks.
 	WasmName = "plugin.wasm"
+	// CacheDir keeps compiled modules between runs, relative to the project
+	// root.
+	CacheDir = ".kite/cache/wasm"
 )
 
 // Bounds on a plugin package: room for a module, scripts, stylesheets and
