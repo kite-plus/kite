@@ -69,3 +69,46 @@ func TestATimeZoneMustNameAZone(t *testing.T) {
 		}
 	}
 }
+
+// Plugins were a plain list before they had settings, and such a file still
+// reads as the plugins to run.
+func TestPluginsReadAsAListOrWithTheirSettings(t *testing.T) {
+	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
+
+	cfg, err := load(t, site+"plugins: [search, comments]\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"search", "comments"}; !slices.Equal(cfg.Plugins.Enabled, want) {
+		t.Errorf("enabled = %q, want %q", cfg.Plugins.Enabled, want)
+	}
+
+	cfg, err = load(t, site+`plugins:
+  enabled: [comments]
+  settings:
+    comments: {provider: giscus}
+    search: {placeholder: Find}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(cfg.Plugins.Enabled, []string{"comments"}) {
+		t.Errorf("enabled = %q, want only comments", cfg.Plugins.Enabled)
+	}
+	// A plugin that is off keeps what it was set to.
+	if cfg.Plugins.Settings["search"]["placeholder"] != "Find" || cfg.Plugins.Settings["comments"]["provider"] != "giscus" {
+		t.Errorf("settings = %v", cfg.Plugins.Settings)
+	}
+}
+
+func TestAPluginIsNamedByAnIdOnce(t *testing.T) {
+	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
+	for _, list := range []string{"[Search]", "[my_plugin]", "[../x]", "[search, search]"} {
+		if _, err := load(t, site+"plugins: "+list+"\n"); err == nil || !strings.Contains(err.Error(), "plugins.enabled") {
+			t.Errorf("plugins: %s = %v, want a refusal naming plugins.enabled", list, err)
+		}
+	}
+	if _, err := load(t, site+"plugins: [search, code-copy]\n"); err != nil {
+		t.Errorf("valid ids were refused: %v", err)
+	}
+}

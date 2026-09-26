@@ -64,6 +64,10 @@ type HTMLDoc struct {
 	Item *content.Content
 	URL  string
 	HTML string
+
+	// Kind is the kind of page: home, single, list, taxonomy, term or
+	// notFound, for a hook that belongs on some pages and not others.
+	Kind string
 }
 
 // PageInfo describes a page that has just been written.

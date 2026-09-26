@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/kite-plus/kite/internal/hook"
 	"github.com/kite-plus/kite/internal/hook/builtin"
 	"github.com/kite-plus/kite/internal/index"
+	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/project"
 	"github.com/kite-plus/kite/internal/publish"
 	gitpub "github.com/kite-plus/kite/internal/publish/git"
@@ -49,6 +51,14 @@ type Site struct {
 	Engine   *theme.Engine
 	Markdown *markdown.Renderer
 	Hooks    *hook.Bus
+
+	// Plugins are the enabled plugins that loaded, in the order they run.
+	Plugins []*plugin.Plugin
+
+	// PluginProblems says why an enabled plugin did not load. A preview goes
+	// on without it; a build refuses, because a site published without a
+	// plugin it was set up with is not the site its author has been seeing.
+	PluginProblems []string
 
 	// publisher is made once, because it remembers what the host has said
 	// about deployments between one question and the next.
@@ -130,6 +140,7 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 		Feed:      cfg.Build.Feed,
 		FeedLimit: cfg.Build.FeedLimit,
 	})
+	plugins, pluginProblems := loadPlugins(p.Root, cfg, resolver, bus)
 
 	return &Site{
 		Project:  p,
@@ -145,9 +156,41 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 			HardWraps:      cfg.Markdown.HardWraps,
 			HighlightTheme: cfg.Markdown.HighlightTheme,
 		}),
-		Hooks:     bus,
-		publisher: newPublisher(p, cfg),
+		Hooks:          bus,
+		Plugins:        plugins,
+		PluginProblems: pluginProblems,
+		publisher:      newPublisher(p, cfg),
 	}, nil
+}
+
+// loadPlugins loads the enabled plugins and puts their hooks on the bus,
+// after Kite's own and in the order the site lists them. One that does not
+// load is reported and left out rather than taking the site down with it.
+func loadPlugins(root string, cfg *config.Config, links *kurl.Resolver, bus *hook.Bus) ([]*plugin.Plugin, []string) {
+	site := plugin.Site{Title: cfg.Site.Title, BaseURL: cfg.Site.BaseURL, Language: cfg.Site.Language}
+
+	var loaded []*plugin.Plugin
+	var problems []string
+	for i, id := range cfg.Plugins.Enabled {
+		p, err := plugin.Open(root, id)
+		if err != nil {
+			problems = append(problems, err.Error())
+			continue
+		}
+		injector, err := p.Injector(cfg.Plugins.Settings[id], site, plugin.Links{
+			Asset:    func(name string) string { return links.Rel(path.Join(plugin.Dir, id, name)) },
+			Absolute: links.Absolute,
+		})
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("plugin %s: %v", id, err))
+			continue
+		}
+		if injector != nil {
+			bus.Register(injector, hook.DefaultPriority+1+i)
+		}
+		loaded = append(loaded, p)
+	}
+	return loaded, problems
 }
 
 func newPublisher(p *project.Project, cfg *config.Config) publish.Publisher {
@@ -268,6 +311,9 @@ func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []str
 	if len(s.Problems) > 0 {
 		return build.Stats{}, nil, fmt.Errorf("%s", strings.Join(s.Problems, "\n"))
 	}
+	if len(s.PluginProblems) > 0 {
+		return build.Stats{}, nil, fmt.Errorf("%s", strings.Join(s.PluginProblems, "\n"))
+	}
 
 	outDir := opts.OutDir
 	if outDir == "" {
@@ -289,6 +335,15 @@ func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []str
 	if err := emitter.CopyTree(s.Theme.Assets, "assets"); err != nil {
 		_ = emitter.Discard()
 		return build.Stats{}, nil, err
+	}
+	for _, p := range s.Plugins {
+		if p.Assets == nil {
+			continue
+		}
+		if err := emitter.CopyTree(p.Assets, path.Join(plugin.Dir, p.Manifest.ID)); err != nil {
+			_ = emitter.Discard()
+			return build.Stats{}, nil, err
+		}
 	}
 	staticDir := filepath.Join(s.Project.Root, "static")
 	if info, err := os.Stat(staticDir); err == nil && info.IsDir() {

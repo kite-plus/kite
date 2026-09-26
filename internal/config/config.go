@@ -167,6 +167,34 @@ type Build struct {
 	FeedLimit int    `yaml:"feedLimit,omitempty"`
 }
 
+// Plugins chooses the plugins a site runs and holds their settings.
+type Plugins struct {
+	// Enabled lists the plugins that run, in the order they run, so that two
+	// of them working on the same page always do so in the same sequence and
+	// a build comes out the same every time.
+	Enabled []string `yaml:"enabled,omitempty"`
+
+	// Settings holds each plugin's settings by its id. A plugin that is
+	// turned off keeps them, and finds them again when it is turned back on.
+	Settings map[string]map[string]any `yaml:"settings,omitempty"`
+}
+
+// UnmarshalYAML also reads a plain list, as the plugins to run.
+func (p *Plugins) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.SequenceNode {
+		return node.Decode(&p.Enabled)
+	}
+	type plain Plugins
+	return node.Decode((*plain)(p))
+}
+
+// pluginID is the shape of a plugin's id: the name of its directory under
+// plugins/, and the key of its settings.
+var pluginID = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+// ValidPluginID reports whether an id can name a plugin.
+func ValidPluginID(id string) bool { return pluginID.MatchString(id) }
+
 // Publish configures how content reaches its destination.
 type Publish struct {
 	Publisher string `yaml:"publisher,omitempty"`
@@ -182,7 +210,7 @@ type Config struct {
 	Markdown Markdown `yaml:"markdown,omitempty"`
 	Build    Build    `yaml:"build,omitempty"`
 	Publish  Publish  `yaml:"publish,omitempty"`
-	Plugins  []string `yaml:"plugins,omitempty"`
+	Plugins  Plugins  `yaml:"plugins,omitempty"`
 }
 
 // Default returns the configuration of a site that specifies nothing.
@@ -294,6 +322,16 @@ func (c *Config) Validate() error {
 	}
 	if strings.Contains(c.Build.Output, "..") {
 		return fmt.Errorf("config: build.output must stay inside the project")
+	}
+	seen := make(map[string]bool, len(c.Plugins.Enabled))
+	for _, id := range c.Plugins.Enabled {
+		switch {
+		case !ValidPluginID(id):
+			return fmt.Errorf("config: plugins.enabled: %q is not a plugin id (want lowercase words joined by -)", id)
+		case seen[id]:
+			return fmt.Errorf("config: plugins.enabled lists %q twice", id)
+		}
+		seen[id] = true
 	}
 	return nil
 }

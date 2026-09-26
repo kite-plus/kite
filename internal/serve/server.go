@@ -33,6 +33,7 @@ import (
 	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/render"
 	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/setup"
@@ -197,7 +198,7 @@ func NewWithClock(ctx context.Context, s *site.Site, opts Options, now func() ti
 	}
 	srv.previews = newPreviews(srv)
 	srv.configHash = srv.readConfigHash()
-	srv.templates = srv.templatesStamp(s.Config.Theme.Name)
+	srv.templates = srv.templatesStamp(s.Config)
 	if err := srv.Reload(ctx); err != nil {
 		return nil, err
 	}
@@ -404,7 +405,7 @@ func (s *Server) reconfigureIfChanged() error {
 	s.mu.RLock()
 	current, known, stamp := s.site, s.configHash, s.templates
 	s.mu.RUnlock()
-	if hash == known && s.templatesStamp(current.Config.Theme.Name) == stamp {
+	if hash == known && s.templatesStamp(current.Config) == stamp {
 		return nil
 	}
 
@@ -412,7 +413,7 @@ func (s *Server) reconfigureIfChanged() error {
 	if err != nil {
 		return err
 	}
-	stamp = s.templatesStamp(next.Config.Theme.Name)
+	stamp = s.templatesStamp(next.Config)
 
 	s.mu.Lock()
 	s.site, s.configHash, s.templates = next, hash, stamp
@@ -422,11 +423,18 @@ func (s *Server) reconfigureIfChanged() error {
 	return nil
 }
 
-// templatesStamp fingerprints the site's own layouts and what an installed
-// theme is assembled from, its manifest, layouts and language packs, by path,
-// size and modification time. Its static files are read on every request.
-func (s *Server) templatesStamp(themeName string) string {
+// templatesStamp fingerprints the site's own layouts, what an installed theme
+// is assembled from, its manifest, layouts and language packs, and the
+// directory of each enabled plugin, by path, size and modification time. A
+// theme's static files are read on every request.
+func (s *Server) templatesStamp(cfg *config.Config) string {
+	themeName := cfg.Theme.Name
 	paths := []string{filepath.Join(s.root, theme.LayoutsDir)}
+	for _, id := range cfg.Plugins.Enabled {
+		if config.ValidPluginID(id) {
+			paths = append(paths, filepath.Join(s.root, plugin.Dir, id))
+		}
+	}
 	if themeName != "" && themeName != site.BuiltinTheme && content.ValidThemeName(themeName) {
 		dir := filepath.Join(s.root, site.ThemesDir, themeName)
 		// A theme linked in from elsewhere is fingerprinted where it lives.
@@ -658,6 +666,11 @@ func staticRoots(root string, current *site.Site) []fs.FS {
 	}
 	if current.Theme.Assets != nil {
 		roots = append(roots, prefixed{fsys: current.Theme.Assets, prefix: "assets/"})
+	}
+	for _, p := range current.Plugins {
+		if p.Assets != nil {
+			roots = append(roots, prefixed{fsys: p.Assets, prefix: path.Join(plugin.Dir, p.Manifest.ID) + "/"})
+		}
 	}
 	return roots
 }

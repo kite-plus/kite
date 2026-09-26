@@ -489,11 +489,20 @@ func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req 
 		return nil, info, fmt.Errorf("build: %s: %w", t.ID(), err)
 	}
 
-	doc := hook.HTMLDoc{Item: t.Item, URL: t.URL, HTML: string(html)}
+	doc := hook.HTMLDoc{Item: t.Item, URL: t.URL, HTML: string(html), Kind: hookKind(t.Kind)}
 	if err := b.opts.Hooks.TransformHTML(ctx, &doc); err != nil {
 		return nil, info, err
 	}
 	return []byte(doc.HTML), describe(t, page), nil
+}
+
+// hookKind names a kind of page for hooks, which read "notFound" more easily
+// than the status code a theme's template is named after.
+func hookKind(k render.Kind) string {
+	if k == render.KindNotFound {
+		return "notFound"
+	}
+	return string(k)
 }
 
 // describe is what hooks are told about a rendered target.

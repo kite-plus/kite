@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/kite-plus/kite/internal/config"
 )
 
 // A theme linked into themes/, as one being written in its own repository
@@ -66,15 +68,16 @@ func TestOnlyWhatAThemeIsMadeOfIsFingerprinted(t *testing.T) {
 	write("example/.kite/index.db", "first")
 
 	s := &Server{root: root}
-	before := s.templatesStamp("paper")
+	paper := &config.Config{Theme: config.Theme{Name: "paper"}}
+	before := s.templatesStamp(paper)
 
 	write("example/.kite/index.db", "written again, and longer")
-	if s.templatesStamp("paper") != before {
+	if s.templatesStamp(paper) != before {
 		t.Error("a file the theme is not made of changed its fingerprint")
 	}
 
 	write("layouts/single.html", "edited, and longer")
-	if s.templatesStamp("paper") == before {
+	if s.templatesStamp(paper) == before {
 		t.Error("an edited template left the fingerprint as it was")
 	}
 }
