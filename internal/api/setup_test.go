@@ -196,3 +196,51 @@ func TestAServerWithNoSetupFlowBehavesExactlyAsBefore(t *testing.T) {
 		t.Error("a server with nothing to set up asks to be set up")
 	}
 }
+
+// A folder with no site yet is set up by naming the site: the form asks for
+// no account, answers are checked as settings are, and a good one creates it.
+func TestAFolderWithNoSiteIsSetUpByDescribingTheSite(t *testing.T) {
+	var made []setup.Site
+	flow := setup.NewSite(setup.Site{BaseURL: "http://localhost:1717"}, func(site setup.Site) error {
+		made = append(made, site)
+		return nil
+	})
+	srv := api.New(api.Options{Site: func() api.View { return api.View{} }, Setup: flow})
+	mux := http.NewServeMux()
+	srv.Mount(mux)
+
+	state := decode[api.SetupState](t, send(t, mux, http.MethodGet, api.Prefix+"/setup", nil, nil))
+	if !state.Required || !state.NewSite || state.MinPasswordLength != 0 || state.User != "" {
+		t.Errorf("state = %+v, want a new site with no account to create", state)
+	}
+	if state.Site == nil || state.Site.BaseURL != "http://localhost:1717" {
+		t.Errorf("state.Site = %+v, want the default address", state.Site)
+	}
+
+	nameless := send(t, mux, http.MethodPost, api.Prefix+"/setup",
+		map[string]any{"site": map[string]any{"title": " ", "base_url": "http://localhost:1717"}}, nil)
+	if nameless.Code != http.StatusBadRequest || decode[api.ErrorBody](t, nameless).Error.Field != "site.title" {
+		t.Errorf("a nameless site: status %d, body %s", nameless.Code, nameless.Body.String())
+	}
+
+	rec := send(t, mux, http.MethodPost, api.Prefix+"/setup", map[string]any{"site": map[string]any{
+		"title": " 林间笔记 ", "base_url": "https://notes.example.com", "language": "zh-CN",
+	}}, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: status = %d\nbody: %s", rec.Code, rec.Body.String())
+	}
+	if info := decode[api.SessionInfo](t, rec); info.Required {
+		t.Errorf("session = %+v, want a studio that asks for nothing", info)
+	}
+	want := setup.Site{Title: "林间笔记", BaseURL: "https://notes.example.com", Language: "zh-CN"}
+	if len(made) != 1 || made[0] != want {
+		t.Errorf("created %+v, want %+v", made, want)
+	}
+
+	again := send(t, mux, http.MethodPost, api.Prefix+"/setup", map[string]any{"site": map[string]any{
+		"title": "Other", "base_url": "https://other.example.com",
+	}}, nil)
+	if again.Code != http.StatusConflict {
+		t.Errorf("a second create: status = %d, want 409", again.Code)
+	}
+}

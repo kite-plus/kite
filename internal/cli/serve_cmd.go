@@ -18,6 +18,7 @@ import (
 
 	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/auth"
+	"github.com/kite-plus/kite/internal/project"
 	"github.com/kite-plus/kite/internal/serve"
 	"github.com/kite-plus/kite/internal/site"
 	"github.com/kite-plus/kite/web"
@@ -48,6 +49,7 @@ func newRunCmd() *cobra.Command {
 		defaultAdmin:  true,
 		defaultWrite:  true,
 		open:          true,
+		create:        true,
 	})
 }
 
@@ -59,6 +61,10 @@ type commandShape struct {
 	defaultAdmin     bool
 	defaultWrite     bool
 	open             bool
+
+	// create offers to start a site in an empty folder rather than refusing
+	// to serve one that is not there.
+	create bool
 }
 
 func serveCommand(shape commandShape) *cobra.Command {
@@ -89,16 +95,32 @@ func serveCommand(shape commandShape) *cobra.Command {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 
+			listenAddr, err := resolveAddr(addr, port)
+			if err != nil {
+				return err
+			}
+
+			level := slog.LevelInfo
+			if quiet {
+				level = slog.LevelWarn
+			}
+			log := slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), &slog.HandlerOptions{Level: level}))
+
+			if shape.create {
+				started, err := startHere(ctx, cmd, wd, listenAddr, open && admin, admin && write, log)
+				if err != nil {
+					return err
+				}
+				// The browser is already on the studio it created the
+				// site in, and is not sent a second one.
+				open = open && !started
+			}
+
 			s, err := site.Open(ctx, wd)
 			if err != nil {
 				return err
 			}
 			defer func() { _ = s.Close() }()
-
-			listenAddr, err := resolveAddr(addr, port)
-			if err != nil {
-				return err
-			}
 
 			// The account is read once, here, so that the server is handed a
 			// decision rather than a file to consult. A change made in the
@@ -109,12 +131,6 @@ func serveCommand(shape commandShape) *cobra.Command {
 				return err
 			}
 			guard := auth.New(account)
-
-			level := slog.LevelInfo
-			if quiet {
-				level = slog.LevelWarn
-			}
-			log := slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), &slog.HandlerOptions{Level: level}))
 
 			srv, err := serve.New(ctx, s, serve.Options{
 				Addr:       listenAddr,
@@ -192,6 +208,34 @@ func serveCommand(shape commandShape) *cobra.Command {
 	cmd.Flags().BoolVar(&open, "open", shape.open, "open the site in a browser")
 	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "only log warnings and errors")
 	return cmd
+}
+
+// startHere creates a site in dir through the browser when dir is an empty
+// folder with no site above it, and reports whether it did. Anywhere else it
+// leaves the refusal to opening the project, which says what to do.
+func startHere(ctx context.Context, cmd *cobra.Command, dir, addr string, open, writable bool, log *slog.Logger) (bool, error) {
+	if _, err := project.Open(dir); !errors.Is(err, project.ErrNotFound) {
+		return false, nil
+	}
+	empty, err := emptyFolder(dir)
+	if err != nil {
+		return false, err
+	}
+	switch {
+	case !empty:
+		return false, fmt.Errorf("%w\n\n"+
+			"run kite run in an empty folder to create a site there, or kite init here", project.ErrNotFound)
+	case !writable:
+		return false, fmt.Errorf("%w\n\nrun it with --admin and --write to create a site here", project.ErrNotFound)
+	case !auth.Loopback(addr):
+		// A site anybody on the network could create is a server anybody
+		// could claim; making one is a thing to do on this machine.
+		return false, fmt.Errorf("%w\n\nrun kite init here, or create the site on localhost first", project.ErrNotFound)
+	}
+	if err := firstRun(ctx, cmd, dir, addr, open, log); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // resolveAddr turns the address flags into something to listen on, asking the

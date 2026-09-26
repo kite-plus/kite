@@ -431,7 +431,7 @@ export interface paths {
         /** Report whether this server still has to be set up. */
         get: operations["getSetupState"];
         put?: never;
-        /** Describe the site and create the account that guards it. */
+        /** Describe the site and create the account that guards it; in a folder with no site yet, create the site instead, with no account. */
         post: operations["setUp"];
         delete?: never;
         options?: never;
@@ -843,6 +843,7 @@ export interface components {
         };
         SetupState: {
             min_password_length?: number;
+            new_site?: boolean;
             required: boolean;
             site?: components["schemas"]["SiteSettings"];
             user?: string;

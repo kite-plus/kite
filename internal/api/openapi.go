@@ -211,7 +211,8 @@ func openAPI() *document {
 				},
 				Post: &operation{
 					OperationID: "setUp",
-					Summary:     "Describe the site and create the account that guards it.",
+					Summary: "Describe the site and create the account that guards it; in a folder " +
+						"with no site yet, create the site instead, with no account.",
 					Security:    &public,
 					RequestBody: body(ref(SetupRequest{})),
 					Responses: ok(ref(SessionInfo{}),

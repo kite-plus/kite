@@ -33,6 +33,11 @@ type SetupState struct {
 	// MinPasswordLength lets the form refuse a short password before asking
 	// the server to.
 	MinPasswordLength int `json:"min_password_length,omitempty"`
+
+	// NewSite is a folder with no site in it yet. Setup then creates the site
+	// and asks for no account, since such a server listens on this machine
+	// only; the form is the site's half alone.
+	NewSite bool `json:"new_site,omitempty"`
 }
 
 // SetupRequest finishes the first run: it describes the site and creates the
@@ -57,6 +62,15 @@ var setupPaths = map[string]bool{
 func (s *Server) handleSetupState(w http.ResponseWriter, _ *http.Request) {
 	if !s.setup.Pending() {
 		writeJSON(w, http.StatusOK, SetupState{Required: false})
+		return
+	}
+	if s.setup.CreatesSite() {
+		d := s.setup.Defaults()
+		writeJSON(w, http.StatusOK, SetupState{
+			Required: true,
+			NewSite:  true,
+			Site:     &SiteSettings{Title: d.Title, Description: d.Description, BaseURL: d.BaseURL, Language: d.Language},
+		})
 		return
 	}
 
@@ -88,6 +102,10 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 	req, ok := decodeJSON[SetupRequest](s, w, r)
 	if !ok {
+		return
+	}
+	if s.setup.CreatesSite() {
+		s.createSite(w, req.Site)
 		return
 	}
 
@@ -140,6 +158,27 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		User:          session.User,
 		ExpiresAt:     session.Expires,
 	})
+}
+
+// createSite finishes the first run of a folder with no site in it: the
+// answers become the project, checked as the settings page checks them.
+func (s *Server) createSite(w http.ResponseWriter, answers SiteSettings) {
+	if _, valid := setupSettings(w, answers); !valid {
+		return
+	}
+	site := setup.Site{
+		Title:       strings.TrimSpace(answers.Title),
+		Description: strings.TrimSpace(answers.Description),
+		BaseURL:     strings.TrimSpace(answers.BaseURL),
+		Language:    strings.TrimSpace(answers.Language),
+	}
+	if err := s.setup.CreateSite(site); err != nil {
+		s.failSetup(w, err)
+		return
+	}
+	s.log.Info("created the site", "title", site.Title)
+	// Nothing guards the new studio: it is on this machine only.
+	writeJSON(w, http.StatusOK, SessionInfo{Required: false})
 }
 
 // setupSettings turns the form into configuration values, refusing the ones

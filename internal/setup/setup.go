@@ -29,18 +29,75 @@ import (
 // operator can act on, and it is what a second browser tab gets.
 var ErrDone = errors.New("setup: this server is already set up")
 
+// errWrongKind reports a flow asked to finish in the way it was not started
+// for: an account for a site that does not exist yet, or the reverse.
+var errWrongKind = errors.New("setup: this flow does not finish that way")
+
 // Flow is the first run of one server.
 //
 // It is created only when there is something to guide: a server with an
 // account, or one on localhost where an open studio is nobody else's
-// business, has no flow and no gate.
+// business, has no flow and no gate. The exception is a folder with no site
+// in it yet, where the first run is describing the site itself.
 type Flow struct {
 	root  string
 	guard *auth.Guard
 
+	// create writes a new project, for a flow that makes the site rather
+	// than an account; defaults are what its form starts from.
+	create   func(Site) error
+	defaults Site
+	created  chan struct{}
+
 	mu   sync.Mutex
 	done bool
 }
+
+// Site is what a new site is created with.
+type Site struct {
+	Title       string
+	Description string
+	BaseURL     string
+	Language    string
+}
+
+// NewSite starts a flow for a folder that holds no site yet.
+//
+// Finishing it describes the site and asks for no account: the studio of a
+// folder being started from scratch is on this machine only, and create
+// writes the project the answers describe.
+func NewSite(defaults Site, create func(Site) error) *Flow {
+	return &Flow{create: create, defaults: defaults, created: make(chan struct{})}
+}
+
+// CreatesSite reports whether finishing this flow creates the site rather
+// than an account.
+func (f *Flow) CreatesSite() bool { return f != nil && f.create != nil }
+
+// Defaults are what the form of a new site starts from.
+func (f *Flow) Defaults() Site { return f.defaults }
+
+// CreateSite writes the new project and closes the flow.
+func (f *Flow) CreateSite(site Site) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	switch {
+	case f.done:
+		return ErrDone
+	case f.create == nil:
+		return errWrongKind
+	}
+	if err := f.create(site); err != nil {
+		return err
+	}
+	f.done = true
+	close(f.created)
+	return nil
+}
+
+// Created is closed once the site exists, which is what the command that
+// started the flow waits for before it serves the site.
+func (f *Flow) Created() <-chan struct{} { return f.created }
 
 // New starts a flow for a project whose studio has no account yet.
 func New(root string, guard *auth.Guard) (*Flow, error) {
@@ -70,8 +127,11 @@ func (f *Flow) Pending() bool {
 func (f *Flow) Complete(user, password string) (*auth.Account, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.done {
+	switch {
+	case f.done:
 		return nil, ErrDone
+	case f.create != nil:
+		return nil, errWrongKind
 	}
 
 	account, err := auth.SetPassword(f.root, user, password)

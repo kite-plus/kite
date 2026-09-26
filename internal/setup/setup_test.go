@@ -164,3 +164,56 @@ func TestANilFlowIsAServerWithNothingToSetUp(t *testing.T) {
 		t.Error("a server that was never waiting reports that it is")
 	}
 }
+
+// A folder with no site yet is set up by describing the site, and nothing
+// else: it has no account to create, and the flow refuses to make one.
+func TestANewSiteIsCreatedOnceAndNeverGivenAnAccount(t *testing.T) {
+	var made []setup.Site
+	flow := setup.NewSite(setup.Site{BaseURL: "http://localhost:1717"}, func(site setup.Site) error {
+		made = append(made, site)
+		return nil
+	})
+
+	if !flow.CreatesSite() || !flow.Pending() {
+		t.Fatalf("CreatesSite = %v, Pending = %v, want both", flow.CreatesSite(), flow.Pending())
+	}
+	if got := flow.Defaults().BaseURL; got != "http://localhost:1717" {
+		t.Errorf("default address = %q", got)
+	}
+	if _, err := flow.Complete("admin", "correct horse battery"); err == nil {
+		t.Error("a flow for a new site created an account")
+	}
+
+	select {
+	case <-flow.Created():
+		t.Fatal("Created is closed before anything was created")
+	default:
+	}
+	if err := flow.CreateSite(setup.Site{Title: "Notes"}); err != nil {
+		t.Fatalf("CreateSite: %v", err)
+	}
+	select {
+	case <-flow.Created():
+	default:
+		t.Fatal("Created is still open after the site was created")
+	}
+	if flow.Pending() {
+		t.Error("the flow is still pending")
+	}
+	if err := flow.CreateSite(setup.Site{Title: "Again"}); !errors.Is(err, setup.ErrDone) {
+		t.Errorf("a second CreateSite = %v, want ErrDone", err)
+	}
+	if len(made) != 1 || made[0].Title != "Notes" {
+		t.Errorf("created %+v, want the one site", made)
+	}
+}
+
+func TestASiteThatCouldNotBeWrittenLeavesSetupOpen(t *testing.T) {
+	flow := setup.NewSite(setup.Site{}, func(setup.Site) error { return os.ErrPermission })
+	if err := flow.CreateSite(setup.Site{Title: "Notes"}); !errors.Is(err, os.ErrPermission) {
+		t.Fatalf("CreateSite = %v, want the write's error", err)
+	}
+	if !flow.Pending() {
+		t.Error("a failed write closed the flow, and nobody can try again")
+	}
+}

@@ -35,6 +35,10 @@ type plan struct {
 	BaseURL  string
 	Language string
 
+	// Description is what the site is about, asked only by the browser
+	// setup; the wizard leaves it for the settings page.
+	Description string
+
 	// Workflow writes the GitHub Pages deploy workflow.
 	Workflow bool
 	// Git runs git init, which the workflow is useless without.
@@ -258,9 +262,13 @@ func create(ctx context.Context, p plan) ([]string, error) {
 // version of kite already applies, and writing them out would freeze today's
 // defaults into every project created today.
 func starterConfig(p plan) string {
+	about := ""
+	if p.Description != "" {
+		about = "  description: " + yamlScalar(p.Description) + "\n"
+	}
 	return fmt.Sprintf(`site:
   title: %s
-  baseURL: %s
+%s  baseURL: %s
   language: %s
 
 content:
@@ -269,7 +277,7 @@ content:
 
 build:
   output: public
-`, yamlScalar(p.Title), yamlScalar(p.BaseURL), yamlScalar(p.Language))
+`, yamlScalar(p.Title), about, yamlScalar(p.BaseURL), yamlScalar(p.Language))
 }
 
 // yamlScalar quotes a value the way YAML needs it quoted, if it does.
