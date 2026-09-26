@@ -127,7 +127,9 @@ func (g *Guard) SignIn(w http.ResponseWriter, r *http.Request, user, password st
 	err := account.Verify(user, password)
 	g.verifying.Unlock()
 	if err != nil {
-		g.attempts.Refused(now)
+		// Timed from when the guess is known to be wrong: verifying takes
+		// long enough on a slow machine to use up the first delay otherwise.
+		g.attempts.Refused(g.now())
 		return Session{}, err
 	}
 
@@ -167,7 +169,7 @@ func (g *Guard) Confirm(password string) (*Account, error) {
 	err := account.Verify(account.user, password)
 	g.verifying.Unlock()
 	if err != nil {
-		g.attempts.Refused(now)
+		g.attempts.Refused(g.now())
 		return nil, err
 	}
 	g.attempts.Accepted()
