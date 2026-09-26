@@ -22,6 +22,8 @@ interface Props {
   placeholder: { empty: string; line: string };
   /** base is the item's own address, which its images are named relative to. */
   base?: string;
+  /** home is the path the site is previewed at, which images named from its root are under. */
+  home?: string;
   slash: SlashItem[];
   labels: { slashEmpty: string; plain: string; language: string };
   /** upload stores a dropped, pasted or picked file and resolves to the link that reaches it. */
@@ -49,6 +51,7 @@ export function RichEditor({
   onChange,
   placeholder,
   base,
+  home,
   slash,
   labels,
   upload,
@@ -57,7 +60,7 @@ export function RichEditor({
   onReady,
 }: Props) {
   // Read through a ref so the extensions, built once, always see the latest.
-  const current = { placeholder, base, slash, labels, upload, onUploadError, onChange, onExitTop, onReady };
+  const current = { placeholder, base, home, slash, labels, upload, onUploadError, onChange, onExitTop, onReady };
   const latest = useRef(current);
   latest.current = current;
 
@@ -68,6 +71,7 @@ export function RichEditor({
   const env = useMemo<Env>(
     () => ({
       base: () => latest.current.base,
+      home: () => latest.current.home ?? "/",
       placeholder: (kind) => latest.current.placeholder[kind],
       slash: () => latest.current.slash,
       labels: () => latest.current.labels,

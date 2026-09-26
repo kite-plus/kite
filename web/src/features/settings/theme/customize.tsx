@@ -412,10 +412,10 @@ function pathInside(path: string, home: string | null): string {
  */
 function useSiteUploads(): Uploads {
   const site = useSite();
-  const home = siteHome(site.data).replace(/\/$/, "");
+  const home = siteHome(site.data);
   return {
     upload: uploadSiteMedia,
-    resolve: (link) => (link.startsWith("/") && !link.startsWith("//") ? home + link : resolveLink(link)),
+    resolve: (link) => resolveLink(link, undefined, home),
   };
 }
 

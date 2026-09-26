@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem, type Key } from "@/i18n";
-import { useContentTypes } from "@/hooks/useContents";
+import { useContentTypes, useSite } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useItem } from "@/hooks/useItem";
 import { useKindLabel } from "@/hooks/useKindLabel";
@@ -14,6 +14,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { canPublish, useDelivery, usePublish } from "@/hooks/usePublish";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { useWordCount } from "@/hooks/useWordCount";
+import { siteHome } from "@/lib/links";
 import { isoDate } from "@/lib/dates";
 import { composing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,10 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const kindLabel = useKindLabel();
   const types = useContentTypes();
   const item = useItem(id, kind);
+  // Images named from the site's root are shown under its path, so the body
+  // waits for the site as it does for the item.
+  const site = useSite();
+  const home = siteHome(site.data);
   const delivery = useDelivery();
   const publish = usePublish(
     id ? [id] : [],
@@ -289,7 +294,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     setLost([]);
   };
 
-  if (item.status === "loading") {
+  if (item.status === "loading" || site.isPending) {
     return (
       <>
         <Header />
@@ -473,6 +478,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             onMode={switchMode}
             onPickImage={pick}
             base={item.base?.url}
+            home={home}
           />
 
           {mode === "source" && lost.length > 0 && (
@@ -526,6 +532,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                   onChange={(body) => item.edit({ body })}
                   placeholder={{ empty: t("editor.bodyPlaceholder"), line: t("editor.slashHint") }}
                   base={item.base?.url}
+                  home={home}
                   slash={slash}
                   labels={{
                     slashEmpty: t("editor.slashEmpty"),

@@ -25,6 +25,8 @@ import { resolveLink } from "@/lib/links";
 export interface Env {
   /** base is the address links in the body are relative to. */
   base: () => string | undefined;
+  /** home is the path the site is previewed at, which links from its root are under. */
+  home: () => string;
   placeholder: (kind: "empty" | "line") => string;
   slash: () => SlashItem[];
   labels: () => { slashEmpty: string; plain: string; language: string };
@@ -42,15 +44,15 @@ const lowlight = createLowlight(common);
  * An image whose src is kept as written -- a file name beside the page -- and
  * resolved only for the browser, so the markdown stays portable.
  */
-const RelativeImage = Image.extend<ImageOptions & { base: () => string | undefined }>({
+const RelativeImage = Image.extend<ImageOptions & { base: () => string | undefined; home: () => string }>({
   addOptions() {
-    return { ...(this.parent?.() as ImageOptions), base: () => undefined };
+    return { ...(this.parent?.() as ImageOptions), base: () => undefined, home: () => "/" };
   },
   renderHTML({ HTMLAttributes }) {
     return [
       "img",
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        src: resolveLink(String(HTMLAttributes.src ?? ""), this.options.base()),
+        src: resolveLink(String(HTMLAttributes.src ?? ""), this.options.base(), this.options.home()),
       }),
     ];
   },
@@ -110,7 +112,7 @@ export function extensions(env: Env) {
     PlainParagraph,
     HorizontalRule,
     HighlightedCode.configure({ lowlight, defaultLanguage: null, labels: () => env.labels() }),
-    RelativeImage.configure({ base: env.base }),
+    RelativeImage.configure({ base: env.base, home: env.home }),
     // The drop zone the toolbar's image button puts in. It is never saved:
     // it has no markdown, and it becomes an image once the file is up.
     ImageUploadNode.configure({

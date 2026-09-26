@@ -56,6 +56,8 @@ interface Props {
   onPickImage: () => void;
   /** base is the item's own address, which links in the body are relative to. */
   base?: string;
+  /** home is the path the site is previewed at, which links from its root are under. */
+  home?: string;
 }
 
 const searchScroll: ScrollIntoViewOptions = { block: "center" };
@@ -110,7 +112,7 @@ const extra = (label: Key) => extras.find((each) => each.label === label)!;
  * the markdown switch at the far end. Where the bar is too narrow, as beside
  * the preview, the extra tools move into a More menu rather than off its edge.
  */
-export function EditorToolbar({ editor, mode, onMode, onPickImage, base }: Props) {
+export function EditorToolbar({ editor, mode, onMode, onPickImage, base, home }: Props) {
   const { t } = useI18n();
   const isMobile = useIsBreakpoint();
   const bar = useRef<HTMLDivElement>(null);
@@ -118,7 +120,7 @@ export function EditorToolbar({ editor, mode, onMode, onPickImage, base }: Props
   const [linking, setLinking] = useState(false);
   const [searching, setSearching] = useState(false);
   const searchButton = useRef<HTMLButtonElement>(null);
-  const resolveUrl = useCallback((url: string) => resolveLink(url, base), [base]);
+  const resolveUrl = useCallback((url: string) => resolveLink(url, base, home), [base, home]);
 
   useEffect(() => {
     if (!isMobile) setLinking(false);
