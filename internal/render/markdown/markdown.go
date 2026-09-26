@@ -9,7 +9,9 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 	"unicode"
+	"unicode/utf8"
 
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/yuin/goldmark"
@@ -61,13 +63,20 @@ type Heading struct {
 	Text  string `json:"text"`
 }
 
+// ExcerptLimit is about how many characters an excerpt keeps.
+const ExcerptLimit = 220
+
 // Document is the result of rendering one body.
 type Document struct {
-	HTML    string
-	TOC     []Heading
+	HTML string
+	TOC  []Heading
+
+	// Excerpt is the prose the body opens with, as plain text, cut at a word
+	// near ExcerptLimit: what a listing shows of the item.
 	Excerpt string
-	Links   []string
-	Images  []string
+
+	Links  []string
+	Images []string
 
 	// WordCount is how many words a reader reads: those of paragraphs, list
 	// items, headings and table cells, but not of code blocks or alt text.
@@ -163,11 +172,6 @@ func collect(root ast.Node, src []byte, doc *Document) error {
 			doc.Links = append(doc.Links, string(node.URL(src)))
 		case *ast.Image:
 			doc.Images = append(doc.Images, string(node.Destination))
-		case *ast.Paragraph:
-			text := strings.TrimSpace(plainText(node, src))
-			if doc.Excerpt == "" && text != "" {
-				doc.Excerpt = truncate(text, 200)
-			}
 		}
 		if prose(n) {
 			read := readText(n, src)
@@ -182,7 +186,51 @@ func collect(root ast.Node, src []byte, doc *Document) error {
 		return ast.WalkContinue, nil
 	})
 	doc.Text = strings.TrimSuffix(plain.String(), "\n")
+	doc.Excerpt = opening(root, src)
 	return err
+}
+
+// Excerpt is the prose a markdown source opens with, as a Document of it
+// would have it, read without rendering the source.
+func Excerpt(source string) string {
+	src := []byte(source)
+	root := excerptParser().Parse(text.NewReader(src), parser.WithContext(parser.NewContext()))
+	return opening(root, src)
+}
+
+// excerptParser reads sources the way the renderer does, so that an excerpt
+// sees the same tables, footnotes and lists a page does.
+var excerptParser = sync.OnceValue(func() parser.Parser { return New(DefaultOptions()).md.Parser() })
+
+// opening is the prose a document opens with, as plain text: its paragraphs
+// and list items in order, without the headings, quotations, tables, code,
+// raw HTML and footnotes between them, cut at a word near ExcerptLimit.
+//
+// It is read from the tree rather than the source, which is what keeps an
+// underscore inside a word and an escaped asterisk: neither is emphasis.
+func opening(root ast.Node, src []byte) string {
+	var parts []string
+	length := 0
+	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		switch n.(type) {
+		case *ast.Heading, *ast.Blockquote, *ast.HTMLBlock, *east.Table, *east.FootnoteList:
+			return ast.WalkSkipChildren, nil
+		case *ast.Paragraph, *ast.TextBlock:
+			if text := strings.Join(strings.Fields(readText(n, src)), " "); text != "" {
+				parts = append(parts, text)
+				length += utf8.RuneCountInString(text) + 1
+			}
+			if length > ExcerptLimit {
+				return ast.WalkStop, nil
+			}
+			return ast.WalkSkipChildren, nil
+		}
+		return ast.WalkContinue, nil
+	})
+	return truncate(strings.Join(parts, " "), ExcerptLimit)
 }
 
 // prose reports a block whose text is read: a paragraph wherever it sits, the
@@ -294,10 +342,24 @@ func countWords(s string) (words, cjk int) {
 	return words + cjk, cjk
 }
 
+// truncate cuts s at a word near limit characters and marks the cut, so that
+// an excerpt does not end mid-word where it can help it. Text with no spaces
+// to cut at, as Chinese has, is cut at the limit.
 func truncate(s string, limit int) string {
 	runes := []rune(s)
 	if len(runes) <= limit {
 		return s
 	}
-	return strings.TrimSpace(string(runes[:limit])) + "…"
+	cut := string(runes[:limit])
+	if i := strings.LastIndexByte(cut, ' '); i > len(cut)/2 {
+		cut = cut[:i]
+	}
+	// Cut inside math between \( and \), or \[ and \], the reader would get
+	// its source rather than a formula, so the excerpt stops before it.
+	for _, pair := range [][2]string{{`\(`, `\)`}, {`\[`, `\]`}} {
+		if open := strings.LastIndex(cut, pair[0]); open >= 0 && open > strings.LastIndex(cut, pair[1]) {
+			cut = cut[:open]
+		}
+	}
+	return strings.TrimRight(cut, " ,.;:，、；：") + "…"
 }

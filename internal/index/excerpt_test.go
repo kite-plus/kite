@@ -3,6 +3,8 @@ package index
 import (
 	"strings"
 	"testing"
+
+	"github.com/kite-plus/kite/internal/render/markdown"
 )
 
 // A summary is read on its own, away from the page it came from, so none of
@@ -34,7 +36,7 @@ See [the design notes](docs/design/architecture.md) for the reasoning.
 ![a diagram](diagram.png)
 `
 
-	got := plainProse(body)
+	got := summarize("", body)
 
 	for _, unwanted := range []string{
 		"##", "|", "```", "func main", "**", "*looks*",
@@ -82,8 +84,8 @@ func TestTruncateEndsOnAWord(t *testing.T) {
 	long := strings.Repeat("alpha beta ", 60)
 	got := summarize("", long)
 
-	if len([]rune(got)) > excerptLimit+1 {
-		t.Errorf("summary is %d runes, want at most %d", len([]rune(got)), excerptLimit+1)
+	if len([]rune(got)) > markdown.ExcerptLimit+1 {
+		t.Errorf("summary is %d runes, want at most %d", len([]rune(got)), markdown.ExcerptLimit+1)
 	}
 	if !strings.HasSuffix(got, "\u2026") {
 		t.Errorf("a truncated summary should end with an ellipsis: %q", got)
@@ -102,40 +104,26 @@ func TestShortBodyIsNotTruncated(t *testing.T) {
 	}
 }
 
-func TestInlineText(t *testing.T) {
+// Markup goes and text stays, however it sits in a line: an underscore inside
+// a word is not emphasis, and a paragraph may open with a link.
+func TestSummaryKeepsTheText(t *testing.T) {
 	cases := map[string]string{
-		"plain words":                   "plain words",
-		"**bold** and *italic*":         "bold and italic",
-		"`code` inline":                 "code inline",
-		"a [link](https://example.com)": "a link",
-		"![img](x.png) after":           "after",
-		"1. numbered item":              "numbered item",
-		"- bulleted item":               "bulleted item",
-		"~~struck~~ through":            "struck through",
-		"[bare brackets]":               "bare brackets",
+		"plain words":                           "plain words",
+		"**bold** and *italic*":                 "bold and italic",
+		"`code` inline":                         "code inline",
+		"a [link](https://example.com)":         "a link",
+		"![img](x.png) after":                   "after",
+		"1. numbered item":                      "numbered item",
+		"- bulleted item":                       "bulleted item",
+		"~~struck~~ through":                    "struck through",
+		"[bare brackets]":                       "[bare brackets]",
+		"[Kite](https://example.com) is a tool": "Kite is a tool",
+		"a hit costs t_h and max_retries":       "a hit costs t_h and max_retries",
+		`an escaped \*star\*`:                   "an escaped *star*",
 	}
 	for in, want := range cases {
-		if got := inlineText(in); got != want {
-			t.Errorf("inlineText(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-func TestSkipLine(t *testing.T) {
-	for line, want := range map[string]bool{
-		"":                  true,
-		"## heading":        true,
-		"| a | b |":         true,
-		"> quote":           true,
-		"---":               true,
-		"***":               true,
-		"<div>":             true,
-		"ordinary prose":    false,
-		"- a list item":     false,
-		"a - b in a phrase": false,
-	} {
-		if got := skipLine(line); got != want {
-			t.Errorf("skipLine(%q) = %v, want %v", line, got, want)
+		if got := summarize("", in); got != want {
+			t.Errorf("summarize(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

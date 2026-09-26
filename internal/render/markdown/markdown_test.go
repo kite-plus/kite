@@ -116,7 +116,7 @@ First paragraph with five words.
 Second paragraph here.
 `, nil)
 
-	if doc.Excerpt != "First paragraph with five words." {
+	if doc.Excerpt != "First paragraph with five words. Second paragraph here." {
 		t.Errorf("Excerpt = %q", doc.Excerpt)
 	}
 	// The heading is read as well as the two paragraphs.
@@ -209,13 +209,54 @@ func TestWordCountCountsCJKCharacters(t *testing.T) {
 	}
 }
 
-func TestExcerptIsTruncated(t *testing.T) {
-	doc := render(t, strings.Repeat("word ", 200), nil)
-	if len([]rune(doc.Excerpt)) > 201 {
-		t.Errorf("excerpt not truncated: %d runes", len([]rune(doc.Excerpt)))
+func TestExcerptIsTruncatedAtAWord(t *testing.T) {
+	doc := render(t, strings.Repeat("alpha beta ", 60), nil)
+	if n := len([]rune(doc.Excerpt)); n > markdown.ExcerptLimit+1 {
+		t.Errorf("excerpt is %d runes, want at most %d", n, markdown.ExcerptLimit+1)
 	}
-	if !strings.HasSuffix(doc.Excerpt, "\u2026") {
-		t.Errorf("truncated excerpt should end with an ellipsis: %q", doc.Excerpt)
+	cut := strings.TrimSuffix(doc.Excerpt, "\u2026")
+	if cut == doc.Excerpt {
+		t.Errorf("a truncated excerpt should end with an ellipsis: %q", doc.Excerpt)
+	}
+	if !strings.HasSuffix(cut, "alpha") && !strings.HasSuffix(cut, "beta") {
+		t.Errorf("excerpt ends mid-word: %q", doc.Excerpt)
+	}
+
+	// Math a plugin has written between \( and \) is not cut in two, which
+	// would show its source.
+	math := render(t, strings.Repeat("word ", 40)+`\\(a_1 + b_1 + c_1 + d_1 + e_1 + f_1 + g_1\\) end`, nil).Excerpt
+	if strings.Contains(math, `\(`) || !strings.HasSuffix(math, "word\u2026") {
+		t.Errorf("the excerpt cuts into math: %q", math)
+	}
+
+	// Chinese has no spaces to cut at, and is cut at the limit.
+	zh := render(t, strings.Repeat("中文没有空格", 60), nil).Excerpt
+	if n := len([]rune(zh)); n != markdown.ExcerptLimit+1 {
+		t.Errorf("a Chinese excerpt is %d runes, want %d", n, markdown.ExcerptLimit+1)
+	}
+}
+
+// An excerpt is the prose a body opens with. It is read from the document
+// rather than scraped from its lines, so what is structure stays out and
+// what is text stays in, however it is written.
+func TestExcerptIsTheOpeningProse(t *testing.T) {
+	for _, tc := range []struct{ name, src, want string }{
+		{"structure left out",
+			"# Title\n\nFirst words.\n\n> A quote.\n\n| a | b |\n|---|---|\n| c | d |\n\n```go\ncode()\n```\n\n<div>html</div>\n\n- one\n- two\n\nLast words.[^1]\n\n[^1]: A footnote.\n",
+			"First words. one two Last words."},
+		{"underscores inside words", "Set max_retries and snake_case keys.", "Set max_retries and snake_case keys."},
+		{"escapes and entities", `1\. Not a list, a \*star\* &amp; more.`, "1. Not a list, a *star* & more."},
+		{"a paragraph that opens with a link", "[Kite](https://example.com) builds sites.", "Kite builds sites."},
+		{"a lone asterisk", "Two * three = six.", "Two * three = six."},
+		{"a picture", "![a tree](tree.jpg)\n\nWords after it.", "Words after it."},
+		{"a reference link defined later", "See [the notes][n].\n\nMore.\n\n[n]: https://example.com\n", "See the notes. More."},
+	} {
+		if got := render(t, tc.src, nil).Excerpt; got != tc.want {
+			t.Errorf("%s: Excerpt = %q, want %q", tc.name, got, tc.want)
+		}
+		if got := markdown.Excerpt(tc.src); got != tc.want {
+			t.Errorf("%s: Excerpt(source) = %q, want %q", tc.name, got, tc.want)
+		}
 	}
 }
 
