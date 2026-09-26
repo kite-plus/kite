@@ -159,19 +159,28 @@ func TestAModuleCannotWriteOutsideItsOwnDirectory(t *testing.T) {
 }
 
 func TestAModuleThatMisbehavesFailsTheBuildNamingThePlugin(t *testing.T) {
-	defer plugin.SetPageLimit(200 * time.Millisecond)()
 	p := loadGuest(t, plugin.HookTransformMarkdown)
-	for mode, want := range map[string]string{
-		"fail":  "refused on purpose",
-		"spin":  "took longer than 200ms",
-		"fetch": "not allowed",
-	} {
+	misbehave := func(mode string) error {
 		bus := guestBus(t, p, map[string]any{"mode": mode})
 		doc := hook.MarkdownDoc{Item: hello, Source: "text"}
-		err := bus.TransformMarkdown(t.Context(), &doc)
-		if err == nil || !strings.Contains(err.Error(), want) || !strings.Contains(err.Error(), "plugin guest") {
+		return bus.TransformMarkdown(t.Context(), &doc)
+	}
+	for mode, want := range map[string]string{
+		"fail":  "refused on purpose",
+		"fetch": "not allowed",
+	} {
+		if err := misbehave(mode); err == nil || !strings.Contains(err.Error(), want) || !strings.Contains(err.Error(), "plugin guest") {
 			t.Errorf("%s: err = %v, want one naming the plugin and saying %q", mode, err, want)
 		}
+	}
+
+	// Only the module that never stops gets a short limit: a first call also
+	// starts the module's runtime, which a slow runner can take a while over.
+	restore := plugin.SetPageLimit(200 * time.Millisecond)
+	err := misbehave("spin")
+	restore()
+	if err == nil || !strings.Contains(err.Error(), "took longer than 200ms") || !strings.Contains(err.Error(), "plugin guest") {
+		t.Errorf("spin: err = %v, want one naming the plugin and its time limit", err)
 	}
 
 	// A module that failed does not take the next page down with it.
