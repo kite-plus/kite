@@ -39,6 +39,14 @@ const (
 	WasmName = "plugin.wasm"
 )
 
+// Bounds on a plugin package: room for a module, scripts, stylesheets and
+// fonts, and none for an archive built to fill a disk.
+const (
+	MaxArchive = 64 << 20
+	MaxSize    = 128 << 20
+	MaxFiles   = 5000
+)
+
 // The hooks a module can export, named as Extism calls them.
 const (
 	HookTransformMarkdown = "transform_markdown"

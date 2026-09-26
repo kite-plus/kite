@@ -8,17 +8,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/kite-plus/kite/internal/archive"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/schema"
-)
-
-// Bounds on an uploaded plugin, as for a theme: room for a module, scripts,
-// stylesheets and fonts, and none for an archive built to fill the disk.
-const (
-	maxPluginArchive = 64 << 20
-	maxPluginSize    = 128 << 20
-	maxPluginFiles   = 5000
 )
 
 // PluginAuthor says who made a plugin.
@@ -129,23 +122,23 @@ func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = file.Close() }()
-	archive, err := io.ReadAll(io.LimitReader(file, maxPluginArchive+1))
+	sent, err := io.ReadAll(io.LimitReader(file, plugin.MaxArchive+1))
 	if err != nil {
 		s.failErr(w, err)
 		return
 	}
-	if len(archive) > maxPluginArchive {
+	if len(sent) > plugin.MaxArchive {
 		fail(w, http.StatusRequestEntityTooLarge, CodeInvalidRequest,
-			fmt.Sprintf("a plugin archive may be at most %d MB", maxPluginArchive>>20))
+			fmt.Sprintf("a plugin archive may be at most %d MB", plugin.MaxArchive>>20))
 		return
 	}
 
-	files, problem := unpackArchive(archive, "plugin", plugin.ManifestName, maxPluginSize, maxPluginFiles)
+	files, problem := archive.Unpack(sent, "plugin", plugin.ManifestName, plugin.MaxSize, plugin.MaxFiles)
 	if problem != "" {
 		failField(w, http.StatusBadRequest, CodeInvalidRequest, "file", problem)
 		return
 	}
-	manifest, err := plugin.ReadManifest(mapFS(files))
+	manifest, err := plugin.ReadManifest(archive.FS(files))
 	if err != nil {
 		failField(w, http.StatusBadRequest, CodeInvalidRequest, "file", err.Error())
 		return
@@ -153,7 +146,7 @@ func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 	// Loaded under the id it gives itself, which is the directory it will
 	// be installed in; everything else about it is checked the same way a
 	// site checks it when it loads.
-	uploaded, err := plugin.Load(mapFS(files), manifest.ID)
+	uploaded, err := plugin.Load(archive.FS(files), manifest.ID)
 	if err != nil {
 		failField(w, http.StatusBadRequest, CodeInvalidRequest, "file", err.Error())
 		return
