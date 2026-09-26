@@ -6,6 +6,8 @@ type AuthLayoutProps = {
   title: React.ReactNode
   description: React.ReactNode
   children: React.ReactNode
+  // Kite: a site being created has no pages to go back to yet.
+  noSite?: boolean
 }
 
 /**
@@ -16,7 +18,12 @@ type AuthLayoutProps = {
  * It is shadcn-admin's second sign-in page without its picture: the form
  * alone, in the middle of the page.
  */
-export function AuthLayout({ title, description, children }: AuthLayoutProps) {
+export function AuthLayout({
+  title,
+  description,
+  children,
+  noSite,
+}: AuthLayoutProps) {
   return (
     // Kite: min-h-svh rather than h-svh, so a form taller than a landscape
     // phone scrolls instead of losing its top.
@@ -34,7 +41,7 @@ export function AuthLayout({ title, description, children }: AuthLayoutProps) {
             <p className='text-sm text-muted-foreground'>{description}</p>
           </div>
           {children}
-          <AuthFooter />
+          <AuthFooter noSite={noSite} />
         </div>
       </div>
     </div>
@@ -42,15 +49,19 @@ export function AuthLayout({ title, description, children }: AuthLayoutProps) {
 }
 
 /** AuthFooter is the way back out, and the language to read the form in. */
-function AuthFooter() {
+function AuthFooter({ noSite }: { noSite?: boolean }) {
   const { t } = useI18n()
   return (
     <div className='flex items-center justify-center gap-2 pt-2 text-xs text-muted-foreground'>
-      {/* The server sends the bare host to the site's home page. */}
-      <a href='/' className='transition-colors hover:text-foreground'>
-        {t('login.backToSite')}
-      </a>
-      <span aria-hidden>·</span>
+      {!noSite && (
+        <>
+          {/* The server sends the bare host to the site's home page. */}
+          <a href='/' className='transition-colors hover:text-foreground'>
+            {t('login.backToSite')}
+          </a>
+          <span aria-hidden>·</span>
+        </>
+      )}
       <LanguagePicker />
     </div>
   )

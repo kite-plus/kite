@@ -141,6 +141,12 @@ export const en = {
   "setup.install": "Finish",
   "setup.installing": "Setting up",
   "setup.failed": "Could not finish setting up",
+  "setup.new.title": "Create your site",
+  "setup.new.description": "Give the site a name; everything else can change later. Its files are kept in this folder.",
+  "setup.create": "Create site",
+  "setup.creating": "Creating the site",
+  "setup.starting": "Opening the studio",
+  "setup.startFailed": "The site was created, but the studio did not come back. The terminal says why.",
 
   // The dashboard.
   "dashboard.morning": "Good morning",

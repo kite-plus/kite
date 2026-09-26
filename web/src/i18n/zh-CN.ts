@@ -137,6 +137,12 @@ export const zhCN: Record<keyof typeof en, string> = {
   "setup.install": "完成安装",
   "setup.installing": "正在安装",
   "setup.failed": "安装没能完成",
+  "setup.new.title": "新建站点",
+  "setup.new.description": "给网站起个名字，其余以后都能改。网站的文件会保存在当前文件夹里。",
+  "setup.create": "创建站点",
+  "setup.creating": "正在创建站点",
+  "setup.starting": "正在打开后台",
+  "setup.startFailed": "网站已经创建好了，但后台没能打开，原因请看终端里的输出。",
 
   "dashboard.morning": "上午好",
   "dashboard.afternoon": "下午好",

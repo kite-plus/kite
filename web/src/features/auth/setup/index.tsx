@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check, Loader2, XCircle } from "lucide-react";
 
-import { ApiError } from "@/api/client";
+import { ApiError, api } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useInstall, useSetup } from "@/hooks/useSetup";
@@ -28,18 +28,26 @@ import { AuthLayout } from "../auth-layout";
  * else until the form is finished, which is why it says so little.
  */
 export function Setup() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const problem = useProblem();
   const navigate = useNavigate();
   const state = useSetup().data;
   const install = useInstall();
+  // A folder with no site in it yet: the form names the site and stops
+  // there, since a studio on this machine alone has no account to create.
+  // Read once, because finishing rewrites the answer this page came with.
+  const [newSite] = useState(() => Boolean(state?.new_site));
+  // Set once the site exists and this page is waiting for it to be served.
+  const [opening, setOpening] = useState<"waiting" | "failed">();
 
   const [step, setStep] = useState<"site" | "account">("site");
-  useDocumentTitle(t(step === "site" ? "setup.site.title" : "setup.account.title"));
+  useDocumentTitle(
+    t(newSite ? "setup.new.title" : step === "site" ? "setup.site.title" : "setup.account.title"),
+  );
 
   const [title, setTitle] = useState(state?.site?.title ?? "");
   const [baseURL, setBaseURL] = useState(state?.site?.base_url ?? "");
-  const [language, setLanguage] = useState(state?.site?.language || "en");
+  const [language, setLanguage] = useState(state?.site?.language || (newSite ? locale : "en"));
 
   const [user, setUser] = useState(state?.user ?? "admin");
   const [password, setPassword] = useState("");
@@ -52,6 +60,22 @@ export function Setup() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (newSite) {
+      if (install.isPending || opening === "waiting") return;
+      install.mutate(
+        { user: "", password: "", site: { title, base_url: baseURL, language } },
+        {
+          onSuccess: async () => {
+            // The command that made the site now serves it at this address,
+            // and takes a moment to.
+            setOpening("waiting");
+            if (await served()) void navigate({ to: "/", replace: true });
+            else setOpening("failed");
+          },
+        },
+      );
+      return;
+    }
     if (step === "site") {
       setStep("account");
       return;
@@ -73,12 +97,21 @@ export function Setup() {
         ? { title: t("setup.failed"), detail: String(failure) }
         : null;
 
+  const creating = install.isPending || opening === "waiting";
+
   return (
     <AuthLayout
-      title={t(step === "site" ? "setup.site.title" : "setup.account.title")}
-      description={t(step === "site" ? "setup.site.description" : "setup.account.description")}
+      title={t(newSite ? "setup.new.title" : step === "site" ? "setup.site.title" : "setup.account.title")}
+      description={t(
+        newSite
+          ? "setup.new.description"
+          : step === "site"
+            ? "setup.site.description"
+            : "setup.account.description",
+      )}
+      noSite={newSite}
     >
-      <Steps step={step} />
+      {!newSite && <Steps step={step} />}
       <form onSubmit={submit} className="grid gap-3">
         {step === "site" ? (
           <>
@@ -108,10 +141,26 @@ export function Setup() {
               <Label htmlFor="language">{t("setup.language")}</Label>
               <LanguageSelect id="language" value={language} onChange={setLanguage} />
             </div>
-            <Button type="submit" className="mt-2">
-              {t("setup.next")}
-              <ArrowRight />
-            </Button>
+            {newSite ? (
+              <>
+                {(refusal || opening === "failed") && (
+                  <Alert variant="destructive">
+                    <XCircle />
+                    <AlertTitle>{refusal?.title ?? t("setup.startFailed")}</AlertTitle>
+                    {refusal?.detail && <AlertDescription>{refusal.detail}</AlertDescription>}
+                  </Alert>
+                )}
+                <Button type="submit" className="mt-2" disabled={creating || opening === "failed"}>
+                  {creating ? <Loader2 className="animate-spin" /> : <Check />}
+                  {t(opening === "waiting" ? "setup.starting" : install.isPending ? "setup.creating" : "setup.create")}
+                </Button>
+              </>
+            ) : (
+              <Button type="submit" className="mt-2">
+                {t("setup.next")}
+                <ArrowRight />
+              </Button>
+            )}
           </>
         ) : (
           <>
@@ -162,6 +211,24 @@ export function Setup() {
       </form>
     </AuthLayout>
   );
+}
+
+/**
+ * served waits for the new site to be served here, which it is once the
+ * command that created it has handed the address over: until then the
+ * address answers that there is no site yet, or not at all.
+ */
+async function served(): Promise<boolean> {
+  for (const until = Date.now() + 20_000; Date.now() < until; ) {
+    try {
+      const { response } = await api.GET("/site", {});
+      if (response.ok) return true;
+    } catch {
+      // Nothing is listening for the moment between the two servers.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return false;
 }
 
 /** Steps says how far through this is, because a form in two halves should. */
