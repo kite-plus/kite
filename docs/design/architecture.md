@@ -1097,7 +1097,7 @@ kite/
 | kite-plus/website | kite.plus 官网 + 文档（**用 Kite 自己搭 —— dogfooding**） | M4 |
 | kite-plus/starters | Starter 模板（blog / docs / portfolio） | M4 |
 | kite-plus/setup-kite | GitHub Action | M4 |
-| kite-plus/theme-sinan | 文档站主题「司南」，官网也用它搭（本地已建） | 骨架能用时 |
+| kite-plus/theme-vane | 文档站主题「风标」（原名司南，2026-09-27 改名），官网也用它搭 | 已建 |
 | kite-plus/plugin-sdk | 插件 SDK（Go / Rust / Zig） | M8 |
 | kite-plus/plugins | 官方插件集合 | M8 |
 
