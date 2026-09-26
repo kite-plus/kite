@@ -203,6 +203,146 @@ as well. A template links to Kite's own pages with `url.For "home"`,
 The theme contract is not frozen yet; it freezes at M5, after a second theme
 has been written against it.
 
+## Plugins
+
+A plugin adds to a site what its theme does not: comments, analytics, search,
+math. It lives in `plugins/`, one folder each, and runs once it is listed
+under `plugins.enabled` in `kite.yaml`, in the order it runs in. The studio's
+Plugins screen installs one from a zip archive, turns it on and off, edits its
+settings and removes it, and says before a plugin is turned on what it adds to
+pages and which other sites its code loads from. The command line does the
+same:
+
+```bash
+kite plugin add search-0.1.0.zip   # or a folder
+kite plugin enable search
+kite plugin list
+kite plugin disable search
+kite plugin remove search
+```
+
+The official plugins live in their own repositories, like themes other than
+the default one:
+
+| Plugin | Does |
+|---|---|
+| [analytics](https://github.com/kite-plus/plugin-analytics) | Counts visits with Baidu Tongji, Google Analytics, Umami or Plausible |
+| [comments](https://github.com/kite-plus/plugin-comments) | A comment thread under posts, with Giscus, Waline or Twikoo |
+| [math](https://github.com/kite-plus/plugin-math) | TeX math with KaTeX, and mermaid code blocks drawn as diagrams |
+| [search](https://github.com/kite-plus/plugin-search) | Search in the reader's browser, over an index written at build time |
+
+### Writing a plugin
+
+```bash
+kite plugin new greet     # a folder to start from
+kite plugin verify greet  # checked the way a site checks it
+```
+
+A plugin is a folder with a `plugin.yaml`. Files under its `assets/` are
+published with the site at `plugins/<id>/`, and language packs in `i18n/`,
+under the key `plugin`, translate what the studio says about it, as a theme's
+do.
+
+```yaml
+id: greet                  # the folder's name
+name: Greet
+version: 0.1.0
+apiVersion: kite/plugin/v1
+requires: ">=1.0.0 <2.0.0" # the Kite versions it works with
+description: A line under every post.
+hosts: [cdn.example.com]   # other sites its own scripts load from
+
+inject:
+  - at: head               # before </head>; body is before </body>
+    html: <link rel="stylesheet" href="{{ asset "greet.css" }}">
+  - at: body
+    pages: [single]        # home, single, list, taxonomy, term, notFound
+    kinds: [post]          # the content kinds of single pages it goes on
+    when: {style: plain}   # settings it waits for; a list is any of them
+    skip: {greet: false}   # front matter that leaves a page out
+    html: <p class="greet">{{ .Settings.message }}</p>
+
+settings:                  # the same fields as a theme's
+  - {key: message, type: string, label: Message, default: Thanks for reading.}
+  - key: style
+    type: select
+    default: plain
+    options: [{value: plain, label: Plain}, {value: bold, label: Bold}]
+```
+
+`html` is a Go `html/template`, given `.Settings`, `.Site` with its `Title`,
+`Description`, `BaseURL` and `Language`, and `.Page` with its `URL`,
+`Permalink`, `Kind` and `Title`, and on a single page its item's `ID`, `Type`,
+`Params`, `Taxonomies` and `PublishedAt`. `asset` gives the address of one of
+the plugin's files. A setting written into a script becomes a JavaScript
+value, so `{{ .Settings }}` hands a script all of them. `skip` reads a switch
+the way authors write it: `false`, `no` and `off` all turn a page's code off.
+
+Settings are stored under `plugins.settings.<id>` in `kite.yaml`, and stay
+there when a plugin is turned off.
+
+### Build hooks
+
+A plugin can also bring `plugin.wasm`, a WebAssembly module whose functions
+run while a site is built, and name them under `hooks`:
+
+| Hook | Runs | Is handed | Answers with |
+|---|---|---|---|
+| `transform_markdown` | before a page's markdown is rendered | `markdown` | `{"markdown": ...}` |
+| `transform_html` | on each rendered page | `html` | `{"html": ...}` |
+| `build_complete` | once the site is built | `pages`, each with its plain `text` | `{"files": [{"path": ..., "content": ...}]}` |
+
+Each is handed JSON with `settings`, `site` and, but for `build_complete`,
+`page`, named as in templates but in snake case, and answers with JSON or with
+nothing, which leaves the page as it was. The files `build_complete` writes go
+under `plugins/<id>/` in the output and nowhere else. A preview runs the same
+hooks, so it shows what a build publishes.
+
+The module runs through [Extism](https://extism.org), so any language with an
+Extism PDK can write one; the official plugins use Go 1.24 or later:
+
+```go
+//go:build wasip1
+
+package main
+
+import (
+	"strings"
+
+	"github.com/extism/go-pdk"
+)
+
+func main() {}
+
+//go:wasmexport transform_html
+func transformHTML() int32 {
+	var in struct {
+		HTML string `json:"html"`
+	}
+	if err := pdk.InputJSON(&in); err != nil {
+		pdk.SetError(err)
+		return 1
+	}
+	out := strings.Replace(in.HTML, "</body>", "<p>Built with Kite.</p></body>", 1)
+	_ = pdk.OutputJSON(map[string]string{"html": out})
+	return 0
+}
+```
+
+```bash
+GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o plugin.wasm .
+```
+
+A module reaches no network and no files, its clock does not tell the time and
+its random numbers are the same on every run, so what it answers depends on
+what it is handed alone. It has 64 MiB of memory, ten seconds a page and two
+minutes for `build_complete`; one that fails, or takes longer, fails the build
+and names the plugin. Pages are rendered on every core at once, so a transform
+runs in whichever instance of the module is free and must keep nothing between
+calls; `build_complete` runs in a fresh one each build. A module is compiled
+once, when its plugin is turned on or a site first loads it, and kept compiled
+under `.kite/cache/wasm`.
+
 ## Configuration
 
 `kite.yaml` sits at the root of a project. Everything except `site` is
@@ -244,6 +384,11 @@ build:
 publish:
   publisher: git
   branch: main
+
+plugins:
+  enabled: []          # the plugins that run, in the order they run in
+  settings:            # whatever each plugin declares in plugin.yaml
+    search: {full_text: true}
 ```
 
 `timezone` decides which day a date falls on. Left empty, a date is shown in
@@ -437,7 +582,7 @@ Verify a download against the `checksums.txt` published with the release.
 | M5 | Public theme contract | |
 | M6 | `kite.lock` and the `kitew` wrapper | |
 | M7 | Dynamic mode backed by SQLite | |
-| M8 | WebAssembly plugins | |
+| M8 | WebAssembly plugins | first version done: injected code and build hooks |
 
 The [roadmap](design/roadmap.md) (in Chinese) records what has been verified as done, what remains before v1.0 is tagged, and the plan after it.
 
