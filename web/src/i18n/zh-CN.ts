@@ -95,7 +95,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "login.failed": "无法登录",
   "session.signOut": "退出登录",
   "session.signOutNote": "退出后需要重新登录才能使用后台。",
-  "session.role": "超级管理员",
+  "session.role": "站长",
   "session.local": "本地模式",
   "session.localNote": "未设置密码",
   "session.checking": "正在检查登录状态",

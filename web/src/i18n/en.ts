@@ -99,7 +99,7 @@ export const en = {
   "login.failed": "Could not sign in",
   "session.signOut": "Sign out",
   "session.signOutNote": "You will need to sign in again to use the studio.",
-  "session.role": "Administrator",
+  "session.role": "Owner",
   "session.local": "Local mode",
   "session.localNote": "No password set",
   "session.checking": "Checking your session",
