@@ -73,7 +73,9 @@ archives:
     files:
       - README*
       - LICENSE*
-      - src: docs/design/*.md
+      # The manual, which a reader of an archive wants more than the design
+      # notes behind it.
+      - src: docs/reference*.md
         dst: docs
 
 checksum:
