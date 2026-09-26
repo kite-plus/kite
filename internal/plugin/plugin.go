@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -68,6 +69,8 @@ const (
 // PageKinds are the kinds of page an injection can be limited to.
 var PageKinds = []string{"home", "single", "list", "taxonomy", "term", "notFound"}
 
+var hostName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
+
 // Author says who made a plugin.
 type Author struct {
 	Name string `yaml:"name"`
@@ -113,6 +116,11 @@ type Manifest struct {
 	Homepage    string `yaml:"homepage,omitempty"`
 
 	Inject []Injection `yaml:"inject,omitempty"`
+
+	// Hosts names the other sites the plugin's code loads from where the
+	// studio cannot find them in what it injects: in a script of its own, or
+	// in an address a setting holds.
+	Hosts []string `yaml:"hosts,omitempty"`
 
 	// Hooks lists the functions plugin.wasm exports to run during a build.
 	Hooks []string `yaml:"hooks,omitempty"`
@@ -160,6 +168,11 @@ func (m *Manifest) Validate() error {
 			if m.Settings.Field(key) == nil {
 				return fmt.Errorf("%s: when names %q, which is not a setting", where, key)
 			}
+		}
+	}
+	for _, host := range m.Hosts {
+		if !hostName.MatchString(host) {
+			return fmt.Errorf("plugin %s: %q in hosts is not a host name such as cdn.example.com", m.ID, host)
 		}
 	}
 	seen := make(map[string]bool, len(m.Hooks))

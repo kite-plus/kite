@@ -81,6 +81,12 @@ func TestAPluginLoadsFromItsDirectory(t *testing.T) {
 	if got := p.Hosts(); !slices.Equal(got, []string{"giscus.app"}) {
 		t.Errorf("hosts = %q, want only giscus.app", got)
 	}
+	// Hosts a script of the plugin's own loads from are declared, and are
+	// said alongside the ones the studio finds.
+	p.Manifest.Hosts = []string{"unpkg.com", "giscus.app"}
+	if got := p.Hosts(); !slices.Equal(got, []string{"giscus.app", "unpkg.com"}) {
+		t.Errorf("hosts = %q, want the declared ones merged in", got)
+	}
 
 	zh := p.Localized("zh-CN")
 	if zh.Name != "评论" || zh.Settings[0].Label != "评论服务" || zh.Settings[0].Options[2].Label != "Twikoo 评论" {
@@ -107,6 +113,7 @@ func TestAPluginThatCannotWorkIsRefused(t *testing.T) {
 		{"a broken template", valid + "inject:\n  - at: body\n    html: '{{ .Settings.x '\n", "inject 1"},
 		{"an unknown hook", valid + "hooks: [transform_css]\n", "not a hook"},
 		{"hooks with no module", valid + "hooks: [transform_html]\n", "plugin.wasm"},
+		{"a host with a scheme", valid + inject + "hosts: [https://cdn.example.com]\n", "host name"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := plugin.Load(tree(map[string]string{"plugin.yaml": tc.manifest}), "comments")

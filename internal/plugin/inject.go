@@ -244,9 +244,10 @@ func insert(html, head, body string) string {
 var hostsIn = regexp.MustCompile(`(?i)(?:src|href)\s*=\s*["']?(?:https?:)?//([a-z0-9.-]+\.[a-z]{2,})`)
 
 // Hosts lists the other sites the plugin's code loads from, for the studio
-// to say before it is turned on.
+// to say before it is turned on: the ones it declares and the ones written
+// into what it injects.
 func (p *Plugin) Hosts() []string {
-	var hosts []string
+	hosts := slices.Clone(p.Manifest.Hosts)
 	for _, in := range p.Manifest.Inject {
 		for _, m := range hostsIn.FindAllStringSubmatch(in.HTML, -1) {
 			host := strings.ToLower(m[1])
@@ -256,5 +257,5 @@ func (p *Plugin) Hosts() []string {
 		}
 	}
 	slices.Sort(hosts)
-	return hosts
+	return slices.Compact(hosts)
 }
