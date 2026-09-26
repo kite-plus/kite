@@ -21,6 +21,7 @@ import (
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 )
 
 // Options configures the pipeline.
@@ -227,7 +228,11 @@ func literal(n ast.Node, src []byte, withoutImages bool) string {
 				return ast.WalkSkipChildren, nil
 			}
 		case *ast.Text:
-			b.Write(t.Segment.Value(src))
+			value := t.Segment.Value(src)
+			if !t.IsRaw() {
+				value = unescape(value)
+			}
+			b.Write(value)
 			if t.SoftLineBreak() || t.HardLineBreak() {
 				b.WriteByte(' ')
 			}
@@ -239,6 +244,28 @@ func literal(n ast.Node, src []byte, withoutImages bool) string {
 		return ast.WalkContinue, nil
 	})
 	return b.String()
+}
+
+// unescape is text as the renderer writes it: a backslash escape stands for
+// the character it escapes, and an entity or a numeric reference for its
+// character. A reference is only resolved between escapes, since an escaped
+// ampersand starts none.
+func unescape(value []byte) []byte {
+	resolve := func(b []byte) []byte { return util.ResolveEntityNames(util.ResolveNumericReferences(b)) }
+	var out []byte
+	start := 0
+	for i := 0; i+1 < len(value); i++ {
+		if value[i] == '\\' && util.IsPunct(value[i+1]) {
+			out = append(out, resolve(value[start:i])...)
+			out = append(out, value[i+1])
+			i++
+			start = i + 1
+		}
+	}
+	if start == 0 {
+		return resolve(value)
+	}
+	return append(out, resolve(value[start:])...)
 }
 
 // countWords counts words, and how many of them are CJK characters.

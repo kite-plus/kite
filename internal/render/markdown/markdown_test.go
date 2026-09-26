@@ -178,6 +178,16 @@ func TestTextIsWhatAReaderReads(t *testing.T) {
 	}
 }
 
+// Escapes and references are written in the source for the renderer, and a
+// reader of the excerpt or the text sees what they stand for.
+func TestPlainTextReadsEscapesAndReferences(t *testing.T) {
+	doc := render(t, "1\\. Not a list, a\\_b \\*c\\* &amp; &#169; \\&amp; `a\\_b`\n", nil)
+	want := "1. Not a list, a_b *c* & \u00a9 &amp; a\\_b"
+	if doc.Excerpt != want || doc.Text != want {
+		t.Errorf("Excerpt = %q, Text = %q, want %q", doc.Excerpt, doc.Text, want)
+	}
+}
+
 // A Chinese paragraph has no spaces, so counting fields called a whole article
 // a handful of words and every post a one minute read.
 func TestWordCountCountsCJKCharacters(t *testing.T) {
