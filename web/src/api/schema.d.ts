@@ -751,6 +751,7 @@ export interface components {
             min?: number;
             options?: components["schemas"]["Option"][];
             placeholder?: string;
+            preview?: string;
             required?: boolean;
             showIf?: {
                 [key: string]: unknown;

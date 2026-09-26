@@ -62,6 +62,7 @@ settings:
   - key: home
     type: section
     label: Home page
+    preview: home
     fields:
       - key: show_summary
         type: boolean
@@ -71,6 +72,7 @@ settings:
   - key: posts
     type: section
     label: Posts
+    preview: post
     fields:
       - key: show_toc
         type: boolean

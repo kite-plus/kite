@@ -98,6 +98,7 @@ settings:
   - key: look
     type: section          # 表单里的一个分组标题；其中的字段仍存在同一层
     label: Look
+    preview: home          # 编辑这个分区时后台预览哪个页面
     fields:
       - key: accent
         type: color
@@ -115,8 +116,10 @@ settings:
 ```
 
 字段类型有 `string`、`text`、`number`、`boolean`、`color`、`select`、`multiselect`、
-`image`、`url`、`date`、`code`、`group`、`repeat` 和 `section`。设置值存在 `kite.yaml`
-的 `theme.settings` 下，恢复成默认值的设置会从中删除。模板按字段声明的类型读取每个值，
+`image`、`url`、`date`、`code`、`group`、`repeat` 和 `section`。后台把主题的分区列在
+表单旁边，分区的 `preview` 指定编辑它时预览哪个页面：`home`（首页）、`post`（最新的
+文章）、`page`（一个独立页面）或 `posts`（文章列表）。设置值存在 `kite.yaml` 的
+`theme.settings` 下，恢复成默认值的设置会从中删除。模板按字段声明的类型读取每个值，
 写作 `.Site.ThemeSettings.accent`，读不成该类型的值就用默认值；`repeat` 还能读取每行
 一条 `名称 | /路径/` 的文本，所以主题把文本设置改成列表时，已经填好的站点不会丢内容。
 

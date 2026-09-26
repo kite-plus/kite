@@ -118,6 +118,7 @@ settings:
   - key: look
     type: section          # a heading in the form; its fields are stored beside it
     label: Look
+    preview: home          # the page the studio previews while it is edited
     fields:
       - key: accent
         type: color
@@ -136,8 +137,11 @@ settings:
 
 The types are `string`, `text`, `number`, `boolean`, `color`, `select`,
 `multiselect`, `image`, `url`, `date`, `code`, `group`, `repeat` and
-`section`. Values are stored under `theme.settings` in `kite.yaml`, and a
-setting put back to its default is removed from it. A template reads each one
+`section`. The studio lists a theme's sections beside the form, and a
+section's `preview` names the page shown while it is edited: `home`, `post`
+(the newest post), `page` or `posts` (the list of posts). Values are stored
+under `theme.settings` in `kite.yaml`, and a setting put back to its default
+is removed from it. A template reads each one
 as the type its field declares, `.Site.ThemeSettings.accent`, and falls back
 to the default for a value it cannot read as one; a `repeat` also reads text
 written one `Label | /path/` a line, so a theme can turn a text setting into a

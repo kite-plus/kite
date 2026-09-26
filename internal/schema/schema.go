@@ -69,7 +69,15 @@ type Field struct {
 
 	// ShowIf hides the field until every listed key holds the given value.
 	ShowIf map[string]any `json:"showIf,omitempty" yaml:"showIf,omitempty"`
+
+	// Preview names the page the studio shows while a [TypeSection] is being
+	// edited, one of [PreviewPages]. Without it the preview stays where it is.
+	Preview string `json:"preview,omitempty" yaml:"preview,omitempty"`
 }
+
+// PreviewPages are the pages a section can ask to be previewed on: the home
+// page, the newest post, a page, and the list of posts.
+var PreviewPages = []string{"home", "post", "page", "posts"}
 
 // Schema is an ordered list of fields. Order is significant: the admin renders
 // fields in declaration order.
@@ -110,6 +118,9 @@ func (s Schema) validate(seen map[string]bool, top bool) error {
 			if !top {
 				return fmt.Errorf("%s: a section can only sit at the top of a schema", where)
 			}
+			if f.Preview != "" && !slices.Contains(PreviewPages, f.Preview) {
+				return fmt.Errorf("%s: preview %q is not one of %s", where, f.Preview, strings.Join(PreviewPages, ", "))
+			}
 			if len(f.Fields) == 0 {
 				return fmt.Errorf("%s: type %q requires nested fields", where, f.Type)
 			}
@@ -120,6 +131,9 @@ func (s Schema) validate(seen map[string]bool, top bool) error {
 				return fmt.Errorf("%s: %w", where, err)
 			}
 			continue
+		}
+		if f.Preview != "" {
+			return fmt.Errorf("%s: only a section names a page to preview", where)
 		}
 		if (f.Type == TypeSelect || f.Type == TypeMultiSelect) && len(f.Options) == 0 {
 			return fmt.Errorf("%s: type %q requires options", where, f.Type)

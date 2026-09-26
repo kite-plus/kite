@@ -74,6 +74,19 @@ func TestASectionKeepsItsFieldsWhereTheyWere(t *testing.T) {
 	}
 }
 
+// A section can name the page its settings show on, so the studio previews
+// the home page while the home page's settings are edited.
+func TestASectionNamesThePageItIsPreviewedOn(t *testing.T) {
+	s := parse(t, `
+- key: home
+  type: section
+  preview: home
+  fields: [{key: headline, type: string}]`)
+	if s[0].Preview != "home" {
+		t.Errorf("Preview = %q, want home", s[0].Preview)
+	}
+}
+
 func TestASectionIsCheckedLikeTheLevelItSitsOn(t *testing.T) {
 	for name, text := range map[string]string{
 		"a key used twice across a section": `
@@ -103,6 +116,13 @@ func TestASectionIsCheckedLikeTheLevelItSitsOn(t *testing.T) {
 		"an empty section": `
 - key: look
   type: section`,
+		"a section previewed on a page the studio cannot find": `
+- key: look
+  type: section
+  preview: docs
+  fields: [{key: accent, type: color}]`,
+		"a field that is not a section naming a page": `
+- {key: accent, type: color, preview: home}`,
 	} {
 		var s schema.Schema
 		if err := yaml.Unmarshal([]byte(text), &s); err != nil {
