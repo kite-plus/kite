@@ -678,6 +678,14 @@ func openAPI() *document {
 					},
 				},
 			},
+			"/plugins/{id}/enabled": {Put: &operation{
+				OperationID: "switchPlugin",
+				Summary: "Turn a plugin on, to run after the ones already on, or off. It changes " +
+					"plugins.enabled by one; one that cannot load is not turned on.",
+				Parameters:  []parameter{pathParam("id")},
+				RequestBody: body(ref(PluginSwitch{})),
+				Responses:   ok(ref(PluginInfo{}), "The plugin as it now is.", "400", "404", "405", "409"),
+			}},
 			"/previews": {Post: &operation{
 				OperationID: "openPreview",
 				Summary: "Draw the site with a theme or settings being tried, without writing " +

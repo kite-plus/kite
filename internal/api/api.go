@@ -211,6 +211,7 @@ func (s *Server) routes() []route {
 		{http.MethodPost, "/plugins", s.handleInstallPlugin},
 		{http.MethodGet, "/plugins/{id}", s.handlePlugin},
 		{http.MethodDelete, "/plugins/{id}", s.handleRemovePlugin},
+		{http.MethodPut, "/plugins/{id}/enabled", s.handleSwitchPlugin},
 		{http.MethodPost, "/previews", s.handleOpenPreview},
 		{http.MethodPut, "/previews/{token}", s.handleUpdatePreview},
 		{http.MethodDelete, "/previews/{token}", s.handleClosePreview},

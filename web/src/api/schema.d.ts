@@ -318,6 +318,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plugins/{id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Turn a plugin on, to run after the ones already on, or off. It changes plugins.enabled by one; one that cannot load is not turned on. */
+        put: operations["switchPlugin"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preview": {
         parameters: {
             query?: never;
@@ -854,6 +871,9 @@ export interface components {
             items: components["schemas"]["PluginInfo"][];
             next_cursor?: string;
             total?: number;
+        };
+        PluginSwitch: {
+            enabled: boolean;
         };
         Preview: {
             token: string;
@@ -2695,6 +2715,86 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    switchPlugin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginSwitch"];
+            };
+        };
+        responses: {
+            /** @description The plugin as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginInfo"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
             };
             /** @description Not signed in. */
             401: {

@@ -208,3 +208,46 @@ func TestAPluginThatIsOnIsNotRemoved(t *testing.T) {
 		t.Error("the plugin's directory is still there")
 	}
 }
+
+// Turning plugins on keeps the order they were turned on in, which is the
+// order they run in; turning one off takes it out and leaves the rest.
+func TestPluginsAreTurnedOnInOrderAndOffOneAtATime(t *testing.T) {
+	root := newProject(t, 1)
+	write(t, filepath.Join(root, "plugins", "hello", "plugin.yaml"), helloPlugin)
+	write(t, filepath.Join(root, "plugins", "bye", "plugin.yaml"), strings.Replace(helloPlugin, "id: hello", "id: bye", 1))
+	write(t, filepath.Join(root, "plugins", "broken", "plugin.yaml"), "id: broken\n")
+	h, _ := newWritableServer(t, root)
+
+	flip := func(id string, on bool) *httptest.ResponseRecorder {
+		return send(t, h, http.MethodPut, api.Prefix+"/plugins/"+id+"/enabled", api.PluginSwitch{Enabled: on}, nil)
+	}
+	enabled := func() []string {
+		cfg, err := kiteconfig.Load(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg.Plugins.Enabled
+	}
+
+	for _, step := range []struct {
+		id   string
+		on   bool
+		want []string
+	}{
+		{"hello", true, []string{"hello"}},
+		{"bye", true, []string{"hello", "bye"}},
+		{"hello", true, []string{"hello", "bye"}},
+		{"hello", false, []string{"bye"}},
+	} {
+		rec := flip(step.id, step.on)
+		if rec.Code != http.StatusOK || decode[api.PluginInfo](t, rec).Enabled != step.on {
+			t.Fatalf("switch %s to %v: status %d\n%s", step.id, step.on, rec.Code, rec.Body.String())
+		}
+		if got := enabled(); !slices.Equal(got, step.want) {
+			t.Errorf("after switching %s to %v: enabled = %q, want %q", step.id, step.on, got, step.want)
+		}
+	}
+	if rec := flip("broken", true); rec.Code != http.StatusBadRequest {
+		t.Errorf("turning on a plugin that cannot load: status %d, want 400", rec.Code)
+	}
+}

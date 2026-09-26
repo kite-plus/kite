@@ -201,6 +201,63 @@ func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 	s.failErr(w, errNothingWritten)
 }
 
+// PluginSwitch turns a plugin on or off.
+type PluginSwitch struct {
+	Enabled bool `json:"enabled"`
+}
+
+// handleSwitchPlugin turns a plugin on, after the ones already on, or off.
+// It is plugins.enabled changed by one, worked out here rather than by the
+// client, which would otherwise need the list and its order to change it.
+func (s *Server) handleSwitchPlugin(w http.ResponseWriter, r *http.Request) {
+	view := s.src()
+	if !s.writable(w, view) {
+		return
+	}
+	one, ok := s.findPlugin(w, view, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	req, ok := decodeJSON[PluginSwitch](s, w, r)
+	if !ok {
+		return
+	}
+	if req.Enabled && one.Plugin == nil {
+		fail(w, http.StatusBadRequest, CodeInvalidRequest, one.ID+" cannot be used: "+one.Problem)
+		return
+	}
+
+	enabled, verb := view.Plugins.Enabled, ""
+	switch on := slices.Contains(enabled, one.ID); {
+	case req.Enabled && !on:
+		enabled, verb = append(slices.Clone(enabled), one.ID), "turn on"
+	case !req.Enabled && on:
+		enabled = slices.DeleteFunc(slices.Clone(enabled), func(id string) bool { return id == one.ID })
+		verb = "turn off"
+	}
+	if verb != "" {
+		if _, err := s.apply(r, view, content.ChangeSet{
+			Ops: []content.Op{content.PutSettings{
+				IfRevision: view.ConfigRevision,
+				Values:     map[string]any{"plugins.enabled": enabled},
+			}},
+			Message: "plugin: " + verb + " " + one.ID,
+		}); err != nil {
+			s.failWrite(w, view, r, err)
+			return
+		}
+	}
+
+	after := s.src()
+	for _, now := range after.InstalledPlugins() {
+		if now.ID == one.ID {
+			writeJSON(w, http.StatusOK, pluginInfo(after, now, r))
+			return
+		}
+	}
+	s.failErr(w, errNothingWritten)
+}
+
 // handleRemovePlugin removes an installed plugin. One the site runs stays:
 // turning it off first is what makes removing it a decision about a plugin
 // the site already does without.
