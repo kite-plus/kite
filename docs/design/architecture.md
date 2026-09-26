@@ -877,10 +877,10 @@ SQLite 用 **`modernc.org/sqlite`**（纯 Go，零 CGO，交叉编译不破，�
 
 - 路径 `/api/v1/...`，**Admin 与 Headless 同源**
 - 规范：OpenAPI 3.1。由代码生成 spec，再由 spec 生成前端 client——**禁止手写请求**
-- 资源：`contents` / `taxonomies` / `media` / `content-types` / `themes` / `plugins` / `settings` / `builds` / `publishes` / `users`
+- 资源：`contents` / `taxonomies` / `media` / `content-types` / `themes` / `plugins` / `settings` / `builds` / `publishes` / `account`
 - **分页一律复合游标**（[§9.1](#91-读侧一个读模型一个实现)），**公开 API 里不允许出现 offset**
 - 并发控制：`ETag` + `If-Match`（[§9.4](#94-并发编辑--cas绝不-last-write-wins)）
-- 认证：V1 本地单用户（本地 token / session）；M7 多用户；V3 API Token + Scope；V4 OAuth
+- 认证：只有一个账号（本地 session），不做多用户：博客只有一个站长；V3 API Token + Scope；V4 OAuth
 - 版本策略：v1 内**只增不改**；破坏性变更开 v2 并保留 v1 至少一个大版本
 - Webhook（V3）：内容变更、构建完成、发布完成
 

@@ -1,11 +1,10 @@
 // Package auth guards the admin with a single local account.
 //
-// V1 is deliberately one account. A self-hosted site has one operator, and
-// what would make several of them mean anything -- roles, invitations,
-// per-author audit -- belongs with the database store rather than with a
-// project made of files. What cannot wait is the part that is painful to
-// retrofit: credentials stored safely, a session that cannot be forged, and a
-// server that refuses to put an unprotected admin on a public address.
+// There is one account by design, not as a first step: a blog has one owner,
+// and the studio is theirs. What the account has to get right is the part
+// that is painful to retrofit: credentials stored safely, a session that
+// cannot be forged, and a server that refuses to put an unprotected admin on
+// a public address.
 package auth
 
 import (
