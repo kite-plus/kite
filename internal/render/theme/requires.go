@@ -15,12 +15,19 @@ import (
 // release, such as a build from source, cannot be placed in a range, so it
 // is not held to one.
 func (m *Manifest) Satisfied(kite string) error {
-	if m.Requires == "" {
+	return Requires("theme", m.Name, m.Requires, kite)
+}
+
+// Requires checks the range of Kite versions an extension says it needs
+// against the running Kite. kind and name say what the extension is, as
+// "plugin" and "search", for the message that refuses it.
+func Requires(kind, name, requires, kite string) error {
+	if requires == "" {
 		return nil
 	}
-	want, err := parseRange(m.Requires)
+	want, err := parseRange(requires)
 	if err != nil {
-		return fmt.Errorf("theme %s: requires %q is not a version range: %w", m.Name, m.Requires, err)
+		return fmt.Errorf("%s %s: requires %q is not a version range: %w", kind, name, requires, err)
 	}
 	// A short commit hash made only of digits would read as a major version.
 	release := described.ReplaceAllString(kite, "")
@@ -29,9 +36,9 @@ func (m *Manifest) Satisfied(kite string) error {
 		return nil
 	}
 	if !want.admits(running) {
-		return fmt.Errorf("theme %s requires Kite %s, and this is Kite %s; "+
-			"install a Kite in that range, or a version of the theme made for this one",
-			m.Name, m.Requires, kite)
+		return fmt.Errorf("%s %s requires Kite %s, and this is Kite %s; "+
+			"install a Kite in that range, or a version of the %s made for this one",
+			kind, name, requires, kite, kind)
 	}
 	return nil
 }

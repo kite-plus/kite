@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/kite-plus/kite/internal/buildinfo"
+	"github.com/kite-plus/kite/internal/pack"
 	"github.com/kite-plus/kite/internal/schema"
 )
 
@@ -170,7 +171,7 @@ type Theme struct {
 
 	// Packs holds the theme's language packs by lowercased language tag,
 	// each a flat table of dotted keys, as zh-cn: {theme.title: ...}.
-	Packs map[string]map[string]string
+	Packs pack.Packs
 }
 
 // ReadManifest parses a theme's manifest without checking it, for saying
@@ -208,7 +209,7 @@ func Load(fsys fs.FS) (*Theme, error) {
 	if err := checkLayouts(&m, layouts); err != nil {
 		return nil, err
 	}
-	packs, err := loadPacks(fsys, m.Name)
+	packs, err := pack.Load(fsys, "theme "+m.Name)
 	if err != nil {
 		return nil, err
 	}
