@@ -86,9 +86,11 @@ type workflow struct {
 		If    string `yaml:"if"`
 		Uses  string `yaml:"uses"`
 		Steps []struct {
+			ID   string            `yaml:"id"`
 			Uses string            `yaml:"uses"`
 			Run  string            `yaml:"run"`
 			With map[string]string `yaml:"with"`
+			Env  map[string]string `yaml:"env"`
 		} `yaml:"steps"`
 	} `yaml:"jobs"`
 }
@@ -164,6 +166,50 @@ func TestTheScheduledWorkflowReadsTheDueTimeTheBuildReports(t *testing.T) {
 	}
 	if call.Needs != "due" || !strings.Contains(call.If, "needs.due.outputs.build") {
 		t.Errorf("deploying is not gated on the due check: needs %v, if %q", call.Needs, call.If)
+	}
+}
+
+// A project site is published under the repository's name, and a site built
+// for the address kite.yaml still holds, often the one it was previewed at,
+// would link every page to the wrong place. The workflow builds for the
+// address Pages reports instead.
+func TestTheDeployWorkflowBuildsForWherePagesPublishes(t *testing.T) {
+	deploy, _ := readWorkflows(t)
+	configured, built := -1, -1
+	for i, s := range deploy.Jobs["build"].Steps {
+		if strings.HasPrefix(s.Uses, "actions/configure-pages@") && s.ID == "pages" {
+			configured = i
+		}
+		if strings.Contains(s.Run, "kite build") {
+			built = i
+			if got := s.Env["KITE_SITE_BASEURL"]; got != "${{ steps.pages.outputs.base_url }}" {
+				t.Errorf("the build runs with KITE_SITE_BASEURL = %q", got)
+			}
+		}
+	}
+	if configured < 0 || built < 0 || configured > built {
+		t.Errorf("configure-pages is step %d and the build step %d; the address has to be known first", configured, built)
+	}
+}
+
+// The workflow installs the release that wrote it, so the site builds the
+// same way in a year. A release stamps its version without the v its tag
+// has, and a build that is no release installs the latest one.
+func TestTheWorkflowInstallsTheReleaseThatWroteIt(t *testing.T) {
+	for v, want := range map[string]string{
+		"0.1.0":              "v0.1.0",
+		"v0.1.0":             "v0.1.0",
+		"v0.2.0-rc.1":        "v0.2.0-rc.1",
+		"v0.1.0-3-gabc1234":  "latest",
+		"v0.1.0-dirty":       "latest",
+		"26200b0":            "latest",
+		"577feeb-dirty":      "latest",
+		"0.1.1-snapshot-abc": "latest",
+		"dev":                "latest",
+	} {
+		if got := pinnedVersion(v); got != want {
+			t.Errorf("pinnedVersion(%q) = %q, want %q", v, got, want)
+		}
 	}
 }
 

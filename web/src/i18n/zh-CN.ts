@@ -503,7 +503,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "deploy.exported": "已导出 {name}（{size}）",
   "deploy.exportFailed": "网站没能导出",
   "deploy.github": "GitHub Pages",
-  "deploy.githubNote": "把网站推送到 GitHub 仓库后，由 GitHub Actions 自动构建并部署到 Pages。适合会用 git 的用户。",
+  "deploy.githubNote": "把网站推送到 GitHub 仓库后，由 GitHub Actions 自动构建并部署到 Pages。适合会用 git 的用户。链接按 Pages 给出的地址生成，不用先改站点地址。",
   "deploy.githubReady": "在文章列表或编辑器里点「发布」，就会提交并推送；下面显示它走到了哪一步。",
   "deploy.githubSteps": "这个站点还没有放进 git 仓库。要用 GitHub Pages 发布：",
   "deploy.step1": "在 GitHub 上新建一个仓库。",

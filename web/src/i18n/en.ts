@@ -523,7 +523,7 @@ export const en = {
   "deploy.exported": "Exported {name} ({size})",
   "deploy.exportFailed": "The site could not be exported",
   "deploy.github": "GitHub Pages",
-  "deploy.githubNote": "Push the site to a GitHub repository, and GitHub Actions builds it and deploys it to Pages. For those at home with git.",
+  "deploy.githubNote": "Push the site to a GitHub repository, and GitHub Actions builds it and deploys it to Pages. For those at home with git. Links are made for the address Pages gives the site, so the site address need not change first.",
   "deploy.githubReady": "Publishing from a list or the editor commits and pushes; these steps follow it to the site.",
   "deploy.githubSteps": "This site is not in a git repository yet. To publish it with GitHub Pages:",
   "deploy.step1": "Create a repository on GitHub.",

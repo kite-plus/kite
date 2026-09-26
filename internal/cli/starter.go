@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/kite-plus/kite/internal/buildinfo"
@@ -57,10 +58,19 @@ jobs:
       - name: Install Kite
         run: go install github.com/kite-plus/kite/cmd/kite@@@VERSION@@
 
-      # --verify builds twice and compares every byte, so a site that would
-      # deploy differently on a second run fails here instead.
+      # Where Pages publishes the site: under the repository's name for a
+      # project site, or at its own domain.
+      - id: pages
+        uses: actions/configure-pages@v6
+
+      # Built for that address rather than the one kite.yaml names, which
+      # may still be the one the site was previewed at. --verify builds twice
+      # and compares every byte, so a site that would deploy differently on
+      # a second run fails here instead.
       - name: Build
         shell: bash # with pipefail, so a failed build is not hidden by tee
+        env:
+          KITE_SITE_BASEURL: ${{ steps.pages.outputs.base_url }}
         run: kite build --verify --json | tee build.json
 
       # Tells scheduled.yml when there is next something to publish.
@@ -71,7 +81,6 @@ jobs:
           path: .kite-next-due
           key: kite-next-due-${{ github.run_id }}-${{ github.run_attempt }}
 
-      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
           path: public
@@ -197,12 +206,21 @@ func writeWorkflow(root, branch string) ([]string, error) {
 // installVersion is what `go install` should be pinned to.
 //
 // A released build names its own tag. A build from source has no tag anyone
-// else can fetch, so it names the default branch and the workflow says what
-// that means, rather than pinning to a version that does not exist.
-func installVersion() string {
-	v := buildinfo.Version
-	if v == "" || v == "dev" || strings.Contains(v, "dirty") || !strings.HasPrefix(v, "v") {
+// else can fetch, so it names the latest release rather than a version that
+// does not exist.
+func installVersion() string { return pinnedVersion(buildinfo.Version) }
+
+// release matches a version a tag names: the version a release stamps, as
+// 0.1.0, or what git describe says at a tag, as v0.1.0 or v0.2.0-rc.1.
+// Commits past a tag, as v0.1.0-3-gabc1234, and a dirty tree name no tag.
+var release = regexp.MustCompile(`^v?\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$`)
+
+// pinnedVersion is what the deploy workflow installs for a build of Kite
+// stamped v: the tag it was released as, or the latest release for a build
+// that is no release.
+func pinnedVersion(v string) string {
+	if !release.MatchString(v) || strings.HasSuffix(v, "-dirty") {
 		return "latest"
 	}
-	return v
+	return "v" + strings.TrimPrefix(v, "v")
 }
