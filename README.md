@@ -68,16 +68,15 @@ make web
 make install
 ```
 
-Add Go's binary installation directory (usually `~/go/bin`) to your `PATH`, then create a site:
+Add Go's binary installation directory (usually `~/go/bin`) to your `PATH`, then start a site in an empty folder:
 
 ```bash
-kite init blog
+mkdir blog
 cd blog
-kite new post "Hello, Kite"
 kite run
 ```
 
-Open the [studio](http://localhost:1717/admin/) to start editing. Next time, run `kite run` from the `blog` directory.
+The browser opens on a page that asks what the site is called; answer it and you are in the [studio](http://localhost:1717/admin/). `kite init` asks the same questions in the terminal instead. Next time, run `kite run` from the `blog` directory.
 
 </details>
 
@@ -91,7 +90,7 @@ Local `kite run` includes drafts for preview. Normal serving and static builds e
 
 ## Publish your site
 
-**Export static pages:** Run `kite build` in your local site directory, then upload the generated `public/` directory to a static host. With Docker:
+**Export static pages:** Open Deploy in the studio and export the site as a zip, then upload what is in it to any static host. From the command line, `kite build` writes the same files to `public/`. With Docker:
 
 ```bash
 docker exec kite kite build

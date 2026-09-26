@@ -68,16 +68,15 @@ make web
 make install
 ```
 
-将 Go 的二进制安装目录（默认 `~/go/bin`）加入 `PATH`，然后创建站点：
+将 Go 的二进制安装目录（默认 `~/go/bin`）加入 `PATH`，然后在一个空文件夹里启动：
 
 ```bash
-kite init blog
+mkdir blog
 cd blog
-kite new post "你好，Kite"
 kite run
 ```
 
-打开 [管理后台](http://localhost:1717/admin/) 开始编辑。后续只需在 `blog` 目录运行 `kite run`。
+浏览器会打开一个建站页面，填上站点名称就进入了[管理后台](http://localhost:1717/admin/)。想在终端里回答这些问题，可以改用 `kite init`。后续只需在 `blog` 目录运行 `kite run`。
 
 </details>
 
@@ -91,7 +90,7 @@ kite run
 
 ## 发布站点
 
-**导出静态页面：** 在本机站点目录运行 `kite build`，将生成的 `public/` 目录上传到静态托管服务即可。Docker 用户运行：
+**导出静态页面：** 在后台打开「部署」，把网站导出成 zip，再把里面的文件上传到任何静态托管服务。命令行里运行 `kite build`，会把同样的文件写到 `public/`。Docker 用户运行：
 
 ```bash
 docker exec kite kite build

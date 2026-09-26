@@ -6,7 +6,9 @@
 
 `kite run` opens the studio at `/admin/`. It is a React application compiled
 into the binary, so there is nothing to install and nothing to keep in sync
-with the server.
+with the server. Run in an empty folder, it opens on a page that creates the
+site there first: its name, address and language, which is what `kite init`
+asks in a terminal.
 
 | | |
 |---|---|
@@ -15,6 +17,7 @@ with the server.
 | **Editor** | A visual editor that reads and writes Markdown, with the source one click away, a live preview, front matter as a form, terms, slug, word count, and files dropped straight into the bundle |
 | **Taxonomies** | tags and categories as they actually exist across the content |
 | **Theme** | every theme the project has, each previewed on the whole site before it is used; a theme installed from its zip archive; the active theme's settings edited beside a live preview |
+| **Deploy** | the site exported as a zip to upload anywhere, or how far a push to GitHub Pages has got |
 | **Settings** | the site's title, description, address, language, author, keywords, time zone, search engine visibility and code added to every page; the studio's own language and colors; your account: profile, picture, password and sessions |
 
 An item that changed on disk since it was loaded is refused rather than
