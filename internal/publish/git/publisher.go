@@ -351,10 +351,10 @@ func (p *Publisher) dirtyContent(ctx context.Context) ([]string, error) {
 	return dirty, nil
 }
 
-// watched is what a publish would ever carry. Themes are among it because
-// the admin installs them, and a site switched to a theme nobody committed
+// watched is what a publish would ever carry. Themes and plugins are among
+// it because the admin installs them, and a site using one nobody committed
 // would build on no machine but this one.
-var watched = []string{"content", "static", "themes", "kite.yaml"}
+var watched = []string{"content", "static", "themes", "plugins", "kite.yaml"}
 
 func (p *Publisher) message(req publish.Request) string {
 	if req.Message != "" {
