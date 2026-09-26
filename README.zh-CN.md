@@ -23,6 +23,7 @@ Kite 是一个开源内容发布平台，兼顾 CMS 的写作体验与静态站�
 - **文件始终属于你**：内容就是磁盘上的 Markdown 文件。保存时只改写真正变化的部分，key 的顺序和注释原样保留，改个标题，`git diff` 只有一行。
 - **发布方式由你选**：导出静态页面放到任意托管平台，在自己的服务器上运行站点，或者通过 Git 提交并推送。
 - **无需额外安装**：后台、支持深浅色的默认主题和 SQLite 驱动都已编译进这一个程序。
+- **按需装插件**：评论、统计、站内搜索、公式与图表都有官方插件，在后台安装、一键开启。插件可以往页面里加代码，也可以在构建时于沙箱中运行 WebAssembly。
 
 > 项目仍在早期开发中，目前请从源码安装，包含完整后台的步骤如下。
 
@@ -103,8 +104,8 @@ docker cp kite:/data/public ./public
 
 ## 路线图
 
-- **已完成**：静态构建、实时预览服务、浏览器后台、Git 发布（M0–M4），打 v1.0 标签前还有少量收尾。
-- **接下来**：公开主题契约、`kite.lock` 与 `kitew` wrapper、基于 SQLite 的动态模式、WebAssembly 插件（M5–M8）。
+- **已完成**：静态构建、实时预览服务、浏览器后台、Git 发布（M0–M4），以及 WebAssembly 插件的第一版（M8），打 v1.0 标签前还有少量收尾。
+- **接下来**：公开主题契约、`kite.lock` 与 `kitew` wrapper、基于 SQLite 的动态模式（M5–M7）。
 
 完整的里程碑列表见[详细使用说明](docs/reference.zh-CN.md#路线图)，逐项进度见[路线图与实现现状](docs/design/roadmap.md)。
 
@@ -115,6 +116,6 @@ docker cp kite:/data/public ./public
 
 ## 更多
 
-- [详细使用说明](docs/reference.zh-CN.md)：账号、主题、配置、部署与常用开发操作。
+- [详细使用说明](docs/reference.zh-CN.md)：账号、主题、插件、配置、部署与常用开发操作。
 - [设计文档](docs/design/)：架构、主题系统与插件系统。
 - [Apache License 2.0](LICENSE)

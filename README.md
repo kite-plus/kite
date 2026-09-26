@@ -23,6 +23,7 @@ Kite is an open-source publishing platform that gives you the writing experience
 - **Files that stay yours.** Content is plain Markdown on disk. Saving rewrites only what changed and keeps your key order and comments, so editing a title is a one-line `git diff`.
 - **Publish your way.** Export static pages for any host, run the site on your own server, or commit and push through Git.
 - **Nothing else to install.** The studio, a default theme with light and dark modes, and the SQLite driver are compiled into the binary.
+- **Plugins when you want them.** Comments, analytics, search, and math come as official plugins you install and switch on in the studio. A plugin adds code to pages, or runs WebAssembly in a sandbox while the site builds.
 
 > Kite is in early development. Install from source using the steps below, which include the full studio.
 
@@ -103,8 +104,8 @@ docker cp kite:/data/public ./public
 
 ## Roadmap
 
-- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4). A few items remain before v1.0 is tagged.
-- **Next:** a public theme contract, `kite.lock` with the `kitew` wrapper, a dynamic mode backed by SQLite, and WebAssembly plugins (M5–M8).
+- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4), and the first version of WebAssembly plugins (M8). A few items remain before v1.0 is tagged.
+- **Next:** a public theme contract, `kite.lock` with the `kitew` wrapper, and a dynamic mode backed by SQLite (M5–M7).
 
 The [reference guide](docs/reference.md#roadmap) lists every milestone, and the [roadmap](docs/design/roadmap.md) tracks progress item by item.
 
@@ -115,6 +116,6 @@ The [reference guide](docs/reference.md#roadmap) lists every milestone, and the 
 
 ## More
 
-- [Reference guide](docs/reference.md): accounts, themes, configuration, deployment, and development.
+- [Reference guide](docs/reference.md): accounts, themes, plugins, configuration, deployment, and development.
 - [Design documents](docs/design/): architecture, the theme system, and the plugin system, written in Chinese.
 - [Apache License 2.0](LICENSE)
