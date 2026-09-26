@@ -93,7 +93,7 @@
 | **2. M5 主题契约** | v1.1 | 写第二套风格完全不同的主题，并用 `kite theme verify`（已有）检查它：文档站主题司南，在它自己的仓库 `kite-plus/theme-sinan` 里写（本地已建，规划在那边的 `docs/design/README.md`），主程序只内置默认主题；`kite theme list/add/new`；菜单（`.Site.Menus`）写入契约；冻结之前要把 [theme-system.md](theme-system.md) §12 i18n 的三件事（尤其是多语言 URL 策略）和 §14 的开放问题定下来；发布 `kite/v1` 和主题开发文档 | 查找顺序、带方法的 RenderContext、命名空间函数、`apiVersion` 和 `requires` 校验、由 settings schema 生成的配置页都已经有了 |
 | **3. M6 可重现构建** | v1.2 | `kite.lock`、`kitew`、Cloudflare Pages 部署模板；启用增量构建里的跳过判断 | 依赖记录和缓存键已经有了 |
 | **4. 媒体库**（新增） | v1.5 | 在现有索引上汇总所有 page bundle 里的文件：媒体列表、跨文章复用、找出没人引用的文件、上传入口 | 单篇的附件上传和删除 API 已经有了 |
-| **5. M7 动态模式** | v2.0 | SQLite 作为真相源，写入同一套读模型；`kite migrate` 在文件和数据库之间互转；私密文章；数据库备份和 `kite export`；Kite 自己存储的评论 | 读模型、单账号认证、Docker 都已经有了 |
+| **5. M7 动态模式** | v2.0 | SQLite 作为真相源，写入同一套读模型；`kite migrate` 在文件和数据库之间互转；文章加密和私密文章（只在服务端部署提供）；数据库备份和 `kite export`；Kite 自己存储的评论 | 读模型、单账号认证、Docker 都已经有了 |
 | **6. M8 插件** | v3.0 | 基于 wazero 的 WebAssembly 插件、Host ABI、能力和权限声明、`kite plugin`、插件 SDK | HookBus 已经被内置功能使用 |
 
 ## 6. 后台占位功能的归属
@@ -108,7 +108,7 @@
 | 附件、上传附件 | 全站媒体库 | v1.5 |
 | 评论、待审核评论、最近评论 | 静态模式可以先接 Giscus 或 Waline（前端评论组件，对应 architecture.md §13 的 client 能力）；由 Kite 自己存储评论要等动态模式或插件 | 先接组件；自存放到 M7 或 M8 |
 | 用户 | 不做多用户：博客只有一个站长，后台只有一个账号（2026-09-26 定），在「设置 → 账户」里管理 | 不做 |
-| 可见性、备份、上次备份 | 私密文章、数据库备份都依赖动态模式 | M7 |
+| 可见性、备份、上次备份 | 文章加密、私密文章和数据库备份都要服务端部署，纯静态部署不提供 | M7 |
 | 插件、插件可更新 | WebAssembly 插件 | M8 |
 | 存储空间 | 统计内容目录和上传文件的大小 | 阶段 1 可做 |
 | 版本号旁的「最新」 | 查询 GitHub Releases | 阶段 1 可做 |

@@ -42,6 +42,8 @@ Kite 的目标结果：
 
 所谓 Static / Dynamic / Headless 三种"模式"，在这个矩阵里其实是 **Store 的选择 + Runtime 的选择 + Publisher 的选择** 三个独立维度的组合，**不是三个产品**。
 
+**两种部署不追求功能完全一致**（2026-09-26 定）。部署到服务器，是为了在线写文章，并提供只有服务器才做得到的功能，比如文章加密；纯静态是给没有服务器的托管用的。需要服务器的功能在纯静态部署里不提供，文档要写明哪些功能只在服务端部署可用。两边都会发布的页面，build 与 serve 仍然逐字节一致。
+
 **架构含义（现在就必须做对）：**
 
 1. Core 必须同时对 Store 和 Runtime 解耦。任何一个方向耦合了，另外几格就废掉。
@@ -1115,7 +1117,7 @@ MVP（= M0~M4）要回答唯一的问题：
 
 **包含**：File Store + 派生索引 + Markdown 渲染 + post/page + tag/category + 拖图进 bundle + 一套内置主题 + React Admin + 服务端实时预览 + 409 冲突流程 + 全量 `kite build` + `kite serve` + GitPublisher + DeliveryState + GitHub Actions workflow 模板 + `kite doctor`。
 
-**不包含**：Dynamic 生产模式、SQLite 内容库、插件运行时、公开的主题契约、完整媒体库、`kite.lock` / `kitew`、Cloudflare Pages、多用户、搜索、评论、对象存储、自定义内容类型注册、增量构建、i18n。
+**不包含**：Dynamic 生产模式、SQLite 内容库、插件运行时、公开的主题契约、完整媒体库、`kite.lock` / `kitew`、Cloudflare Pages、搜索、评论、对象存储、自定义内容类型注册、增量构建、i18n。
 
 ---
 
@@ -1260,14 +1262,14 @@ Hugo 在 v0.146 不得不重写整个模板系统并打断主题生态 `[EV]`。
 | SCSS / PostCSS 工具链 | 纯 CSS + 拷贝 + 可选 fingerprint | M5 之后 |
 | Block Editor / 富文本 | Markdown + 实时预览 | V2 之后评估 |
 | 多站点 / 多租户 | 单站点，但配置不写死全局单例 | V4 |
-| 细粒度 RBAC | 单用户；权限检查点预留 | M7+ |
+| 多用户、角色、RBAC | 只有一个账号 | 不做（2026-09-26 定） |
 | GraphQL | REST + OpenAPI | 有真实需求再说 |
 | 实时协作 / CRDT | 乐观锁 + 409 三方冲突 | V4+ |
 | Marketplace / Kite Cloud | Admin 走公开 API，为复用留路 | V4 |
 | 增量构建算法、磁盘持久化依赖图、增量重建的并行调度 | 只记录依赖；全量构建按目标并行渲染（每个输出只取决于计划和冻结的时钟，与渲染顺序无关） | M6+ |
 | PostgreSQL / MySQL | 接口按多方言设计，只实现 SQLite | V3 |
 | FTS5 全文检索 | 2k 篇以下用 `LIKE`/`instr`（索引是派生的，schema 随时能改） | 需要时 |
-| 编辑流 / PR-per-draft、多作者锁、由发布器按时提交和推送的定时发布 | `scheduled` 和日期在未来的 `published` 在 build 和 serve 时都按发布时间生效；部署模板每小时检查一次有没有到点的文章 | V3+ |
+| 编辑流 / PR-per-draft、由发布器按时提交和推送的定时发布 | `scheduled` 和日期在未来的 `published` 在 build 和 serve 时都按发布时间生效；部署模板每小时检查一次有没有到点的文章 | V3+ |
 | i18n 完整方案 | 函数、目录约定、**URL 策略**先定，实现单语言 | M5 |
 
 ---
