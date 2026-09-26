@@ -49,6 +49,13 @@ type Options struct {
 	// light and another for dark. Inline colors could not answer a media
 	// query, which is why a code block used to stay light on a dark page.
 	HighlightTheme string
+
+	// BasePath is the path the site is published under, as "/blog" for a
+	// GitHub Pages project site, and empty at the root of its host. A body
+	// names the site's own pages and files from the site's root, as
+	// "/about/" or "/uploads/river.jpg", which keeps it right wherever the
+	// site is published; the renderer puts BasePath in front of them.
+	BasePath string
 }
 
 // DefaultOptions returns the pipeline defaults.
@@ -124,14 +131,44 @@ func New(opts Options) *Renderer {
 		rendererOpts = append(rendererOpts, html.WithHardWraps())
 	}
 
+	parserOpts := []parser.Option{parser.WithAutoHeadingID(), parser.WithAttribute()}
+	if base := strings.TrimSuffix(opts.BasePath, "/"); base != "" {
+		parserOpts = append(parserOpts, parser.WithASTTransformers(util.Prioritized(siteLinks{base: base}, 1000)))
+	}
+
 	return &Renderer{md: goldmark.New(
 		goldmark.WithExtensions(extensions...),
-		goldmark.WithParserOptions(
-			parser.WithAutoHeadingID(),
-			parser.WithAttribute(),
-		),
+		goldmark.WithParserOptions(parserOpts...),
 		goldmark.WithRendererOptions(rendererOpts...),
 	)}
+}
+
+// siteLinks puts the path a site is published under in front of the links
+// and pictures a body names from the site's root. One that already starts
+// with the path is left alone, as is anything on another host.
+type siteLinks struct{ base string }
+
+func (t siteLinks) Transform(doc *ast.Document, _ text.Reader, _ parser.Context) {
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		switch node := n.(type) {
+		case *ast.Link:
+			node.Destination = t.rebase(node.Destination)
+		case *ast.Image:
+			node.Destination = t.rebase(node.Destination)
+		}
+		return ast.WalkContinue, nil
+	})
+}
+
+func (t siteLinks) rebase(dest []byte) []byte {
+	d := string(dest)
+	if !strings.HasPrefix(d, "/") || strings.HasPrefix(d, "//") || d == t.base || strings.HasPrefix(d, t.base+"/") {
+		return dest
+	}
+	return []byte(t.base + d)
 }
 
 // Render converts a markdown body into HTML plus the metadata a theme needs.

@@ -155,6 +155,7 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 			Typographer:    cfg.Markdown.Typographer,
 			HardWraps:      cfg.Markdown.HardWraps,
 			HighlightTheme: cfg.Markdown.HighlightTheme,
+			BasePath:       strings.TrimSuffix(resolver.Rel("/"), "/"),
 		}),
 		Hooks:          bus,
 		Plugins:        plugins,

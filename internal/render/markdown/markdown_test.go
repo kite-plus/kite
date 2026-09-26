@@ -260,6 +260,37 @@ func TestExcerptIsTheOpeningProse(t *testing.T) {
 	}
 }
 
+// A body names the site's own pages and files from the site's root, which is
+// right wherever the site is published once the renderer puts the path it is
+// published under in front of them.
+func TestSiteLinksFollowTheBasePath(t *testing.T) {
+	src := "[about](/about/) ![river](/uploads/river.jpg) [again](/blog/about/) " +
+		"[cdn](//cdn.example.com/x.js) [out](https://example.com/) [near](notes.md) " +
+		"[top](#top) [ref][r]\n\n[r]: /posts/hello/\n"
+	doc, err := markdown.New(markdown.Options{BasePath: "/blog/"}).Render(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`href="/blog/about/"`, `src="/blog/uploads/river.jpg"`, `href="/blog/about/"`,
+		`href="//cdn.example.com/x.js"`, `href="https://example.com/"`, `href="notes.md"`,
+		`href="#top"`, `href="/blog/posts/hello/"`,
+	} {
+		if !strings.Contains(doc.HTML, want) {
+			t.Errorf("rendered without %s:\n%s", want, doc.HTML)
+		}
+	}
+	if strings.Contains(doc.HTML, "/blog/blog/") {
+		t.Errorf("a link already under the path got it twice:\n%s", doc.HTML)
+	}
+
+	// At the root of a host a link is written as it is.
+	root := render(t, "[about](/about/)", nil)
+	if !strings.Contains(root.HTML, `href="/about/"`) {
+		t.Errorf("at the root: %s", root.HTML)
+	}
+}
+
 func TestCodeHighlighting(t *testing.T) {
 	doc := render(t, "```go\nfunc main() {}\n```\n", nil)
 	if !strings.Contains(doc.HTML, "<pre") {

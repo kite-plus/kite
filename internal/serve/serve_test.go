@@ -105,6 +105,51 @@ func openSite(t *testing.T, root string) *site.Site {
 	return s
 }
 
+// A GitHub Pages project site is published under a path. What an author links
+// from a body, and the pictures the studio puts in one, are named from the
+// site's root, and have to arrive under that path in a build and a preview
+// alike, or every picture in a post is missing once it is published.
+func TestBodyLinksFollowTheSitesPath(t *testing.T) {
+	root := newProjectAt(t, 1, "https://example.github.io/blog/")
+	first := filepath.Join(root, "content", "posts", "post-00", "index.md")
+	data, err := os.ReadFile(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := strings.Replace(string(data), "# Heading 00", "# Heading 00\n\n![river](/uploads/river.jpg) and [about](/about/).", 1)
+	if err := os.WriteFile(first, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "static", "uploads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "static", "uploads", "river.jpg"), []byte("jpeg"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := filepath.Join(root, "public")
+	if _, _, err := openSite(t, root).Build(t.Context(), site.BuildOptions{OutDir: out, Now: frozen}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	built, err := os.ReadFile(filepath.Join(out, "posts", "post-00", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`src="/blog/uploads/river.jpg"`, `href="/blog/about/"`} {
+		if !strings.Contains(string(built), want) {
+			t.Errorf("the built post has no %s", want)
+		}
+	}
+
+	handler := newServer(t, root, serve.Options{}).Handler()
+	if rec := fetch(t, handler, "/blog/posts/post-00/"); rec.Body.String() != string(built) {
+		t.Errorf("the served post differs from the built one\n%s", firstDifference(string(built), rec.Body.String()))
+	}
+	if rec := fetch(t, handler, "/blog/uploads/river.jpg"); rec.Code != http.StatusOK {
+		t.Errorf("the picture is not served where the post links it: %d", rec.Code)
+	}
+}
+
 // This is the claim the whole two-axes design rests on: where content lives
 // and how it is delivered are independent, so the same content delivered two
 // ways is the same bytes. If this test ever fails, a theme author can no
