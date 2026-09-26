@@ -139,6 +139,9 @@ theme:
 主题目录里放 `screenshot.png`、`.jpg` 或 `.webp` 作为截图，也可以在 `theme.yaml` 里用
 `screenshot:` 指定其他文件。
 
+页面里的代码按类名而不是颜色高亮，主题的样式表可以为浅色和深色各带一套配色。一个代码块写出来是
+`<pre class="chroma" data-lang="go">`，`data-lang` 是作者标注的语言，主题可以用它给代码块加上标题。
+
 主题还可以提供让作者按页面选用的模板，比如友链页，在 `theme.yaml` 里声明：
 
 ```yaml

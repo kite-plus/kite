@@ -8,6 +8,7 @@ package markdown
 import (
 	"bytes"
 	"fmt"
+	stdhtml "html"
 	"strings"
 	"sync"
 	"unicode"
@@ -117,6 +118,13 @@ func New(opts Options) *Renderer {
 		highlighting.NewHighlighting(
 			highlighting.WithStyle(opts.HighlightTheme),
 			highlighting.WithFormatOptions(chromahtml.WithClasses(true)),
+			highlighting.WithCodeBlockOptions(func(c highlighting.CodeBlockContext) []chromahtml.Option {
+				lang, ok := c.Language()
+				if !ok || len(lang) == 0 {
+					return nil
+				}
+				return []chromahtml.Option{chromahtml.WithPreWrapper(langPre(lang))}
+			}),
 		),
 	}
 	if opts.Typographer {
@@ -141,6 +149,24 @@ func New(opts Options) *Renderer {
 		goldmark.WithParserOptions(parserOpts...),
 		goldmark.WithRendererOptions(rendererOpts...),
 	)}
+}
+
+// langPre writes the pre element chroma writes, naming the block's language
+// in data-lang so that a theme can label the block.
+type langPre string
+
+func (l langPre) Start(code bool, styleAttr string) string {
+	if !code {
+		return fmt.Sprintf(`<pre%s>`, styleAttr)
+	}
+	return fmt.Sprintf(`<pre%s data-lang="%s"><code>`, styleAttr, stdhtml.EscapeString(string(l)))
+}
+
+func (l langPre) End(code bool) string {
+	if !code {
+		return `</pre>`
+	}
+	return `</code></pre>`
 }
 
 // siteLinks puts the path a site is published under in front of the links

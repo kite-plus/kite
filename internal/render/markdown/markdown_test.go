@@ -301,6 +301,18 @@ func TestCodeHighlighting(t *testing.T) {
 	}
 }
 
+// A theme labels a code block by its language, so a highlighted block says
+// which one it is written in, and a block without one says nothing.
+func TestCodeBlocksNameTheirLanguage(t *testing.T) {
+	doc := render(t, "```go\nfunc main() {}\n```\n\n```\nplain\n```\n", nil)
+	if !strings.Contains(doc.HTML, `<pre class="chroma" data-lang="go"><code>`) {
+		t.Errorf("highlighted block does not name its language:\n%s", doc.HTML)
+	}
+	if strings.Count(doc.HTML, "data-lang") != 1 {
+		t.Errorf("a block without a language was given one:\n%s", doc.HTML)
+	}
+}
+
 func TestFootnotes(t *testing.T) {
 	doc := render(t, "Text with a note.[^1]\n\n[^1]: The note.\n", nil)
 	if !strings.Contains(doc.HTML, "footnote") {

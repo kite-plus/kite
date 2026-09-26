@@ -163,6 +163,11 @@ theme:
 A theme can show itself with `screenshot.png`, `.jpg` or `.webp` in its
 folder, or name another file with `screenshot:` in `theme.yaml`.
 
+Code in a page is highlighted with classes rather than colors, so a theme's
+stylesheet can carry one palette for light and one for dark. A fenced block is
+written as `<pre class="chroma" data-lang="go">`, where `data-lang` is the
+language the author gave it, for a theme that labels its code blocks.
+
 A theme can also offer templates for an author to choose page by page, such
 as a page of links, by declaring them in `theme.yaml`:
 
