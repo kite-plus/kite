@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"maps"
@@ -223,6 +224,10 @@ func (s *Server) handleSwitchPlugin(w http.ResponseWriter, r *http.Request) {
 	enabled, verb := view.Plugins.Enabled, ""
 	switch on := slices.Contains(enabled, one.ID); {
 	case req.Enabled && !on:
+		if err := one.Plugin.Check(r.Context(), ""); err != nil {
+			fail(w, http.StatusBadRequest, CodeInvalidRequest, one.ID+" cannot be used: "+err.Error())
+			return
+		}
 		enabled, verb = append(slices.Clone(enabled), one.ID), "turn on"
 	case !req.Enabled && on:
 		enabled = slices.DeleteFunc(slices.Clone(enabled), func(id string) bool { return id == one.ID })
@@ -327,8 +332,9 @@ func pluginInfo(view View, one InstalledPlugin, r *http.Request) PluginInfo {
 
 // checkPluginsEnabled reports why a list cannot be the plugins a site runs:
 // every one has to be installed and able to load, since turning on a plugin
-// that cannot would stop the next build.
-func checkPluginsEnabled(view View, value any) string {
+// that cannot would stop the next build. The module of each one the list
+// turns on is compiled to be sure.
+func checkPluginsEnabled(ctx context.Context, view View, value any) string {
 	list, ok := value.([]any)
 	if !ok && value != nil {
 		return "want a list of plugin ids"
@@ -356,6 +362,11 @@ func checkPluginsEnabled(view View, value any) string {
 			return "no plugin of that id is installed: " + id
 		case installed[i].Plugin == nil:
 			return id + " cannot be used: " + installed[i].Problem
+		case slices.Contains(view.Plugins.Enabled, id):
+			continue
+		}
+		if err := installed[i].Plugin.Check(ctx, ""); err != nil {
+			return id + " cannot be used: " + err.Error()
 		}
 	}
 	return ""

@@ -250,7 +250,11 @@ func newPluginSwitchCmd(on bool) *cobra.Command {
 			enabled := slices.DeleteFunc(slices.Clone(cfg.Plugins.Enabled), func(one string) bool { return one == id })
 			if on {
 				// Refused here rather than left for the next build to find.
-				if _, err := plugin.Open(p.Root, id); err != nil {
+				one, err := plugin.Open(p.Root, id)
+				if err != nil {
+					return err
+				}
+				if err := one.Check(cmd.Context(), filepath.Join(p.Root, filepath.FromSlash(plugin.CacheDir))); err != nil {
 					return err
 				}
 				if slices.Contains(cfg.Plugins.Enabled, id) {
@@ -281,8 +285,8 @@ func newPluginVerifyCmd() *cobra.Command {
 		Use:   "verify [dir]",
 		Short: "Check that a plugin loads, as a site would load it",
 		Long: "Reads the plugin in dir, or in the current directory, and checks its\n" +
-			"manifest, its templates and its settings the way a site checks them\n" +
-			"when it loads the plugin.",
+			"manifest, its templates, its settings and its module the way a site\n" +
+			"checks them when it loads the plugin.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := "."
@@ -297,6 +301,9 @@ func newPluginVerifyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := loaded.Check(cmd.Context(), ""); err != nil {
+				return err
+			}
 			m := loaded.Manifest
 			printf(cmd, "%s %s loads\n", m.ID, m.Version)
 			if len(m.Inject) > 0 {
@@ -306,7 +313,7 @@ func newPluginVerifyCmd() *cobra.Command {
 				printf(cmd, "  loads from %s\n", strings.Join(hosts, ", "))
 			}
 			if len(m.Hooks) > 0 {
-				printf(cmd, "  hooks: %s\n", strings.Join(m.Hooks, ", "))
+				printf(cmd, "  %s exports %s\n", plugin.WasmName, strings.Join(m.Hooks, ", "))
 			}
 			if len(m.Settings) > 0 {
 				printf(cmd, "  %d setting(s)\n", len(m.Settings))

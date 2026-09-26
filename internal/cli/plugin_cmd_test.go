@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/kite-plus/kite/internal/config"
+	"github.com/kite-plus/kite/internal/plugin"
+	"github.com/kite-plus/kite/internal/plugin/plugintest"
 )
 
 // runKiteErr runs a command line that is expected to fail, and returns why.
@@ -90,5 +92,38 @@ func TestAPluginThatDoesNotLoadIsNotEnabled(t *testing.T) {
 	}
 	if out := runKite(t, site, "plugin", "list"); !strings.Contains(out, "name is required") {
 		t.Errorf("list does not say why it cannot load:\n%s", out)
+	}
+}
+
+// A module is compiled before its plugin is enabled, so one that cannot run
+// is refused by the command rather than by the next build.
+func TestAModuleIsCheckedBeforeItsPluginIsEnabled(t *testing.T) {
+	site := newSite(t)
+	dir := filepath.Join(site, "plugins", "guest")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name string, data []byte) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(plugin.ManifestName, []byte(plugintest.Manifest("guest", plugin.HookTransformHTML, plugin.HookBuildComplete)))
+	write(plugin.WasmName, plugintest.Wasm(t))
+	if out := runKite(t, site, "plugin", "verify", dir); !strings.Contains(out, "plugin.wasm exports transform_html, build_complete") {
+		t.Errorf("verify said:\n%s", out)
+	}
+
+	write(plugin.WasmName, []byte("not a module"))
+	if err := runKiteErr(t, site, "plugin", "enable", "guest"); !strings.Contains(err.Error(), plugin.WasmName) {
+		t.Errorf("enable = %v, want the module refused", err)
+	}
+	cfg, err := config.Load(site)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Plugins.Enabled) != 0 {
+		t.Errorf("enabled = %q after a refusal", cfg.Plugins.Enabled)
 	}
 }

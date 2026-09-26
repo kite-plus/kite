@@ -13,6 +13,8 @@ import (
 
 	"github.com/kite-plus/kite/internal/api"
 	kiteconfig "github.com/kite-plus/kite/internal/config"
+	"github.com/kite-plus/kite/internal/plugin"
+	"github.com/kite-plus/kite/internal/plugin/plugintest"
 )
 
 const helloPlugin = `id: hello
@@ -249,5 +251,32 @@ func TestPluginsAreTurnedOnInOrderAndOffOneAtATime(t *testing.T) {
 	}
 	if rec := flip("broken", true); rec.Code != http.StatusBadRequest {
 		t.Errorf("turning on a plugin that cannot load: status %d, want 400", rec.Code)
+	}
+}
+
+// A plugin's module is compiled when the plugin is turned on, whichever way
+// it is, and one that cannot run is refused before kite.yaml names it.
+func TestAPluginWhoseModuleCannotRunIsNotTurnedOn(t *testing.T) {
+	root := newProject(t, 1)
+	dir := filepath.Join(root, "plugins", "guest")
+	write(t, filepath.Join(dir, plugin.ManifestName), plugintest.Manifest("guest", plugin.HookTransformHTML))
+	write(t, filepath.Join(dir, plugin.WasmName), "not a module")
+	h, _ := newWritableServer(t, root)
+
+	rec := send(t, h, http.MethodPut, api.Prefix+"/plugins/guest/enabled", api.PluginSwitch{Enabled: true}, nil)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), plugin.WasmName) {
+		t.Errorf("switch: status %d, want 400 naming the module\n%s", rec.Code, rec.Body.String())
+	}
+	rec = send(t, h, http.MethodPut, api.Prefix+"/settings", map[string]any{"plugins.enabled": []string{"guest"}},
+		map[string]string{"If-Match": settingsTag(t, h)})
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), plugin.WasmName) {
+		t.Errorf("settings: status %d, want 400 naming the module\n%s", rec.Code, rec.Body.String())
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, plugin.WasmName), plugintest.Wasm(t), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if rec := send(t, h, http.MethodPut, api.Prefix+"/plugins/guest/enabled", api.PluginSwitch{Enabled: true}, nil); rec.Code != http.StatusOK {
+		t.Errorf("switching on a working module: status %d\n%s", rec.Code, rec.Body.String())
 	}
 }

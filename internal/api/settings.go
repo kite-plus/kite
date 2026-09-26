@@ -271,7 +271,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		case plugged:
 			problem = checkPluginSetting(view, ofPlugin, values[path])
 		case path == "plugins.enabled":
-			problem = checkPluginsEnabled(view, values[path])
+			problem = checkPluginsEnabled(r.Context(), view, values[path])
 		}
 		if problem != "" {
 			failField(w, http.StatusBadRequest, CodeInvalidRequest, path, problem)
