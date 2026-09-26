@@ -346,6 +346,19 @@ func openAPI() *document {
 				Responses: withRefused(ref(PublishRefused{}),
 					ok(ref(publish.Result{}), "What was pushed.", "400", "405", "501")),
 			}},
+			"/export": {Post: &operation{
+				OperationID: "exportSite",
+				Summary: "Build the site as a deployment gets it, without drafts, and answer with it " +
+					"as a zip archive of what kite build writes, to upload anywhere that serves static files.",
+				Responses: map[string]response{
+					"200": {
+						Description: "The site. Content-Disposition names the archive.",
+						Content:     map[string]mediaType{"application/zip": {Schema: &jsonSchema{Type: "string", Format: "binary"}}},
+					},
+					"409": {Description: "The site could not be built as it stands.", Content: jsonOf(errorRef)},
+					"501": {Description: "Failed.", Content: jsonOf(errorRef)},
+				},
+			}},
 			"/settings": {
 				Get: &operation{
 					OperationID: "getSettings",

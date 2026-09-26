@@ -43,6 +43,10 @@ const (
 	CodePublishNeedsConfirmation = "publish_needs_confirmation"
 	CodePublishFailed            = "publish_failed"
 	CodeInternal                 = "internal"
+
+	// CodeBuildFailed reports a site that could not be built as it stands,
+	// such as one with content the index refused.
+	CodeBuildFailed = "build_failed"
 )
 
 // errNothingWritten reports a store that accepted a write and reported no

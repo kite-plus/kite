@@ -322,7 +322,24 @@ func (s *Server) view() api.View {
 	}
 	v.Preview = s.preview
 	v.WordCount = s.wordCount
+	v.Export = s.export
 	return v
+}
+
+// export builds the site as a deployment gets it, whatever this server
+// shows: a studio serving drafts still exports without them.
+func (s *Server) export(ctx context.Context, dir string) error {
+	s.mu.RLock()
+	current, problems := s.site, s.problems
+	s.mu.RUnlock()
+
+	// The site's own list of what the index refused dates from when it was
+	// opened; the server's is from its last reindex. The build is handed the
+	// current one, and refuses a site it cannot fully see.
+	snapshot := *current
+	snapshot.Problems = problems
+	_, _, err := snapshot.Build(ctx, site.BuildOptions{OutDir: dir, Now: s.now()})
+	return err
 }
 
 // themes lists the themes the project could switch to.

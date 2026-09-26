@@ -1,10 +1,12 @@
 package serve_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1198,5 +1200,123 @@ func TestTheSitesOwnSettingsReachItsPages(t *testing.T) {
 	}
 	if !strings.Contains(page("/colophon/"), `<meta name="keywords" content="fonts, paper">`) {
 		t.Error("a page's own keywords did not stand in for the site's")
+	}
+}
+
+// exported posts to the studio's export and reads the archive it answers with.
+func exported(t *testing.T, h http.Handler) (map[string][]byte, *httptest.ResponseRecorder) {
+	t.Helper()
+	rec := call(t, h, http.MethodPost, "/api/v1/export", nil)
+	if rec.Code != http.StatusOK {
+		return nil, rec
+	}
+	zr, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
+	if err != nil {
+		t.Fatalf("the export is not a zip archive: %v", err)
+	}
+	files := map[string][]byte{}
+	for _, f := range zr.File {
+		r, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(r)
+		_ = r.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[f.Name] = data
+	}
+	return files, rec
+}
+
+// An export is how a site gets deployed without git: the archive has to be
+// the site a build writes, drafts left out although the studio shows them.
+func TestTheSiteIsExportedAsABuildWritesIt(t *testing.T) {
+	root := newProject(t, 3)
+	dir := filepath.Join(root, "content", "posts", "hidden")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	draft := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ950\ntitle: Hidden\nslug: hidden\nstatus: draft\n---\n\nsecret\n"
+	if err := os.WriteFile(filepath.Join(dir, "index.md"), []byte(draft), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := newServer(t, root, serve.Options{Admin: true, Drafts: true})
+	got, rec := exported(t, srv.Handler())
+	if got == nil {
+		t.Fatalf("export: status = %d, want 200\nbody: %s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/zip" {
+		t.Errorf("Content-Type = %q, want application/zip", ct)
+	}
+	if cd := rec.Header().Get("Content-Disposition"); !strings.HasPrefix(cd, "attachment") ||
+		!strings.Contains(cd, "example.com-") {
+		t.Errorf("Content-Disposition = %q, want an attachment named after the site", cd)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	_, files, err := openSite(t, root).Build(t.Context(), site.BuildOptions{OutDir: out, Now: frozen})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if len(got) != len(files) {
+		t.Errorf("the archive holds %d files, a build writes %d", len(got), len(files))
+	}
+	for _, name := range files {
+		want, err := os.ReadFile(filepath.Join(out, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got[name], want) {
+			t.Errorf("%s differs from what a build writes", name)
+		}
+	}
+	for name := range got {
+		if strings.Contains(name, "hidden") {
+			t.Errorf("the draft was exported: %s", name)
+		}
+	}
+}
+
+// The server's own record of what the index refused is the one that counts: a
+// file fixed since the site was opened must not keep the site from exporting.
+func TestAnExportWaitsForContentTheIndexRefusedToBeFixed(t *testing.T) {
+	root := newProject(t, 2)
+	// A second file claiming post-00's id: the index keeps one and refuses
+	// the other, and a build will not publish a site missing a post.
+	broken := filepath.Join(root, "content", "posts", "twin")
+	twin := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ000\ntitle: Twin\nslug: twin\nstatus: published\n---\n\nbody\n"
+	if err := os.MkdirAll(broken, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(broken, "index.md"), []byte(twin), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := newServer(t, root, serve.Options{Admin: true})
+	_, rec := exported(t, srv.Handler())
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("export of a site with broken content: status = %d, want 409", rec.Code)
+	}
+	var refusal struct {
+		Error struct{ Code, Message string } `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &refusal); err != nil {
+		t.Fatal(err)
+	}
+	if refusal.Error.Code != "build_failed" || !strings.Contains(refusal.Error.Message, "content/posts/twin/index.md") {
+		t.Errorf("refusal = %+v, want build_failed naming the file", refusal.Error)
+	}
+
+	if err := os.RemoveAll(broken); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Reload(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got, rec := exported(t, srv.Handler()); got == nil {
+		t.Errorf("export after the fix: status = %d, want 200\nbody: %s", rec.Code, rec.Body.String())
 	}
 }

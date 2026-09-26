@@ -51,6 +51,11 @@ type View struct {
 	// WordCount counts an item that is not on disk the way its page will.
 	WordCount func(context.Context, *content.Content) (int, error)
 
+	// Export builds the site into dir as a deployment would get it: no
+	// drafts, and what is scheduled only once its time has come. It is nil
+	// where the site cannot be built.
+	Export func(ctx context.Context, dir string) error
+
 	// Publisher moves committed content onward. It is nil when the project
 	// has none configured, which is a perfectly ordinary way to run: an
 	// author may prefer to commit themselves.
