@@ -15,7 +15,7 @@ with the server.
 | **Editor** | A visual editor that reads and writes Markdown, with the source one click away, a live preview, front matter as a form, terms, slug, word count, and files dropped straight into the bundle |
 | **Taxonomies** | tags and categories as they actually exist across the content |
 | **Theme** | every theme the project has, each previewed on the whole site before it is used; a theme installed from its zip archive; the active theme's settings edited beside a live preview |
-| **Settings** | title, description, base URL and language |
+| **Settings** | the site's title, description, address, language, author, keywords, time zone, search engine visibility and code added to every page; the studio's own language and colors; your account: profile, picture, password and sessions |
 
 An item that changed on disk since it was loaded is refused rather than
 overwritten, and the studio says so. Editing is available in English and
@@ -53,6 +53,19 @@ kite auth set-password                          # asked for twice, never echoed
 
 `kite auth status` reports whether a project asks for a password, and
 `kite auth remove` takes the account away again.
+
+The same can be done in the studio, under **Settings → Account**. A studio
+open on localhost can be given a password there, and asks for it from that
+moment, without a restart. A guarded one changes its user name and password
+once the current password is confirmed, which signs out every other browser
+and keeps this one; it can also sign the others out without changing
+anything, and on localhost take the password away again. An account that
+comes from the environment is changed where it is set.
+
+The same page holds a profile: a display name, an email address and a
+picture, shown in the studio's menus. They are kept beside the account, in
+`.kite/secrets/profile.json` and `.kite/secrets/avatar`, and never
+published: the author a theme shows is `site.author`.
 
 The account is stored in `.kite/secrets/account.json` as an argon2id hash. It
 is never committed, and it has to survive a deployment for the account to. A
