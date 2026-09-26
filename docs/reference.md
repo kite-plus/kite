@@ -248,7 +248,7 @@ id: greet                  # the folder's name
 name: Greet
 version: 0.1.0
 apiVersion: kite/plugin/v1
-requires: ">=1.0.0 <2.0.0" # the Kite versions it works with
+requires: ">=0.1.0 <2.0.0" # the Kite versions it works with
 description: A line under every post.
 hosts: [cdn.example.com]   # other sites its own scripts load from
 
@@ -578,13 +578,13 @@ Verify a download against the `checksums.txt` published with the release.
 | M1 | `kite serve`: render per request, watch and reload | done |
 | M2 | Read-only admin over an existing repository | done |
 | M3 | Editing admin: editor, media, conflict handling | done |
-| M4 | Git publisher — **v1.0** | done, wrapping up before the tag |
+| M4 | Git publisher — the first release, **0.1** | done |
 | M5 | Public theme contract | |
 | M6 | `kite.lock` and the `kitew` wrapper | |
 | M7 | Dynamic mode backed by SQLite | |
 | M8 | WebAssembly plugins | first version done: injected code and build hooks |
 
-The [roadmap](design/roadmap.md) (in Chinese) records what has been verified as done, what remains before v1.0 is tagged, and the plan after it.
+The [roadmap](design/roadmap.md) (in Chinese) records what has been verified as done and the plan after it.
 
 ## Contributing
 
