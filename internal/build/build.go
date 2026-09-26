@@ -69,6 +69,11 @@ type Builder struct {
 	opts     Options
 	buildCtx *Context
 	site     render.Site
+
+	// rewrites says a hook rewrites markdown, and excerpts then keeps what
+	// listings say about each item, by id and revision.
+	rewrites bool
+	excerpts sync.Map
 }
 
 // New returns a builder.
@@ -94,7 +99,7 @@ func New(opts Options) (*Builder, error) {
 		opts.Now = time.Now()
 	}
 
-	b := &Builder{opts: opts}
+	b := &Builder{opts: opts, rewrites: opts.Hooks.TransformsMarkdown()}
 	b.buildCtx = NewContext(opts.Now, b.sharedKey()...)
 	b.site = b.newSite(b.buildCtx)
 	return b, nil
@@ -457,7 +462,10 @@ func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req 
 	if err != nil {
 		return nil, info, err
 	}
-	pages := b.listed(out, t)
+	pages, err := b.listed(ctx, out, t)
+	if err != nil {
+		return nil, info, err
+	}
 
 	target := theme.Target{
 		Kind:   string(t.Kind),
@@ -527,12 +535,16 @@ func describe(t Target, page render.Page, body *markdown.Document) hook.PageInfo
 }
 
 // listed builds the Page view of everything a target lists.
-func (b *Builder) listed(out *Context, t Target) []render.Page {
+func (b *Builder) listed(ctx context.Context, out *Context, t Target) ([]render.Page, error) {
 	listed := make([]render.Page, 0, len(t.Items))
 	for _, s := range t.Items {
-		listed = append(listed, b.listedPage(out, s))
+		page, err := b.listedPage(ctx, out, s)
+		if err != nil {
+			return nil, err
+		}
+		listed = append(listed, page)
 	}
-	return listed
+	return listed, nil
 }
 
 // page builds the Page view of a target itself, and returns its item's
@@ -558,10 +570,14 @@ func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page
 		// Assigned only when present: a nil *Summary stored in the interface
 		// field would not be nil to a template.
 		if t.Prev != nil {
-			opts.Prev = b.listedPage(out, *t.Prev)
+			if opts.Prev, err = b.listedPage(ctx, out, *t.Prev); err != nil {
+				return nil, nil, err
+			}
 		}
 		if t.Next != nil {
-			opts.Next = b.listedPage(out, *t.Next)
+			if opts.Next, err = b.listedPage(ctx, out, *t.Next); err != nil {
+				return nil, nil, err
+			}
 		}
 		page = render.NewPage(t.Item, opts)
 	} else if t.Kind != render.KindSingle {
@@ -572,18 +588,51 @@ func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page
 
 // listedPage is the Page of an item that another page links to: an entry in a
 // listing, or a neighbor of a single page.
-func (b *Builder) listedPage(out *Context, s content.Summary) render.Page {
+func (b *Builder) listedPage(ctx context.Context, out *Context, s content.Summary) (render.Page, error) {
 	// Only this projection of the item is read, so editing a body does not
 	// invalidate the pages that merely link to it.
 	out.Read(Node{Kind: NodeContent, ID: string(s.ID)}, string(s.Revision),
 		"title", "slug", "excerpt", "published_at", "taxonomies")
+	excerpt, err := b.excerpt(ctx, s)
+	if err != nil {
+		return nil, err
+	}
 	return render.NewPage(summaryToContent(s), render.PageOptions{
 		Kind:     render.KindSingle,
-		Rendered: &markdown.Document{Excerpt: s.Excerpt},
+		Rendered: &markdown.Document{Excerpt: excerpt},
 		Resolver: b.opts.Resolver,
 		Terms:    b.termsOfMap(s.Taxonomies),
 		Location: b.opts.Site.Location,
-	})
+	}), nil
+}
+
+// excerpt is what a listing says about an item: the summary the index keeps,
+// unless a hook rewrites markdown. The index knows nothing of hooks, so its
+// summary would show what a plugin turns into something else, such as math,
+// as its source; the listing says what the item's own page says instead.
+func (b *Builder) excerpt(ctx context.Context, s content.Summary) (string, error) {
+	if !b.rewrites {
+		return s.Excerpt, nil
+	}
+	key := string(s.ID) + "@" + string(s.Revision)
+	if v, ok := b.excerpts.Load(key); ok {
+		return v.(string), nil
+	}
+	item, err := b.opts.Reader.Get(ctx, s.ID)
+	if err != nil {
+		return "", fmt.Errorf("build: excerpt of %s: %w", s.ID, err)
+	}
+	description, _ := item.Meta["description"].(string)
+	text := markdown.Excerpt(description)
+	if text == "" {
+		doc, err := b.renderBody(ctx, item)
+		if err != nil {
+			return "", err
+		}
+		text = doc.Excerpt
+	}
+	b.excerpts.Store(key, text)
+	return text, nil
 }
 
 // renderBody runs the markdown pipeline with the markdown hooks around it.

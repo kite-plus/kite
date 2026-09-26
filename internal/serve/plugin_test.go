@@ -135,6 +135,14 @@ func TestAModuleReachesBuiltAndServedPagesAlike(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "content", "pages", "about.md"), []byte(about), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	first := filepath.Join(root, "content", "posts", "post-00", "index.md")
+	data, err := os.ReadFile(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(first, []byte(strings.Replace(string(data), "Body with", "Flying :kite:. Body with", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	appendConfig(t, root, "plugins:\n  enabled: [guest]\n  settings:\n    guest: {sign: built}\n")
 
 	out := filepath.Join(root, "public")
@@ -152,6 +160,10 @@ func TestAModuleReachesBuiltAndServedPagesAlike(t *testing.T) {
 
 	if page := read("about/index.html"); !strings.Contains(page, "Flying a kite at /blog/about/.") {
 		t.Error("the page's source was not rewritten by the module")
+	}
+	// A listing says what the post's page says, not what its source does.
+	if home := read("index.html"); !strings.Contains(home, "Flying a kite at /blog/posts/post-00/.") {
+		t.Error("the home page lists the post by its source rather than by what the module made of it")
 	}
 	if post := read("posts/post-00/index.html"); !strings.Contains(post, `<meta name="signed" content="built single /blog/posts/post-00/">`) {
 		t.Errorf("the post was not rewritten by the module with the site's settings:\n%s", post)

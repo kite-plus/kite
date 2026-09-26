@@ -704,6 +704,47 @@ func TestAWordCountGoesThroughTheMarkdownHooks(t *testing.T) {
 	}
 }
 
+// A listing says of an item what the item's own page says. The index keeps a
+// summary of every item, but knows nothing of hooks, so when one rewrites
+// markdown the listing asks the page instead.
+func TestAListingSaysWhatThePageSaysThroughTheHooks(t *testing.T) {
+	f := newFixture(t, 2)
+	described := filepath.Join(f.root, "content", "posts", "post-01", "index.md")
+	data, err := os.ReadFile(described)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withDescription := strings.Replace(string(data), "tags: [Go]\n", "tags: [Go]\ndescription: Written to stand *alone*.\n", 1)
+	if err := os.WriteFile(described, []byte(withDescription), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ix, err := index.Open(f.root, f.types)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ix.Close()
+	if _, err := ix.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	bus := hook.NewBus()
+	bus.Register(signing{hook.Base{HookName: "signing", HookPhase: hook.PhaseBuild}}, hook.DefaultPriority)
+	f.run(t, f.out, func(o *build.Options) {
+		o.Hooks = bus
+		o.Site.ThemeSettings = map[string]any{"show_summary": true}
+	})
+	home, err := os.ReadFile(filepath.Join(f.out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(home), "Body of post 00. Signed by Kite.") {
+		t.Error("the listing does not carry what the hook added to the post")
+	}
+	if !strings.Contains(string(home), "Written to stand alone.") || strings.Contains(string(home), "Body of post 01.") {
+		t.Error("a post with a description is not listed by it")
+	}
+}
+
 type signing struct{ hook.Base }
 
 func (signing) TransformMarkdown(_ context.Context, doc *hook.MarkdownDoc) error {

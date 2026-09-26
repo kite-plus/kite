@@ -193,6 +193,17 @@ func (b *Bus) CacheKey() []byte {
 	return key
 }
 
+// TransformsMarkdown reports whether any hook rewrites markdown before it is
+// rendered, which makes what a page says differ from what its source says.
+func (b *Bus) TransformsMarkdown() bool {
+	for _, h := range b.Hooks() {
+		if _, ok := h.(MarkdownTransformer); ok {
+			return true
+		}
+	}
+	return false
+}
+
 // TransformMarkdown runs every markdown transformer in order.
 func (b *Bus) TransformMarkdown(ctx context.Context, doc *MarkdownDoc) error {
 	for _, h := range b.Hooks() {
