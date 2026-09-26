@@ -25,7 +25,7 @@ Kite is an open-source publishing platform that gives you the writing experience
 - **Nothing else to install.** The studio, a default theme with light and dark modes, and the SQLite driver are compiled into the binary.
 - **Plugins when you want them.** Comments, analytics, search, and math come as official plugins you install and switch on in the studio. A plugin adds code to pages, or runs WebAssembly in a sandbox while the site builds.
 
-> Kite is in early development. Install from source using the steps below, which include the full studio.
+> Kite is in early development: 0.1 is its first release, and things may still change from one version to the next.
 
 ## How it works
 
@@ -37,18 +37,29 @@ Your Markdown files are the source of truth. The studio edits them in place, and
 
 ## Install and start
 
-### Docker (recommended)
+### Download (recommended)
 
-With Git and Docker installed, run:
+Download the archive for your system from the [latest release](https://github.com/kite-plus/kite/releases/latest), unpack it, and put `kite` somewhere on your `PATH`. Then start a site in an empty folder:
 
 ```bash
-git clone https://github.com/kite-plus/kite.git
-cd kite
-docker build -t kite .
-docker run -d --name kite --restart unless-stopped -p 127.0.0.1:1717:1717 -v kite-data:/data kite
+mkdir blog
+cd blog
+kite run
 ```
 
-Open the [studio](http://localhost:1717/admin/) and follow the setup steps to name your site and create an admin account. Your site is at [localhost:1717](http://localhost:1717). The first build downloads dependencies and may take a while.
+The browser opens on a page that asks what the site is called; answer it and you are in the [studio](http://localhost:1717/admin/). `kite init` asks the same questions in the terminal instead. Next time, run `kite run` from the `blog` folder.
+
+On macOS, a downloaded program is held back the first time it runs; `xattr -d com.apple.quarantine kite` lets it through. Every archive can be checked against `checksums.txt` in the release.
+
+### Docker
+
+To run the site on a server, with Docker installed:
+
+```bash
+docker run -d --name kite --restart unless-stopped -p 127.0.0.1:1717:1717 -v kite-data:/data ghcr.io/kite-plus/kite:latest
+```
+
+Open the [studio](http://localhost:1717/admin/) and follow the setup steps to name your site and create an admin account. Your site is at [localhost:1717](http://localhost:1717).
 
 Content and your account are stored in the `kite-data` volume. To stop or restart:
 
@@ -58,7 +69,7 @@ docker start kite
 ```
 
 <details>
-<summary>Without Docker: install locally</summary>
+<summary>From source</summary>
 
 Requires Git, Make, Go 1.26.4+, Node.js 22.19.0, and pnpm 10.11.1. The build uses the Go toolchain pinned by the project.
 
@@ -69,15 +80,7 @@ make web
 make install
 ```
 
-Add Go's binary installation directory (usually `~/go/bin`) to your `PATH`, then start a site in an empty folder:
-
-```bash
-mkdir blog
-cd blog
-kite run
-```
-
-The browser opens on a page that asks what the site is called; answer it and you are in the [studio](http://localhost:1717/admin/). `kite init` asks the same questions in the terminal instead. Next time, run `kite run` from the `blog` directory.
+Add Go's binary installation directory (usually `~/go/bin`) to your `PATH`, then start a site as above. To build the Docker image yourself instead, run `docker build -t kite .` in the clone.
 
 </details>
 
@@ -104,7 +107,7 @@ docker cp kite:/data/public ./public
 
 ## Roadmap
 
-- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4), and the first version of WebAssembly plugins (M8). A few items remain before v1.0 is tagged.
+- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4), and the first version of WebAssembly plugins (M8), released as 0.1.
 - **Next:** a public theme contract, `kite.lock` with the `kitew` wrapper, and a dynamic mode backed by SQLite (M5–M7).
 
 The [reference guide](docs/reference.md#roadmap) lists every milestone, and the [roadmap](docs/design/roadmap.md) tracks progress item by item.

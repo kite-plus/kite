@@ -25,7 +25,7 @@ Kite 是一个开源内容发布平台，兼顾 CMS 的写作体验与静态站�
 - **无需额外安装**：后台、支持深浅色的默认主题和 SQLite 驱动都已编译进这一个程序。
 - **按需装插件**：评论、统计、站内搜索、公式与图表都有官方插件，在后台安装、一键开启。插件可以往页面里加代码，也可以在构建时于沙箱中运行 WebAssembly。
 
-> 项目仍在早期开发中，目前请从源码安装，包含完整后台的步骤如下。
+> 项目仍在早期开发中：0.1 是第一个发布版本，版本之间仍可能有变化。
 
 ## 工作方式
 
@@ -37,18 +37,29 @@ Markdown 文件是唯一的真相源。后台直接编辑这些文件，Kite 在
 
 ## 安装并启动
 
-### Docker（推荐）
+### 下载（推荐）
 
-安装 Git 和 Docker 后，运行：
+从[最新版本](https://github.com/kite-plus/kite/releases/latest)下载对应系统的压缩包，解压后把 `kite` 放到 `PATH` 里的某个目录。然后在一个空文件夹里启动：
 
 ```bash
-git clone https://github.com/kite-plus/kite.git
-cd kite
-docker build -t kite .
-docker run -d --name kite --restart unless-stopped -p 127.0.0.1:1717:1717 -v kite-data:/data kite
+mkdir blog
+cd blog
+kite run
 ```
 
-打开 [管理后台](http://localhost:1717/admin/)，按提示设置站点和管理员账号，即可开始写作。站点地址是 [localhost:1717](http://localhost:1717)。首次构建需要下载依赖，请稍等。
+浏览器会打开一个建站页面，填上站点名称就进入了[管理后台](http://localhost:1717/admin/)。想在终端里回答这些问题，可以改用 `kite init`。后续只需在 `blog` 目录运行 `kite run`。
+
+在 macOS 上，下载的程序第一次运行会被系统拦下，运行 `xattr -d com.apple.quarantine kite` 即可放行。每个压缩包都可以用版本附带的 `checksums.txt` 校验。
+
+### Docker
+
+在服务器上运行站点，安装 Docker 后执行：
+
+```bash
+docker run -d --name kite --restart unless-stopped -p 127.0.0.1:1717:1717 -v kite-data:/data ghcr.io/kite-plus/kite:latest
+```
+
+打开[管理后台](http://localhost:1717/admin/)，按提示设置站点和管理员账号，即可开始写作。站点地址是 [localhost:1717](http://localhost:1717)。
 
 内容和账号保存在 `kite-data` 数据卷中。停止或重新启动：
 
@@ -58,7 +69,7 @@ docker start kite
 ```
 
 <details>
-<summary>不用 Docker：安装到本机</summary>
+<summary>从源码构建</summary>
 
 需要 Git、Make、Go 1.26.4+、Node.js 22.19.0 和 pnpm 10.11.1（构建会使用项目指定的 Go 工具链）。
 
@@ -69,15 +80,7 @@ make web
 make install
 ```
 
-将 Go 的二进制安装目录（默认 `~/go/bin`）加入 `PATH`，然后在一个空文件夹里启动：
-
-```bash
-mkdir blog
-cd blog
-kite run
-```
-
-浏览器会打开一个建站页面，填上站点名称就进入了[管理后台](http://localhost:1717/admin/)。想在终端里回答这些问题，可以改用 `kite init`。后续只需在 `blog` 目录运行 `kite run`。
+将 Go 的二进制安装目录（默认 `~/go/bin`）加入 `PATH`，然后按上面的方式启动。想自己构建 Docker 镜像，在克隆的目录里运行 `docker build -t kite .`。
 
 </details>
 
@@ -104,7 +107,7 @@ docker cp kite:/data/public ./public
 
 ## 路线图
 
-- **已完成**：静态构建、实时预览服务、浏览器后台、Git 发布（M0–M4），以及 WebAssembly 插件的第一版（M8），打 v1.0 标签前还有少量收尾。
+- **已完成**：静态构建、实时预览服务、浏览器后台、Git 发布（M0–M4），以及 WebAssembly 插件的第一版（M8），作为 0.1 发布。
 - **接下来**：公开主题契约、`kite.lock` 与 `kitew` wrapper、基于 SQLite 的动态模式（M5–M7）。
 
 完整的里程碑列表见[详细使用说明](docs/reference.zh-CN.md#路线图)，逐项进度见[路线图与实现现状](docs/design/roadmap.md)。
