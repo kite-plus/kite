@@ -89,6 +89,11 @@ type Injection struct {
 	// A list stands for any of its values.
 	When map[string]any `yaml:"when,omitempty"`
 
+	// Skip leaves out the pages whose front matter holds these values, as
+	// {comments: false} for a post that turns its comments off. A list
+	// stands for any of its values, and false is also written no or off.
+	Skip map[string]any `yaml:"skip,omitempty"`
+
 	// HTML is an html/template, given .Settings, .Site and .Page, and asset,
 	// which gives the address of one of the plugin's files.
 	HTML string `yaml:"html"`

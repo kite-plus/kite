@@ -157,6 +157,11 @@ func (in *injection) covers(page Page, settings map[string]any) bool {
 			return false
 		}
 	}
+	for key, value := range in.Skip {
+		if have, ok := page.Params[key]; ok && matches(have, value) {
+			return false
+		}
+	}
 	return true
 }
 
@@ -164,6 +169,15 @@ func (in *injection) covers(page Page, settings map[string]any) bool {
 func matches(have, want any) bool {
 	if list, ok := want.([]any); ok {
 		return slices.ContainsFunc(list, func(w any) bool { return matches(have, w) })
+	}
+	if flag, ok := want.(bool); ok {
+		// Front matter says a switch in more words than YAML reads as one.
+		switch strings.ToLower(fmt.Sprint(have)) {
+		case "true", "yes", "on":
+			return flag
+		case "false", "no", "off":
+			return !flag
+		}
 	}
 	return fmt.Sprint(have) == fmt.Sprint(want)
 }

@@ -25,6 +25,7 @@ inject:
     pages: [single]
     kinds: [post]
     when: {provider: giscus}
+    skip: {comments: false}
     html: |
       <script src="https://giscus.app/client.js" data-repo="{{ .Settings.repo }}" data-term="{{ .Page.ID }}" async></script>
   - at: body
@@ -168,6 +169,26 @@ func TestInjectedCodeGoesWhereItBelongsOnThePagesItCovers(t *testing.T) {
 	}
 	if !strings.Contains(got, `{server: "https://c.example.com/\"};alert(1);//", page: "https://example.com/blog/posts/hello/"}`) {
 		t.Errorf("the settings were not written as values:\n%s", got)
+	}
+}
+
+// A post turns a plugin's code off in its front matter, however its author
+// writes the switch.
+func TestAPageSkipsCodeItsFrontMatterTurnsOff(t *testing.T) {
+	p := load(t, map[string]string{"plugin.yaml": comments})
+	for _, off := range []any{false, "false", "no", "Off"} {
+		post := &content.Content{ID: "01J8KQ2P3R4S5T6V7W8X9YZ000", Kind: "post", Meta: map[string]any{"comments": off}}
+		got := inject(t, p, nil, hook.HTMLDoc{Item: post, URL: "/posts/hello/", Kind: "single", HTML: page})
+		if strings.Contains(got, "giscus") {
+			t.Errorf("comments: %v still got the thread", off)
+		}
+	}
+	for _, on := range []any{true, "yes", 1} {
+		post := &content.Content{ID: "01J8KQ2P3R4S5T6V7W8X9YZ000", Kind: "post", Meta: map[string]any{"comments": on}}
+		got := inject(t, p, nil, hook.HTMLDoc{Item: post, URL: "/posts/hello/", Kind: "single", HTML: page})
+		if !strings.Contains(got, "giscus") {
+			t.Errorf("comments: %v lost the thread", on)
+		}
 	}
 }
 
