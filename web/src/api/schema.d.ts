@@ -282,6 +282,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the plugins in plugins/, including the ones that cannot be used, with why, in the language Accept-Language asks for when a plugin has a pack for it. */
+        get: operations["listPlugins"];
+        put?: never;
+        /** Install a plugin from a zip archive holding plugin.yaml at its top or in one folder. It is checked the way a site checks it when it loads, and is not turned on: plugins.enabled in the settings does that. */
+        post: operations["installPlugin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Describe a plugin with its settings form and what each setting holds. ETag carries the revision of kite.yaml, for saving plugins.settings.<id>. */
+        get: operations["getPlugin"];
+        put?: never;
+        post?: never;
+        /** Remove an installed plugin. One that is turned on stays. */
+        delete: operations["removePlugin"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preview": {
         parameters: {
             query?: never;
@@ -768,6 +804,56 @@ export interface components {
             remote?: string;
             skip_hooks?: boolean;
             warnings?: components["schemas"]["Problem"][];
+        };
+        PluginAuthor: {
+            name: string;
+            url?: string;
+        };
+        PluginDetail: {
+            author?: components["schemas"]["PluginAuthor"];
+            description?: string;
+            enabled: boolean;
+            homepage?: string;
+            hooks?: string[];
+            hosts?: string[];
+            id: string;
+            injects: boolean;
+            license?: string;
+            name: string;
+            problem?: string;
+            requires?: string;
+            schema?: components["schemas"]["Field"][];
+            stored: string[];
+            values: {
+                [key: string]: unknown;
+            };
+            version?: string;
+        };
+        PluginExists: {
+            error: components["schemas"]["ErrorDetail"];
+            installed: components["schemas"]["PluginInfo"];
+            uploaded: components["schemas"]["PluginInfo"];
+        };
+        PluginInfo: {
+            author?: components["schemas"]["PluginAuthor"];
+            description?: string;
+            enabled: boolean;
+            homepage?: string;
+            hooks?: string[];
+            hosts?: string[];
+            id: string;
+            injects: boolean;
+            license?: string;
+            name: string;
+            problem?: string;
+            requires?: string;
+            version?: string;
+        };
+        PluginInfoList: {
+            has_more: boolean;
+            items: components["schemas"]["PluginInfo"][];
+            next_cursor?: string;
+            total?: number;
         };
         Preview: {
             token: string;
@@ -2403,6 +2489,251 @@ export interface operations {
             };
             /** @description Failed. */
             415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    listPlugins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plugins. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginInfoList"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    installPlugin: {
+        parameters: {
+            query?: {
+                /** @description Replace an installed plugin of the same id. Without it, one already installed is answered with 409 and both versions. */
+                replace?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The installed plugin. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginInfo"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A plugin of that id is installed already. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginExists"];
+                };
+            };
+            /** @description Failed. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    getPlugin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plugin. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginDetail"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    removePlugin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

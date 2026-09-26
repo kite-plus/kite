@@ -620,6 +620,64 @@ func openAPI() *document {
 					"404": {Description: "Failed.", Content: jsonOf(errorRef)},
 				},
 			}},
+			"/plugins": {
+				Get: &operation{
+					OperationID: "listPlugins",
+					Summary: "List the plugins in plugins/, including the ones that cannot be used, " +
+						"with why, in the language Accept-Language asks for when a plugin has a pack for it.",
+					Responses: ok(ref(List[PluginInfo]{}), "The plugins.", "501"),
+				},
+				Post: &operation{
+					OperationID: "installPlugin",
+					Summary: "Install a plugin from a zip archive holding plugin.yaml at its top or in " +
+						"one folder. It is checked the way a site checks it when it loads, and is not " +
+						"turned on: plugins.enabled in the settings does that.",
+					Parameters: []parameter{{
+						Name: "replace", In: "query",
+						Description: "Replace an installed plugin of the same id. Without it, one " +
+							"already installed is answered with 409 and both versions.",
+						Schema: &jsonSchema{Type: "boolean"},
+					}},
+					RequestBody: &requestBody{
+						Required: true,
+						Content: map[string]mediaType{"multipart/form-data": {Schema: &jsonSchema{
+							Type: "object",
+							Properties: map[string]*jsonSchema{
+								"file": {Type: "string", Format: "binary"},
+							},
+							Required: []string{"file"},
+						}}},
+					},
+					Responses: func() map[string]response {
+						out := created(ref(PluginInfo{}), "The installed plugin.", "400", "405", "413", "501")
+						out["409"] = response{
+							Description: "A plugin of that id is installed already.",
+							Content:     jsonOf(ref(PluginExists{})),
+						}
+						return out
+					}(),
+				},
+			},
+			"/plugins/{id}": {
+				Get: &operation{
+					OperationID: "getPlugin",
+					Summary: "Describe a plugin with its settings form and what each setting holds. " +
+						"ETag carries the revision of kite.yaml, for saving plugins.settings.<id>.",
+					Parameters: []parameter{pathParam("id")},
+					Responses:  ok(ref(PluginDetail{}), "The plugin.", "404", "501"),
+				},
+				Delete: &operation{
+					OperationID: "removePlugin",
+					Summary:     "Remove an installed plugin. One that is turned on stays.",
+					Parameters:  []parameter{pathParam("id")},
+					Responses: map[string]response{
+						"204": {Description: "Removed."},
+						"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+						"405": {Description: "Failed.", Content: jsonOf(errorRef)},
+						"409": {Description: "Failed.", Content: jsonOf(errorRef)},
+					},
+				},
+			},
 			"/previews": {Post: &operation{
 				OperationID: "openPreview",
 				Summary: "Draw the site with a theme or settings being tried, without writing " +

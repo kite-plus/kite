@@ -65,6 +65,8 @@ const (
 	OpChangeTerm     OpKind = "change_term"
 	OpPutTheme       OpKind = "put_theme"
 	OpDeleteTheme    OpKind = "delete_theme"
+	OpPutPlugin      OpKind = "put_plugin"
+	OpDeletePlugin   OpKind = "delete_plugin"
 )
 
 // Op is a single typed operation inside a [ChangeSet].
@@ -208,6 +210,29 @@ type DeleteTheme struct {
 
 func (o DeleteTheme) Kind() OpKind     { return OpDeleteTheme }
 func (o DeleteTheme) Describe() string { return "themes/" + o.Name }
+
+// PutPlugin installs a plugin as the directory plugins/<ID>, going through a
+// change set for the same reasons a theme does.
+type PutPlugin struct {
+	ID string
+	// Files maps each path inside the plugin directory, written with forward
+	// slashes, to its bytes.
+	Files map[string][]byte
+	// Replace lets it take the place of an installed version. A file the old
+	// one had and the new one lacks is removed.
+	Replace bool
+}
+
+func (o PutPlugin) Kind() OpKind     { return OpPutPlugin }
+func (o PutPlugin) Describe() string { return "plugins/" + o.ID }
+
+// DeletePlugin removes an installed plugin and everything in its directory.
+type DeletePlugin struct {
+	ID string
+}
+
+func (o DeletePlugin) Kind() OpKind     { return OpDeletePlugin }
+func (o DeletePlugin) Describe() string { return "plugins/" + o.ID }
 
 // DeleteMedia removes a media file.
 type DeleteMedia struct {

@@ -36,6 +36,7 @@ var settable = []string{
 	"theme.name",
 	"build.pageSize",
 	"build.feedLimit",
+	"plugins.enabled",
 }
 
 // Limits on what a form may write. Each is well past any real use, and each
@@ -50,8 +51,11 @@ const (
 
 // settablePrefix covers the keys a theme declares for itself, which cannot be
 // listed here because only the theme knows them. Each is checked against the
-// theme's own schema instead.
-const settablePrefix = "theme.settings."
+// theme's own schema instead. pluginPrefix does the same for each plugin's.
+const (
+	settablePrefix = "theme.settings."
+	pluginPrefix   = "plugins.settings."
+)
 
 // checkSetting reports why a value cannot be stored, or "" when it can.
 //
@@ -250,7 +254,8 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, path := range slices.Sorted(maps.Keys(values)) {
 		rest, themed := strings.CutPrefix(path, settablePrefix)
-		if !slices.Contains(settable, path) && !themed {
+		ofPlugin, plugged := strings.CutPrefix(path, pluginPrefix)
+		if !slices.Contains(settable, path) && !themed && !plugged {
 			failField(w, http.StatusBadRequest, CodeInvalidRequest, path,
 				"this setting cannot be changed through the API")
 			return
@@ -259,8 +264,14 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		// reload that follows a write would leave the bad value in the file
 		// and the project unable to open.
 		problem := checkSetting(path, values[path])
-		if problem == "" && themed {
+		switch {
+		case problem != "":
+		case themed:
 			problem = checkThemeSetting(target, rest, values[path])
+		case plugged:
+			problem = checkPluginSetting(view, ofPlugin, values[path])
+		case path == "plugins.enabled":
+			problem = checkPluginsEnabled(view, values[path])
 		}
 		if problem != "" {
 			failField(w, http.StatusBadRequest, CodeInvalidRequest, path, problem)

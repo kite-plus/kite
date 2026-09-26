@@ -6,6 +6,7 @@ import (
 
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/publish"
 	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/render/url"
@@ -38,6 +39,14 @@ type View struct {
 	// Previews keeps the sites being drawn with a theme or settings that are
 	// being tried. It is nil where none can be drawn.
 	Previews Previews
+
+	// Plugins is what kite.yaml says about plugins: which run, in what
+	// order, and their settings.
+	Plugins config.Plugins
+	// InstalledPlugins lists the plugins in plugins/, including the ones
+	// that cannot be used, with why. It is nil where plugins cannot be
+	// managed.
+	InstalledPlugins func() []InstalledPlugin
 
 	// Writer is nil when this deployment may not be written to, which is the
 	// difference between a preview an author is typing into and a read-only
@@ -83,6 +92,16 @@ type InstalledTheme struct {
 	// Manifest holds what could be read of it, if anything.
 	Theme    *theme.Theme
 	Manifest *theme.Manifest
+	Problem  string
+}
+
+// InstalledPlugin is a plugin a project has.
+type InstalledPlugin struct {
+	ID string
+	// Plugin is nil when it cannot be used. Problem then says why, and
+	// Manifest holds what could be read of it, if anything.
+	Plugin   *plugin.Plugin
+	Manifest *plugin.Manifest
 	Problem  string
 }
 

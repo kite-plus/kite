@@ -315,6 +315,9 @@ func (s *Server) view() api.View {
 		ThemeSettings: current.Config.Theme.Settings,
 		Themes:        s.themes,
 		Previews:      s.previews,
+
+		Plugins:          current.Config.Plugins,
+		InstalledPlugins: s.installedPlugins,
 	}
 	if s.opts.Write {
 		v.Writer = current.Project.Writer()
@@ -325,6 +328,30 @@ func (s *Server) view() api.View {
 	v.WordCount = s.wordCount
 	v.Export = s.export
 	return v
+}
+
+// installedPlugins lists the plugins in plugins/, each loaded afresh so that
+// one just installed or edited is described as it is now.
+func (s *Server) installedPlugins() []api.InstalledPlugin {
+	ids, err := plugin.Installed(s.root)
+	if err != nil {
+		s.log.Error("list plugins", "err", err)
+		return nil
+	}
+	out := make([]api.InstalledPlugin, 0, len(ids))
+	for _, id := range ids {
+		one := api.InstalledPlugin{ID: id}
+		if p, err := plugin.Open(s.root, id); err == nil {
+			one.Plugin, one.Manifest = p, &p.Manifest
+		} else {
+			one.Problem = err.Error()
+			if m, err := plugin.ReadManifest(os.DirFS(filepath.Join(s.root, plugin.Dir, id))); err == nil {
+				one.Manifest = m
+			}
+		}
+		out = append(out, one)
+	}
+	return out
 }
 
 // export builds the site as a deployment gets it, whatever this server

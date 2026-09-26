@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/frontmatter"
 )
@@ -104,6 +105,10 @@ func (w *Writer) Apply(ctx context.Context, cs content.ChangeSet) (content.Resul
 			err = w.putTheme(o, &res)
 		case content.DeleteTheme:
 			err = w.deleteTheme(o, &res)
+		case content.PutPlugin:
+			err = w.putPlugin(o, &res)
+		case content.DeletePlugin:
+			err = w.deletePlugin(o, &res)
 		default:
 			err = fmt.Errorf("file store: unsupported operation %q", op.Kind())
 		}
@@ -494,40 +499,55 @@ func (w *Writer) putSettings(op content.PutSettings, res *content.Result) error 
 // ThemesDir is where installed themes live, one directory each.
 const ThemesDir = "themes"
 
+// PluginsDir holds installed plugins, one directory each.
+const PluginsDir = "plugins"
+
 // putTheme writes a theme's files into its directory, and on a replace takes
 // away the files the old version had that the new one does not.
 func (w *Writer) putTheme(op content.PutTheme, res *content.Result) error {
 	if !content.ValidThemeName(op.Name) {
 		return fmt.Errorf("%w: theme name %q", content.ErrInvalid, op.Name)
 	}
-	if len(op.Files) == 0 {
-		return fmt.Errorf("%w: theme %s has no files", content.ErrInvalid, op.Name)
+	return w.putPackage("theme", path.Join(ThemesDir, op.Name), op.Files, op.Replace, res)
+}
+
+// putPlugin writes a plugin's files into its directory, as putTheme does.
+func (w *Writer) putPlugin(op content.PutPlugin, res *content.Result) error {
+	if !config.ValidPluginID(op.ID) {
+		return fmt.Errorf("%w: plugin id %q", content.ErrInvalid, op.ID)
 	}
-	names := slices.Sorted(maps.Keys(op.Files))
+	return w.putPackage("plugin", path.Join(PluginsDir, op.ID), op.Files, op.Replace, res)
+}
+
+// putPackage writes the files of a theme or a plugin, kind, into dir.
+func (w *Writer) putPackage(kind, dir string, files map[string][]byte, replace bool, res *content.Result) error {
+	if len(files) == 0 {
+		return fmt.Errorf("%w: %s %s has no files", content.ErrInvalid, kind, path.Base(dir))
+	}
+	names := slices.Sorted(maps.Keys(files))
 	for _, name := range names {
 		if !fs.ValidPath(name) || name == "." {
-			return fmt.Errorf("%w: theme file %q", content.ErrInvalid, name)
+			return fmt.Errorf("%w: %s file %q", content.ErrInvalid, kind, name)
 		}
 	}
 
-	dir := path.Join(ThemesDir, op.Name)
-	old, err := w.themeFiles(dir)
+	old, err := w.packageFiles(kind, dir)
 	if err != nil {
 		return err
 	}
-	if len(old) > 0 && !op.Replace {
-		return fmt.Errorf("%w: theme %s is already installed", content.ErrInvalid, op.Name)
+	if len(old) > 0 && !replace {
+		return fmt.Errorf("%w: %s %s is already installed", content.ErrInvalid, kind, path.Base(dir))
 	}
 
 	for _, name := range names {
 		target := path.Join(dir, name)
-		if err := w.write(target, op.Files[name]); err != nil {
+		if err := w.write(target, files[name]); err != nil {
 			return err
 		}
 		appendUnique(&res.Written, target)
 	}
 	for _, target := range old {
-		if _, kept := op.Files[strings.TrimPrefix(target, dir+"/")]; kept {
+		if _, kept := files[strings.TrimPrefix(target, dir+"/")]; kept {
 			continue
 		}
 		if err := w.remove(target); err != nil {
@@ -539,10 +559,10 @@ func (w *Writer) putTheme(op content.PutTheme, res *content.Result) error {
 	return nil
 }
 
-// themeFiles lists the files of an installed theme, none when it is not
-// installed. A link to a theme kept elsewhere is refused rather than written
-// through, since its files belong to wherever it points.
-func (w *Writer) themeFiles(dir string) ([]string, error) {
+// packageFiles lists the files of an installed theme or plugin, kind, none
+// when it is not installed. A link to one kept elsewhere is refused rather
+// than written through, since its files belong to wherever it points.
+func (w *Writer) packageFiles(kind, dir string) ([]string, error) {
 	info, err := os.Lstat(abs(w.root, dir))
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
@@ -550,9 +570,9 @@ func (w *Writer) themeFiles(dir string) ([]string, error) {
 	case err != nil:
 		return nil, err
 	case info.Mode()&fs.ModeSymlink != 0:
-		return nil, fmt.Errorf("%w: %s links to a theme kept elsewhere; change it there", content.ErrInvalid, dir)
+		return nil, fmt.Errorf("%w: %s links to a %s kept elsewhere; change it there", content.ErrInvalid, dir, kind)
 	case !info.IsDir():
-		return nil, fmt.Errorf("%w: %s is a file, not a theme", content.ErrInvalid, dir)
+		return nil, fmt.Errorf("%w: %s is a file, not a %s", content.ErrInvalid, dir, kind)
 	}
 	var files []string
 	err = filepath.WalkDir(abs(w.root, dir), func(p string, d fs.DirEntry, err error) error {
@@ -590,11 +610,23 @@ func (w *Writer) deleteTheme(op content.DeleteTheme, res *content.Result) error 
 	if !content.ValidThemeName(op.Name) {
 		return fmt.Errorf("%w: theme name %q", content.ErrInvalid, op.Name)
 	}
-	dir := path.Join(ThemesDir, op.Name)
+	return w.deletePackage("theme", path.Join(ThemesDir, op.Name), res)
+}
+
+// deletePlugin removes a plugin's directory, as deleteTheme does.
+func (w *Writer) deletePlugin(op content.DeletePlugin, res *content.Result) error {
+	if !config.ValidPluginID(op.ID) {
+		return fmt.Errorf("%w: plugin id %q", content.ErrInvalid, op.ID)
+	}
+	return w.deletePackage("plugin", path.Join(PluginsDir, op.ID), res)
+}
+
+// deletePackage removes the directory of a theme or plugin, kind.
+func (w *Writer) deletePackage(kind, dir string, res *content.Result) error {
 	info, err := os.Lstat(abs(w.root, dir))
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
-		return fmt.Errorf("%w: theme %s", content.ErrNotFound, op.Name)
+		return fmt.Errorf("%w: %s %s", content.ErrNotFound, kind, path.Base(dir))
 	case err != nil:
 		return err
 	case info.Mode()&fs.ModeSymlink != 0 || !info.IsDir():

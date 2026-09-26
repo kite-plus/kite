@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/kite-plus/kite/internal/api"
+	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/site"
 	"github.com/kite-plus/kite/internal/store/file"
 )
@@ -466,17 +467,21 @@ func newWritableServer(t *testing.T, root string, with ...func(*api.Options)) (h
 
 	opts := api.Options{Site: func() api.View {
 		return api.View{
-			Reader:         current.Reader,
-			Resolver:       current.Resolver,
-			Types:          current.Project.Types,
-			Site:           current.Config.Site,
-			Build:          current.Config.Build,
-			Store:          current.Config.Content.Store,
-			Runtime:        "test",
-			Theme:          current.Config.Theme.Name,
-			ActiveTheme:    current.Theme,
-			ThemeSettings:  current.Config.Theme.Settings,
-			Themes:         func() []api.InstalledTheme { return installedThemes(root) },
+			Reader:        current.Reader,
+			Resolver:      current.Resolver,
+			Types:         current.Project.Types,
+			Site:          current.Config.Site,
+			Build:         current.Config.Build,
+			Store:         current.Config.Content.Store,
+			Runtime:       "test",
+			Theme:         current.Config.Theme.Name,
+			ActiveTheme:   current.Theme,
+			ThemeSettings: current.Config.Theme.Settings,
+			Themes:        func() []api.InstalledTheme { return installedThemes(root) },
+			Plugins:       current.Config.Plugins,
+			InstalledPlugins: func() []api.InstalledPlugin {
+				return installedPlugins(root)
+			},
 			ConfigRevision: configRevision,
 			Problems:       current.Problems,
 			Writer:         current.Project.Writer(),
@@ -515,6 +520,21 @@ func installedThemes(root string) []api.InstalledTheme {
 		out = append(out, api.InstalledTheme{
 			Name: one.Name, Builtin: one.Builtin, Theme: one.Theme, Manifest: one.Manifest, Problem: one.Problem,
 		})
+	}
+	return out
+}
+
+func installedPlugins(root string) []api.InstalledPlugin {
+	ids, _ := plugin.Installed(root)
+	var out []api.InstalledPlugin
+	for _, id := range ids {
+		one := api.InstalledPlugin{ID: id}
+		if p, err := plugin.Open(root, id); err == nil {
+			one.Plugin, one.Manifest = p, &p.Manifest
+		} else {
+			one.Problem = err.Error()
+		}
+		out = append(out, one)
 	}
 	return out
 }

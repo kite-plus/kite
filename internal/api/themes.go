@@ -137,7 +137,7 @@ func (s *Server) handleInstallTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	files, problem := unpackTheme(archive)
+	files, problem := unpackArchive(archive, "theme", theme.ManifestName, maxThemeSize, maxThemeFiles)
 	if problem != "" {
 		failField(w, http.StatusBadRequest, CodeInvalidRequest, "file", problem)
 		return
@@ -294,10 +294,11 @@ func themeInfo(view View, installed []InstalledTheme, one InstalledTheme, r *htt
 	return info
 }
 
-// unpackTheme reads a theme out of a zip archive: from its top, or from the
-// one folder everything in it sits in, as an archive of a repository has it.
-// It reports what is wrong with the archive when it cannot.
-func unpackTheme(archive []byte) (map[string][]byte, string) {
+// unpackArchive reads a theme or a plugin, kind, out of a zip archive: from
+// its top, or from the one folder everything in it sits in, as an archive of
+// a repository has it. manifest is the file that has to be there. It reports
+// what is wrong with the archive when it cannot.
+func unpackArchive(archive []byte, kind, manifest string, maxSize int64, maxFiles int) (map[string][]byte, string) {
 	zr, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
 	if err != nil {
 		return nil, "the file is not a zip archive"
@@ -310,18 +311,19 @@ func unpackTheme(archive []byte) (map[string][]byte, string) {
 		}
 	}
 	root := ""
-	if !slices.Contains(names, theme.ManifestName) {
+	missing := "the archive has no " + manifest + " at its top or in a single folder"
+	if !slices.Contains(names, manifest) {
 		if len(names) == 0 {
 			return nil, "the archive is empty"
 		}
 		top, _, _ := strings.Cut(names[0], "/")
 		for _, name := range names {
 			if !strings.HasPrefix(name, top+"/") {
-				return nil, "the archive has no theme.yaml at its top or in a single folder"
+				return nil, missing
 			}
 		}
-		if !slices.Contains(names, top+"/"+theme.ManifestName) {
-			return nil, "the archive has no theme.yaml at its top or in a single folder"
+		if !slices.Contains(names, top+"/"+manifest) {
+			return nil, missing
 		}
 		root = top + "/"
 	}
@@ -335,13 +337,13 @@ func unpackTheme(archive []byte) (map[string][]byte, string) {
 		}
 		rel := strings.TrimPrefix(name, root)
 		if !fs.ValidPath(rel) {
-			return nil, "the archive holds a path that leads out of the theme: " + f.Name
+			return nil, "the archive holds a path that leads out of the " + kind + ": " + f.Name
 		}
 		if !f.Mode().IsRegular() {
 			return nil, "the archive holds something other than a plain file: " + f.Name
 		}
-		if len(files) == maxThemeFiles {
-			return nil, fmt.Sprintf("a theme may hold at most %d files", maxThemeFiles)
+		if len(files) == maxFiles {
+			return nil, fmt.Sprintf("a %s may hold at most %d files", kind, maxFiles)
 		}
 		rc, err := f.Open()
 		if err != nil {
@@ -349,14 +351,14 @@ func unpackTheme(archive []byte) (map[string][]byte, string) {
 		}
 		// The sizes an archive declares are not trusted: the bytes are
 		// counted as they come out.
-		data, err := io.ReadAll(io.LimitReader(rc, maxThemeSize-total+1))
+		data, err := io.ReadAll(io.LimitReader(rc, maxSize-total+1))
 		_ = rc.Close()
 		if err != nil {
 			return nil, "the archive cannot be read: " + err.Error()
 		}
 		total += int64(len(data))
-		if total > maxThemeSize {
-			return nil, fmt.Sprintf("a theme may take at most %d MB unpacked", maxThemeSize>>20)
+		if total > maxSize {
+			return nil, fmt.Sprintf("a %s may take at most %d MB unpacked", kind, maxSize>>20)
 		}
 		files[rel] = data
 	}
@@ -377,7 +379,8 @@ func archived(name string) string {
 	return name
 }
 
-// mapFS holds unpacked files as a filesystem a theme can be loaded from.
+// mapFS holds unpacked files as a filesystem a theme or plugin can be loaded
+// from.
 func mapFS(files map[string][]byte) fs.FS {
 	fsys := make(fstest.MapFS, len(files))
 	for name, data := range files {
