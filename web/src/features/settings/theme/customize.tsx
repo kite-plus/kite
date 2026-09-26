@@ -13,7 +13,7 @@ import { useThemePreview } from "@/hooks/useThemePreview";
 import { uploadSiteMedia, useSaveTheme, useTheme } from "@/hooks/useThemes";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { resolveLink, siteHome } from "@/lib/links";
-import { defaultOf, problemOf, sameValue, valueFields } from "@/lib/schema";
+import { changesOf, defaultOf, problemOf, valueFields } from "@/lib/schema";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -66,7 +66,7 @@ export function ThemeCustomizer({ name }: { name: string }) {
 
   const submit = () => {
     if (!detail || !values) return;
-    const changes = changesOf(fields, detail.stored, values, form.baseline ?? {});
+    const changes = changesOf("theme.settings.", fields, detail.stored, values, form.baseline ?? {});
     if (trying) changes["theme.name"] = name;
     save.mutate(
       { changes, revision: form.revision ?? detail.revision },
@@ -398,32 +398,6 @@ function arrange(fields: Field[], general: string): Field[] {
     }
   }
   flush();
-  return out;
-}
-
-/**
- * changesOf is what a save writes, by dotted path: each setting that changed,
- * and for one put back to the theme's default, its removal, so the theme's
- * default applies again and follows the theme when it changes.
- */
-function changesOf(
-  fields: Field[],
-  stored: string[],
-  values: Record<string, unknown>,
-  baseline: Record<string, unknown>,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const field of fields) {
-    const value = values[field.key];
-    if (sameValue(value, baseline[field.key])) continue;
-    const fallback = defaultOf(field);
-    const cleared = value === "" && fallback === undefined;
-    if (cleared || sameValue(value, fallback)) {
-      if (stored.includes(field.key)) out[`theme.settings.${field.key}`] = null;
-    } else {
-      out[`theme.settings.${field.key}`] = value;
-    }
-  }
   return out;
 }
 

@@ -36,6 +36,34 @@ export function sameValue(a: unknown, b: unknown): boolean {
   return Object.is(a, b) || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 }
 
+/**
+ * changesOf is what a save writes, by dotted path under prefix, as
+ * "theme.settings.": each setting that changed, and for one put back to its
+ * default, its removal, so the default applies again and follows the theme or
+ * plugin when a new version changes it.
+ */
+export function changesOf(
+  prefix: string,
+  fields: Field[],
+  stored: string[],
+  values: Record<string, unknown>,
+  baseline: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of fields) {
+    const value = values[field.key];
+    if (sameValue(value, baseline[field.key])) continue;
+    const fallback = defaultOf(field);
+    const cleared = value === "" && fallback === undefined;
+    if (cleared || sameValue(value, fallback)) {
+      if (stored.includes(field.key)) out[prefix + field.key] = null;
+    } else {
+      out[prefix + field.key] = value;
+    }
+  }
+  return out;
+}
+
 const hexColor = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 /** isColor reports whether a value is a color the server stores. */

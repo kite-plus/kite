@@ -81,7 +81,11 @@ function ActiveBar({ className }: { className: string }) {
 
 function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
   const { setOpenMobile } = useSidebar()
-  const active = checkIsActive(href, item)
+  // Kite: a page under a top-level entry, such as a plugin's settings or a
+  // post in the editor, keeps the entry marked.
+  const path = href.split('?')[0]
+  const active =
+    checkIsActive(href, item) || (item.url !== '/' && path.startsWith(`${item.url}/`))
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={active} tooltip={item.title}>

@@ -17,6 +17,8 @@ import { Route as AuthenticatedDeployRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedThemeRouteImport } from './routes/_authenticated/theme'
 import { Route as AuthenticatedContentKindRouteRouteImport } from './routes/_authenticated/content/$kind/route'
+import { Route as AuthenticatedPluginsIndexRouteImport } from './routes/_authenticated/plugins/index'
+import { Route as AuthenticatedPluginsIdRouteImport } from './routes/_authenticated/plugins/$id'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
@@ -68,6 +70,17 @@ const AuthenticatedContentKindRouteRoute =
     path: '/content/$kind',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPluginsIndexRoute =
+  AuthenticatedPluginsIndexRouteImport.update({
+    id: '/plugins/',
+    path: '/plugins/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPluginsIdRoute = AuthenticatedPluginsIdRouteImport.update({
+  id: '/plugins/$id',
+  path: '/plugins/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsIndexRoute =
   AuthenticatedSettingsIndexRouteImport.update({
     id: '/',
@@ -131,10 +144,12 @@ export interface FileRoutesByFullPath {
   '/deploy': typeof AuthenticatedDeployRoute
   '/theme': typeof AuthenticatedThemeRoute
   '/content/$kind': typeof AuthenticatedContentKindRouteRouteWithChildren
+  '/plugins/$id': typeof AuthenticatedPluginsIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/theme': typeof AuthenticatedSettingsThemeRoute
   '/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
+  '/plugins/': typeof AuthenticatedPluginsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/taxonomies/': typeof AuthenticatedTaxonomiesIndexRoute
   '/content/$kind/$id': typeof AuthenticatedContentKindIdRoute
@@ -147,10 +162,12 @@ export interface FileRoutesByTo {
   '/deploy': typeof AuthenticatedDeployRoute
   '/theme': typeof AuthenticatedThemeRoute
   '/': typeof AuthenticatedIndexRoute
+  '/plugins/$id': typeof AuthenticatedPluginsIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/theme': typeof AuthenticatedSettingsThemeRoute
   '/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
+  '/plugins': typeof AuthenticatedPluginsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/taxonomies': typeof AuthenticatedTaxonomiesIndexRoute
   '/content/$kind/$id': typeof AuthenticatedContentKindIdRoute
@@ -167,10 +184,12 @@ export interface FileRoutesById {
   '/_authenticated/theme': typeof AuthenticatedThemeRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/content/$kind': typeof AuthenticatedContentKindRouteRouteWithChildren
+  '/_authenticated/plugins/$id': typeof AuthenticatedPluginsIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/theme': typeof AuthenticatedSettingsThemeRoute
   '/_authenticated/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
+  '/_authenticated/plugins/': typeof AuthenticatedPluginsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/taxonomies/': typeof AuthenticatedTaxonomiesIndexRoute
   '/_authenticated/content/$kind/$id': typeof AuthenticatedContentKindIdRoute
@@ -187,10 +206,12 @@ export interface FileRouteTypes {
     | '/deploy'
     | '/theme'
     | '/content/$kind'
+    | '/plugins/$id'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/theme'
     | '/taxonomies/$taxonomy'
+    | '/plugins/'
     | '/settings/'
     | '/taxonomies/'
     | '/content/$kind/$id'
@@ -203,10 +224,12 @@ export interface FileRouteTypes {
     | '/deploy'
     | '/theme'
     | '/'
+    | '/plugins/$id'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/theme'
     | '/taxonomies/$taxonomy'
+    | '/plugins'
     | '/settings'
     | '/taxonomies'
     | '/content/$kind/$id'
@@ -222,10 +245,12 @@ export interface FileRouteTypes {
     | '/_authenticated/theme'
     | '/_authenticated/'
     | '/_authenticated/content/$kind'
+    | '/_authenticated/plugins/$id'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/theme'
     | '/_authenticated/taxonomies/$taxonomy'
+    | '/_authenticated/plugins/'
     | '/_authenticated/settings/'
     | '/_authenticated/taxonomies/'
     | '/_authenticated/content/$kind/$id'
@@ -295,6 +320,20 @@ declare module '@tanstack/react-router' {
       path: '/content/$kind'
       fullPath: '/content/$kind'
       preLoaderRoute: typeof AuthenticatedContentKindRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/plugins/': {
+      id: '/_authenticated/plugins/'
+      path: '/plugins'
+      fullPath: '/plugins/'
+      preLoaderRoute: typeof AuthenticatedPluginsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/plugins/$id': {
+      id: '/_authenticated/plugins/$id'
+      path: '/plugins/$id'
+      fullPath: '/plugins/$id'
+      preLoaderRoute: typeof AuthenticatedPluginsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings/': {
@@ -405,7 +444,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedThemeRoute: typeof AuthenticatedThemeRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedContentKindRouteRoute: typeof AuthenticatedContentKindRouteRouteWithChildren
+  AuthenticatedPluginsIdRoute: typeof AuthenticatedPluginsIdRoute
   AuthenticatedTaxonomiesTaxonomyRoute: typeof AuthenticatedTaxonomiesTaxonomyRoute
+  AuthenticatedPluginsIndexRoute: typeof AuthenticatedPluginsIndexRoute
   AuthenticatedTaxonomiesIndexRoute: typeof AuthenticatedTaxonomiesIndexRoute
   AuthenticatedSettingsThemeNameRoute: typeof AuthenticatedSettingsThemeNameRoute
 }
@@ -417,7 +458,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedContentKindRouteRoute:
     AuthenticatedContentKindRouteRouteWithChildren,
+  AuthenticatedPluginsIdRoute: AuthenticatedPluginsIdRoute,
   AuthenticatedTaxonomiesTaxonomyRoute: AuthenticatedTaxonomiesTaxonomyRoute,
+  AuthenticatedPluginsIndexRoute: AuthenticatedPluginsIndexRoute,
   AuthenticatedTaxonomiesIndexRoute: AuthenticatedTaxonomiesIndexRoute,
   AuthenticatedSettingsThemeNameRoute: AuthenticatedSettingsThemeNameRoute,
 }
