@@ -2,13 +2,14 @@ import {
   FileText,
   Folder,
   LayoutDashboard,
+  MonitorCog,
   Newspaper,
   Palette,
   Settings,
   SlidersHorizontal,
   Tag,
   Tags,
-  UserCog,
+  UserRound,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { useContentTypes, useTaxonomies } from '@/hooks/useContents'
@@ -71,7 +72,8 @@ export function useSidebarData(): SidebarData {
             items: [
               { title: t('nav.site'), url: '/settings', icon: SlidersHorizontal },
               { title: t('nav.theme'), url: '/settings/theme', icon: Palette },
-              { title: t('settings.interface'), url: '/settings/appearance', icon: UserCog },
+              { title: t('settings.interface'), url: '/settings/appearance', icon: MonitorCog },
+              { title: t('nav.account'), url: '/settings/account', icon: UserRound },
             ],
           },
         ],

@@ -1,6 +1,5 @@
 import { ChevronsUpDown } from 'lucide-react'
 import useDialogState from '@/hooks/use-dialog-state'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +14,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { SignOutDialog } from '@/components/sign-out-dialog'
-import { AccountMenuItems, useAccount } from './account'
+import { AccountMenuItems, UserAvatar, useAccount } from './account'
 
 export function NavUser() {
   const { isMobile } = useSidebar()
@@ -32,11 +31,7 @@ export function NavUser() {
                 size='lg'
                 className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
               >
-                <Avatar className='h-8 w-8 rounded-lg'>
-                  <AvatarFallback className='rounded-lg'>
-                    {account.initials}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar square />
                 <div className='grid flex-1 text-start text-sm leading-tight'>
                   <span className='truncate font-semibold'>{account.name}</span>
                   <span className='truncate text-xs'>{account.note}</span>
@@ -52,11 +47,7 @@ export function NavUser() {
             >
               <DropdownMenuLabel className='p-0 font-normal'>
                 <div className='flex items-center gap-2 px-1 py-1.5 text-start text-sm'>
-                  <Avatar className='h-8 w-8 rounded-lg'>
-                    <AvatarFallback className='rounded-lg'>
-                      {account.initials}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar square />
                   <div className='grid flex-1 text-start text-sm leading-tight'>
                     <span className='truncate font-semibold'>{account.name}</span>
                     <span className='truncate text-xs'>{account.note}</span>

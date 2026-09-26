@@ -1,5 +1,5 @@
+import { useI18n } from '@/i18n'
 import useDialogState from '@/hooks/use-dialog-state'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -8,10 +8,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { AccountMenuItems, useAccount } from '@/components/layout/account'
+import {
+  AccountMenuItems,
+  UserAvatar,
+  useAccount,
+} from '@/components/layout/account'
 import { SignOutDialog } from '@/components/sign-out-dialog'
 
 export function ProfileDropdown() {
+  const { t } = useI18n()
   const [open, setOpen] = useDialogState()
   const account = useAccount()
 
@@ -19,10 +24,12 @@ export function ProfileDropdown() {
     <>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant='ghost' className='relative h-8 w-8 rounded-full'>
-            <Avatar className='h-8 w-8'>
-              <AvatarFallback>{account.initials}</AvatarFallback>
-            </Avatar>
+          <Button
+            variant='ghost'
+            className='relative h-8 w-8 rounded-full'
+            aria-label={t('nav.account')}
+          >
+            <UserAvatar />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className='w-56' align='end' forceMount>

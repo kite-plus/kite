@@ -1,7 +1,5 @@
-import type { ReactNode } from "react";
-
 import type { Settings } from "@/api/client";
-import { useI18n, type Key } from "@/i18n";
+import { useI18n } from "@/i18n";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +10,7 @@ import { KeywordsInput } from "@/components/KeywordsInput";
 import { LanguageSelect } from "@/components/LanguageSelect";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { ContentSection } from "../components/content-section";
+import { Group, Row } from "../components/form-group";
 import { FormProblem, LeaveGuard, SaveButton, useSettingsForm } from "../use-settings-form";
 
 /** paths maps a field of the form to the config path that holds it. */
@@ -174,29 +173,5 @@ export function SiteSettings() {
         <LeaveGuard form={form} />
       </div>
     </ContentSection>
-  );
-}
-
-/** Group is a titled part of the form, drawn as theme settings draw a section. */
-function Group({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
-  return (
-    <fieldset className="grid gap-6">
-      <legend className="mb-6 w-full border-b pb-2">
-        <span className="text-sm font-semibold">{title}</span>
-        {note && <p className="mt-0.5 text-sm text-muted-foreground">{note}</p>}
-      </legend>
-      {children}
-    </fieldset>
-  );
-}
-
-function Row({ id, label, help, children }: { id: string; label: Key; help?: Key; children: ReactNode }) {
-  const { t } = useI18n();
-  return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{t(label)}</Label>
-      {children}
-      {help && <p className="text-sm text-muted-foreground">{t(help)}</p>}
-    </div>
   );
 }

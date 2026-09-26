@@ -17,6 +17,7 @@ import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authen
 import { Route as AuthenticatedThemeRouteImport } from './routes/_authenticated/theme'
 import { Route as AuthenticatedContentKindRouteRouteImport } from './routes/_authenticated/content/$kind/route'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
+import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsThemeRouteImport } from './routes/_authenticated/settings/theme'
 import { Route as AuthenticatedTaxonomiesIndexRouteImport } from './routes/_authenticated/taxonomies/index'
@@ -65,6 +66,12 @@ const AuthenticatedSettingsIndexRoute =
   AuthenticatedSettingsIndexRouteImport.update({
     id: '/',
     path: '/',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
+const AuthenticatedSettingsAccountRoute =
+  AuthenticatedSettingsAccountRouteImport.update({
+    id: '/account',
+    path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
 const AuthenticatedSettingsAppearanceRoute =
@@ -117,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof authSignInRoute
   '/theme': typeof AuthenticatedThemeRoute
   '/content/$kind': typeof AuthenticatedContentKindRouteRouteWithChildren
+  '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/theme': typeof AuthenticatedSettingsThemeRoute
   '/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
@@ -131,6 +139,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof authSignInRoute
   '/theme': typeof AuthenticatedThemeRoute
   '/': typeof AuthenticatedIndexRoute
+  '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/theme': typeof AuthenticatedSettingsThemeRoute
   '/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
@@ -149,6 +158,7 @@ export interface FileRoutesById {
   '/_authenticated/theme': typeof AuthenticatedThemeRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/content/$kind': typeof AuthenticatedContentKindRouteRouteWithChildren
+  '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/theme': typeof AuthenticatedSettingsThemeRoute
   '/_authenticated/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/theme'
     | '/content/$kind'
+    | '/settings/account'
     | '/settings/appearance'
     | '/settings/theme'
     | '/taxonomies/$taxonomy'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/theme'
     | '/'
+    | '/settings/account'
     | '/settings/appearance'
     | '/settings/theme'
     | '/taxonomies/$taxonomy'
@@ -198,6 +210,7 @@ export interface FileRouteTypes {
     | '/_authenticated/theme'
     | '/_authenticated/'
     | '/_authenticated/content/$kind'
+    | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/theme'
     | '/_authenticated/taxonomies/$taxonomy'
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/settings/account': {
+      id: '/_authenticated/settings/account'
+      path: '/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
     '/_authenticated/settings/appearance': {
       id: '/_authenticated/settings/appearance'
       path: '/appearance'
@@ -325,6 +345,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedSettingsRouteRouteChildren {
+  AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
   AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
   AuthenticatedSettingsThemeRoute: typeof AuthenticatedSettingsThemeRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
@@ -332,6 +353,7 @@ interface AuthenticatedSettingsRouteRouteChildren {
 
 const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteChildren =
   {
+    AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
     AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
     AuthenticatedSettingsThemeRoute: AuthenticatedSettingsThemeRoute,
     AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,

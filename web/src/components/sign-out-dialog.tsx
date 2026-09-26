@@ -1,4 +1,3 @@
-import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useI18n } from '@/i18n'
 import { useSignOut } from '@/hooks/useSession'
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -10,22 +9,13 @@ interface SignOutDialogProps {
 
 export function SignOutDialog({ open, onOpenChange }: SignOutDialogProps) {
   const { t } = useI18n()
-  const navigate = useNavigate()
-  const location = useLocation()
   const signOut = useSignOut()
 
+  // Kite: the layout takes a signed-out browser to the sign-in form, with the
+  // way back to this page. Navigating here as well raced it, and the second
+  // one nested the sign-in address inside the way back.
   const handleSignOut = () => {
-    signOut.mutate(undefined, {
-      onSuccess: () => {
-        onOpenChange(false)
-        // Signing in again comes back to where this left off.
-        void navigate({
-          to: '/sign-in',
-          search: { redirect: location.href },
-          replace: true,
-        })
-      },
-    })
+    signOut.mutate(undefined, { onSuccess: () => onOpenChange(false) })
   }
 
   return (

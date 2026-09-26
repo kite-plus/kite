@@ -46,8 +46,8 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
 
 /**
  * useSignedOutElsewhere sends the person to the sign-in form the moment the
- * server refuses a request, which is how an expired session shows up. The
- * route checks the session only on the way in.
+ * session ends: signed out here, or refused by the server, which is how an
+ * expired session shows up. The route checks the session only on the way in.
  */
 function useSignedOutElsewhere() {
   const session = useSession()

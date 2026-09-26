@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check, Loader2, XCircle } from "lucide-react";
 
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LanguageSelect } from "@/components/LanguageSelect";
-import { PasswordInput } from "@/components/password-input";
+import { NewPassword, newPasswordReady } from "@/components/new-password";
 import { AuthLayout } from "../auth-layout";
 
 /**
@@ -46,14 +46,9 @@ export function Setup() {
   const [again, setAgain] = useState("");
 
   const minimum = state?.min_password_length ?? 8;
-  const missing = minimum - password.length;
-  const longEnough = password.length >= minimum;
-  const tooShort = password.length > 0 && !longEnough;
-  const matches = again.length > 0 && again === password;
-  const mismatch = again.length > 0 && again !== password;
   // What the form needs before it is worth sending, which is also what the
   // hints under each field are saying one at a time.
-  const ready = Boolean(user) && longEnough && matches;
+  const ready = Boolean(user) && newPasswordReady(password, again, minimum);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -131,38 +126,13 @@ export function Setup() {
                 required
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">{t("setup.password")}</Label>
-              <PasswordInput
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                required
-              />
-              {tooShort ? (
-                <Hint tone="wrong">{t("setup.passwordNeeds", { count: missing })}</Hint>
-              ) : longEnough ? (
-                <Hint tone="right">{t("setup.passwordOK")}</Hint>
-              ) : (
-                <Hint>{t("setup.passwordHelp", { n: minimum })}</Hint>
-              )}
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="again">{t("setup.again")}</Label>
-              <PasswordInput
-                id="again"
-                value={again}
-                onChange={(e) => setAgain(e.target.value)}
-                autoComplete="new-password"
-                required
-              />
-              {mismatch ? (
-                <Hint tone="wrong">{t("setup.mismatch")}</Hint>
-              ) : matches ? (
-                <Hint tone="right">{t("setup.match")}</Hint>
-              ) : null}
-            </div>
+            <NewPassword
+              password={password}
+              again={again}
+              onPassword={setPassword}
+              onAgain={setAgain}
+              minimum={minimum}
+            />
 
             {refusal && (
               <Alert variant="destructive">
@@ -191,31 +161,6 @@ export function Setup() {
         )}
       </form>
     </AuthLayout>
-  );
-}
-
-/**
- * One line of feedback under a field.
- *
- * It says when an answer is right as well as when it is wrong. A form that
- * only speaks up to complain leaves somebody staring at a password they
- * cannot see, wondering whether the two boxes agree.
- */
-function Hint({ tone, children }: { tone?: "right" | "wrong"; children: ReactNode }) {
-  return (
-    // Polite rather than assertive: this changes on every keystroke, and a
-    // screen reader interrupting each one would be unusable.
-    <p
-      aria-live="polite"
-      className={cn(
-        "text-sm text-muted-foreground",
-        tone === "wrong" && "text-destructive",
-        tone === "right" && "text-success",
-      )}
-    >
-      {tone === "right" && <Check aria-hidden className="me-1 inline size-3.5 align-[-0.15em]" />}
-      {children}
-    </p>
   );
 }
 
