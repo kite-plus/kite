@@ -78,6 +78,13 @@ type PageInfo struct {
 	Title      string
 	Excerpt    string
 
+	// Kind is the kind of page, as in HTMLDoc.
+	Kind string
+
+	// Text is the plain text of the item's body, a block to a line, and
+	// empty on a page of no item.
+	Text string
+
 	// Indexable says whether the page belongs in listings that describe the
 	// site to the outside world. An error page is rendered and written but is
 	// not part of the site's contents.

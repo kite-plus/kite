@@ -76,6 +76,10 @@ type Document struct {
 	// read at a different pace than spaced words, so a reading time needs
 	// the two apart.
 	CJKCount int
+
+	// Text is the text those words are counted in, a block to a line, for
+	// what searches a page rather than shows it.
+	Text string
 }
 
 // Renderer turns markdown into HTML.
@@ -140,7 +144,8 @@ func (r *Renderer) Render(source string) (*Document, error) {
 // collect walks the tree once, gathering everything a theme or a build step
 // needs so that nothing has to re-parse the document later.
 func collect(root ast.Node, src []byte, doc *Document) error {
-	return ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+	var plain strings.Builder
+	err := ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
@@ -164,12 +169,19 @@ func collect(root ast.Node, src []byte, doc *Document) error {
 			}
 		}
 		if prose(n) {
-			words, cjk := countWords(readText(n, src))
+			read := readText(n, src)
+			words, cjk := countWords(read)
 			doc.WordCount += words
 			doc.CJKCount += cjk
+			if read = strings.TrimSpace(read); read != "" {
+				plain.WriteString(read)
+				plain.WriteByte('\n')
+			}
 		}
 		return ast.WalkContinue, nil
 	})
+	doc.Text = strings.TrimSuffix(plain.String(), "\n")
+	return err
 }
 
 // prose reports a block whose text is read: a paragraph wherever it sits, the

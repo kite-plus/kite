@@ -234,11 +234,11 @@ func (b *Builder) renderAll(ctx context.Context, plan *Plan) ([]hook.PageInfo, e
 func (b *Builder) Extras(ctx context.Context, plan *Plan) (map[string][]byte, error) {
 	pages := make([]hook.PageInfo, plan.Len())
 	err := eachTarget(ctx, plan, func(ctx context.Context, i int, t Target) error {
-		page, err := b.page(ctx, b.buildCtx.ForOutput(), t)
+		page, body, err := b.page(ctx, b.buildCtx.ForOutput(), t)
 		if err != nil {
 			return err
 		}
-		pages[i] = describe(t, page)
+		pages[i] = describe(t, page, body)
 		return nil
 	})
 	if err != nil {
@@ -453,10 +453,11 @@ func (b *Builder) NextDue(ctx context.Context) (time.Time, error) {
 func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req render.Request) ([]byte, hook.PageInfo, error) {
 	var info hook.PageInfo
 
-	page, pages, err := b.pages(ctx, out, t)
+	page, body, err := b.page(ctx, out, t)
 	if err != nil {
 		return nil, info, err
 	}
+	pages := b.listed(out, t)
 
 	target := theme.Target{
 		Kind:   string(t.Kind),
@@ -493,7 +494,7 @@ func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req 
 	if err := b.opts.Hooks.TransformHTML(ctx, &doc); err != nil {
 		return nil, info, err
 	}
-	return []byte(doc.HTML), describe(t, page), nil
+	return []byte(doc.HTML), describe(t, page, body), nil
 }
 
 // hookKind names a kind of page for hooks, which read "notFound" more easily
@@ -505,48 +506,51 @@ func hookKind(k render.Kind) string {
 	return string(k)
 }
 
-// describe is what hooks are told about a rendered target.
-func describe(t Target, page render.Page) hook.PageInfo {
+// describe is what hooks are told about a rendered target. body is its item's
+// rendered body, nil on a page of no item.
+func describe(t Target, page render.Page, body *markdown.Document) hook.PageInfo {
 	info := hook.PageInfo{
 		Item:       t.Item,
 		URL:        t.URL,
 		OutputPath: t.Path,
+		Kind:       hookKind(t.Kind),
 		Indexable:  t.Kind != render.KindNotFound,
 	}
 	if page != nil {
 		info.Title = page.Title()
 		info.Excerpt = page.Excerpt()
 	}
+	if body != nil {
+		info.Text = body.Text
+	}
 	return info
 }
 
-// pages builds the Page view of a target and of everything it lists.
-func (b *Builder) pages(ctx context.Context, out *Context, t Target) (render.Page, []render.Page, error) {
-	page, err := b.page(ctx, out, t)
-	if err != nil {
-		return nil, nil, err
-	}
+// listed builds the Page view of everything a target lists.
+func (b *Builder) listed(out *Context, t Target) []render.Page {
 	listed := make([]render.Page, 0, len(t.Items))
 	for _, s := range t.Items {
 		listed = append(listed, b.listedPage(out, s))
 	}
-	return page, listed, nil
+	return listed
 }
 
-// page builds the Page view of a target itself.
-func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page, error) {
+// page builds the Page view of a target itself, and returns its item's
+// rendered body alongside, nil when it has no item.
+func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page, *markdown.Document, error) {
 	var page render.Page
+	var body *markdown.Document
 
 	if t.Item != nil {
-		doc, err := b.renderBody(ctx, t.Item)
-		if err != nil {
-			return nil, err
+		var err error
+		if body, err = b.renderBody(ctx, t.Item); err != nil {
+			return nil, nil, err
 		}
 		out.Read(Node{Kind: NodeContent, ID: string(t.Item.ID)}, string(t.Item.Revision),
 			"title", "slug", "body", "params", "published_at", "updated_at", "taxonomies")
 		opts := render.PageOptions{
 			Kind:     t.Kind,
-			Rendered: doc,
+			Rendered: body,
 			Resolver: b.opts.Resolver,
 			Terms:    b.termsOf(t.Item),
 			Location: b.opts.Site.Location,
@@ -563,7 +567,7 @@ func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page
 	} else if t.Kind != render.KindSingle {
 		page = b.listingPage(t)
 	}
-	return page, nil
+	return page, body, nil
 }
 
 // listedPage is the Page of an item that another page links to: an entry in a

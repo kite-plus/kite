@@ -167,6 +167,17 @@ func TestWordCountLeavesOutCodeAndPictures(t *testing.T) {
 	}
 }
 
+// The text is what the word count counts, so a search finds a page by what
+// its reader reads and not by its code or its markup.
+func TestTextIsWhatAReaderReads(t *testing.T) {
+	src := "# Cherry trees\n\nThey bloom in *April*.\n\n```go\nfmt.Println(\"hidden\")\n```\n\n" +
+		"- one\n- two\n\n![a picture](tree.jpg)\n\n| a | b |\n|---|---|\n| c | d |\n"
+	want := "Cherry trees\nThey bloom in April.\none\ntwo\na\nb\nc\nd"
+	if got := render(t, src, nil).Text; got != want {
+		t.Errorf("Text = %q, want %q", got, want)
+	}
+}
+
 // A Chinese paragraph has no spaces, so counting fields called a whole article
 // a handful of words and every post a one minute read.
 func TestWordCountCountsCJKCharacters(t *testing.T) {
