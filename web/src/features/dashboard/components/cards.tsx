@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
+import { Download } from "lucide-react";
 
 import { useI18n } from "@/i18n";
 import { useLatest, useTerms } from "@/hooks/useContents";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
-import { useDelivery, usePublish } from "@/hooks/usePublish";
+import { canPublish, useDelivery, usePublish } from "@/hooks/usePublish";
 import { isoDate } from "@/lib/dates";
 import {
   Card,
@@ -13,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeliveryStages } from "@/components/publish/Delivery";
 import { QueryError } from "@/components/query-error";
@@ -88,14 +90,31 @@ export function DeliveryCard() {
             ? `${delivery.data.remote ?? "origin"}/${delivery.data.branch}`
             : t("publish.title")}
         </CardDescription>
+        <CardAction>
+          <Link to="/deploy" className="text-sm text-muted-foreground hover:text-foreground">
+            {t("nav.deploy")}
+          </Link>
+        </CardAction>
       </CardHeader>
       <CardContent>
         {delivery.error && !delivery.data ? (
           <QueryError error={delivery.error} onRetry={() => void delivery.refetch()} />
         ) : delivery.isPending ? (
           <Skeleton className="h-24 w-full" />
-        ) : (
+        ) : canPublish(delivery.data) ? (
           <DeliveryStages delivery={delivery.data} publish={publish} />
+        ) : (
+          // Without git there is nothing to travel through; the way out is an
+          // export, which the deploy page makes.
+          <div className="grid justify-items-start gap-3 text-sm">
+            <p className="text-muted-foreground">{t("deploy.cardNote")}</p>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/deploy">
+                <Download />
+                {t("deploy.export")}
+              </Link>
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>

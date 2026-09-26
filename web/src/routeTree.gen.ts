@@ -13,6 +13,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as authSetupRouteImport } from './routes/(auth)/setup'
 import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedDeployRouteImport } from './routes/_authenticated/deploy'
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedThemeRouteImport } from './routes/_authenticated/theme'
 import { Route as AuthenticatedContentKindRouteRouteImport } from './routes/_authenticated/content/$kind/route'
@@ -43,6 +44,11 @@ const authSignInRoute = authSignInRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDeployRoute = AuthenticatedDeployRouteImport.update({
+  id: '/deploy',
+  path: '/deploy',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRouteRoute =
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/setup': typeof authSetupRoute
   '/sign-in': typeof authSignInRoute
+  '/deploy': typeof AuthenticatedDeployRoute
   '/theme': typeof AuthenticatedThemeRoute
   '/content/$kind': typeof AuthenticatedContentKindRouteRouteWithChildren
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/setup': typeof authSetupRoute
   '/sign-in': typeof authSignInRoute
+  '/deploy': typeof AuthenticatedDeployRoute
   '/theme': typeof AuthenticatedThemeRoute
   '/': typeof AuthenticatedIndexRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/(auth)/setup': typeof authSetupRoute
   '/(auth)/sign-in': typeof authSignInRoute
+  '/_authenticated/deploy': typeof AuthenticatedDeployRoute
   '/_authenticated/theme': typeof AuthenticatedThemeRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/content/$kind': typeof AuthenticatedContentKindRouteRouteWithChildren
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup'
     | '/sign-in'
+    | '/deploy'
     | '/theme'
     | '/content/$kind'
     | '/settings/account'
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
   to:
     | '/setup'
     | '/sign-in'
+    | '/deploy'
     | '/theme'
     | '/'
     | '/settings/account'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/(auth)/setup'
     | '/(auth)/sign-in'
+    | '/_authenticated/deploy'
     | '/_authenticated/theme'
     | '/_authenticated/'
     | '/_authenticated/content/$kind'
@@ -255,6 +267,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/deploy': {
+      id: '/_authenticated/deploy'
+      path: '/deploy'
+      fullPath: '/deploy'
+      preLoaderRoute: typeof AuthenticatedDeployRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
@@ -382,6 +401,7 @@ const AuthenticatedContentKindRouteRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
+  AuthenticatedDeployRoute: typeof AuthenticatedDeployRoute
   AuthenticatedThemeRoute: typeof AuthenticatedThemeRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedContentKindRouteRoute: typeof AuthenticatedContentKindRouteRouteWithChildren
@@ -392,6 +412,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
+  AuthenticatedDeployRoute: AuthenticatedDeployRoute,
   AuthenticatedThemeRoute: AuthenticatedThemeRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedContentKindRouteRoute:

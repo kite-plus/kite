@@ -5,6 +5,7 @@ import {
   MonitorCog,
   Newspaper,
   Palette,
+  Rocket,
   Settings,
   SlidersHorizontal,
   Tag,
@@ -66,6 +67,7 @@ export function useSidebarData(): SidebarData {
       {
         title: t('nav.system'),
         items: [
+          { title: t('nav.deploy'), url: '/deploy', icon: Rocket },
           {
             title: t('nav.settings'),
             icon: Settings,
