@@ -558,3 +558,23 @@
     font-size: 0.875rem;
   }
 }
+
+.kite-link-bubble {
+  .tiptap-input.kite-link-input {
+    width: 16rem;
+    max-width: 55vw;
+    border: none;
+    font-size: 0.875rem;
+  }
+}
+
+// The template flattens a floating toolbar into a bare bar on a phone; the
+// bubbles beside a link or an image keep their card there, over the text.
+.tiptap-toolbar[data-variant="floating"]:is(.kite-link-bubble, .kite-image-bubble) {
+  @media screen and (max-width: 480px) {
+    width: auto;
+    border: var(--tt-toolbar-border-width) solid var(--tt-toolbar-border-color);
+    border-radius: calc(var(--tt-toolbar-padding) + var(--tt-radius-lg) + var(--tt-toolbar-border-width));
+    box-shadow: var(--tt-shadow-elevated-md);
+  }
+}

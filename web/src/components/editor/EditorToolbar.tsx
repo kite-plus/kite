@@ -220,7 +220,8 @@ export function EditorToolbar({ editor, mode, onMode, onPickImage, base, home }:
           {isMobile ? (
             <LinkButton onClick={() => setLinking(true)} />
           ) : (
-            <LinkPopover resolveUrl={resolveUrl} />
+            // Only on a click: a link the caret is in has its own bubble beside it.
+            <LinkPopover resolveUrl={resolveUrl} autoOpenOnLinkActive={false} />
           )}
           <ImageUploadButton />
           {hidden < 7 && <CodeBlockButton data-tier={6} />}

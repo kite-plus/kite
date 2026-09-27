@@ -146,7 +146,9 @@ export function useLinkHandler(props: LinkHandlerProps) {
     if (!url || !editor) return
 
     const { selection } = editor.state
-    const isEmpty = selection.empty
+    // Kite: a caret inside a link changes that link's address; only a caret
+    // outside one writes the address out as the link's text.
+    const isEmpty = selection.empty && !editor.isActive("link")
 
     let chain = editor.chain().focus()
 

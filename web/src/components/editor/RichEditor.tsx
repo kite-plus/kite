@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 
 import { extensions, type Env } from "@/components/editor/extensions";
 import { ImageBubble } from "@/components/editor/ImageBubble";
+import { LinkBubble } from "@/components/editor/LinkBubble";
 import { slashKey, type SlashItem } from "@/components/editor/SlashMenu";
 import type { UploadFunction } from "@/components/tiptap-node/image-upload-node";
+import { resolveLink } from "@/lib/links";
 
 import "@/components/tiptap-node/blockquote-node/blockquote-node.scss";
 import "@/components/tiptap-node/code-block-node/code-block-node.scss";
@@ -166,10 +168,13 @@ export function RichEditor({
     editor.commands.setContent(value, { contentType: "markdown", emitUpdate: false });
   }, [editor, value]);
 
+  const resolveUrl = useCallback((url: string) => resolveLink(url, base, home), [base, home]);
+
   return (
     <>
       <EditorContent editor={editor} role="presentation" className="simple-editor-content" />
       <ImageBubble editor={editor} />
+      <LinkBubble editor={editor} resolveUrl={resolveUrl} />
     </>
   );
 }

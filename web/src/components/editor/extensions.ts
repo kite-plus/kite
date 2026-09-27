@@ -100,7 +100,9 @@ export function extensions(env: Env) {
       heading: { levels: [1, 2, 3, 4] },
       link: {
         openOnClick: false,
-        enableClickSelection: true,
+        // A click puts the caret in a link, so its words can be typed over;
+        // the link's own bubble handles its address.
+        enableClickSelection: false,
         autolink: true,
         linkOnPaste: true,
         markdownLinks: true,
