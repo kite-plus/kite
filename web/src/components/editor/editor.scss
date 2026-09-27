@@ -173,6 +173,31 @@
   }
 }
 
+// The summary reads as the title's subtitle, and is typed the same way.
+.kite-summary {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  margin: -0.5rem 0 1rem;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  field-sizing: content;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+
+  &::placeholder {
+    color: var(--tt-gray-light-a-400);
+
+    .dark & {
+      color: var(--tt-gray-dark-a-400);
+    }
+  }
+}
+
 // The article at 16px, the size the markdown view already writes in: the
 // design's 13.5px read too small. Space between blocks and around headings
 // scales with it.

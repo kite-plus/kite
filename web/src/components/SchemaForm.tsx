@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { ImagePlus, ImageUp, RotateCcw, X } from "lucide-react";
+import { ImageUp, RotateCcw, X } from "lucide-react";
 
 import type { Field } from "@/api/client";
 import { locales, useI18n, type Key } from "@/i18n";
@@ -161,7 +161,7 @@ function FieldRow({
   onReset?: () => void;
 }) {
   const { t } = useI18n();
-  const label = builtinLabel(field, t) ?? (field.label || field.key);
+  const label = fieldLabel(field, t);
   const problem = problemOf(field, value, t);
 
   // A switch reads better beside its label than under it.
@@ -249,7 +249,7 @@ function FieldRow({
           placeholder={field.placeholder}
         />
       ) : field.type === "image" && uploads ? (
-        <ImageField id={id} value={asString(value)} onChange={onChange} uploads={uploads} compact />
+        <ImageField id={id} value={asString(value)} onChange={onChange} uploads={uploads} />
       ) : field.type === "date" ? (
         <DateTimePicker
           id={id}
@@ -300,32 +300,30 @@ function FieldRow({
 }
 
 /**
- * builtinLabel translates a field the built-in types declare. A project that
- * gave the field a label of its own keeps it: only the stock English one is
- * recognized.
+ * fieldLabel names a field. One the built-in types declare is translated; a
+ * project that gave the field a label of its own keeps it, since only the
+ * stock English one is recognized.
  */
-function builtinLabel(field: Field, t: (key: Key) => string): string | undefined {
+export function fieldLabel(field: Field, t: (key: Key) => string): string {
   const key = `field.${field.key}`;
   const stock = (locales.en.catalog as Record<string, string>)[key];
-  return stock !== undefined && stock === field.label ? t(key as Key) : undefined;
+  return stock !== undefined && stock === field.label ? t(key as Key) : field.label || field.key;
 }
 
-/** An image is chosen by handing over a file, not by typing where one is. */
-export function ImageField({
+/**
+ * An image is chosen by handing over a file, not by typing where one is, and
+ * shows as a small picture beside its name.
+ */
+function ImageField({
   id,
   value,
   onChange,
   uploads,
-  cover = false,
-  compact = false,
 }: {
   id: string;
   value: string;
   onChange: (value: unknown) => void;
   uploads: Uploads;
-  cover?: boolean;
-  /** compact shows a small picture beside its name, for an icon or a logo. */
-  compact?: boolean;
 }) {
   const { t } = useI18n();
   const input = useRef<HTMLInputElement>(null);
@@ -345,13 +343,6 @@ export function ImageField({
     }
   };
 
-  const drop = {
-    onDragOver: (event: React.DragEvent) => event.preventDefault(),
-    onDrop: (event: React.DragEvent) => {
-      event.preventDefault();
-      void take(event.dataTransfer.files[0]);
-    },
-  };
   const shown = value ? (uploads.resolve?.(value) ?? resolveLink(value, uploads.base)) : "";
 
   return (
@@ -367,72 +358,45 @@ export function ImageField({
           event.target.value = "";
         }}
       />
-      {compact ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border p-2" {...drop}>
-          <div className="kite-checker flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border">
-            {value ? (
-              <img src={shown} alt="" className="size-full object-contain" />
-            ) : (
-              <ImageUp className="size-5 text-muted-foreground" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-mono text-xs text-muted-foreground">
-              {value || t("form.noImage")}
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => input.current?.click()}>
-              {busy && <Spinner />}
-              {value ? t("form.replaceImage") : t("form.pickImage")}
-            </Button>
-            {value && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label={t("form.removeImage")}
-                onClick={() => onChange(undefined)}
-              >
-                <X />
-              </Button>
-            )}
-          </div>
+      <div
+        className="flex flex-wrap items-center gap-3 rounded-lg border p-2"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          void take(event.dataTransfer.files[0]);
+        }}
+      >
+        <div className="kite-checker flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border">
+          {value ? (
+            <img src={shown} alt="" className="size-full object-contain" />
+          ) : (
+            <ImageUp className="size-5 text-muted-foreground" />
+          )}
         </div>
-      ) : value ? (
-        <div className="relative overflow-hidden rounded-lg border">
-          <img src={shown} alt="" className="aspect-video w-full bg-muted object-cover" />
-          <div className="flex items-center gap-1 border-t px-2.5 py-1">
-            <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-              {value}
-            </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-mono text-xs text-muted-foreground">
+            {value || t("form.noImage")}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => input.current?.click()}>
+            {busy && <Spinner />}
+            {value ? t("form.replaceImage") : t("form.pickImage")}
+          </Button>
+          {value && (
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="size-7"
+              className="size-8"
               aria-label={t("form.removeImage")}
               onClick={() => onChange(undefined)}
             >
               <X />
             </Button>
-          </div>
-        </div>
-      ) : (
-        <Button
-          variant="outline"
-          disabled={busy}
-          className={cn(
-            "w-full flex-col gap-1.5 border-dashed font-normal text-muted-foreground",
-            cover ? "h-28 bg-muted/40" : "h-28",
           )}
-          onClick={() => input.current?.click()}
-          {...drop}
-        >
-          {busy ? <Spinner /> : cover ? <ImagePlus /> : <ImageUp />}
-          <span className="text-xs">{t(cover ? "editor.coverPrompt" : "form.chooseImage")}</span>
-        </Button>
-      )}
+        </div>
+      </div>
       {failed && <Help className="text-destructive">{failed}</Help>}
     </>
   );

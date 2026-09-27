@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChainedCommands, Editor } from "@tiptap/react";
-import { ChevronLeft, Info, Minus, SlidersHorizontal, Table, Type, XCircle } from "lucide-react";
+import { ChevronLeft, Info, Minus, Table, Type, XCircle } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -8,9 +8,9 @@ import { ApiError } from "@/api/client";
 import { useI18n, useProblem, type Key } from "@/i18n";
 import { useContentTypes, useSite } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useFoldedSidebar } from "@/hooks/useFoldedSidebar";
 import { useItem } from "@/hooks/useItem";
 import { useKindLabel } from "@/hooks/useKindLabel";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { canPublish, useDelivery, usePublish } from "@/hooks/usePublish";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { useWordCount } from "@/hooks/useWordCount";
@@ -20,13 +20,13 @@ import { composing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { StatusLabel } from "@/components/StatusLabel";
 import { AppHeader } from "@/components/layout/app-header";
 import { Header } from "@/components/layout/header";
 import { Main } from "@/components/layout/main";
+import { CoverField, fieldsOf, Properties, SummaryField } from "@/components/editor/ArticleHead";
 import { ConflictDialog } from "@/components/editor/ConflictDialog";
-import { EditorAside } from "@/components/editor/EditorAside";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
+import { ItemMenu } from "@/components/editor/ItemMenu";
 import {
   losses,
   preferredMode,
@@ -35,6 +35,7 @@ import {
   type Mode,
 } from "@/components/editor/markdown";
 import { Preview } from "@/components/editor/Preview";
+import { PublishMenu } from "@/components/editor/PublishMenu";
 import { RichEditor } from "@/components/editor/RichEditor";
 import { renderedBlocks, useScrollSync } from "@/components/editor/scrollSync";
 import type { SlashItem } from "@/components/editor/SlashMenu";
@@ -50,9 +51,7 @@ import { ListIcon } from "@/components/tiptap-icons/list-icon";
 import { ListOrderedIcon } from "@/components/tiptap-icons/list-ordered-icon";
 import { ListTodoIcon } from "@/components/tiptap-icons/list-todo-icon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -84,11 +83,10 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     },
   );
 
+  // Writing wants the room; the sidebar folds to its icons meanwhile.
+  useFoldedSidebar(true);
+
   const [preview, setPreview] = useState(false);
-  const [panel, setPanel] = useState(false);
-  // The details sit beside the text where there is room, and in a sheet
-  // where there is not; a preview takes the room they would have had.
-  const docked = useMediaQuery(preview ? "(min-width: 1536px)" : "(min-width: 1024px)");
   const [uploading, setUploading] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -104,6 +102,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const [rich, setRich] = useState<Editor | null>(null);
   const source = useRef<SourceHandle | null>(null);
   const title = useRef<HTMLTextAreaElement>(null);
+  const summaryInput = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const dirty = useRef(false);
@@ -120,6 +119,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     rich ? renderedBlocks(rich.view.dom) : (source.current?.blocks() ?? []),
   );
   const type = types.data?.items.find((entry) => entry.kind === (draft?.kind ?? kind));
+  const { summary, cover, others } = fieldsOf(type);
 
   // A document that uses what the visual editor would damage opens as
   // source, whatever this browser prefers. Decided once per document.
@@ -363,18 +363,19 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     field?.focus();
     field?.setSelectionRange(field.value.length, field.value.length);
   };
+  const focusSummary = (at: "start" | "end") => {
+    const field = summaryInput.current;
+    const offset = at === "start" ? 0 : (field?.value.length ?? 0);
+    field?.focus();
+    field?.setSelectionRange(offset, offset);
+  };
+  // Moving between the title and the text stops at the summary on the way.
+  const belowTitle = () => (summary ? focusSummary("start") : focusBody());
+  const aboveText = () => (summary ? focusSummary("end") : focusTitle());
 
-  const aside = (
-    <EditorAside
-      draft={draft}
-      type={type}
-      onEdit={item.edit}
-      delivery={delivery.data}
-      publish={publish}
-      uploads={uploads}
-      onDelete={id ? () => setRemoving(true) : undefined}
-    />
-  );
+  const meta = draft.meta ?? {};
+  const text = (key: string) => (typeof meta[key] === "string" ? (meta[key] as string) : "");
+  const setMeta = (key: string, value: unknown) => item.edit({ meta: { ...meta, [key]: value } });
 
   return (
     // Fixed: the layout gives this page the viewport's height, and the text
@@ -392,7 +393,8 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           <TooltipContent>{t("editor.back")}</TooltipContent>
         </Tooltip>
 
-        <div className="min-w-0 flex-1">
+        {/* A phone has room for the actions only; the title is right below. */}
+        <div className="min-w-0 flex-1 max-sm:invisible">
           <div className="truncate text-sm font-semibold">{draft.title || t("editor.untitled")}</div>
           <div className="truncate text-xs text-muted-foreground">
             <Link to="/content/$kind" params={{ kind }} className="hover:text-foreground">
@@ -403,57 +405,52 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           </div>
         </div>
 
-        <Badge variant="outline" className="hidden sm:inline-flex">
-          <StatusLabel status={draft.status} className="gap-1.5 [&_svg]:size-3.5" />
-        </Badge>
-
-        <Button
-          variant="outline"
-          size="sm"
-          aria-pressed={preview}
-          onClick={() => setPreview(!preview)}
-          className="hidden sm:inline-flex aria-pressed:bg-muted"
-        >
-          {t("editor.preview")}
-        </Button>
-        {!docked && (
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <PublishMenu draft={draft} onEdit={item.edit} delivery={delivery.data} publish={publish} />
           <Button
             variant="outline"
-            size="icon"
-            className="size-8 shrink-0"
-            aria-label={t("editor.panel")}
-            onClick={() => setPanel(true)}
+            size="sm"
+            aria-pressed={preview}
+            onClick={() => setPreview(!preview)}
+            className="hidden sm:inline-flex aria-pressed:bg-muted"
           >
-            <SlidersHorizontal />
+            {t("editor.preview")}
           </Button>
-        )}
+          <ItemMenu
+            draft={draft}
+            fields={others}
+            onEdit={item.edit}
+            uploads={uploads}
+            onDelete={id ? () => setRemoving(true) : undefined}
+          />
 
-        {canPublish(delivery.data) ? (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!item.dirty || busy}
-              onClick={() => void save()}
-            >
+          {canPublish(delivery.data) ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!item.dirty || busy}
+                onClick={() => void save()}
+              >
+                {saving && <Spinner />}
+                {t("editor.save")}
+              </Button>
+              <Button size="sm" disabled={busy} onClick={() => void ship()}>
+                {publish.pending && <Spinner />}
+                {publish.needsConfirmation
+                  ? t("publish.anyway")
+                  : draft.status === "published"
+                    ? t("publish.update")
+                    : t("publish.action")}
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" disabled={!item.dirty || busy} onClick={() => void save()}>
               {saving && <Spinner />}
               {t("editor.save")}
             </Button>
-            <Button size="sm" disabled={busy} onClick={() => void ship()}>
-              {publish.pending && <Spinner />}
-              {publish.needsConfirmation
-                ? t("publish.anyway")
-                : draft.status === "published"
-                  ? t("publish.update")
-                  : t("publish.action")}
-            </Button>
-          </>
-        ) : (
-          <Button size="sm" disabled={!item.dirty || busy} onClick={() => void save()}>
-            {saving && <Spinner />}
-            {t("editor.save")}
-          </Button>
-        )}
+          )}
+        </div>
       </Header>
 
       {(item.error || uploadError) && (
@@ -500,32 +497,55 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
 
           <div ref={scroller} className="min-h-0 flex-1 overflow-auto">
             <div className="kite-editor-page">
-              {/* A textarea so a long title wraps; it still holds one line of text. */}
-              <textarea
-                ref={title}
-                rows={1}
-                autoFocus={!id}
-                value={draft.title}
-                onChange={(event) => item.edit({ title: event.target.value.replace(/\n/g, " ") })}
-                onKeyDown={(event) => {
-                  // While an input method composes, Enter and the arrows pick
-                  // its candidates.
-                  if (composing(event)) return;
-                  const field = event.currentTarget;
-                  // Down leaves from the end of the title, as up comes back
-                  // from the first line of the body.
-                  const atEnd =
-                    field.selectionStart === field.value.length &&
-                    field.selectionEnd === field.value.length;
-                  if (event.key === "Enter" || (event.key === "ArrowDown" && atEnd && !event.shiftKey)) {
-                    event.preventDefault();
-                    focusBody();
-                  }
-                }}
-                placeholder={t("editor.titlePlaceholder")}
-                aria-label={t("editor.titlePlaceholder")}
-                className="kite-title"
-              />
+              {/* The head reads as the item's page opens: cover, title, summary. */}
+              <div className="group/head">
+                {cover && (
+                  <CoverField
+                    value={text(cover.key)}
+                    onChange={(value) => setMeta(cover.key, value)}
+                    upload={upload}
+                    base={item.base?.url}
+                    home={home}
+                  />
+                )}
+                {/* A textarea so a long title wraps; it still holds one line of text. */}
+                <textarea
+                  ref={title}
+                  rows={1}
+                  autoFocus={!id}
+                  value={draft.title}
+                  onChange={(event) => item.edit({ title: event.target.value.replace(/\n/g, " ") })}
+                  onKeyDown={(event) => {
+                    // While an input method composes, Enter and the arrows pick
+                    // its candidates.
+                    if (composing(event)) return;
+                    const field = event.currentTarget;
+                    // Down leaves from the end of the title, as up comes back
+                    // into it from the line below.
+                    const atEnd =
+                      field.selectionStart === field.value.length &&
+                      field.selectionEnd === field.value.length;
+                    if (event.key === "Enter" || (event.key === "ArrowDown" && atEnd && !event.shiftKey)) {
+                      event.preventDefault();
+                      belowTitle();
+                    }
+                  }}
+                  placeholder={t("editor.titlePlaceholder")}
+                  aria-label={t("editor.titlePlaceholder")}
+                  className="kite-title"
+                />
+                {summary && (
+                  <SummaryField
+                    ref={summaryInput}
+                    value={text(summary.key)}
+                    // A summary cleared goes out as null, which takes it out of the file.
+                    onChange={(value) => setMeta(summary.key, value || null)}
+                    onExitDown={focusBody}
+                    onExitUp={focusTitle}
+                  />
+                )}
+                <Properties draft={draft} type={type} onEdit={item.edit} />
+              </div>
               {mode === "visual" ? (
                 <RichEditor
                   value={draft.body}
@@ -541,7 +561,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                   }}
                   upload={upload}
                   onUploadError={setUploadError}
-                  onExitTop={focusTitle}
+                  onExitTop={aboveText}
                   onReady={setRich}
                 />
               ) : (
@@ -550,7 +570,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                   onChange={(body) => item.edit({ body })}
                   placeholder={t("editor.bodyPlaceholder")}
                   onDropFiles={attach}
-                  onExitTop={focusTitle}
+                  onExitTop={aboveText}
                   onReady={(handle) => {
                     source.current = handle;
                   }}
@@ -581,8 +601,6 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             />
           </div>
         )}
-
-        {docked && <aside className="w-80 shrink-0 overflow-auto border-s">{aside}</aside>}
       </div>
 
       <input
@@ -598,16 +616,6 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           event.target.value = "";
         }}
       />
-
-      <Sheet open={panel && !docked} onOpenChange={setPanel}>
-        <SheetContent className="overflow-auto">
-          <SheetHeader>
-            <SheetTitle>{t("editor.panel")}</SheetTitle>
-            <SheetDescription className="sr-only">{t("editor.panel")}</SheetDescription>
-          </SheetHeader>
-          {aside}
-        </SheetContent>
-      </Sheet>
 
       {item.conflict && (
         <ConflictDialog
