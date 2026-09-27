@@ -1,27 +1,133 @@
-import { GitMerge, TriangleAlert, Upload, XCircle } from "lucide-react";
+import { Check, GitMerge, Minus, TriangleAlert, Upload, X, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { useI18n, useProblem } from "@/i18n";
+import { useI18n, useProblem, type Key, type Values } from "@/i18n";
 import type { DeliveryState, RemoteChange, usePublish } from "@/hooks/usePublish";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 type Publish = ReturnType<typeof usePublish>;
-
-const tones: Record<string, string> = {
-  done: "bg-success",
-  pending: "bg-border",
-  failed: "bg-destructive",
-  not_applicable: "bg-border opacity-40",
-};
+type Translate = (key: Key, values?: Values) => string;
 
 /**
- * How far the content has actually travelled.
- *
- * The four steps are shown separately because they fail separately: a post
- * can be saved but not committed, committed but not pushed, pushed but not
- * yet deployed, and "published" alone cannot say which.
+ * How a step of the way stands: done, waiting on work, under way at the
+ * host, failed, or not something this project can know.
+ */
+export type Standing = "done" | "waiting" | "working" | "failed" | "unknown";
+
+export interface Step {
+  key: "saved" | "committed" | "pushed" | "deployed";
+  standing: Standing;
+  /** label names the step as it stands, as "to commit" or "deploying". */
+  label: string;
+  /** note says what holds it up. */
+  note?: string;
+  /** brief says it in fewer words, under a step whose label already says the rest. */
+  brief?: string;
+}
+
+/**
+ * steps reads the four steps content takes to the site: saved on disk,
+ * committed, pushed, and deployed by the host. They are told apart because
+ * they fail apart: a post can be saved but not committed, committed but not
+ * pushed, pushed but not yet deployed, and "published" alone cannot say
+ * which.
+ */
+export function steps(delivery: DeliveryState | undefined, t: Translate): Step[] {
+  const d = delivery;
+  const dirty = d?.dirty?.length ?? 0;
+  const pushed = d?.pushed ?? "pending";
+  const deployed = d?.deployed ?? "pending";
+
+  const stand = (step: string | undefined): Standing =>
+    step === "done" ? "done" : step === "failed" ? "failed" : step === "not_applicable" ? "unknown" : "waiting";
+
+  const deployStanding: Standing =
+    deployed === "pending" && pushed === "done" ? "working" : stand(deployed);
+
+  return [
+    { key: "saved", standing: stand(d?.local), label: t(stepLabel("saved", stand(d?.local))) },
+    {
+      key: "committed",
+      standing: stand(d?.committed),
+      label: t(stepLabel("committed", stand(d?.committed))),
+      note: dirty ? t("publish.uncommitted", { count: dirty }) : undefined,
+      brief: dirty ? t("publish.files", { count: dirty }) : undefined,
+    },
+    {
+      key: "pushed",
+      standing: stand(pushed),
+      label: t(stepLabel("pushed", stand(pushed))),
+      note: d?.ahead ? t("publish.toPush", { count: d.ahead }) : undefined,
+      brief: d?.ahead ? t("publish.commits", { count: d.ahead }) : undefined,
+    },
+    {
+      key: "deployed",
+      standing: deployStanding,
+      label: t(stepLabel("deployed", deployStanding)),
+      note: {
+        done: t("publish.live"),
+        working: t("publish.deployedNote"),
+        waiting: undefined,
+        failed: t("publish.deployFailed"),
+        unknown: t("publish.deployedUnknown"),
+      }[deployStanding],
+    },
+  ];
+}
+
+function stepLabel(step: Step["key"], standing: Standing): Key {
+  return `publish.step.${step}.${standing}` as Key;
+}
+
+/** StepMark shows how a step stands; current marks the step with work to do. */
+export function StepMark({
+  standing,
+  current,
+  className,
+}: {
+  standing: Standing;
+  current?: boolean;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full [&_svg]:size-[60%]",
+        standing === "done" && "bg-success text-white",
+        standing === "failed" && "bg-destructive text-white",
+        standing === "working" && "border-2 border-primary/30 text-primary",
+        standing === "unknown" && "border border-dashed border-muted-foreground/40 text-muted-foreground",
+        standing === "waiting" && (current ? "border-2 border-warning bg-warning/10" : "border border-border"),
+        className,
+      )}
+    >
+      {standing === "done" ? (
+        <Check strokeWidth={3} />
+      ) : standing === "failed" ? (
+        <X strokeWidth={3} />
+      ) : standing === "working" ? (
+        <Spinner className="size-[70%]!" />
+      ) : standing === "unknown" ? (
+        <Minus />
+      ) : current ? (
+        <span className="size-[35%] rounded-full bg-warning" />
+      ) : null}
+    </span>
+  );
+}
+
+/** current is the first step still to be done, the one with work waiting. */
+export function currentStep(list: Step[]): number {
+  return list.findIndex((step) => step.standing !== "done" && step.standing !== "unknown");
+}
+
+/**
+ * DeliveryStages is how far the content has actually travelled, as a list
+ * for a narrow place: each step as it stands, what holds it up, and the push
+ * at hand where commits wait for it.
  */
 export function DeliveryStages({
   delivery,
@@ -32,80 +138,79 @@ export function DeliveryStages({
   publish?: Publish;
 }) {
   const { t } = useI18n();
+  const list = steps(delivery, t);
+  const current = currentStep(list);
+
   return (
-    <ol className="flex flex-col gap-2">
-      <Stage label={t("publish.saved")} step={delivery?.local} />
-      <Stage
-        label={t("publish.committed")}
-        step={delivery?.committed}
-        note={
-          delivery?.dirty?.length
-            ? t("publish.uncommitted", { count: delivery.dirty.length })
-            : undefined
-        }
-      />
-      <Stage
-        label={t("publish.pushed")}
-        step={delivery?.pushed}
-        note={delivery?.ahead ? t("publish.toPush", { count: delivery.ahead }) : undefined}
-        action={
-          publish && delivery?.ahead ? (
+    <ol className="flex flex-col gap-2.5">
+      {list.map((step, i) => (
+        <li key={step.key} className="flex items-center gap-2.5 text-sm">
+          <StepMark standing={step.standing} current={i === current} className="size-4" />
+          <span className={cn(i > current && current >= 0 && "text-muted-foreground")}>{step.label}</span>
+          {step.note && <span className="ml-auto truncate text-xs text-muted-foreground">{step.note}</span>}
+          {step.key === "pushed" && publish && delivery?.ahead ? (
             <button
               type="button"
-              className="shrink-0 text-xs text-brand hover:underline disabled:opacity-50"
+              className={cn("shrink-0 text-xs text-brand hover:underline disabled:opacity-50", !step.note && "ml-auto")}
               disabled={publish.pending}
               onClick={() => void publish.push()}
             >
               {t("publish.push")}
             </button>
-          ) : undefined
-        }
-      />
-      <Stage
-        label={t("publish.deployed")}
-        step={delivery?.deployed}
-        note={
-          {
-            pending: t("publish.deployedNote"),
-            not_applicable: t("publish.deployedUnknown"),
-            failed: t("publish.deployFailed"),
-          }[delivery?.deployed ?? "pending"]
-        }
-        action={
-          delivery?.deployed === "done" && delivery.deployed_url ? (
+          ) : null}
+          {step.key === "deployed" && step.standing === "done" && delivery?.deployed_url ? (
             <a
               href={delivery.deployed_url}
               target="_blank"
               rel="noreferrer"
-              className="ml-auto shrink-0 text-xs text-brand hover:underline"
+              className="shrink-0 text-xs text-brand hover:underline"
             >
               {t("publish.viewSite")}
             </a>
-          ) : undefined
-        }
-      />
+          ) : null}
+        </li>
+      ))}
     </ol>
   );
 }
 
-function Stage({
-  label,
-  step,
-  note,
-  action,
-}: {
-  label: string;
-  step?: string;
-  note?: string;
-  action?: React.ReactNode;
-}) {
+/**
+ * DeliveryProgress is the same four steps drawn across, for a place with
+ * room: each step's mark on one line, the stretch between two filled once
+ * the later is done, and under each what holds it up.
+ */
+export function DeliveryProgress({ delivery }: { delivery?: DeliveryState }) {
+  const { t } = useI18n();
+  const list = steps(delivery, t);
+  const current = currentStep(list);
+
   return (
-    <li className="flex items-center gap-2 text-sm">
-      <span className={cn("size-1.5 shrink-0 rounded-full", tones[step ?? "pending"])} />
-      <span className={cn(step === "not_applicable" && "opacity-50")}>{label}</span>
-      {note && <span className="ml-auto truncate text-xs text-muted-foreground">{note}</span>}
-      {action}
-    </li>
+    <ol className="grid grid-cols-4">
+      {list.map((step, i) => (
+        <li key={step.key} className="relative flex min-w-0 flex-col items-center gap-1.5 text-center">
+          {i < list.length - 1 && (
+            <span
+              aria-hidden
+              className={cn(
+                "absolute top-3 right-[calc(-50%+18px)] left-[calc(50%+18px)] h-0.5 rounded-full",
+                list[i + 1].standing === "done" ? "bg-success" : "bg-border",
+              )}
+            />
+          )}
+          <StepMark standing={step.standing} current={i === current} className="size-6" />
+          <span
+            className={cn(
+              "text-sm",
+              i === current && "font-medium",
+              current >= 0 && i > current && "text-muted-foreground",
+            )}
+          >
+            {step.label}
+          </span>
+          <span className="min-h-4 max-w-full px-1 text-xs text-muted-foreground">{step.brief ?? step.note}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
