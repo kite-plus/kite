@@ -1,39 +1,28 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { KeyRound, Laptop, LogOut, ShieldCheck, UserRound } from 'lucide-react'
+import { CircleUserRound, LogOut } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { cn } from '@/lib/utils'
 import useDialogState from '@/hooks/use-dialog-state'
-import { Avatar, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { SignOutDialog } from '@/components/sign-out-dialog'
-import { useAccount } from './account'
-
-interface Action {
-  label: string
-  icon: React.ElementType
-  to?: '/settings/account'
-  hash?: string
-  onClick?: () => void
-}
+import { UserAvatar, useAccount } from './account'
 
 /**
- * NavUser is the person at the foot of the sidebar, as Halo's console has
- * it: their name and what they are to the site, and beside them the way to
- * their account and the way out, or with no password yet the way to set
- * one. Nothing is folded into a menu.
+ * NavUser is the person at the foot of the sidebar, with two buttons beside
+ * them and no menu: their profile, and the way out. Where nobody signs in
+ * there is no way out, and the button says so instead.
  */
 export function NavUser() {
   const { t } = useI18n()
@@ -41,98 +30,92 @@ export function NavUser() {
   const [open, setOpen] = useDialogState()
   const account = useAccount()
   const path = useLocation({ select: (location) => location.pathname })
-  const onAccount = path === '/settings/account'
+  const onProfile = path === '/settings/account'
+  const signOutLabel = account.user ? t('session.signOut') : t('session.noSignOut')
 
-  const actions: Action[] = [
-    { label: t('nav.account'), icon: UserRound, to: '/settings/account' },
-  ]
-  if (account.user) {
-    actions.push({ label: t('session.signOut'), icon: LogOut, onClick: () => setOpen(true) })
-  } else if (account.canSetPassword) {
-    actions.push({
-      label: t('session.setPassword'),
-      icon: KeyRound,
-      to: '/settings/account',
-      hash: 'sign-in',
-    })
+  if (state === 'collapsed' && !isMobile) {
+    return (
+      <>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip={t('session.profile')} isActive={onProfile}>
+              <Link to='/settings/account'>
+                <CircleUserRound />
+                <span>{t('session.profile')}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip={signOutLabel}
+              aria-disabled={!account.user}
+              className='aria-disabled:opacity-50'
+              onClick={() => account.user && setOpen(true)}
+            >
+              <LogOut />
+              <span>{t('session.signOut')}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <SignOutDialog open={!!open} onOpenChange={setOpen} />
+      </>
+    )
   }
-  const leave = () => setOpenMobile(false)
 
   return (
     <>
-      {state === 'collapsed' && !isMobile ? (
-        <SidebarMenu>
-          {actions.map((action) => (
-            <SidebarMenuItem key={action.label}>
-              <SidebarMenuButton
-                asChild={Boolean(action.to)}
-                tooltip={action.label}
-                isActive={action.to !== undefined && !action.hash && onAccount}
-                onClick={action.onClick}
-              >
-                {action.to ? (
-                  <Link to={action.to} hash={action.hash}>
-                    <action.icon />
-                    <span>{action.label}</span>
-                  </Link>
-                ) : (
-                  <>
-                    <action.icon />
-                    <span>{action.label}</span>
-                  </>
-                )}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      ) : (
-        <div className='flex items-center gap-2 p-2'>
-          {account.avatar && (
-            <Avatar className='size-9 rounded-full'>
-              <AvatarImage src={account.avatar} alt='' className='object-cover' />
-            </Avatar>
+      <div className='flex h-12 items-center gap-2 px-2'>
+        <UserAvatar />
+        <div className='grid min-w-0 flex-1 text-start text-sm leading-tight'>
+          {account.name ? (
+            <span className='truncate font-medium'>{account.name}</span>
+          ) : (
+            <Skeleton className='h-4 w-20' />
           )}
-          <div className='grid min-w-0 flex-1 justify-items-start gap-1'>
-            {account.name ? (
-              <span className='max-w-full truncate text-sm font-semibold'>{account.name}</span>
-            ) : (
-              <Skeleton className='h-5 w-20' />
-            )}
-            <Badge variant='outline' className='gap-1 font-normal text-muted-foreground'>
-              {account.user ? <ShieldCheck /> : <Laptop />}
-              {account.user ? t('session.role') : t('session.local')}
-            </Badge>
-          </div>
-          <div className='flex shrink-0 items-center'>
-            {actions.map((action) => (
-              <Tooltip key={action.label}>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    className={cn(
-                      'size-8 text-muted-foreground hover:text-foreground',
-                      action.to && !action.hash && onAccount && 'bg-sidebar-accent text-foreground'
-                    )}
-                    aria-label={action.label}
-                    asChild={Boolean(action.to)}
-                    onClick={action.onClick}
-                  >
-                    {action.to ? (
-                      <Link to={action.to} hash={action.hash} onClick={leave}>
-                        <action.icon />
-                      </Link>
-                    ) : (
-                      <action.icon />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side='top'>{action.label}</TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
+          {account.email && (
+            <span className='truncate text-xs text-muted-foreground'>{account.email}</span>
+          )}
         </div>
-      )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant='ghost'
+              size='icon'
+              className={cn(
+                'size-8 text-muted-foreground hover:text-foreground',
+                onProfile && 'bg-sidebar-accent text-foreground'
+              )}
+              aria-label={t('session.profile')}
+              asChild
+            >
+              <Link to='/settings/account' onClick={() => setOpenMobile(false)}>
+                <CircleUserRound />
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side='top'>{t('session.profile')}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          {/* A disabled button takes no pointer, so its hint hangs on a wrapper. */}
+          <TooltipTrigger asChild>
+            <span tabIndex={account.user ? undefined : 0}>
+              <Button
+                variant='ghost'
+                size='icon'
+                className='size-8 text-muted-foreground hover:text-foreground'
+                aria-label={signOutLabel}
+                disabled={!account.user}
+                onClick={() => setOpen(true)}
+              >
+                <LogOut />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side='top' className='max-w-56'>
+            {signOutLabel}
+          </TooltipContent>
+        </Tooltip>
+      </div>
 
       <SignOutDialog open={!!open} onOpenChange={setOpen} />
     </>

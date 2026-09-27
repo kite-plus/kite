@@ -28,6 +28,7 @@ export function useAccount() {
   return {
     user,
     name: shown || (loading ? '' : t('session.role')),
+    email: profile?.email || undefined,
     avatar: info.data?.avatar,
     // Initials only from a name somebody chose; nobody named gets a figure.
     initials: shown ? getDisplayNameInitials(shown) : undefined,
