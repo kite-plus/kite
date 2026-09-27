@@ -250,8 +250,12 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
         return;
       }
       const alt = file.name.replace(/\.[^.]+$/, "");
-      if (rich) rich.chain().focus().setImage({ src: link, alt }).run();
-      else source.current?.insert(`\n![${alt}](${link})\n`);
+      // After what is selected rather than over it: a picture just put in is
+      // selected, and the next one would replace it.
+      if (rich) {
+        const at = rich.state.selection.to;
+        rich.chain().focus().insertContentAt(at, { type: "image", attrs: { src: link, alt } }).run();
+      } else source.current?.insert(`\n![${alt}](${link})\n`);
     }
   };
   const pick = () => picker.current?.click();
