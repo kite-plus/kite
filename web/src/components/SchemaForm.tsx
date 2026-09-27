@@ -95,7 +95,7 @@ export function SchemaForm({ fields, values, onChange, uploads, onReset, idPrefi
 }
 
 /** visible applies a field's showIf, so a form only asks what still applies. */
-function visible(field: Field, values: Record<string, unknown>): boolean {
+export function visible(field: Field, values: Record<string, unknown>): boolean {
   if (!field.showIf) return true;
   return Object.entries(field.showIf).every(([key, want]) => values[key] === want);
 }

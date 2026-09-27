@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Clock } from "lucide-react";
+import { ChevronDown, Clock, Trash2 } from "lucide-react";
 
 import type { Draft } from "@/api/client";
 import { useI18n, type Key } from "@/i18n";
@@ -18,19 +18,23 @@ const ORDER = ["draft", "published", "scheduled", "archived"];
 
 /**
  * PublishMenu is the item's standing, beside the button that publishes it:
- * its status and date, and how far the site has got with publishing. A
- * refused publish opens it, since the reasons and their fixes are here.
+ * its status and date, how far the site has got with publishing, and last,
+ * the way to the trash. A refused publish opens it, since the reasons and
+ * their fixes are here.
  */
 export function PublishMenu({
   draft,
   onEdit,
   delivery,
   publish,
+  onDelete,
 }: {
   draft: Draft;
   onEdit: (patch: Partial<Draft>) => void;
   delivery?: DeliveryState;
   publish: ReturnType<typeof usePublish>;
+  /** onDelete is absent until the item is saved. */
+  onDelete?: () => void;
 }) {
   const { t, date } = useI18n();
   const [open, setOpen] = useState(false);
@@ -122,6 +126,24 @@ export function PublishMenu({
               <Label>{t("publish.delivery")}</Label>
               <DeliveryStages delivery={delivery} publish={publish} />
             </div>
+          </>
+        )}
+
+        {onDelete && (
+          <>
+            <Separator />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-mx-2 -my-1 justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+            >
+              <Trash2 />
+              {t("editor.delete")}
+            </Button>
           </>
         )}
       </PopoverContent>

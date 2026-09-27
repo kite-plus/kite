@@ -1,5 +1,20 @@
 import { useRef, useState, type DragEvent, type Ref } from "react";
-import { Check, ChevronDown, Folder, ImagePlus, LayoutTemplate, Link2, Plus, Tag, Tags, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Circle,
+  CircleCheck,
+  Folder,
+  ImagePlus,
+  LayoutTemplate,
+  Link2,
+  Pin,
+  Plus,
+  SlidersHorizontal,
+  Tag,
+  Tags,
+  X,
+} from "lucide-react";
 
 import type { components, ContentType, Draft, Field } from "@/api/client";
 import { useI18n } from "@/i18n";
@@ -27,6 +42,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
+import { fieldLabel, SchemaForm, visible, type Uploads } from "@/components/SchemaForm";
 
 type LayoutOption = components["schemas"]["LayoutOption"];
 
@@ -36,7 +52,7 @@ const DEFAULT_LAYOUT = "@default";
 
 /**
  * fieldsOf sorts a kind's fields by where the editor shows them: the summary
- * under the title, the cover above it, and the rest in the item's menu.
+ * under the title, the cover above it, and the rest among the properties.
  */
 export function fieldsOf(type?: ContentType) {
   const fields = type?.fields ?? [];
@@ -201,22 +217,31 @@ export function SummaryField({
   );
 }
 
-// A property reads as a small outlined button; one not set yet is dashed.
+// A property reads as a small outlined button; one not set yet is dashed,
+// and a switch that is on takes the accent.
 const chip =
   "h-7 max-w-full min-w-0 gap-1.5 px-2.5 text-[13px] font-normal shadow-none has-[>svg]:px-2.5 [&>svg]:text-muted-foreground";
 const unset = "border-dashed text-muted-foreground";
+const on =
+  "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 [&>svg]:text-primary";
 
 /**
  * Properties are the settings of an item a reader meets on its page, set
- * where they are read: its terms, its address and the template that draws it.
+ * where they are read: its terms, its address, the template that draws it,
+ * and whatever else its kind declares, such as pinning a post.
  */
 export function Properties({
   draft,
   type,
+  fields,
+  uploads,
   onEdit,
 }: {
   draft: Draft;
   type?: ContentType;
+  /** fields are the kind's own, less the summary and cover placed apart. */
+  fields: Field[];
+  uploads: Uploads;
   onEdit: (patch: Partial<Draft>) => void;
 }) {
   // Categories lead, as they do in the listing.
@@ -248,7 +273,87 @@ export function Properties({
           onChange={(layout) => onEdit({ meta: { ...meta, layout } })}
         />
       )}
+      {fields
+        .filter((field) => visible(field, meta))
+        .map((field) =>
+          field.type === "boolean" ? (
+            <SwitchChip
+              key={field.key}
+              field={field}
+              value={Boolean(meta[field.key] ?? field.default)}
+              onChange={(value) => onEdit({ meta: { ...meta, [field.key]: value } })}
+            />
+          ) : (
+            <FieldChip
+              key={field.key}
+              field={field}
+              values={meta}
+              onChange={(next) => onEdit({ meta: next })}
+              uploads={uploads}
+            />
+          ),
+        )}
     </div>
+  );
+}
+
+/** SwitchChip turns a yes-or-no setting, such as pinning, on and off in one click. */
+function SwitchChip({
+  field,
+  value,
+  onChange,
+}: {
+  field: Field;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  const { t } = useI18n();
+  const Icon = field.key === "pinned" ? Pin : value ? CircleCheck : Circle;
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      aria-pressed={value}
+      className={cn(chip, value ? on : unset)}
+      onClick={() => onChange(!value)}
+    >
+      <Icon className={cn(value && field.key === "pinned" && "fill-current")} />
+      {fieldLabel(field, t)}
+    </Button>
+  );
+}
+
+/** FieldChip holds any other setting the kind declares, set in a popover. */
+function FieldChip({
+  field,
+  values,
+  onChange,
+  uploads,
+}: {
+  field: Field;
+  values: Record<string, unknown>;
+  onChange: (values: Record<string, unknown>) => void;
+  uploads: Uploads;
+}) {
+  const { t } = useI18n();
+  const label = fieldLabel(field, t);
+  const value = values[field.key];
+  const set = value !== undefined && value !== null && value !== "";
+  // A word or a number reads in the chip; anything larger only shows it is set.
+  const shown = typeof value === "string" || typeof value === "number" ? String(value) : "";
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className={cn(chip, !set && unset)}>
+          <SlidersHorizontal />
+          <span className="truncate">{set && shown ? t("editor.fieldValue", { label, value: shown }) : label}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80" align="start">
+        <SchemaForm fields={[field]} values={values} onChange={onChange} uploads={uploads} />
+      </PopoverContent>
+    </Popover>
   );
 }
 

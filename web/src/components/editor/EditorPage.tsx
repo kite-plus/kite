@@ -26,7 +26,6 @@ import { Main } from "@/components/layout/main";
 import { CoverField, fieldsOf, Properties, SummaryField } from "@/components/editor/ArticleHead";
 import { ConflictDialog } from "@/components/editor/ConflictDialog";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
-import { ItemMenu } from "@/components/editor/ItemMenu";
 import {
   losses,
   preferredMode,
@@ -393,8 +392,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           <TooltipContent>{t("editor.back")}</TooltipContent>
         </Tooltip>
 
-        {/* A phone has room for the actions only; the title is right below. */}
-        <div className="min-w-0 flex-1 max-sm:invisible">
+        <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold">{draft.title || t("editor.untitled")}</div>
           <div className="truncate text-xs text-muted-foreground">
             <Link to="/content/$kind" params={{ kind }} className="hover:text-foreground">
@@ -406,7 +404,13 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <PublishMenu draft={draft} onEdit={item.edit} delivery={delivery.data} publish={publish} />
+          <PublishMenu
+            draft={draft}
+            onEdit={item.edit}
+            delivery={delivery.data}
+            publish={publish}
+            onDelete={id ? () => setRemoving(true) : undefined}
+          />
           <Button
             variant="outline"
             size="sm"
@@ -416,13 +420,6 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           >
             {t("editor.preview")}
           </Button>
-          <ItemMenu
-            draft={draft}
-            fields={others}
-            onEdit={item.edit}
-            uploads={uploads}
-            onDelete={id ? () => setRemoving(true) : undefined}
-          />
 
           {canPublish(delivery.data) ? (
             <>
@@ -544,7 +541,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                     onExitUp={focusTitle}
                   />
                 )}
-                <Properties draft={draft} type={type} onEdit={item.edit} />
+                <Properties draft={draft} type={type} fields={others} uploads={uploads} onEdit={item.edit} />
               </div>
               {mode === "visual" ? (
                 <RichEditor
