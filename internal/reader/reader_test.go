@@ -438,3 +438,31 @@ func TestSummariesSayWhichItemsArePinned(t *testing.T) {
 		t.Errorf("pinned = %v, want %v", pinned, want)
 	}
 }
+
+// A list shows what the author set on each item, such as a cover, and how
+// long each one is, without loading their bodies.
+func TestSummariesCarryMetaAndLength(t *testing.T) {
+	r := fixture(t, 2, func(i int) string {
+		return fmt.Sprintf("cover: cover-%d.jpg\nstyle: {tone: warm, size: %d}\n", i, i+1)
+	})
+	page, err := r.Query(t.Context(), content.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range page.Items {
+		item, err := r.Get(t.Context(), s.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(s.Meta, item.Meta) {
+			t.Errorf("%s: the list has meta %v, the item %v", s.Title, s.Meta, item.Meta)
+		}
+		// "body 00" and the like.
+		if s.WordCount != 2 || s.CJKCount != 0 {
+			t.Errorf("%s: WordCount, CJKCount = %d, %d, want 2, 0", s.Title, s.WordCount, s.CJKCount)
+		}
+	}
+	if got := page.Items[0].Meta["cover"]; got != "cover-1.jpg" {
+		t.Errorf("the newest post's cover = %v, want cover-1.jpg", got)
+	}
+}

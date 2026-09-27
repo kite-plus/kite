@@ -123,10 +123,8 @@ func (r *Reader) Query(ctx context.Context, q content.Query) (content.Page[conte
 	order := buildOrder(q.Sort)
 
 	// One extra row tells us whether another page exists without a count(*).
-	// Only a JSON true pins an item, which is what Summarize reads too.
 	sqlText := `SELECT id, kind, slug, title, status, locale, locator, revision, excerpt,
-		created_at, updated_at, published_at,
-		COALESCE(json_type(meta_json, '$.pinned') = 'true', 0),
+		word_count, cjk_count, meta_json, created_at, updated_at, published_at,
 		COALESCE((SELECT mtime_ns FROM files WHERE files.path = contents.path), 0)
 		FROM contents` + where + order + ` LIMIT ?`
 	rows, err := r.db.QueryContext(ctx, sqlText, append(args, q.Limit+1)...)
@@ -138,13 +136,19 @@ func (r *Reader) Query(ctx context.Context, q content.Query) (content.Page[conte
 	var ids []string
 	for rows.Next() {
 		var s content.Summary
+		var metaJSON string
 		var createdAt, updatedAt, modifiedNS int64
 		var publishedAt sql.NullInt64
 		if err := rows.Scan(&s.ID, &s.Kind, &s.Slug, &s.Title, &s.Status, &s.Locale,
-			&s.Locator, &s.Revision, &s.Excerpt, &createdAt, &updatedAt, &publishedAt, &s.Pinned,
-			&modifiedNS); err != nil {
+			&s.Locator, &s.Revision, &s.Excerpt, &s.WordCount, &s.CJKCount, &metaJSON,
+			&createdAt, &updatedAt, &publishedAt, &modifiedNS); err != nil {
 			return page, err
 		}
+		if err := json.Unmarshal([]byte(metaJSON), &s.Meta); err != nil {
+			return page, fmt.Errorf("reader: decode meta of %s: %w", s.ID, err)
+		}
+		// Only a JSON true pins an item, which is what Summarize reads too.
+		s.Pinned = s.Meta["pinned"] == true
 		s.CreatedAt = fromUnix(createdAt)
 		s.UpdatedAt = fromUnix(updatedAt)
 		s.PublishedAt = fromNullUnix(publishedAt)

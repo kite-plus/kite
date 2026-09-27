@@ -277,6 +277,25 @@ func TestExcerptIsTheOpeningProse(t *testing.T) {
 	}
 }
 
+// A list shows what the index read of a source without rendering it, and
+// has to say what the item's own page says.
+func TestSkimReadsAsRenderDoes(t *testing.T) {
+	for _, src := range []string{
+		"# Title\n\nFirst words.\n\n- one\n- two\n\n| a | b |\n|---|---|\n| c d | e |\n\n```go\ncode()\n```\n",
+		"湖边的桂花开了，用 kite build 一条命令就能重新发布。\n\n> 引用的话\n\n![图](a.jpg)\n",
+		"Term\n: Its description\n\nText[^1].\n\n[^1]: A note.\n\n<div>markup</div>\n",
+		strings.Repeat("alpha beta ", 60),
+		"",
+	} {
+		doc := render(t, src, nil)
+		skim := markdown.Skim(src)
+		if skim.Excerpt != doc.Excerpt || skim.WordCount != doc.WordCount || skim.CJKCount != doc.CJKCount {
+			t.Errorf("Skim(%q) = %q, %d, %d; Render has %q, %d, %d", src,
+				skim.Excerpt, skim.WordCount, skim.CJKCount, doc.Excerpt, doc.WordCount, doc.CJKCount)
+		}
+	}
+}
+
 // A body names the site's own pages and files from the site's root, which is
 // right wherever the site is published once the renderer puts the path it is
 // published under in front of them.

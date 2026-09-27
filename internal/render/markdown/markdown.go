@@ -237,11 +237,7 @@ func collect(root ast.Node, src []byte, doc *Document) error {
 			doc.Images = append(doc.Images, string(node.Destination))
 		}
 		if prose(n) {
-			read := readText(n, src)
-			words, cjk := countWords(read)
-			doc.WordCount += words
-			doc.CJKCount += cjk
-			if read = strings.TrimSpace(read); read != "" {
+			if read := strings.TrimSpace(doc.count(n, src)); read != "" {
 				plain.WriteString(read)
 				plain.WriteByte('\n')
 			}
@@ -253,12 +249,38 @@ func collect(root ast.Node, src []byte, doc *Document) error {
 	return err
 }
 
+// count adds the words of a prose block to the document's counts, and returns
+// the text they were counted in.
+func (doc *Document) count(n ast.Node, src []byte) string {
+	read := readText(n, src)
+	words, cjk := countWords(read)
+	doc.WordCount += words
+	doc.CJKCount += cjk
+	return read
+}
+
 // Excerpt is the prose a markdown source opens with, as a Document of it
 // would have it, read without rendering the source.
 func Excerpt(source string) string {
 	src := []byte(source)
 	root := excerptParser().Parse(text.NewReader(src), parser.WithContext(parser.NewContext()))
 	return opening(root, src)
+}
+
+// Skim reads a markdown source without rendering it, for what a list shows of
+// it: a Document with only its Excerpt, WordCount and CJKCount, as Render
+// would have them.
+func Skim(source string) *Document {
+	src := []byte(source)
+	root := excerptParser().Parse(text.NewReader(src), parser.WithContext(parser.NewContext()))
+	doc := &Document{Excerpt: opening(root, src)}
+	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if entering && prose(n) {
+			doc.count(n, src)
+		}
+		return ast.WalkContinue, nil
+	})
+	return doc
 }
 
 // excerptParser reads sources the way the renderer does, so that an excerpt

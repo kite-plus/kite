@@ -70,10 +70,10 @@ type Builder struct {
 	buildCtx *Context
 	site     render.Site
 
-	// rewrites says a hook rewrites markdown, and excerpts then keeps what
+	// rewrites says a hook rewrites markdown, and summaries then keeps what
 	// listings say about each item, by id and revision.
-	rewrites bool
-	excerpts sync.Map
+	rewrites  bool
+	summaries sync.Map
 }
 
 // New returns a builder.
@@ -589,50 +589,51 @@ func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page
 // listedPage is the Page of an item that another page links to: an entry in a
 // listing, or a neighbor of a single page.
 func (b *Builder) listedPage(ctx context.Context, out *Context, s content.Summary) (render.Page, error) {
-	// Only this projection of the item is read, so editing a body does not
-	// invalidate the pages that merely link to it.
+	// Only this projection of the item is read: a listing says how long the
+	// body is, but never shows it.
 	out.Read(Node{Kind: NodeContent, ID: string(s.ID)}, string(s.Revision),
-		"title", "slug", "excerpt", "published_at", "taxonomies")
-	excerpt, err := b.excerpt(ctx, s)
+		"title", "slug", "excerpt", "word_count", "params", "published_at", "updated_at", "taxonomies")
+	summary, err := b.summary(ctx, s)
 	if err != nil {
 		return nil, err
 	}
 	return render.NewPage(summaryToContent(s), render.PageOptions{
 		Kind:     render.KindSingle,
-		Rendered: &markdown.Document{Excerpt: excerpt},
+		Rendered: &summary,
 		Resolver: b.opts.Resolver,
 		Terms:    b.termsOfMap(s.Taxonomies),
 		Location: b.opts.Site.Location,
 	}), nil
 }
 
-// excerpt is what a listing says about an item: the summary the index keeps,
-// unless a hook rewrites markdown. The index knows nothing of hooks, so its
-// summary would show what a plugin turns into something else, such as math,
-// as its source; the listing says what the item's own page says instead.
-func (b *Builder) excerpt(ctx context.Context, s content.Summary) (string, error) {
+// summary is what a listing says about an item's body: its excerpt and its
+// length, as the index keeps them, unless a hook rewrites markdown. The index
+// knows nothing of hooks, so its summary would show what a plugin turns into
+// something else, such as math, as its source; the listing says what the
+// item's own page says instead.
+func (b *Builder) summary(ctx context.Context, s content.Summary) (markdown.Document, error) {
 	if !b.rewrites {
-		return s.Excerpt, nil
+		return markdown.Document{Excerpt: s.Excerpt, WordCount: s.WordCount, CJKCount: s.CJKCount}, nil
 	}
 	key := string(s.ID) + "@" + string(s.Revision)
-	if v, ok := b.excerpts.Load(key); ok {
-		return v.(string), nil
+	if v, ok := b.summaries.Load(key); ok {
+		return v.(markdown.Document), nil
 	}
 	item, err := b.opts.Reader.Get(ctx, s.ID)
 	if err != nil {
-		return "", fmt.Errorf("build: excerpt of %s: %w", s.ID, err)
+		return markdown.Document{}, fmt.Errorf("build: summary of %s: %w", s.ID, err)
 	}
+	doc, err := b.renderBody(ctx, item)
+	if err != nil {
+		return markdown.Document{}, err
+	}
+	summary := markdown.Document{Excerpt: doc.Excerpt, WordCount: doc.WordCount, CJKCount: doc.CJKCount}
 	description, _ := item.Meta["description"].(string)
-	text := markdown.Excerpt(description)
-	if text == "" {
-		doc, err := b.renderBody(ctx, item)
-		if err != nil {
-			return "", err
-		}
-		text = doc.Excerpt
+	if text := markdown.Excerpt(description); text != "" {
+		summary.Excerpt = text
 	}
-	b.excerpts.Store(key, text)
-	return text, nil
+	b.summaries.Store(key, summary)
+	return summary, nil
 }
 
 // renderBody runs the markdown pipeline with the markdown hooks around it.
@@ -747,6 +748,7 @@ func summaryToContent(s content.Summary) *content.Content {
 		Title:       s.Title,
 		Status:      s.Status,
 		Taxonomies:  s.Taxonomies,
+		Meta:        s.Meta,
 		Locale:      s.Locale,
 		Locator:     s.Locator,
 		Revision:    s.Revision,

@@ -745,6 +745,59 @@ func TestAListingSaysWhatThePageSaysThroughTheHooks(t *testing.T) {
 	}
 }
 
+// A page that reaches a template through a listing, or as the neighbor of a
+// single page, carries what its own page does: what the author set on it,
+// such as a cover, and how long it takes to read, hooks and all.
+func TestAListedPageCarriesItsParamsAndLength(t *testing.T) {
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const show = `{{ .Title }}|{{ .Params.cover }}|{{ .Params.style.tone }}|{{ .WordCount }}|{{ .ReadingTime.Minutes }};`
+	layouts := fstest.MapFS{
+		"home.html": {Data: []byte(`{{ define "main" }}{{ range .Pages }}` + show + `{{ end }}{{ end }}`)},
+		"single.html": {Data: []byte(`{{ define "main" }}{{ with .Page }}` + show + `{{ end }}` +
+			`{{ with .Page.Next }}next:` + show + `{{ end }}{{ end }}`)},
+	}
+	// 1200 characters at 400 a minute and 220 words at 220 a minute.
+	body := strings.Repeat("桂花开了 ", 300) + strings.Repeat("word ", 220)
+
+	for _, tc := range []struct {
+		name   string
+		signed bool
+		want   string
+	}{
+		{"as indexed", false, "Covered|cover.jpg|warm|1420|4;"},
+		{"through a markdown hook", true, "Covered|cover.jpg|warm|1423|5;"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t, 2)
+			f.engine = theme.NewEngine(theme.Options{
+				Sources: []theme.Source{{Name: "site", FS: layouts}, {Name: "default", FS: th.Layouts}},
+				Links:   f.resolve,
+			})
+			f.add(t, "content/posts/covered/index.md", "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ950\ntitle: Covered\nslug: covered\n"+
+				"status: published\npublished_at: 2026-01-20T00:00:00Z\ncover: cover.jpg\nstyle: {tone: warm}\n---\n\n"+body+"\n")
+			f.run(t, f.out, func(o *build.Options) {
+				if tc.signed {
+					o.Hooks = hook.NewBus()
+					o.Hooks.Register(signing{hook.Base{HookName: "signing", HookPhase: hook.PhaseBuild}}, hook.DefaultPriority)
+				}
+			})
+
+			if page := readFile(t, f.out, "posts/covered/index.html"); !strings.Contains(page, tc.want) {
+				t.Fatalf("the post's own page does not say %q: %s", tc.want, excerptOf(page, "Covered|"))
+			}
+			if home := readFile(t, f.out, "index.html"); !strings.Contains(home, tc.want) {
+				t.Errorf("the home page lists %q, want %q", excerptOf(home, "Covered|"), tc.want)
+			}
+			if older := readFile(t, f.out, "posts/post-01/index.html"); !strings.Contains(older, "next:"+tc.want) {
+				t.Errorf("the older post's neighbor is %q, want %q", excerptOf(older, "next:"), tc.want)
+			}
+		})
+	}
+}
+
 type signing struct{ hook.Base }
 
 func (signing) TransformMarkdown(_ context.Context, doc *hook.MarkdownDoc) error {

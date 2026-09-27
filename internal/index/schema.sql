@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS contents (
     body         TEXT    NOT NULL DEFAULT '',
     body_format  TEXT    NOT NULL DEFAULT 'markdown',
     excerpt      TEXT    NOT NULL DEFAULT '',
+    word_count   INTEGER NOT NULL DEFAULT 0,
+    cjk_count    INTEGER NOT NULL DEFAULT 0,
     meta_json    TEXT    NOT NULL DEFAULT '{}',
     aliases_json TEXT    NOT NULL DEFAULT '[]',
     created_at   INTEGER NOT NULL DEFAULT 0,

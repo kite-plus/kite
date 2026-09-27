@@ -5,6 +5,7 @@ package content
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 )
@@ -105,8 +106,18 @@ type Summary struct {
 	PublishedAt *time.Time
 	Excerpt     string
 
-	// Pinned is the one field a listing reads from an item's metadata: an
-	// author who pins a post expects to see which one it is in a list.
+	// Meta is the item's metadata, for a list that shows what an author set
+	// on each item, such as a cover.
+	Meta map[string]any
+
+	// WordCount and CJKCount measure the body as a rendered page of it does,
+	// for a list to say how long an item is without loading it. The index
+	// counts them; Summarize leaves them zero, as counting takes a parser.
+	WordCount int
+	CJKCount  int
+
+	// Pinned says whether Meta pins the item: an author who pins a post
+	// expects to see which one it is in a list.
 	Pinned bool
 
 	// ModifiedAt is when the item's source last changed on disk, for a list
@@ -131,6 +142,7 @@ func (c *Content) Summarize() Summary {
 		CreatedAt:   c.CreatedAt,
 		UpdatedAt:   c.UpdatedAt,
 		PublishedAt: c.PublishedAt,
+		Meta:        maps.Clone(c.Meta),
 		Pinned:      c.Meta["pinned"] == true,
 	}
 }
