@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 
 import { cn } from "@/lib/utils";
+import { outlineChanges } from "./changes";
 
 /** What the page around a preview can ask of it. */
 export interface FrameHandle {
@@ -40,7 +41,8 @@ export const desktopWidth = 1280;
  *
  * It holds two frames. When the preview is drawn again, the page on show is
  * loaded into the one behind, scrolled to where the reader was, and only then
- * brought forward, so a change of color does not flash a blank page.
+ * brought forward, so a change of color does not flash a blank page. What the
+ * redraw changed on the page is then outlined there for a moment.
  */
 export function PreviewFrame({ url, drawn, phone, title, onPage, onScale, ref }: Props) {
   const first = useRef<HTMLIFrameElement>(null);
@@ -93,8 +95,10 @@ export function PreviewFrame({ url, drawn, phone, title, onPage, onScale, ref }:
     if (waiting.current?.frame === i) {
       win?.scrollTo(0, waiting.current.scroll);
       waiting.current = null;
+      const before = readable(frame(shown.current)?.contentDocument);
       shown.current = i;
       setFront(i);
+      if (before && win) outlineChanges(before, win);
     }
     if (win && href && i === shown.current) {
       report.current?.({ path: new URL(href).pathname, title: win.document.title });
@@ -164,6 +168,15 @@ function located(win: Window | null | undefined): string | null {
   try {
     const href = win?.location.href;
     return href && href !== "about:blank" ? href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** readable is a frame's page when the admin may look into it. */
+function readable(doc: Document | null | undefined): Document | null {
+  try {
+    return doc && doc.body ? doc : null;
   } catch {
     return null;
   }
