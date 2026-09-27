@@ -45,7 +45,13 @@ export function NavGroup({ title, items }: NavGroupProps) {
           const key = `${item.title}-${item.url}`
 
           if (!item.items)
-            return <SidebarMenuLink key={key} item={item} href={href} />
+            return (
+              <SidebarMenuLink
+                key={key}
+                item={item}
+                active={item === closest(items, href)}
+              />
+            )
 
           if (state === 'collapsed' && !isMobile)
             return (
@@ -79,13 +85,27 @@ function ActiveBar({ className }: { className: string }) {
   )
 }
 
-function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
-  const { setOpenMobile } = useSidebar()
-  // Kite: a page under a top-level entry, such as a plugin's settings or a
-  // post in the editor, keeps the entry marked.
+/**
+ * Kite: closest is the entry a page belongs to: the one whose address the
+ * page's starts with, and of those the longest, so a page under an entry,
+ * such as a plugin's settings or a post in the editor, keeps it marked, and
+ * the theme's page marks Theme rather than Site as well.
+ */
+function closest(items: NavItem[], href: string): NavLink | undefined {
   const path = href.split('?')[0]
-  const active =
-    checkIsActive(href, item) || (item.url !== '/' && path.startsWith(`${item.url}/`))
+  let best: NavLink | undefined
+  for (const item of items) {
+    if (item.items) continue
+    const url = String(item.url)
+    const under =
+      checkIsActive(href, item) || (url !== '/' && path.startsWith(`${url}/`))
+    if (under && (!best || url.length > String(best.url).length)) best = item
+  }
+  return best
+}
+
+function SidebarMenuLink({ item, active }: { item: NavLink; active: boolean }) {
+  const { setOpenMobile } = useSidebar()
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={active} tooltip={item.title}>

@@ -7,7 +7,6 @@ import {
   Palette,
   Puzzle,
   Rocket,
-  Settings,
   SlidersHorizontal,
   Tag,
   Tags,
@@ -70,16 +69,16 @@ export function useSidebarData(): SidebarData {
         items: [
           { title: t('nav.deploy'), url: '/deploy', icon: Rocket },
           { title: t('nav.plugins'), url: '/plugins', icon: Puzzle },
-          {
-            title: t('nav.settings'),
-            icon: Settings,
-            items: [
-              { title: t('nav.site'), url: '/settings', icon: SlidersHorizontal },
-              { title: t('nav.theme'), url: '/settings/theme', icon: Palette },
-              { title: t('settings.interface'), url: '/settings/appearance', icon: MonitorCog },
-              { title: t('nav.account'), url: '/settings/account', icon: UserRound },
-            ],
-          },
+        ],
+      },
+      // Every setting is one click away rather than behind a fold.
+      {
+        title: t('nav.settings'),
+        items: [
+          { title: t('nav.site'), url: '/settings', icon: SlidersHorizontal },
+          { title: t('nav.theme'), url: '/settings/theme', icon: Palette },
+          { title: t('settings.interface'), url: '/settings/appearance', icon: MonitorCog },
+          { title: t('nav.account'), url: '/settings/account', icon: UserRound },
         ],
       },
     ],
