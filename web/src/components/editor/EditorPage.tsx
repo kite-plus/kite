@@ -570,7 +570,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
               <div className="group/head">
                 {cover && (
                   <CoverField
-                    value={text(cover.key)}
+                    value={meta[cover.key] === false ? false : text(cover.key)}
                     onChange={(value) => setMeta(cover.key, value)}
                     upload={upload}
                     base={item.base?.url}

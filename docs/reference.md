@@ -210,6 +210,14 @@ as well. A template links to Kite's own pages with `url.For "home"`,
 `url.For "term" "tags" "Go"`, and to any other path of the site with
 `url.Rel "rss.xml"`; both carry the path.
 
+A post's cover is the `cover` in its front matter, which a template reads as
+written in `.Params.cover`, and `.Images` lists the pictures its text shows,
+in order and as written; a listed page carries both. A theme resolves either
+as a browser resolves the text's own pictures: a full address as it is, one
+from the site's root with `url.Rel`, and any other from the page's address.
+It may fall back to the first picture when no cover is named, and shows none
+for `cover: false`, which is what the editor's No cover writes.
+
 The theme contract is not frozen yet; it freezes at M5, after a second theme
 has been written against it.
 

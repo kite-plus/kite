@@ -5,6 +5,7 @@ import {
   Circle,
   CircleCheck,
   Folder,
+  ImageOff,
   ImagePlus,
   LayoutTemplate,
   Link2,
@@ -64,7 +65,8 @@ export function fieldsOf(type?: ContentType) {
 
 /**
  * CoverField is the item's cover, above its title as a post shows it. With
- * none, a quiet button offers one where it would go.
+ * none, quiet buttons offer one where it would go, or none at all: false,
+ * which tells a theme not to show a picture from the text in its place.
  */
 export function CoverField({
   value,
@@ -73,9 +75,9 @@ export function CoverField({
   base,
   home,
 }: {
-  value: string;
+  value: string | false;
   /** onChange hears null for a cover taken away, which takes it out of the file. */
-  onChange: (value: string | null) => void;
+  onChange: (value: string | false | null) => void;
   upload: (file: File) => Promise<string>;
   base?: string;
   home?: string;
@@ -153,22 +155,42 @@ export function CoverField({
     );
   }
 
+  if (value === false) {
+    return (
+      <div className="mb-1 flex items-center gap-1 text-sm text-muted-foreground">
+        <ImageOff className="size-4 shrink-0" />
+        <span>{t("editor.coverSkipped")}</span>
+        <Button variant="ghost" size="sm" className="h-7 px-2 font-normal" onClick={() => onChange(null)}>
+          {t("editor.coverSkippedUndo")}
+        </Button>
+      </div>
+    );
+  }
+
+  const quiet = cn(
+    "h-7 px-2 font-normal text-muted-foreground opacity-0 transition-opacity group-focus-within/head:opacity-100 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    (busy || failed) && "opacity-100",
+  );
   return (
     <div className="mb-1" {...drop}>
       {picker}
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={busy}
-        className={cn(
-          "-ms-2 h-7 px-2 font-normal text-muted-foreground opacity-0 transition-opacity group-focus-within/head:opacity-100 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-          (busy || failed) && "opacity-100",
-        )}
-        onClick={() => input.current?.click()}
-      >
-        {busy ? <Spinner /> : <ImagePlus />}
-        {t(busy ? "editor.coverUploading" : "editor.addCover")}
-      </Button>
+      <div className="-ms-2 flex items-center gap-1">
+        <Button variant="ghost" size="sm" disabled={busy} className={quiet} onClick={() => input.current?.click()}>
+          {busy ? <Spinner /> : <ImagePlus />}
+          {t(busy ? "editor.coverUploading" : "editor.addCover")}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          className={quiet}
+          title={t("editor.skipCoverHint")}
+          onClick={() => onChange(false)}
+        >
+          <ImageOff />
+          {t("editor.skipCover")}
+        </Button>
+      </div>
       {problem}
     </div>
   );
