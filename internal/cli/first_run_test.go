@@ -92,7 +92,7 @@ func TestAnEmptyFolderGetsItsSiteFromTheBrowser(t *testing.T) {
 		t.Errorf("GET /site before the site exists: status %d, %+v", status, refused.Error)
 	}
 
-	body := `{"site":{"title":"Notes","base_url":"https://notes.example.com","language":"zh-CN"}}`
+	body := `{"site":{"title":"Notes","base_url":"https://notes.example.com","language":"zh-CN","author":"Wu Xiao"}}`
 	resp, err := http.Post(base+api.Prefix+"/setup", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
@@ -116,6 +116,9 @@ func TestAnEmptyFolderGetsItsSiteFromTheBrowser(t *testing.T) {
 	}
 	if cfg.Site.BaseURL != "https://notes.example.com" {
 		t.Errorf("baseURL = %q", cfg.Site.BaseURL)
+	}
+	if cfg.Site.Author != "Wu Xiao" {
+		t.Errorf("author = %q", cfg.Site.Author)
 	}
 
 	select {

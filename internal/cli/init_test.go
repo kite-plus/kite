@@ -46,6 +46,7 @@ func scripted(t *testing.T, answers string) (plan, string) {
 func TestTheWizardTakesTheAnswersItIsGiven(t *testing.T) {
 	p, _ := scripted(t, strings.Join([]string{
 		"Notes: a journal",          // what is this site called
+		"Wu Xiao",                   // what is your name
 		"https://notes.example.com", // where will it live
 		"zh-CN",                     // language
 		"n",                         // write a deploy workflow
@@ -54,6 +55,9 @@ func TestTheWizardTakesTheAnswersItIsGiven(t *testing.T) {
 
 	if p.Title != "Notes: a journal" {
 		t.Errorf("title = %q", p.Title)
+	}
+	if p.Author != "Wu Xiao" {
+		t.Errorf("author = %q", p.Author)
 	}
 	if p.BaseURL != "https://notes.example.com" {
 		t.Errorf("baseURL = %q", p.BaseURL)
@@ -71,10 +75,14 @@ func TestTheWizardTakesTheAnswersItIsGiven(t *testing.T) {
 
 // An answer nobody gave is the default, not an empty project.
 func TestEmptyAnswersLeaveTheDefaults(t *testing.T) {
-	p, _ := scripted(t, "\n\n\n\n\n")
+	p, _ := scripted(t, "\n\n\n\n\n\n")
 
 	if p.Title != defaultTitle || p.BaseURL != defaultBaseURL || p.Language != defaultLanguage {
 		t.Errorf("defaults not taken: %+v", p)
+	}
+	// A name is not invented: without one the site names no author.
+	if p.Author != "" {
+		t.Errorf("author = %q, want none", p.Author)
 	}
 	// The workflow question defaults to yes, and the password question to no.
 	if !p.Workflow {
@@ -89,7 +97,7 @@ func TestEmptyAnswersLeaveTheDefaults(t *testing.T) {
 // language that does not exist, so the question is asked again.
 func TestAnImpossibleLanguageIsAskedForAgain(t *testing.T) {
 	p, out := scripted(t, strings.Join([]string{
-		"My Site", "https://example.com",
+		"My Site", "", "https://example.com",
 		"not a language", // refused
 		"ja",             // accepted
 		"n", "n",
@@ -132,6 +140,7 @@ func TestCreateWritesAProjectTheRestOfKiteCanOpen(t *testing.T) {
 		Title:    "Field Notes",
 		BaseURL:  "https://notes.example.com",
 		Language: "zh-CN",
+		Author:   "Wu: Xiao",
 		Workflow: true,
 	})
 	if err != nil {
@@ -156,6 +165,9 @@ func TestCreateWritesAProjectTheRestOfKiteCanOpen(t *testing.T) {
 	}
 	if cfg.Site.BaseURL != "https://notes.example.com" {
 		t.Errorf("baseURL = %q", cfg.Site.BaseURL)
+	}
+	if cfg.Site.Author != "Wu: Xiao" {
+		t.Errorf("author = %q", cfg.Site.Author)
 	}
 
 	// Derived state must never be committed, whoever created the project.

@@ -15,6 +15,7 @@ import {
   useUploadAvatar,
   type Account,
 } from "@/hooks/useAccount";
+import { useSaveSettings, useSettings } from "@/hooks/useSettings";
 import { squarePicture } from "@/lib/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -32,9 +33,10 @@ import { ContentSection } from "../components/content-section";
 import { Group, Row } from "../components/form-group";
 
 /**
- * The account is the person's, not the site's: how they are shown in the
- * studio, and how they sign in. None of it is in kite.yaml, so nothing here
- * waits to be published.
+ * The account is the person's: what they are called, how they look in the
+ * studio, and how they sign in. Their name is also the site's author, so it
+ * lives in kite.yaml and is published like any setting; the rest is kept on
+ * this server and never committed.
  */
 export function AccountSettings() {
   const { t } = useI18n();
@@ -73,25 +75,46 @@ export function AccountSettings() {
 function ProfileGroup({ account }: { account: Account }) {
   const { t } = useI18n();
   const update = useUpdateProfile();
+  const settings = useSettings();
+  const saveSettings = useSaveSettings();
   const upload = useUploadAvatar();
   const removeAvatar = useRemoveAvatar();
   const picker = useRef<HTMLInputElement>(null);
 
-  const [name, setName] = useState(account.profile.name);
+  // The name is the site's author, so the site credits the person by it. A
+  // name kept in the profile before is taken over from there.
+  const author = settings.data?.site.author ?? "";
+  const stored = author || account.profile.name;
+  const [name, setName] = useState(stored);
   const [email, setEmail] = useState(account.profile.email);
   // What was stored is what the server trimmed, so the form follows it.
-  useEffect(() => setName(account.profile.name), [account.profile.name]);
+  useEffect(() => setName(stored), [stored]);
   useEffect(() => setEmail(account.profile.email), [account.profile.email]);
 
   const locked = !account.profile_editable;
-  const dirty = name.trim() !== account.profile.name || email.trim() !== account.profile.email;
+  const nameLocked = !settings.data?.writable.includes("site.author");
+  const dirty = name.trim() !== stored || email.trim() !== account.profile.email;
+  const saving = update.isPending || saveSettings.isPending;
   // Judged once the field is left, not while the address is half typed.
   const [emailLeft, setEmailLeft] = useState(false);
   const emailOK = email.trim() === "" || looksLikeEmail(email.trim());
 
-  const save = (e: FormEvent) => {
+  const save = async (e: FormEvent) => {
     e.preventDefault();
-    update.mutate({ name, email }, { onSuccess: () => toast.success(t("account.profileSaved")) });
+    try {
+      if (name.trim() !== author && settings.data) {
+        await saveSettings.mutateAsync({
+          changes: { "site.author": name.trim() || null },
+          revision: settings.data.revision,
+        });
+      }
+      if (email.trim() !== account.profile.email || account.profile.name) {
+        await update.mutateAsync({ name: "", email });
+      }
+      toast.success(t("account.profileSaved"));
+    } catch {
+      // Each save says what went wrong under the form.
+    }
   };
 
   const choose = async (file: File | undefined) => {
@@ -158,10 +181,9 @@ function ProfileGroup({ account }: { account: Account }) {
           <Input
             id="profile-name"
             value={name}
-            placeholder={account.user}
             maxLength={64}
             autoComplete="name"
-            disabled={locked}
+            disabled={nameLocked}
             onChange={(e) => setName(e.target.value)}
           />
         </Row>
@@ -183,10 +205,10 @@ function ProfileGroup({ account }: { account: Account }) {
             <p className="text-sm text-muted-foreground">{t("account.emailHelp")}</p>
           )}
         </div>
-        <Problem error={update.error} />
+        <Problem error={saveSettings.error ?? update.error} />
         <div>
-          <Button type="submit" disabled={locked || !dirty || !emailOK || update.isPending}>
-            {update.isPending && <Spinner />}
+          <Button type="submit" disabled={(locked && nameLocked) || !dirty || !emailOK || saving}>
+            {saving && <Spinner />}
             {t("account.saveProfile")}
           </Button>
         </div>

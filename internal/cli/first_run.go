@@ -49,6 +49,7 @@ func firstRun(ctx context.Context, cmd *cobra.Command, root, addr string, open b
 			Description: site.Description,
 			BaseURL:     site.BaseURL,
 			Language:    site.Language,
+			Author:      site.Author,
 			Workflow:    true,
 		}
 		p.fill()

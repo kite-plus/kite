@@ -46,6 +46,9 @@ export function Setup() {
   );
 
   const [title, setTitle] = useState(state?.site?.title ?? "");
+  // The person's own name, which the site shows as the author of what they
+  // publish and the studio calls them by.
+  const [name, setName] = useState(state?.site?.author ?? "");
   const [baseURL, setBaseURL] = useState(state?.site?.base_url ?? "");
   const [language, setLanguage] = useState(state?.site?.language || (newSite ? locale : "en"));
 
@@ -56,14 +59,14 @@ export function Setup() {
   const minimum = state?.min_password_length ?? 8;
   // What the form needs before it is worth sending, which is also what the
   // hints under each field are saying one at a time.
-  const ready = Boolean(user) && newPasswordReady(password, again, minimum);
+  const ready = Boolean(name.trim()) && Boolean(user) && newPasswordReady(password, again, minimum);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (newSite) {
       if (install.isPending || opening === "waiting") return;
       install.mutate(
-        { user: "", password: "", site: { title, base_url: baseURL, language } },
+        { user: "", password: "", site: { title, base_url: baseURL, language, author: name } },
         {
           onSuccess: async () => {
             // The command that made the site now serves it at this address,
@@ -82,7 +85,7 @@ export function Setup() {
     }
     if (install.isPending || !ready) return;
     install.mutate(
-      { user, password, site: { title, base_url: baseURL, language } },
+      { user, password, site: { title, base_url: baseURL, language, author: name } },
       { onSuccess: () => void navigate({ to: "/", replace: true }) },
     );
   };
@@ -125,6 +128,7 @@ export function Setup() {
                 required
               />
             </div>
+            {newSite && <NameField value={name} onChange={setName} />}
             <div className="grid gap-2">
               <Label htmlFor="base-url">{t("setup.baseURL")}</Label>
               <Input
@@ -164,6 +168,7 @@ export function Setup() {
           </>
         ) : (
           <>
+            <NameField value={name} onChange={setName} autoFocus />
             <div className="grid gap-2">
               <Label htmlFor="user">{t("setup.user")}</Label>
               <Input
@@ -171,7 +176,6 @@ export function Setup() {
                 value={user}
                 onChange={(e) => setUser(e.target.value)}
                 autoComplete="username"
-                autoFocus
                 required
               />
             </div>
@@ -210,6 +214,34 @@ export function Setup() {
         )}
       </form>
     </AuthLayout>
+  );
+}
+
+/** NameField asks for the person's own name, which the site credits them by. */
+function NameField({
+  value,
+  onChange,
+  autoFocus,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  autoFocus?: boolean;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor="name">{t("setup.name")}</Label>
+      <Input
+        id="name"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete="name"
+        maxLength={64}
+        autoFocus={autoFocus}
+        required
+      />
+      <p className="text-sm text-muted-foreground">{t("setup.nameHelp")}</p>
+    </div>
   );
 }
 

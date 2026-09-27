@@ -59,6 +59,9 @@ type Site struct {
 	Description string
 	BaseURL     string
 	Language    string
+	// Author is the name of the person writing the site, shown with what
+	// they publish and in the studio.
+	Author string
 }
 
 // NewSite starts a flow for a folder that holds no site yet.

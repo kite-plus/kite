@@ -47,7 +47,7 @@ cd blog
 kite run
 ```
 
-The browser opens on a page that asks what the site is called; answer it and you are in the [studio](http://localhost:1717/admin/). `kite init` asks the same questions in the terminal instead. Next time, run `kite run` from the `blog` folder.
+The browser opens on a page that asks what the site is called and what your name is, which the site shows as its author; answer it and you are in the [studio](http://localhost:1717/admin/). `kite init` asks the same questions in the terminal instead. Next time, run `kite run` from the `blog` folder.
 
 On macOS, a downloaded program is held back the first time it runs; `xattr -d com.apple.quarantine kite` lets it through. Every archive can be checked against `checksums.txt` in the release.
 

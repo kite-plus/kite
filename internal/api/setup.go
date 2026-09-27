@@ -69,7 +69,13 @@ func (s *Server) handleSetupState(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, SetupState{
 			Required: true,
 			NewSite:  true,
-			Site:     &SiteSettings{Title: d.Title, Description: d.Description, BaseURL: d.BaseURL, Language: d.Language},
+			Site: &SiteSettings{
+				Title:       d.Title,
+				Description: d.Description,
+				BaseURL:     d.BaseURL,
+				Language:    d.Language,
+				Author:      d.Author,
+			},
 		})
 		return
 	}
@@ -82,6 +88,7 @@ func (s *Server) handleSetupState(w http.ResponseWriter, _ *http.Request) {
 			Description: site.Description,
 			BaseURL:     site.BaseURL,
 			Language:    site.Language,
+			Author:      site.Author,
 		},
 		User:              "admin",
 		MinPasswordLength: auth.MinPasswordLength,
@@ -171,6 +178,7 @@ func (s *Server) createSite(w http.ResponseWriter, answers SiteSettings) {
 		Description: strings.TrimSpace(answers.Description),
 		BaseURL:     strings.TrimSpace(answers.BaseURL),
 		Language:    strings.TrimSpace(answers.Language),
+		Author:      strings.TrimSpace(answers.Author),
 	}
 	if err := s.setup.CreateSite(site); err != nil {
 		s.failSetup(w, err)
@@ -194,6 +202,9 @@ func setupSettings(w http.ResponseWriter, site SiteSettings) (map[string]any, bo
 	// one would be an unanswered optional question.
 	if about := strings.TrimSpace(site.Description); about != "" {
 		values["site.description"] = about
+	}
+	if author := strings.TrimSpace(site.Author); author != "" {
+		values["site.author"] = author
 	}
 
 	// Sorted, so that a form with two bad fields always names the same one

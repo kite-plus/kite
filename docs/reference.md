@@ -7,8 +7,8 @@
 `kite run` opens the studio at `/admin/`. It is a React application compiled
 into the binary, so there is nothing to install and nothing to keep in sync
 with the server. Run in an empty folder, it opens on a page that creates the
-site there first: its name, address and language, which is what `kite init`
-asks in a terminal.
+site there first: its name, your own name, its address and language, which
+is what `kite init` asks in a terminal. Your name is the site's author.
 
 | | |
 |---|---|
@@ -18,7 +18,7 @@ asks in a terminal.
 | **Taxonomies** | tags and categories as they actually exist across the content |
 | **Theme** | every theme the project has, each previewed on the whole site before it is used; a theme installed from its zip archive; the active theme's settings edited beside a live preview |
 | **Deploy** | the site exported as a zip to upload anywhere, or how far a push to GitHub Pages has got |
-| **Settings** | the site's title, description, address, language, author, keywords, time zone, search engine visibility and code added to every page; the studio's own language and colors; your account: profile, picture, password and sessions |
+| **Settings** | the site's title, description, address, language, keywords, time zone, search engine visibility and code added to every page; the studio's own language and colors; your account: name, picture, password and sessions |
 
 An item that changed on disk since it was loaded is refused rather than
 overwritten, and the studio says so. Editing is available in English and
@@ -65,10 +65,11 @@ and keeps this one; it can also sign the others out without changing
 anything, and on localhost take the password away again. An account that
 comes from the environment is changed where it is set.
 
-The same page holds a profile: a display name, an email address and a
-picture, shown in the studio's menus. They are kept beside the account, in
-`.kite/secrets/profile.json` and `.kite/secrets/avatar`, and never
-published: the author a theme shows is `site.author`.
+The same page holds your name, an email address and a picture. The name is
+the site's author, `site.author`, which a theme shows with what you publish,
+so it is kept in `kite.yaml` and published like any setting; the studio calls
+you by it too. The email and the picture are kept beside the account, in
+`.kite/secrets/profile.json` and `.kite/secrets/avatar`, and never published.
 
 The account is stored in `.kite/secrets/account.json` as an argon2id hash. It
 is never committed, and it has to survive a deployment for the account to. A

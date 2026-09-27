@@ -47,7 +47,7 @@ cd blog
 kite run
 ```
 
-浏览器会打开一个建站页面，填上站点名称就进入了[管理后台](http://localhost:1717/admin/)。想在终端里回答这些问题，可以改用 `kite init`。后续只需在 `blog` 目录运行 `kite run`。
+浏览器会打开一个建站页面，填上站点名称和你的名字（它会作为文章的作者）就进入了[管理后台](http://localhost:1717/admin/)。想在终端里回答这些问题，可以改用 `kite init`。后续只需在 `blog` 目录运行 `kite run`。
 
 在 macOS 上，下载的程序第一次运行会被系统拦下，运行 `xattr -d com.apple.quarantine kite` 即可放行。每个压缩包都可以用版本附带的 `checksums.txt` 校验。
 

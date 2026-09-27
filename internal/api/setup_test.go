@@ -37,6 +37,7 @@ func setupBody() map[string]any {
 			"description": "Notes on things",
 			"base_url":    "https://notes.example.com",
 			"language":    "zh-CN",
+			"author":      "Wu Xiao",
 		},
 	}
 }
@@ -131,6 +132,7 @@ func TestSetupWritesTheSiteCreatesTheAccountAndSignsTheBrowserIn(t *testing.T) {
 		"description: Notes on things",
 		"baseURL: https://notes.example.com",
 		"language: zh-CN",
+		"author: Wu Xiao",
 	} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("kite.yaml is missing %q:\n%s", want, body)
@@ -182,6 +184,9 @@ func TestAnEmptyDescriptionIsLeftOutOfTheConfiguration(t *testing.T) {
 	if strings.Contains(string(stored), `description: ""`) {
 		t.Errorf("an unanswered description was written anyway:\n%s", stored)
 	}
+	if strings.Contains(string(stored), "author:") {
+		t.Errorf("an unanswered name was written anyway:\n%s", stored)
+	}
 }
 
 // Every other server -- a local preview, one with a password already -- is
@@ -224,7 +229,7 @@ func TestAFolderWithNoSiteIsSetUpByDescribingTheSite(t *testing.T) {
 	}
 
 	rec := send(t, mux, http.MethodPost, api.Prefix+"/setup", map[string]any{"site": map[string]any{
-		"title": " 林间笔记 ", "base_url": "https://notes.example.com", "language": "zh-CN",
+		"title": " 林间笔记 ", "base_url": "https://notes.example.com", "language": "zh-CN", "author": " 吴晓 ",
 	}}, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: status = %d\nbody: %s", rec.Code, rec.Body.String())
@@ -232,7 +237,7 @@ func TestAFolderWithNoSiteIsSetUpByDescribingTheSite(t *testing.T) {
 	if info := decode[api.SessionInfo](t, rec); info.Required {
 		t.Errorf("session = %+v, want a studio that asks for nothing", info)
 	}
-	want := setup.Site{Title: "林间笔记", BaseURL: "https://notes.example.com", Language: "zh-CN"}
+	want := setup.Site{Title: "林间笔记", BaseURL: "https://notes.example.com", Language: "zh-CN", Author: "吴晓"}
 	if len(made) != 1 || made[0] != want {
 		t.Errorf("created %+v, want %+v", made, want)
 	}

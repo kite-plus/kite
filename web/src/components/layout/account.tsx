@@ -8,9 +8,10 @@ import { cn, getDisplayNameInitials } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 /**
- * useAccount says who the studio is being used by: the name and picture from
- * the profile, else the site's author, since one person writes a Kite site,
- * else the name that signs in.
+ * useAccount says who the studio is being used by: their name, which is the
+ * site's author since one person writes a Kite site, else a name an older
+ * profile kept, else the name that signs in; and the picture from the
+ * profile.
  */
 export function useAccount() {
   const { t } = useI18n()
@@ -19,7 +20,7 @@ export function useAccount() {
   const settings = useSettings()
   const user = session.data?.required ? session.data.user : undefined
   const profile = info.data?.profile
-  const shown = profile?.name || settings.data?.site.author || user
+  const shown = settings.data?.site.author || profile?.name || user
 
   // Nothing is named while the answers are on their way, rather than a
   // stand-in that a moment later changes.

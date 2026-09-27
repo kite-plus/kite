@@ -34,6 +34,9 @@ type plan struct {
 	Title    string
 	BaseURL  string
 	Language string
+	// Author is the name of the person writing the site, which it shows with
+	// what they publish; the studio calls them by it too.
+	Author string
 
 	// Description is what the site is about, asked only by the browser
 	// setup; the wizard leaves it for the settings page.
@@ -113,6 +116,7 @@ func newInitCmd() *cobra.Command {
 	cmd.Flags().StringVar(&p.Title, "title", "", "what the site is called (default "+defaultTitle+")")
 	cmd.Flags().StringVar(&p.BaseURL, "base-url", "", "where the site will be published (default "+defaultBaseURL+")")
 	cmd.Flags().StringVar(&p.Language, "language", "", "the language it is written in (default "+defaultLanguage+")")
+	cmd.Flags().StringVar(&p.Author, "author", "", "your name, shown as the author of what you publish")
 	cmd.Flags().BoolVar(&p.Workflow, "workflow", true, "write a GitHub Pages deploy workflow")
 	cmd.Flags().BoolVar(&p.Git, "git", false, "run git init in the new project")
 	cmd.Flags().BoolVarP(&assumeOK, "yes", "y", false, "take the defaults without asking")
@@ -154,6 +158,13 @@ func interview(cmd *cobra.Command, p *plan) error {
 	var err error
 	if p.Title == "" {
 		if p.Title, err = askLine(cmd, lines, "What is this site called?", defaultTitle); err != nil {
+			return err
+		}
+	}
+	if p.Author == "" {
+		printf(cmd, "\nYour name is shown as the author of what you publish, and the\n")
+		printf(cmd, "studio calls you by it. It can be left for later.\n")
+		if p.Author, err = askLine(cmd, lines, "What is your name?", ""); err != nil {
 			return err
 		}
 	}
@@ -266,6 +277,9 @@ func starterConfig(p plan) string {
 	if p.Description != "" {
 		about = "  description: " + yamlScalar(p.Description) + "\n"
 	}
+	if author := strings.TrimSpace(p.Author); author != "" {
+		about += "  author: " + yamlScalar(author) + "\n"
+	}
 	return fmt.Sprintf(`site:
   title: %s
 %s  baseURL: %s
@@ -300,6 +314,9 @@ func reportInit(cmd *cobra.Command, p plan, created []string) {
 	printf(cmd, "\n  title     %s\n", p.Title)
 	printf(cmd, "  address   %s\n", p.BaseURL)
 	printf(cmd, "  language  %s\n", p.Language)
+	if p.Author != "" {
+		printf(cmd, "  author    %s\n", p.Author)
+	}
 	if p.Password != "" {
 		printf(cmd, "  account   admin (%s)\n", auth.File)
 	}
@@ -343,7 +360,11 @@ func relativeTo(root string) string {
 // readLine prints a question with what pressing Enter would mean, and returns
 // what was typed -- empty when that is what Enter was.
 func readLine(cmd *cobra.Command, in *bufio.Reader, question, hint string) (string, error) {
-	printf(cmd, "%s [%s] ", question, hint)
+	if hint == "" {
+		printf(cmd, "%s ", question)
+	} else {
+		printf(cmd, "%s [%s] ", question, hint)
+	}
 	line, err := in.ReadString('\n')
 	// A last answer with no newline after it is still an answer; only an EOF
 	// with nothing before it means there is nobody there.

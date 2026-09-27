@@ -19,7 +19,6 @@ const paths: Record<string, string> = {
   description: "site.description",
   base_url: "site.baseURL",
   language: "site.language",
-  author: "site.author",
   timezone: "site.timezone",
   keywords: "site.keywords",
   noindex: "site.noindex",
@@ -36,7 +35,6 @@ const read = ({ site, build }: Settings) => ({
   description: site.description || null,
   base_url: site.base_url,
   language: site.language ?? "",
-  author: site.author || null,
   timezone: site.timezone || null,
   keywords: site.keywords?.length ? site.keywords : null,
   noindex: site.noindex ?? false,
@@ -87,9 +85,6 @@ export function SiteSettings() {
               </Row>
               <Row id="language" label="settings.siteLanguage">
                 <LanguageSelect id="language" value={values.language ?? ""} onChange={(v) => set("language", v)} />
-              </Row>
-              <Row id="author" label="settings.siteAuthor" help="settings.siteAuthorHelp">
-                <Input id="author" value={values.author ?? ""} onChange={(event) => text("author")(event.target.value)} />
               </Row>
               <Row id="timezone" label="settings.siteTimezone" help="settings.siteTimezoneHelp">
                 <TimezoneSelect id="timezone" value={values.timezone ?? null} onChange={(v) => set("timezone", v)} />
