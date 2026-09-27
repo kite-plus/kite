@@ -31,26 +31,26 @@ export function NavUser() {
                 size='lg'
                 className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
               >
-                <UserAvatar square />
+                <UserAvatar />
                 <div className='grid flex-1 text-start text-sm leading-tight'>
-                  <span className='truncate font-semibold'>{account.name}</span>
-                  <span className='truncate text-xs'>{account.note}</span>
+                  <span className='truncate font-medium'>{account.name}</span>
+                  <span className='truncate text-xs text-muted-foreground'>{account.note}</span>
                 </div>
-                <ChevronsUpDown className='ms-auto size-4' />
+                <ChevronsUpDown className='ms-auto size-4 text-muted-foreground' />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className='w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg'
+              className='w-(--radix-dropdown-menu-trigger-width) min-w-60 rounded-lg'
               side={isMobile ? 'bottom' : 'right'}
               align='end'
               sideOffset={4}
             >
               <DropdownMenuLabel className='p-0 font-normal'>
-                <div className='flex items-center gap-2 px-1 py-1.5 text-start text-sm'>
-                  <UserAvatar square />
-                  <div className='grid flex-1 text-start text-sm leading-tight'>
-                    <span className='truncate font-semibold'>{account.name}</span>
-                    <span className='truncate text-xs'>{account.note}</span>
+                <div className='flex items-center gap-3 p-2 text-start'>
+                  <UserAvatar className='size-10' />
+                  <div className='grid min-w-0 flex-1 gap-1 leading-tight'>
+                    <span className='truncate text-sm font-semibold'>{account.name}</span>
+                    <span className='truncate text-xs text-muted-foreground'>{account.note}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
