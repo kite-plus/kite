@@ -7,12 +7,12 @@ import { ApiError, type Field } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
 import { useContentTypes, useLatest, useSite } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useFoldedSidebar } from "@/hooks/useFoldedSidebar";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useSettingsDraft } from "@/hooks/useSettingsDraft";
 import { useThemePreview } from "@/hooks/useThemePreview";
 import { uploadSiteMedia, useSaveTheme, useTheme } from "@/hooks/useThemes";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
-import { setCookie } from "@/lib/cookies";
 import { resolveLink, siteHome } from "@/lib/links";
 import { changesOf, defaultOf, problemOf, sameValue, valueFields } from "@/lib/schema";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSidebar } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -62,7 +61,7 @@ export function ThemeCustomizer({ name, section }: { name: string; section?: str
   const wide = useMediaQuery("(min-width: 768px)");
   const [open, setOpen] = usePreviewOpen();
   const showing = wide && open && !detail?.problem;
-  useRoomForPreview(showing);
+  useFoldedSidebar(showing);
 
   const [width, setWidth] = usePreviewWidth();
   const [page, setPage] = useState<Page | null>(null);
@@ -588,55 +587,6 @@ function usePreviewOpen(): [boolean, (open: boolean) => void] {
     write(key, next ? "open" : "closed");
   };
   return [open, choose];
-}
-
-// Whether the sidebar is folded for a preview. It outlives the page, so one
-// theme's page giving way to another's keeps the fold rather than unfolding
-// and folding again.
-let folded = false;
-let unfolding: number | undefined;
-
-/**
- * useRoomForPreview folds the admin's sidebar to its icons while the preview
- * is shown, and unfolds it again when the preview closes or the page goes,
- * unless the person opened it again themselves meanwhile. The fold is not
- * remembered as their choice, so leaving by closing the tab keeps the
- * sidebar open elsewhere.
- */
-function useRoomForPreview(active: boolean) {
-  const { open, setOpen, isMobile } = useSidebar();
-  const wasOpen = useRef(open);
-  const latest = useRef(setOpen);
-  latest.current = setOpen;
-
-  useEffect(() => {
-    window.clearTimeout(unfolding);
-    return () => {
-      if (!folded) return;
-      unfolding = window.setTimeout(() => {
-        if (!folded) return;
-        folded = false;
-        latest.current(true);
-      });
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isMobile) return;
-    if (active && open) {
-      folded = true;
-      setOpen(false);
-      setCookie("sidebar_state", "true", 60 * 60 * 24 * 7);
-    } else if (!active && folded) {
-      folded = false;
-      setOpen(true);
-    }
-  }, [active, isMobile]);
-
-  useEffect(() => {
-    if (open && !wasOpen.current) folded = false;
-    wasOpen.current = open;
-  }, [open]);
 }
 
 /**
