@@ -27,7 +27,7 @@ var schemaSQL string
 // SchemaVersion is bumped whenever the shape of the read model changes. A
 // mismatch discards the database rather than migrating it, which is safe
 // precisely because nothing here is a source of truth.
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 // Path is where the derived index lives, relative to the project root.
 const Path = ".kite/cache/index.db"

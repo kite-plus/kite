@@ -466,3 +466,37 @@ func TestSummariesCarryMetaAndLength(t *testing.T) {
 		t.Errorf("the newest post's cover = %v, want cover-1.jpg", got)
 	}
 }
+
+// A list may show one of an item's pictures without loading its body, so a
+// summary carries the pictures the body shows, as Get's body has them.
+func TestSummariesCarryTheirPictures(t *testing.T) {
+	root := t.TempDir()
+	post := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ001\ntitle: Pictures\nslug: pictures\nstatus: published\n" +
+		"published_at: 2026-01-01T00:00:00Z\n---\n\n![first](first.png)\n\nText ![second](/uploads/second.jpg)\n"
+	p := filepath.Join(root, "content", "posts", "pictures", "index.md")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(post), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ix, err := index.Open(root, content.DefaultRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ix.Close() })
+	if _, err := ix.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := reader.New(ix.DB()).Query(t.Context(), content.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("listed %d items, want 1", len(page.Items))
+	}
+	if want := []string{"first.png", "/uploads/second.jpg"}; !slices.Equal(page.Items[0].Images, want) {
+		t.Errorf("Images = %q, want %q", page.Items[0].Images, want)
+	}
+}

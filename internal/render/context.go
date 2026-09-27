@@ -91,6 +91,13 @@ type Page interface {
 	WordCount() int
 	ReadingTime() time.Duration
 
+	// Images are the pictures the body shows, in order and as its source
+	// writes them, for a theme that shows one of them elsewhere: a post's
+	// first picture on its card, say, when its front matter names no cover.
+	// A theme resolves them as it resolves a cover. A listed page has them
+	// too.
+	Images() []string
+
 	Date() time.Time
 	PublishDate() time.Time
 	Lastmod() time.Time

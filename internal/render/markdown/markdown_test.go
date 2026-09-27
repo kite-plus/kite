@@ -283,16 +283,46 @@ func TestSkimReadsAsRenderDoes(t *testing.T) {
 	for _, src := range []string{
 		"# Title\n\nFirst words.\n\n- one\n- two\n\n| a | b |\n|---|---|\n| c d | e |\n\n```go\ncode()\n```\n",
 		"湖边的桂花开了，用 kite build 一条命令就能重新发布。\n\n> 引用的话\n\n![图](a.jpg)\n",
-		"Term\n: Its description\n\nText[^1].\n\n[^1]: A note.\n\n<div>markup</div>\n",
+		"Term\n: Its description\n\nText[^1].\n\n[^1]: A note ![n](/n.png).\n\n<div>markup</div>\n",
+		"![one](1.png) [![badge](https://example.com/b.svg)](https://example.com/) ![ref][r]\n\n[r]: /uploads/r.jpg\n",
 		strings.Repeat("alpha beta ", 60),
 		"",
 	} {
 		doc := render(t, src, nil)
 		skim := markdown.Skim(src)
-		if skim.Excerpt != doc.Excerpt || skim.WordCount != doc.WordCount || skim.CJKCount != doc.CJKCount {
-			t.Errorf("Skim(%q) = %q, %d, %d; Render has %q, %d, %d", src,
-				skim.Excerpt, skim.WordCount, skim.CJKCount, doc.Excerpt, doc.WordCount, doc.CJKCount)
+		if skim.Excerpt != doc.Excerpt || skim.WordCount != doc.WordCount || skim.CJKCount != doc.CJKCount ||
+			!slices.Equal(skim.Images, doc.Images) {
+			t.Errorf("Skim(%q) = %q, %d, %d, %q; Render has %q, %d, %d, %q", src,
+				skim.Excerpt, skim.WordCount, skim.CJKCount, skim.Images,
+				doc.Excerpt, doc.WordCount, doc.CJKCount, doc.Images)
 		}
+	}
+}
+
+// A theme may show a picture of the body elsewhere, as a post's card shows
+// its first one, and resolves it as it resolves a cover. So a document lists
+// its pictures as the source writes them, in order, while the page it renders
+// shows them under the path its site is published at.
+func TestPicturesAreListedAsWritten(t *testing.T) {
+	src := "[about](/about/) ![river](/uploads/river.jpg) ![near](near.png)\n\n" +
+		"![far](https://example.com/far.jpg) ![under](/blog/under.jpg)\n"
+	want := []string{"/uploads/river.jpg", "near.png", "https://example.com/far.jpg", "/blog/under.jpg"}
+
+	doc, err := markdown.New(markdown.Options{BasePath: "/blog/"}).Render(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(doc.Images, want) {
+		t.Errorf("Images = %q, want %q", doc.Images, want)
+	}
+	if !slices.Equal(doc.Links, []string{"/about/"}) {
+		t.Errorf("Links = %q, want the link as written", doc.Links)
+	}
+	if !strings.Contains(doc.HTML, `src="/blog/uploads/river.jpg"`) {
+		t.Errorf("the page does not show the picture under its path:\n%s", doc.HTML)
+	}
+	if got := markdown.Skim(src).Images; !slices.Equal(got, want) {
+		t.Errorf("Skim lists %q, want %q", got, want)
 	}
 }
 

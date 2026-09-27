@@ -3,7 +3,7 @@ package index
 import "github.com/kite-plus/kite/internal/render/markdown"
 
 // summarize reads what a list shows of an item: the best short description
-// available for it, and how many words its body has.
+// available for it, how many words its body has and the pictures it shows.
 //
 // An author-written description always wins: it was written to be read on its
 // own, which is more than can be said for the opening of an article. Either

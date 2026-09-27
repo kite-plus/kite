@@ -291,6 +291,7 @@ type Page interface {
     Plain() string
     WordCount() int
     ReadingTime() time.Duration
+    Images() []string            // 正文里的图片，按出现顺序，保持原文写法
 
     Date() time.Time
     PublishDate() time.Time

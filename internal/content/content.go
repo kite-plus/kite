@@ -111,10 +111,13 @@ type Summary struct {
 	Meta map[string]any
 
 	// WordCount and CJKCount measure the body as a rendered page of it does,
-	// for a list to say how long an item is without loading it. The index
-	// counts them; Summarize leaves them zero, as counting takes a parser.
+	// and Images are the pictures it shows, in order and as written, for a
+	// list to say how long an item is and show one of its pictures without
+	// loading it. The index reads them; Summarize leaves them empty, as
+	// reading them takes a parser.
 	WordCount int
 	CJKCount  int
+	Images    []string
 
 	// Pinned says whether Meta pins the item: an author who pins a post
 	// expects to see which one it is in a list.

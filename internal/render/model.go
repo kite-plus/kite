@@ -201,6 +201,13 @@ func (p *pageModel) WordCount() int {
 	return p.doc.WordCount
 }
 
+func (p *pageModel) Images() []string {
+	if p.doc == nil {
+		return nil
+	}
+	return slices.Clone(p.doc.Images)
+}
+
 func (p *pageModel) ReadingTime() time.Duration {
 	if p.doc == nil {
 		return time.Minute

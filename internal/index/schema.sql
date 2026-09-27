@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS contents (
     excerpt      TEXT    NOT NULL DEFAULT '',
     word_count   INTEGER NOT NULL DEFAULT 0,
     cjk_count    INTEGER NOT NULL DEFAULT 0,
+    images_json  TEXT    NOT NULL DEFAULT '[]',
     meta_json    TEXT    NOT NULL DEFAULT '{}',
     aliases_json TEXT    NOT NULL DEFAULT '[]',
     created_at   INTEGER NOT NULL DEFAULT 0,

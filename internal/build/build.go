@@ -590,9 +590,9 @@ func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page
 // listing, or a neighbor of a single page.
 func (b *Builder) listedPage(ctx context.Context, out *Context, s content.Summary) (render.Page, error) {
 	// Only this projection of the item is read: a listing says how long the
-	// body is, but never shows it.
+	// body is and may show one of its pictures, but never shows the body.
 	out.Read(Node{Kind: NodeContent, ID: string(s.ID)}, string(s.Revision),
-		"title", "slug", "excerpt", "word_count", "params", "published_at", "updated_at", "taxonomies")
+		"title", "slug", "excerpt", "word_count", "images", "params", "published_at", "updated_at", "taxonomies")
 	summary, err := b.summary(ctx, s)
 	if err != nil {
 		return nil, err
@@ -606,14 +606,14 @@ func (b *Builder) listedPage(ctx context.Context, out *Context, s content.Summar
 	}), nil
 }
 
-// summary is what a listing says about an item's body: its excerpt and its
-// length, as the index keeps them, unless a hook rewrites markdown. The index
-// knows nothing of hooks, so its summary would show what a plugin turns into
-// something else, such as math, as its source; the listing says what the
-// item's own page says instead.
+// summary is what a listing says about an item's body: its excerpt, its length
+// and its pictures, as the index keeps them, unless a hook rewrites markdown.
+// The index knows nothing of hooks, so its summary would show what a plugin
+// turns into something else, such as math, as its source; the listing says
+// what the item's own page says instead.
 func (b *Builder) summary(ctx context.Context, s content.Summary) (markdown.Document, error) {
 	if !b.rewrites {
-		return markdown.Document{Excerpt: s.Excerpt, WordCount: s.WordCount, CJKCount: s.CJKCount}, nil
+		return markdown.Document{Excerpt: s.Excerpt, WordCount: s.WordCount, CJKCount: s.CJKCount, Images: s.Images}, nil
 	}
 	key := string(s.ID) + "@" + string(s.Revision)
 	if v, ok := b.summaries.Load(key); ok {
@@ -627,7 +627,7 @@ func (b *Builder) summary(ctx context.Context, s content.Summary) (markdown.Docu
 	if err != nil {
 		return markdown.Document{}, err
 	}
-	summary := markdown.Document{Excerpt: doc.Excerpt, WordCount: doc.WordCount, CJKCount: doc.CJKCount}
+	summary := markdown.Document{Excerpt: doc.Excerpt, WordCount: doc.WordCount, CJKCount: doc.CJKCount, Images: doc.Images}
 	description, _ := item.Meta["description"].(string)
 	if text := markdown.Excerpt(description); text != "" {
 		summary.Excerpt = text

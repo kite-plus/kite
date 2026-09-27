@@ -747,46 +747,54 @@ func TestAListingSaysWhatThePageSaysThroughTheHooks(t *testing.T) {
 
 // A page that reaches a template through a listing, or as the neighbor of a
 // single page, carries what its own page does: what the author set on it,
-// such as a cover, and how long it takes to read, hooks and all.
-func TestAListedPageCarriesItsParamsAndLength(t *testing.T) {
+// such as a cover, how long it takes to read and the pictures it shows, hooks
+// and all. The pictures are as the body writes them, so a theme resolving one
+// on a site under a path does not add the path twice.
+func TestAListedPageCarriesItsParamsLengthAndPictures(t *testing.T) {
 	th, err := theme.Load(themes.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
-	const show = `{{ .Title }}|{{ .Params.cover }}|{{ .Params.style.tone }}|{{ .WordCount }}|{{ .ReadingTime.Minutes }};`
+	const show = `{{ .Title }}|{{ .Params.cover }}|{{ .Params.style.tone }}|{{ .WordCount }}|{{ .ReadingTime.Minutes }}|{{ .Images }};`
 	layouts := fstest.MapFS{
 		"home.html": {Data: []byte(`{{ define "main" }}{{ range .Pages }}` + show + `{{ end }}{{ end }}`)},
-		"single.html": {Data: []byte(`{{ define "main" }}{{ with .Page }}` + show + `{{ end }}` +
+		"single.html": {Data: []byte(`{{ define "main" }}{{ with .Page }}` + show + `{{ .Content }}{{ end }}` +
 			`{{ with .Page.Next }}next:` + show + `{{ end }}{{ end }}`)},
 	}
 	// 1200 characters at 400 a minute and 220 words at 220 a minute.
-	body := strings.Repeat("桂花开了 ", 300) + strings.Repeat("word ", 220)
+	body := "![first](/uploads/first.jpg)\n\n" + strings.Repeat("桂花开了 ", 300) + strings.Repeat("word ", 220) +
+		"\n\n![second](second.png)\n"
 
 	for _, tc := range []struct {
 		name   string
 		signed bool
 		want   string
 	}{
-		{"as indexed", false, "Covered|cover.jpg|warm|1420|4;"},
-		{"through a markdown hook", true, "Covered|cover.jpg|warm|1423|5;"},
+		{"as indexed", false, "Covered|cover.jpg|warm|1420|4|[/uploads/first.jpg second.png];"},
+		{"through a markdown hook", true, "Covered|cover.jpg|warm|1423|5|[/uploads/first.jpg second.png];"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			f := newFixture(t, 2)
+			f := newFixtureAt(t, 2, "https://example.com/blog/")
 			f.engine = theme.NewEngine(theme.Options{
 				Sources: []theme.Source{{Name: "site", FS: layouts}, {Name: "default", FS: th.Layouts}},
 				Links:   f.resolve,
 			})
 			f.add(t, "content/posts/covered/index.md", "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ950\ntitle: Covered\nslug: covered\n"+
-				"status: published\npublished_at: 2026-01-20T00:00:00Z\ncover: cover.jpg\nstyle: {tone: warm}\n---\n\n"+body+"\n")
+				"status: published\npublished_at: 2026-01-20T00:00:00Z\ncover: cover.jpg\nstyle: {tone: warm}\n---\n\n"+body)
 			f.run(t, f.out, func(o *build.Options) {
+				o.Markdown = markdown.New(markdown.Options{BasePath: "/blog/"})
 				if tc.signed {
 					o.Hooks = hook.NewBus()
 					o.Hooks.Register(signing{hook.Base{HookName: "signing", HookPhase: hook.PhaseBuild}}, hook.DefaultPriority)
 				}
 			})
 
-			if page := readFile(t, f.out, "posts/covered/index.html"); !strings.Contains(page, tc.want) {
+			page := readFile(t, f.out, "posts/covered/index.html")
+			if !strings.Contains(page, tc.want) {
 				t.Fatalf("the post's own page does not say %q: %s", tc.want, excerptOf(page, "Covered|"))
+			}
+			if !strings.Contains(page, `src="/blog/uploads/first.jpg"`) {
+				t.Errorf("the post does not show its picture under the site's path: %s", excerptOf(page, "<img"))
 			}
 			if home := readFile(t, f.out, "index.html"); !strings.Contains(home, tc.want) {
 				t.Errorf("the home page lists %q, want %q", excerptOf(home, "Covered|"), tc.want)

@@ -83,6 +83,10 @@ type Document struct {
 	// near ExcerptLimit: what a listing shows of the item.
 	Excerpt string
 
+	// Links and Images are what the body links to and shows, in order and as
+	// its source writes them, before a site's path is put in front: a theme
+	// that shows one of the pictures elsewhere resolves it as it would a
+	// cover, and would otherwise add that path twice.
 	Links  []string
 	Images []string
 
@@ -174,33 +178,56 @@ func (l langPre) End(code bool) string {
 // with the path is left alone, as is anything on another host.
 type siteLinks struct{ base string }
 
-func (t siteLinks) Transform(doc *ast.Document, _ text.Reader, _ parser.Context) {
+func (t siteLinks) Transform(doc *ast.Document, _ text.Reader, pc parser.Context) {
+	written := map[ast.Node][]byte{}
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
+		var dest *[]byte
 		switch node := n.(type) {
 		case *ast.Link:
-			node.Destination = t.rebase(node.Destination)
+			dest = &node.Destination
 		case *ast.Image:
-			node.Destination = t.rebase(node.Destination)
+			dest = &node.Destination
+		default:
+			return ast.WalkContinue, nil
+		}
+		if rebased, ok := t.rebase(*dest); ok {
+			written[n] = *dest
+			*dest = rebased
 		}
 		return ast.WalkContinue, nil
 	})
+	pc.Set(writtenKey, written)
 }
 
-func (t siteLinks) rebase(dest []byte) []byte {
+// rebase is dest under the site's path, and whether that changed it.
+func (t siteLinks) rebase(dest []byte) ([]byte, bool) {
 	d := string(dest)
 	if !strings.HasPrefix(d, "/") || strings.HasPrefix(d, "//") || d == t.base || strings.HasPrefix(d, t.base+"/") {
-		return dest
+		return dest, false
 	}
-	return []byte(t.base + d)
+	return []byte(t.base + d), true
+}
+
+// writtenKey holds the destinations siteLinks rebased, by node, as the source
+// wrote them.
+var writtenKey = parser.NewContextKey()
+
+// asWritten is a node's destination as the source wrote it.
+func asWritten(n ast.Node, dest []byte, written map[ast.Node][]byte) string {
+	if w, ok := written[n]; ok {
+		return string(w)
+	}
+	return string(dest)
 }
 
 // Render converts a markdown body into HTML plus the metadata a theme needs.
 func (r *Renderer) Render(source string) (*Document, error) {
 	src := []byte(source)
-	root := r.md.Parser().Parse(text.NewReader(src), parser.WithContext(parser.NewContext()))
+	pc := parser.NewContext()
+	root := r.md.Parser().Parse(text.NewReader(src), parser.WithContext(pc))
 
 	var buf bytes.Buffer
 	if err := r.md.Renderer().Render(&buf, src, root); err != nil {
@@ -208,7 +235,8 @@ func (r *Renderer) Render(source string) (*Document, error) {
 	}
 
 	doc := &Document{HTML: buf.String()}
-	if err := collect(root, src, doc); err != nil {
+	written, _ := pc.Get(writtenKey).(map[ast.Node][]byte)
+	if err := collect(root, src, doc, written); err != nil {
 		return nil, err
 	}
 	return doc, nil
@@ -216,7 +244,7 @@ func (r *Renderer) Render(source string) (*Document, error) {
 
 // collect walks the tree once, gathering everything a theme or a build step
 // needs so that nothing has to re-parse the document later.
-func collect(root ast.Node, src []byte, doc *Document) error {
+func collect(root ast.Node, src []byte, doc *Document, written map[ast.Node][]byte) error {
 	var plain strings.Builder
 	err := ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
@@ -230,11 +258,11 @@ func collect(root ast.Node, src []byte, doc *Document) error {
 				Text:  plainText(node, src),
 			})
 		case *ast.Link:
-			doc.Links = append(doc.Links, string(node.Destination))
+			doc.Links = append(doc.Links, asWritten(node, node.Destination, written))
 		case *ast.AutoLink:
 			doc.Links = append(doc.Links, string(node.URL(src)))
 		case *ast.Image:
-			doc.Images = append(doc.Images, string(node.Destination))
+			doc.Images = append(doc.Images, asWritten(node, node.Destination, written))
 		}
 		if prose(n) {
 			if read := strings.TrimSpace(doc.count(n, src)); read != "" {
@@ -268,14 +296,20 @@ func Excerpt(source string) string {
 }
 
 // Skim reads a markdown source without rendering it, for what a list shows of
-// it: a Document with only its Excerpt, WordCount and CJKCount, as Render
-// would have them.
+// it: a Document with only its Excerpt, WordCount, CJKCount and Images, as
+// Render would have them.
 func Skim(source string) *Document {
 	src := []byte(source)
 	root := excerptParser().Parse(text.NewReader(src), parser.WithContext(parser.NewContext()))
 	doc := &Document{Excerpt: opening(root, src)}
 	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if entering && prose(n) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		if image, ok := n.(*ast.Image); ok {
+			doc.Images = append(doc.Images, string(image.Destination))
+		}
+		if prose(n) {
 			doc.count(n, src)
 		}
 		return ast.WalkContinue, nil

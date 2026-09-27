@@ -250,9 +250,9 @@ func prepare(ctx context.Context, tx *sql.Tx) (*statements, error) {
 		{&s.insert, `
 			INSERT INTO contents (
 				id, kind, slug, title, status, locale, locator, path, revision,
-				body, body_format, excerpt, word_count, cjk_count, meta_json, aliases_json,
+				body, body_format, excerpt, word_count, cjk_count, images_json, meta_json, aliases_json,
 				created_at, updated_at, published_at, deleted_at
-			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`},
+			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`},
 		{&s.term, `INSERT OR REPLACE INTO terms (content_id, taxonomy, term, position) VALUES (?,?,?,?)`},
 		{&s.file, `
 			INSERT INTO files (path, size, mtime_ns, content_sha256, indexed_at_ns)
@@ -296,11 +296,15 @@ func upsert(ctx context.Context, s *statements, e *file.Entry, nowNS int64) erro
 	}
 
 	summary := summarize(description(item.Meta), item.Body.Raw)
+	images, err := json.Marshal(orEmptySlice(summary.Images))
+	if err != nil {
+		return err
+	}
 	_, err = s.insert.ExecContext(ctx,
 		string(item.ID), string(item.Kind), item.Slug, item.Title, string(item.Status),
 		item.Locale, string(item.Locator), e.Path, string(item.Revision),
 		item.Body.Raw, string(item.Body.Format), summary.Excerpt, summary.WordCount, summary.CJKCount,
-		string(meta), string(aliases),
+		string(images), string(meta), string(aliases),
 		unixOrZero(item.CreatedAt), unixOrZero(item.UpdatedAt),
 		unixPtr(item.PublishedAt), unixPtr(item.DeletedAt),
 	)

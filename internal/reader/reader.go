@@ -124,7 +124,7 @@ func (r *Reader) Query(ctx context.Context, q content.Query) (content.Page[conte
 
 	// One extra row tells us whether another page exists without a count(*).
 	sqlText := `SELECT id, kind, slug, title, status, locale, locator, revision, excerpt,
-		word_count, cjk_count, meta_json, created_at, updated_at, published_at,
+		word_count, cjk_count, images_json, meta_json, created_at, updated_at, published_at,
 		COALESCE((SELECT mtime_ns FROM files WHERE files.path = contents.path), 0)
 		FROM contents` + where + order + ` LIMIT ?`
 	rows, err := r.db.QueryContext(ctx, sqlText, append(args, q.Limit+1)...)
@@ -136,13 +136,16 @@ func (r *Reader) Query(ctx context.Context, q content.Query) (content.Page[conte
 	var ids []string
 	for rows.Next() {
 		var s content.Summary
-		var metaJSON string
+		var imagesJSON, metaJSON string
 		var createdAt, updatedAt, modifiedNS int64
 		var publishedAt sql.NullInt64
 		if err := rows.Scan(&s.ID, &s.Kind, &s.Slug, &s.Title, &s.Status, &s.Locale,
-			&s.Locator, &s.Revision, &s.Excerpt, &s.WordCount, &s.CJKCount, &metaJSON,
+			&s.Locator, &s.Revision, &s.Excerpt, &s.WordCount, &s.CJKCount, &imagesJSON, &metaJSON,
 			&createdAt, &updatedAt, &publishedAt, &modifiedNS); err != nil {
 			return page, err
+		}
+		if err := json.Unmarshal([]byte(imagesJSON), &s.Images); err != nil {
+			return page, fmt.Errorf("reader: decode images of %s: %w", s.ID, err)
 		}
 		if err := json.Unmarshal([]byte(metaJSON), &s.Meta); err != nil {
 			return page, fmt.Errorf("reader: decode meta of %s: %w", s.ID, err)

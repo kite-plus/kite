@@ -1,6 +1,7 @@
 package index
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -142,5 +143,14 @@ func TestSummarizeCountsTheBody(t *testing.T) {
 	}
 	if got.WordCount != page.WordCount || got.CJKCount != page.CJKCount {
 		t.Errorf("the index counts %d, %d, the page %d, %d", got.WordCount, got.CJKCount, page.WordCount, page.CJKCount)
+	}
+}
+
+// A list may show one of an item's pictures, so the index keeps the pictures
+// its body shows, in order and as written. A description is not the body.
+func TestSummarizeListsThePictures(t *testing.T) {
+	got := summarize("Written with a picture ![d](d.png).", "![a](a.png)\n\nText ![b](/uploads/b.jpg)\n")
+	if want := []string{"a.png", "/uploads/b.jpg"}; !slices.Equal(got.Images, want) {
+		t.Errorf("Images = %q, want %q", got.Images, want)
 	}
 }
