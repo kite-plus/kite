@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ImagePlus, ImageUp, RotateCcw, X } from "lucide-react";
+import { ImagePlus, ImageUp, RotateCcw, X } from "lucide-react";
 
 import type { Field } from "@/api/client";
 import { locales, useI18n, type Key } from "@/i18n";
@@ -8,7 +8,6 @@ import { defaultOf, problemOf, sameValue } from "@/lib/schema";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -43,11 +42,6 @@ interface Props {
   values: Record<string, unknown>;
   onChange: (values: Record<string, unknown>) => void;
   uploads?: Uploads;
-  /**
-   * sections says how a section is drawn: a heading over its fields, or a
-   * card of its own that folds away, for a form that is all sections.
-   */
-  sections?: "heading" | "panel";
   /** onReset puts a field back to its default; given, a field that differs offers it. */
   onReset?: (key: string) => void;
   /** idPrefix keeps ids apart when one form sits inside another. */
@@ -62,22 +56,21 @@ interface Props {
  * adding a type a development task; reading the schema is what keeps it a
  * configuration change.
  */
-export function SchemaForm({ fields, values, onChange, uploads, sections = "heading", onReset, idPrefix = "" }: Props) {
+export function SchemaForm({ fields, values, onChange, uploads, onReset, idPrefix = "" }: Props) {
   const set = (key: string, value: unknown) => onChange({ ...values, [key]: value });
 
   return (
-    <div className={cn("grid [&>*]:min-w-0", sections === "panel" ? "gap-4" : "gap-6")}>
+    <div className="grid gap-6 [&>*]:min-w-0">
       {fields.map((field) => {
         if (!visible(field, values)) return null;
         if (field.type === "section") {
           return (
-            <Section key={field.key} field={field} as={sections}>
+            <Section key={field.key} field={field}>
               <SchemaForm
                 fields={field.fields ?? []}
                 values={values}
                 onChange={onChange}
                 uploads={uploads}
-                sections={sections}
                 onReset={onReset}
                 idPrefix={idPrefix}
               />
@@ -93,7 +86,6 @@ export function SchemaForm({ fields, values, onChange, uploads, sections = "head
             value={value}
             onChange={(next) => set(field.key, next)}
             uploads={uploads}
-            plain={sections === "panel"}
             onReset={onReset && !sameValue(value, defaultOf(field)) ? () => onReset(field.key) : undefined}
           />
         );
@@ -108,30 +100,15 @@ function visible(field: Field, values: Record<string, unknown>): boolean {
   return Object.entries(field.showIf).every(([key, want]) => values[key] === want);
 }
 
-function Section({ field, as, children }: { field: Field; as: "heading" | "panel"; children: ReactNode }) {
-  const label = field.label || field.key;
-  if (as === "heading") {
-    return (
-      <fieldset className="grid gap-4">
-        <legend className="mb-4 w-full border-b pb-2">
-          <span className="text-sm font-semibold">{label}</span>
-          {field.help && <Help className="mt-0.5">{field.help}</Help>}
-        </legend>
-        {children}
-      </fieldset>
-    );
-  }
+function Section({ field, children }: { field: Field; children: ReactNode }) {
   return (
-    <Collapsible defaultOpen className="group/section rounded-lg border bg-card">
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-lg px-4 py-3 text-start outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-        <span className="text-sm font-semibold">{label}</span>
-        <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="border-t px-4 pt-4 pb-5">
-        {field.help && <Help className="-mt-1 mb-4">{field.help}</Help>}
-        {children}
-      </CollapsibleContent>
-    </Collapsible>
+    <fieldset className="grid gap-4">
+      <legend className="mb-4 w-full border-b pb-2">
+        <span className="text-sm font-semibold">{field.label || field.key}</span>
+        {field.help && <Help className="mt-0.5">{field.help}</Help>}
+      </legend>
+      {children}
+    </fieldset>
   );
 }
 
@@ -174,7 +151,6 @@ function FieldRow({
   value,
   onChange,
   uploads,
-  plain,
   onReset,
 }: {
   id: string;
@@ -182,8 +158,6 @@ function FieldRow({
   value: unknown;
   onChange: (value: unknown) => void;
   uploads?: Uploads;
-  /** plain drops the border a switch otherwise sits in, inside a card that has one. */
-  plain?: boolean;
   onReset?: () => void;
 }) {
   const { t } = useI18n();
@@ -193,7 +167,7 @@ function FieldRow({
   // A switch reads better beside its label than under it.
   if (field.type === "boolean") {
     return (
-      <div data-field={field.key} className={cn("flex items-center justify-between gap-4", !plain && "rounded-lg border p-4")}>
+      <div data-field={field.key} className="flex items-center justify-between gap-4 rounded-lg border p-4">
         <div className="space-y-1">
           <Label htmlFor={id}>{label}</Label>
           {field.help && <Help>{field.help}</Help>}

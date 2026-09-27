@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 export interface FrameHandle {
   /** home goes back to the preview's home page. */
   home: () => void;
+  /** open shows another page of the preview, by its address. */
+  open: (href: string) => void;
   /** href is the address of the page on show. */
   href: () => string | null;
 }
@@ -23,8 +25,14 @@ interface Props {
   phone: boolean;
   title: string;
   onPage?: (page: Page) => void;
+  /** onScale reports how far a desktop page is shrunk to fit, 1 for not at all. */
+  onScale?: (scale: number) => void;
   ref?: Ref<FrameHandle>;
 }
+
+// A desktop page is drawn at least this wide and shrunk to fit, so a narrow
+// panel still shows the layout a desktop reader sees.
+export const desktopWidth = 1280;
 
 /**
  * PreviewFrame shows a whole-site preview, which can be followed from page
@@ -34,10 +42,12 @@ interface Props {
  * loaded into the one behind, scrolled to where the reader was, and only then
  * brought forward, so a change of color does not flash a blank page.
  */
-export function PreviewFrame({ url, drawn, phone, title, onPage, ref }: Props) {
+export function PreviewFrame({ url, drawn, phone, title, onPage, onScale, ref }: Props) {
   const first = useRef<HTMLIFrameElement>(null);
   const second = useRef<HTMLIFrameElement>(null);
+  const box = useRef<HTMLDivElement>(null);
   const [front, setFront] = useState(0);
+  const [size, setSize] = useState({ width: 0, height: 0 });
   const shown = useRef(0);
   const waiting = useRef<{ frame: number; scroll: number } | null>(null);
   const report = useRef(onPage);
@@ -47,6 +57,22 @@ export function PreviewFrame({ url, drawn, phone, title, onPage, ref }: Props) {
   const go = (i: number, href: string) => {
     frame(i)?.contentWindow?.location.replace(href);
   };
+
+  useEffect(() => {
+    const element = box.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const width = phone ? size.width : Math.max(desktopWidth, size.width);
+  const scale = phone || !size.width ? 1 : size.width / width;
+  useEffect(() => {
+    onScale?.(scale);
+  }, [scale]);
 
   // A preview at a new address starts on its home page.
   useEffect(() => {
@@ -81,14 +107,16 @@ export function PreviewFrame({ url, drawn, phone, title, onPage, ref }: Props) {
       home: () => {
         if (url) go(shown.current, url);
       },
+      open: (href: string) => go(shown.current, href),
       href: () => located(frame(shown.current)?.contentWindow) ?? url,
     }),
     [url],
   );
 
   return (
-    <div className={cn("relative min-h-0 flex-1", phone && "bg-muted/60 p-4")}>
+    <div className={cn("relative min-h-0 flex-1", phone ? "bg-muted/60 p-4" : "overflow-hidden")}>
       <div
+        ref={box}
         className={cn(
           "relative h-full w-full",
           phone && "mx-auto max-w-[390px] overflow-hidden rounded-lg shadow-sm ring-1 ring-border",
@@ -105,8 +133,19 @@ export function PreviewFrame({ url, drawn, phone, title, onPage, ref }: Props) {
             // run here, where they would share the admin's origin.
             sandbox="allow-same-origin"
             onLoad={() => loaded(i)}
+            style={
+              phone
+                ? undefined
+                : {
+                    width: `${width}px`,
+                    height: `${size.height / scale}px`,
+                    transform: scale < 1 ? `scale(${scale})` : undefined,
+                    transformOrigin: "0 0",
+                  }
+            }
             className={cn(
-              "absolute inset-0 block h-full w-full border-0 bg-white",
+              "absolute top-0 left-0 block border-0 bg-white",
+              phone && "h-full w-full",
               i === front ? "visible" : "invisible",
             )}
           />

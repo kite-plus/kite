@@ -203,3 +203,21 @@
   background-size: 8px 8px;
   background-position: 0 0, 4px 4px;
 }
+
+/* A setting found by the theme settings' search, marked for a moment. */
+.kite-found {
+  border-radius: var(--radius);
+  animation: kite-found 1.6s ease-out;
+}
+@keyframes kite-found {
+  0%,
+  45% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--primary) 12%, transparent);
+    background-color: color-mix(in oklab, var(--primary) 12%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kite-found {
+    animation-duration: 0.01s;
+  }
+}

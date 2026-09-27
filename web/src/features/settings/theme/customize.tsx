@@ -1,19 +1,20 @@
-import { useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ExternalLink, House, MoreHorizontal, Palette, RotateCcw, XCircle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { ChevronLeft, ExternalLink, House, MoreHorizontal, PanelRight, RotateCcw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
-import { ApiError, type Field, type ThemeDetail } from "@/api/client";
+import { ApiError, type Field } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
-import { useSite } from "@/hooks/useContents";
+import { useContentTypes, useLatest, useSite } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useSettingsDraft } from "@/hooks/useSettingsDraft";
 import { useThemePreview } from "@/hooks/useThemePreview";
 import { uploadSiteMedia, useSaveTheme, useTheme } from "@/hooks/useThemes";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
+import { setCookie } from "@/lib/cookies";
 import { resolveLink, siteHome } from "@/lib/links";
-import { changesOf, defaultOf, problemOf, valueFields } from "@/lib/schema";
+import { changesOf, defaultOf, problemOf, sameValue, valueFields } from "@/lib/schema";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useSidebar } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,17 +33,20 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Header } from "@/components/layout/header";
 import { SchemaForm, type Uploads } from "@/components/SchemaForm";
 import { usePreviewWidth, WidthToggle } from "@/components/editor/Preview";
-import { PreviewFrame, type FrameHandle, type Page } from "./preview-frame";
+import { PreviewFrame, desktopWidth, type FrameHandle, type Page } from "./preview-frame";
+import { search, SectionNav, type Flags, type Match } from "./section-nav";
 
 /**
- * Customizing a theme: its settings on one side, the whole site drawn with
- * them on the other, redrawn as they change. Nothing reaches the site until
+ * A theme's settings, a page of their own: the theme's sections listed on
+ * one side, the one chosen as a form, and beside it, when wanted, the whole
+ * site drawn with the settings as they change. Nothing reaches the site until
  * it is saved, so a theme not in use yet can be tried the same way, and put
  * in use with the settings chosen for it.
  */
-export function ThemeCustomizer({ name }: { name: string }) {
+export function ThemeCustomizer({ name, section }: { name: string; section?: string }) {
   const { t } = useI18n();
   const problem = useProblem();
+  const navigate = useNavigate();
   const theme = useTheme(name);
   const detail = theme.data;
   useDocumentTitle(t("customize.title", { theme: detail?.title ?? name }));
@@ -51,18 +57,88 @@ export function ThemeCustomizer({ name }: { name: string }) {
   const guard = useUnsavedGuard(form.dirty);
   const preview = useThemePreview(name, detail?.problem ? undefined : values);
   const uploads = useSiteUploads();
+  const pages = usePreviewPages();
+
+  const wide = useMediaQuery("(min-width: 768px)");
+  const [open, setOpen] = usePreviewOpen();
+  const showing = wide && open && !detail?.problem;
+  useRoomForPreview(showing);
 
   const [width, setWidth] = usePreviewWidth();
   const [page, setPage] = useState<Page | null>(null);
+  const [scale, setScale] = useState(1);
   const [tab, setTab] = useState<"settings" | "preview">("settings");
   const [resetting, setResetting] = useState(false);
+  const [query, setQuery] = useState("");
   const frame = useRef<FrameHandle>(null);
-  const wide = useMediaQuery("(min-width: 768px)");
+  const body = useRef<HTMLDivElement>(null);
+  const formBox = useRef<HTMLDivElement>(null);
+  const [formWidth, setFormWidth] = useFormWidth();
 
-  const panels = useMemo(() => arrange(detail?.schema ?? [], t("customize.general")), [detail?.schema, t]);
+  const sections = useMemo(() => arrange(detail?.schema ?? [], t("customize.general")), [detail?.schema, t]);
   const fields = useMemo(() => valueFields(detail?.schema), [detail?.schema]);
+  const current = sections.find((each) => each.key === section) ?? sections[0];
   const problems = values ? fields.filter((field) => problemOf(field, values[field.key], t)).length : 0;
   const trying = detail !== undefined && !detail.active;
+
+  const flags = useMemo(() => {
+    const out: Record<string, Flags> = {};
+    for (const each of sections) {
+      const own = valueFields(each.fields);
+      out[each.key] = {
+        dirty: !!values && !!form.baseline && own.some((field) => !sameValue(values[field.key], form.baseline![field.key])),
+        problem: !!values && own.some((field) => problemOf(field, values[field.key], t) !== null),
+      };
+    }
+    return out;
+  }, [sections, values, form.baseline, t]);
+
+  const matches = useMemo(() => search(sections, (each) => valueFields(each.fields), query), [sections, query]);
+
+  const choose = (key: string) => {
+    void navigate({ to: "/settings/theme/$name/{-$section}", params: { name, section: key }, replace: true });
+    formBox.current?.scrollTo({ top: 0 });
+  };
+
+  // A setting found by a search is brought into view once its section is on
+  // show, and marked for a moment.
+  const [found, setFound] = useState<string | null>(null);
+  const pick = (match: Match) => {
+    setQuery("");
+    if (match.section.key !== current?.key) choose(match.section.key);
+    setFound(match.field.key);
+    if (!wide) setTab("settings");
+  };
+  useEffect(() => {
+    if (!found) return;
+    const row = formBox.current?.querySelector<HTMLElement>(`[data-section-form] > div > [data-field="${CSS.escape(found)}"]`);
+    if (!row) return;
+    row.scrollIntoView({ block: "center" });
+    // The field's own control, rather than the button that resets it.
+    const control =
+      row.querySelector<HTMLElement>(`#${CSS.escape(found)}:not([type=file])`) ??
+      row.querySelector<HTMLElement>("input:not([type=file]), textarea, [role=switch], [role=combobox], button:not([aria-label])");
+    control?.focus({ preventScroll: true });
+    row.classList.remove("kite-found");
+    void row.offsetWidth;
+    row.classList.add("kite-found");
+    window.setTimeout(() => row.classList.remove("kite-found"), 1600);
+    setFound(null);
+  }, [found, current?.key]);
+
+  // The preview goes to the page the section is about, when it names one:
+  // the page last looked at while in it, or else the one the theme names.
+  const visited = useRef<Record<string, string>>({});
+  const onPage = (next: Page) => {
+    setPage(next);
+    if (current?.preview && preview.url) visited.current[current.key] = pathInside(next.path, preview.url);
+  };
+  const wanted = current?.preview ? (visited.current[current.key] ?? pages(current.preview)) : null;
+  useEffect(() => {
+    if (!wanted || !preview.url) return;
+    if (page && pathInside(page.path, preview.url) === wanted) return;
+    frame.current?.open(inPreview(preview.url, wanted));
+  }, [current?.key, preview.url, wanted]);
 
   const submit = () => {
     if (!detail || !values) return;
@@ -127,58 +203,82 @@ export function ThemeCustomizer({ name }: { name: string }) {
     );
   }
 
-  const settingsPanel = (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="grid gap-4 p-4 [&>*]:min-w-0">
-        <Summary theme={detail} />
-        {said && (
-          <Alert variant="destructive">
-            <XCircle />
-            <AlertTitle>{said.title}</AlertTitle>
-            <AlertDescription>
-              {said.detail && <p>{said.detail}</p>}
-              {conflict && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={async () => {
-                    const result = await theme.refetch();
-                    if (result.data) form.reset(result.data.values, result.data.revision);
-                    save.reset();
-                  }}
-                >
-                  {t("settings.reload")}
-                </Button>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
-        {detail.problem ? (
-          <Alert variant="destructive">
-            <XCircle />
-            <AlertTitle>{t("customize.unusable")}</AlertTitle>
-            <AlertDescription>{detail.problem}</AlertDescription>
-          </Alert>
-        ) : !values ? (
-          <Skeleton className="h-72 w-full" />
-        ) : panels.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-6 text-center">
-            <p className="font-medium">{t("customize.noSettings")}</p>
-            <p className="text-sm text-muted-foreground">{t("customize.noSettingsNote")}</p>
-          </div>
-        ) : (
-          <SchemaForm
-            fields={panels}
-            values={values}
-            onChange={form.change}
-            uploads={uploads}
-            sections="panel"
-            onReset={reset}
-          />
-        )}
+  const alerts = (
+    <>
+      {said && (
+        <Alert variant="destructive">
+          <XCircle />
+          <AlertTitle>{said.title}</AlertTitle>
+          <AlertDescription>
+            {said.detail && <p>{said.detail}</p>}
+            {conflict && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={async () => {
+                  const result = await theme.refetch();
+                  if (result.data) form.reset(result.data.values, result.data.revision);
+                  save.reset();
+                }}
+              >
+                {t("settings.reload")}
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+      {detail.problem && (
+        <Alert variant="destructive">
+          <XCircle />
+          <AlertTitle>{t("customize.unusable")}</AlertTitle>
+          <AlertDescription>{detail.problem}</AlertDescription>
+        </Alert>
+      )}
+    </>
+  );
+
+  const sectionForm = !values ? (
+    <Skeleton className="h-72 w-full" />
+  ) : !current ? (
+    <div className="rounded-lg border border-dashed p-6 text-center">
+      <p className="font-medium">{t("customize.noSettings")}</p>
+      <p className="text-sm text-muted-foreground">{t("customize.noSettingsNote")}</p>
+    </div>
+  ) : (
+    <div className="grid gap-6">
+      <div>
+        <h2 className="text-lg font-semibold">{current.label || current.key}</h2>
+        {current.help && <p className="mt-1 text-sm text-muted-foreground">{current.help}</p>}
+      </div>
+      <div data-section-form>
+        <SchemaForm
+          key={current.key}
+          fields={current.fields ?? []}
+          values={values}
+          onChange={form.change}
+          uploads={uploads}
+          onReset={reset}
+        />
       </div>
     </div>
+  );
+
+  const nav = (
+    <SectionNav
+      sections={sections}
+      current={current?.key}
+      flags={flags}
+      query={query}
+      matches={matches}
+      onQuery={setQuery}
+      onChoose={(key) => {
+        choose(key);
+        if (!wide) setTab("settings");
+      }}
+      onPick={pick}
+      className="w-48 shrink-0 border-e"
+    />
   );
 
   const previewPanel = (
@@ -191,11 +291,17 @@ export function ThemeCustomizer({ name }: { name: string }) {
         <span className="me-auto min-w-0 truncate text-[13px]">
           <span className="font-medium">{page?.title || t("customize.previewTitle")}</span>
           {page && (
-            <span className="ms-2 font-mono text-xs text-muted-foreground">
-              {pathInside(page.path, preview.url)}
-            </span>
+            <span className="ms-2 font-mono text-xs text-muted-foreground">{pathInside(page.path, preview.url)}</span>
           )}
         </span>
+        {width === "desktop" && scale < 1 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="px-1 font-mono text-xs text-muted-foreground tabular-nums">{Math.round(scale * 100)}%</span>
+            </TooltipTrigger>
+            <TooltipContent>{t("customize.scaled", { width: desktopWidth })}</TooltipContent>
+          </Tooltip>
+        )}
         <WidthToggle width={width} onChange={setWidth} />
         <IconButton
           label={t("customize.openTab")}
@@ -220,7 +326,8 @@ export function ThemeCustomizer({ name }: { name: string }) {
         drawn={preview.drawn}
         phone={width === "phone"}
         title={t("customize.previewTitle")}
-        onPage={setPage}
+        onPage={onPage}
+        onScale={setScale}
       />
     </div>
   );
@@ -235,11 +342,28 @@ export function ThemeCustomizer({ name }: { name: string }) {
             {problems > 0 ? (
               <span className="text-destructive">{t("customize.problems", { count: problems })}</span>
             ) : (
-              state
+              [detail.version, state].filter(Boolean).join(" · ")
             )}
           </div>
         </div>
 
+        {wide && !detail.problem && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={open ? "secondary" : "outline"}
+                size="sm"
+                aria-pressed={open}
+                onClick={() => setOpen(!open)}
+                className={cn(open && "border border-primary/25 bg-primary/10 text-primary hover:bg-primary/15")}
+              >
+                <PanelRight />
+                {t("customize.preview")}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{open ? t("customize.hidePreview") : t("customize.showPreview")}</TooltipContent>
+          </Tooltip>
+        )}
         {!detail.problem && values && fields.length > 0 && (
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
@@ -265,38 +389,69 @@ export function ThemeCustomizer({ name }: { name: string }) {
         </Button>
       </Header>
 
-      {!wide && (
-        <div role="tablist" className="flex shrink-0 gap-1 border-b p-2">
-          {(["settings", "preview"] as const).map((each) => (
-            <button
-              key={each}
-              type="button"
-              role="tab"
-              aria-selected={tab === each}
-              onClick={() => setTab(each)}
-              className="flex-1 rounded-md py-1.5 text-sm text-muted-foreground aria-selected:bg-muted aria-selected:font-medium aria-selected:text-foreground"
-            >
-              {t(each === "settings" ? "customize.settingsTab" : "customize.previewTab")}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="flex min-h-0 flex-1">
-        <aside
-          className={cn(
-            "flex min-h-0 w-full flex-col md:w-[380px] md:shrink-0 md:border-e",
-            !wide && tab !== "settings" && "hidden",
+      {wide ? (
+        <div ref={body} className="flex min-h-0 flex-1">
+          {sections.length > 0 && nav}
+          <div
+            ref={formBox}
+            className={cn("min-h-0 overflow-y-auto", showing ? "shrink-0" : "min-w-0 flex-1")}
+            style={showing ? { width: formWidth } : undefined}
+          >
+            <div className={cn("grid gap-4 p-6 [&>*]:min-w-0", !showing && "mx-auto max-w-3xl")}>
+              {alerts}
+              {sectionForm}
+            </div>
+          </div>
+          {showing && (
+            <>
+              <Splitter
+                width={formWidth}
+                onChange={setFormWidth}
+                limit={() => (body.current ? body.current.clientWidth - 192 - 360 : 760)}
+              />
+              <section className="flex min-w-0 flex-1">{previewPanel}</section>
+            </>
           )}
-        >
-          {settingsPanel}
-        </aside>
-        {!detail.problem && (
-          <section className={cn("flex min-w-0 flex-1", !wide && tab !== "preview" && "hidden")}>
-            {previewPanel}
-          </section>
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+          <div role="tablist" className="flex shrink-0 gap-1 border-b p-2">
+            {(["settings", "preview"] as const).map((each) => (
+              <button
+                key={each}
+                type="button"
+                role="tab"
+                aria-selected={tab === each}
+                onClick={() => setTab(each)}
+                className="flex-1 rounded-md py-1.5 text-sm text-muted-foreground aria-selected:bg-muted aria-selected:font-medium aria-selected:text-foreground"
+              >
+                {t(each === "settings" ? "customize.settingsTab" : "customize.previewTab")}
+              </button>
+            ))}
+          </div>
+          <div ref={formBox} className={cn("min-h-0 flex-1 overflow-y-auto", tab !== "settings" && "hidden")}>
+            <div className="grid gap-4 p-4 [&>*]:min-w-0">
+              {sections.length > 1 && (
+                <Select value={current?.key} onValueChange={(key) => key && choose(key)}>
+                  <SelectTrigger aria-label={t("customize.sections")} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sections.map((each) => (
+                      <SelectItem key={each.key} value={each.key}>
+                        {each.label || each.key}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {alerts}
+              {sectionForm}
+            </div>
+          </div>
+          {!detail.problem && <section className={cn("flex min-h-0 flex-1", tab !== "preview" && "hidden")}>{previewPanel}</section>}
+        </>
+      )}
 
       <ConfirmDialog
         open={resetting}
@@ -313,7 +468,7 @@ export function ThemeCustomizer({ name }: { name: string }) {
       />
       <ConfirmDialog
         open={guard.leaving}
-        onOpenChange={(open) => !open && guard.cancel()}
+        onOpenChange={(next) => !next && guard.cancel()}
         title={t("editor.discardTitle")}
         desc={t("settings.discardNote")}
         cancelBtnText={t("conflict.keepEditing")}
@@ -354,33 +509,182 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
   );
 }
 
-/** Summary names the theme being customized, and whether it is the one in use. */
-function Summary({ theme }: { theme: ThemeDetail }) {
+/**
+ * Splitter sets the form's width by dragging the rule between it and the
+ * preview, or with the arrow keys. limit is the widest the form may be.
+ */
+function Splitter({ width, onChange, limit }: { width: number; onChange: (width: number) => void; limit: () => number }) {
   const { t } = useI18n();
+  const fit = (next: number) => Math.round(Math.min(Math.max(next, minForm), Math.max(minForm, limit())));
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
-      <div className="flex aspect-[16/10] w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
-        {theme.screenshot ? (
-          <img src={theme.screenshot} alt="" className="size-full object-cover object-top" />
-        ) : (
-          <Palette className="size-4 text-muted-foreground" />
-        )}
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{theme.title}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          {[theme.version, theme.active ? t("customize.inUse") : t("customize.trying")]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-      </div>
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={t("customize.resize")}
+      aria-valuenow={width}
+      tabIndex={0}
+      title={t("customize.resize")}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        const handle = event.currentTarget;
+        // Captured, the pointer keeps reporting here even over the preview's frame.
+        try {
+          handle.setPointerCapture(event.pointerId);
+        } catch {
+          // A pointer already gone cannot be captured; the drag still works off the frame.
+        }
+        const from = event.clientX;
+        const start = width;
+        const move = (next: PointerEvent) => onChange(fit(start + next.clientX - from));
+        const up = () => {
+          handle.removeEventListener("pointermove", move);
+          handle.removeEventListener("pointerup", up);
+          handle.removeEventListener("pointercancel", up);
+        };
+        handle.addEventListener("pointermove", move);
+        handle.addEventListener("pointerup", up);
+        handle.addEventListener("pointercancel", up);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowLeft") onChange(fit(width - 24));
+        if (event.key === "ArrowRight") onChange(fit(width + 24));
+      }}
+      className="group relative z-10 w-px shrink-0 cursor-col-resize touch-none bg-border outline-none after:absolute after:inset-y-0 after:-inset-x-1.5 after:content-[''] focus-visible:bg-primary"
+    >
+      <span className="absolute top-1/2 left-1/2 h-8 w-1 -translate-1/2 rounded-full bg-border group-hover:bg-muted-foreground/40" />
     </div>
   );
 }
 
+const minForm = 380;
+
+function useFormWidth(): [number, (width: number) => void] {
+  const key = "kite.theme.formWidth";
+  const [width, setWidth] = useState(() => {
+    const stored = Number(read(key));
+    return Number.isFinite(stored) && stored >= minForm ? stored : 520;
+  });
+  const choose = (next: number) => {
+    setWidth(next);
+    write(key, String(next));
+  };
+  return [width, choose];
+}
+
+/**
+ * usePreviewOpen is whether the preview is shown beside the form: at first,
+ * when the window is wide enough to have room for both, and after that as
+ * the person last left it.
+ */
+function usePreviewOpen(): [boolean, (open: boolean) => void] {
+  const key = "kite.theme.preview";
+  const [open, setOpen] = useState(() => {
+    const stored = read(key);
+    if (stored === "open" || stored === "closed") return stored === "open";
+    return typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1280px)").matches;
+  });
+  const choose = (next: boolean) => {
+    setOpen(next);
+    write(key, next ? "open" : "closed");
+  };
+  return [open, choose];
+}
+
+// Whether the sidebar is folded for a preview. It outlives the page, so one
+// theme's page giving way to another's keeps the fold rather than unfolding
+// and folding again.
+let folded = false;
+let unfolding: number | undefined;
+
+/**
+ * useRoomForPreview folds the admin's sidebar to its icons while the preview
+ * is shown, and unfolds it again when the preview closes or the page goes,
+ * unless the person opened it again themselves meanwhile. The fold is not
+ * remembered as their choice, so leaving by closing the tab keeps the
+ * sidebar open elsewhere.
+ */
+function useRoomForPreview(active: boolean) {
+  const { open, setOpen, isMobile } = useSidebar();
+  const wasOpen = useRef(open);
+  const latest = useRef(setOpen);
+  latest.current = setOpen;
+
+  useEffect(() => {
+    window.clearTimeout(unfolding);
+    return () => {
+      if (!folded) return;
+      unfolding = window.setTimeout(() => {
+        if (!folded) return;
+        folded = false;
+        latest.current(true);
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) return;
+    if (active && open) {
+      folded = true;
+      setOpen(false);
+      setCookie("sidebar_state", "true", 60 * 60 * 24 * 7);
+    } else if (!active && folded) {
+      folded = false;
+      setOpen(true);
+    }
+  }, [active, isMobile]);
+
+  useEffect(() => {
+    if (open && !wasOpen.current) folded = false;
+    wasOpen.current = open;
+  }, [open]);
+}
+
+/**
+ * usePreviewPages finds the page of the site a section names: the home page,
+ * the newest post, a page, or the list of posts. It answers with the page's
+ * path in the site, or null while it is not known.
+ */
+function usePreviewPages(): (kind: string) => string | null {
+  const post = useLatest("post", 1, "-published_at");
+  const page = useLatest("page", 1, "-updated_at");
+  const types = useContentTypes();
+  const site = useSite();
+  // An item's address carries the path the site is published under; the
+  // preview draws the site at its own root.
+  const home = siteHome(site.data);
+  const inSite = (url: string | undefined) =>
+    url === undefined ? null : home !== "/" && url.startsWith(home) ? "/" + url.slice(home.length) : url;
+  return (kind) => {
+    switch (kind) {
+      case "home":
+        return "/";
+      case "post":
+        return inSite(post.data?.items[0]?.url);
+      case "page":
+        return inSite(page.data?.items[0]?.url);
+      case "posts": {
+        const route = types.data?.items.find((each) => each.kind === "post")?.route;
+        return route ? listOf(route) : null;
+      }
+      default:
+        return null;
+    }
+  };
+}
+
+/** listOf is where a content type lists its items: its route up to the first parameter. */
+function listOf(route: string): string {
+  const fixed: string[] = [];
+  for (const segment of route.split("/").filter(Boolean)) {
+    if (segment.includes(":")) break;
+    fixed.push(segment);
+  }
+  return fixed.length ? `/${fixed.join("/")}/` : "/";
+}
+
 /**
  * arrange puts the fields a theme declares outside any section into one of
- * their own, so the form is a column of cards that fold.
+ * their own, so every setting is in a section the list can show.
  */
 function arrange(fields: Field[], general: string): Field[] {
   const out: Field[] = [];
@@ -403,7 +707,15 @@ function arrange(fields: Field[], general: string): Field[] {
 
 /** pathInside is where a page is in the site, from its address in the preview. */
 function pathInside(path: string, home: string | null): string {
-  return home && path.startsWith(home) ? "/" + path.slice(home.length) : path;
+  if (!home) return path;
+  const root = new URL(home, window.location.origin).pathname;
+  return path.startsWith(root) ? "/" + path.slice(root.length) : path;
+}
+
+/** inPreview is the address in the preview of a page of the site. */
+function inPreview(home: string, path: string): string {
+  const root = new URL(home, window.location.origin);
+  return new URL(path.replace(/^\/+/, ""), root.href.endsWith("/") ? root : `${root.href}/`).href;
 }
 
 /**
@@ -419,3 +731,18 @@ function useSiteUploads(): Uploads {
   };
 }
 
+function read(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function write(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Remembering the layout is a convenience, not a requirement.
+  }
+}

@@ -204,7 +204,7 @@ function ActiveTheme({ theme }: { theme: ThemeInfo }) {
 
         <div className="mt-auto flex flex-wrap gap-2">
           <Button asChild>
-            <Link to="/settings/theme/$name" params={{ name: theme.name }}>
+            <Link to="/settings/theme/$name/{-$section}" params={{ name: theme.name }}>
               <Paintbrush />
               {t("themes.customize")}
             </Link>
@@ -271,7 +271,7 @@ function ThemeCard({ theme, onUse, onRemove }: { theme: ThemeInfo; onUse: () => 
         ) : (
           <>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/settings/theme/$name" params={{ name: theme.name }}>
+              <Link to="/settings/theme/$name/{-$section}" params={{ name: theme.name }}>
                 <Eye />
                 {t("themes.preview")}
               </Link>

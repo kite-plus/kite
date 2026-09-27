@@ -674,7 +674,7 @@ export const en = {
   "publish.settingsNote": "Commits {paths} and pushes them, so the site built from the repository changes too.",
 
   // Customizing a theme.
-  "customize.title": "Customize {theme}",
+  "customize.title": "{theme} · Theme settings",
   "customize.back": "Themes",
   "customize.save": "Save",
   "customize.use": "Use and save",
@@ -696,6 +696,16 @@ export const en = {
   "customize.previewFailed": "The preview could not be drawn",
   "customize.settingsTab": "Settings",
   "customize.previewTab": "Preview",
+  "customize.preview": "Preview",
+  "customize.showPreview": "Show the preview beside the settings",
+  "customize.hidePreview": "Hide the preview",
+  "customize.sections": "Sections",
+  "customize.search": "Search settings",
+  "customize.clearSearch": "Clear the search",
+  "customize.noMatch": "No setting matches.",
+  "customize.sectionProblem": "A setting here needs fixing",
+  "customize.scaled": "Drawn {width} pixels wide, as on a desktop, and shrunk to fit",
+  "customize.resize": "Drag to resize",
   "customize.unusable": "This theme cannot be used",
   "customize.missing": "No theme of that name is installed",
 
