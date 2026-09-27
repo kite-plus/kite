@@ -1,7 +1,7 @@
 import { ConfigDrawer } from '@/components/config-drawer'
-import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { VisitSite } from '@/components/visit-site'
 import { Header } from './header'
 
 /**
@@ -20,9 +20,9 @@ export function AppHeader({
     <Header fixed={fixed}>
       {children}
       <Search className='me-auto' />
+      <VisitSite />
       <ThemeSwitch />
       <ConfigDrawer />
-      <ProfileDropdown />
     </Header>
   )
 }

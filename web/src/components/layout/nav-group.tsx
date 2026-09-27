@@ -98,7 +98,8 @@ function closest(items: NavItem[], href: string): NavLink | undefined {
     if (item.items) continue
     const url = String(item.url)
     const under =
-      checkIsActive(href, item) || (url !== '/' && path.startsWith(`${url}/`))
+      checkIsActive(href, item) ||
+      (!item.exact && url !== '/' && path.startsWith(`${url}/`))
     if (under && (!best || url.length > String(best.url).length)) best = item
   }
   return best

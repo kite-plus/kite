@@ -9,6 +9,8 @@ type BaseNavItem = {
 type NavLink = BaseNavItem & {
   url: LinkProps['to'] | (string & {})
   items?: never
+  /** exact keeps the entry unmarked on the pages under its address. */
+  exact?: boolean
 }
 
 type NavCollapsible = BaseNavItem & {

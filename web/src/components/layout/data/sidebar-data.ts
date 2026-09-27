@@ -10,7 +10,6 @@ import {
   SlidersHorizontal,
   Tag,
   Tags,
-  UserRound,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { useContentTypes, useTaxonomies } from '@/hooks/useContents'
@@ -71,14 +70,15 @@ export function useSidebarData(): SidebarData {
           { title: t('nav.plugins'), url: '/plugins', icon: Puzzle },
         ],
       },
-      // Every setting is one click away rather than behind a fold.
+      // Every setting is one click away rather than behind a fold. The
+      // account is the person's, reached from their name at the foot.
       {
         title: t('nav.settings'),
         items: [
-          { title: t('nav.site'), url: '/settings', icon: SlidersHorizontal },
+          // The account's page is under this address too, but is not the site's.
+          { title: t('nav.site'), url: '/settings', icon: SlidersHorizontal, exact: true },
           { title: t('nav.theme'), url: '/settings/theme', icon: Palette },
           { title: t('settings.interface'), url: '/settings/appearance', icon: MonitorCog },
-          { title: t('nav.account'), url: '/settings/account', icon: UserRound },
         ],
       },
     ],
