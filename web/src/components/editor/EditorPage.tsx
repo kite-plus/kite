@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChainedCommands, Editor } from "@tiptap/react";
-import { ChevronLeft, Info, Minus, Table, Type, XCircle } from "lucide-react";
+import { ChevronLeft, History, Info, Minus, Table, Type, X, XCircle } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -66,11 +66,17 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const navigate = useNavigate();
   const kindLabel = useKindLabel();
   const types = useContentTypes();
-  const item = useItem(id, kind);
   // Images named from the site's root are shown under its path, so the body
   // waits for the site as it does for the item.
   const site = useSite();
   const home = siteHome(site.data);
+  // A new item moves to its own address once its first save gives it an id,
+  // whichever save that was: the button, a shortcut, an upload or its own.
+  const moved = useRef<(saved: string) => void>(() => {});
+  const item = useItem(id, kind, {
+    site: site.data?.base_url,
+    onCreated: (saved) => moved.current(saved),
+  });
   const delivery = useDelivery();
   const publish = usePublish(
     id ? [id] : [],
@@ -88,8 +94,11 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const [preview, setPreview] = useState(false);
   const [uploading, setUploading] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [removing, setRemoving] = useState(false);
+  // The conflict can be put aside to keep writing, and brought back.
+  const [resolving, setResolving] = useState(false);
+  // Leaving a draft saves it first; the question is asked only if that fails.
+  const [leaveSaveFailed, setLeaveSaveFailed] = useState(false);
 
   const [mode, setMode] = useState<Mode>(preferredMode);
   // What the source view is protecting, when a document opened in it for a reason.
@@ -108,7 +117,42 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   dirty.current = item.dirty;
 
   // Work that is not saved is asked about before anything navigates away.
-  const guard = useUnsavedGuard(item.dirty);
+  // It is kept in this browser too, so a session that ends can go to the
+  // sign-in form without losing it.
+  const guard = useUnsavedGuard(item.dirty, { kept: true });
+  // Leaving saves a new draft on the way out; it is not reopened then.
+  const leavingNow = useRef(false);
+  leavingNow.current = guard.leaving;
+  moved.current = (saved) => {
+    if (id || leavingNow.current) return;
+    guard.pass();
+    void navigate({ to: "/content/$kind/$id", params: { kind, id: saved }, replace: true });
+  };
+
+  useEffect(() => {
+    if (item.conflict) setResolving(true);
+  }, [item.conflict]);
+
+  // A draft saves itself, so leaving one saves what the last seconds held
+  // rather than asking about it.
+  const leaving = guard.leaving;
+  useEffect(() => {
+    if (!leaving) {
+      setLeaveSaveFailed(false);
+      return;
+    }
+    if (!item.autosaves) return;
+    let cancelled = false;
+    void item.save().then((saved) => {
+      if (cancelled) return;
+      if (saved) guard.discard();
+      else setLeaveSaveFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only a new attempt to leave starts this over.
+  }, [leaving]);
 
   const draft = item.draft;
   useDocumentTitle(draft ? draft.title || t("editor.untitled") : undefined);
@@ -140,17 +184,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
     setMode(found.length > 0 ? "source" : preferredMode());
   }, [id, item.status]);
 
-  const save = useCallback(async () => {
-    const saved = await item.save();
-    if (!saved) return null;
-    setSavedAt(new Date());
-    // A new item has no id until the server gives it one.
-    if (!id) {
-      guard.pass();
-      void navigate({ to: "/content/$kind/$id", params: { kind, id: saved }, replace: true });
-    }
-    return saved;
-  }, [item, id, kind, guard, navigate]);
+  const save = item.save;
 
   // Read through a ref so the listener is not rebound on every keystroke.
   const saveRef = useRef(save);
@@ -331,26 +365,31 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const saving = item.status === "saving";
   const busy = saving || publish.pending;
   const clock = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" });
+  // A draft that saves itself reads as saving while it waits to; anything
+  // else unsaved is said to be kept in this browser meanwhile.
   const state =
     uploading > 0
       ? t("editor.uploading", { count: uploading })
-      : saving
-        ? t("editor.saving")
-        : item.dirty
-          ? t("editor.unsaved")
-          : savedAt
-            ? t("editor.savedAt", { time: clock.format(savedAt) })
-            : id
-              ? t("editor.saved")
-              : t("editor.notSaved");
-  const settled = uploading === 0 && !saving && !item.dirty;
+      : item.status === "conflict"
+        ? t("editor.conflicted")
+        : saving || (item.dirty && item.autosaves && !item.restored)
+          ? t("editor.saving")
+          : item.dirty
+            ? t("editor.keptHere")
+            : item.savedAt
+              ? t("editor.savedAt", { time: clock.format(item.savedAt) })
+              : id
+                ? t("editor.saved")
+                : t("editor.notSaved");
+  const troubled =
+    item.status === "conflict" || (item.dirty && !saving && (!item.autosaves || item.restored !== null));
 
   // A save from today reads as a time; an older one needs its date too.
   const stamp = (at: Date) =>
     at.toDateString() === new Date().toDateString()
       ? clock.format(at)
       : `${isoDate(at.toISOString())} ${clock.format(at)}`;
-  const saved = savedAt ?? (item.base?.updated_at ? new Date(item.base.updated_at) : null);
+  const saved = item.savedAt ?? (item.base?.updated_at ? new Date(item.base.updated_at) : null);
   const lastSaved = saved ? t("editor.lastSaved", { time: stamp(saved) }) : "";
 
   const focusBody = () => {
@@ -399,7 +438,15 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
               {kindLabel.many(kind)}
             </Link>
             {" · "}
-            <span className={cn(!settled && "text-warning")}>{state}</span>
+            <span className={cn(troubled && "text-warning")}>{state}</span>
+            {item.status === "conflict" && !resolving && (
+              <>
+                {" · "}
+                <button type="button" className="underline-offset-2 hover:underline" onClick={() => setResolving(true)}>
+                  {t("editor.resolve")}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -461,6 +508,27 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
               <AlertDescription>{problem(item.error.code, item.error.detail).detail}</AlertDescription>
             )}
           </Alert>
+        </div>
+      )}
+
+      {item.restored && (
+        <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-1.5 text-xs text-muted-foreground">
+          <History className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">
+            {t("editor.restored", { time: stamp(new Date(item.restored.at)) })}
+          </span>
+          <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={item.discard}>
+            {t("editor.restoredDiscard")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6"
+            aria-label={t("editor.restoredKeep")}
+            onClick={item.keepRestored}
+          >
+            <X className="size-3.5" />
+          </Button>
         </div>
       )}
 
@@ -614,13 +682,13 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
         }}
       />
 
-      {item.conflict && (
+      {item.conflict && resolving && (
         <ConflictDialog
           conflict={item.conflict}
           ours={draft}
           onTakeTheirs={item.takeTheirs}
           onKeepOurs={item.keepOurs}
-          onCancel={() => item.edit({})}
+          onCancel={() => setResolving(false)}
         />
       )}
 
@@ -657,14 +725,18 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
       />
 
       <ConfirmDialog
-        open={guard.leaving}
+        open={guard.leaving && (!item.autosaves || leaveSaveFailed)}
         onOpenChange={(open) => !open && guard.cancel()}
         title={t("editor.discardTitle")}
         desc={t("editor.discardNote")}
         cancelBtnText={t("conflict.keepEditing")}
         confirmText={t("editor.discard")}
         destructive
-        handleConfirm={guard.discard}
+        handleConfirm={() => {
+          // Thrown away on purpose: the copy in this browser goes too.
+          item.forgetUnsaved();
+          guard.discard();
+        }}
       />
     </div>
   );

@@ -14,7 +14,7 @@ is what `kite init` asks in a terminal. Your name is the site's author.
 |---|---|
 | **Dashboard** | what is published, what is still a draft, what is uncommitted, and a publishing trend by month |
 | **Content** | posts and pages, filtered and searched through the index rather than the filesystem |
-| **Editor** | A visual editor that reads and writes Markdown, with the source one click away, a live preview, front matter as a form, terms, slug, word count, and files dropped straight into the bundle |
+| **Editor** | A visual editor that reads and writes Markdown, with the source one click away, a live preview, front matter as a form, terms, slug, word count, and files dropped straight into the bundle; a draft saves itself as you write, and what is not saved yet stays in the browser until it is |
 | **Taxonomies** | tags and categories as they actually exist across the content |
 | **Theme** | every theme the project has, each previewed on the whole site before it is used; a theme installed from its zip archive; the active theme's settings edited beside a live preview |
 | **Deploy** | the site exported as a zip to upload anywhere, or how far a push to GitHub Pages has got |
