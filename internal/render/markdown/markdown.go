@@ -348,7 +348,12 @@ func literal(n ast.Node, src []byte, withoutImages bool) string {
 				b.WriteByte(' ')
 			}
 		case *ast.String:
-			b.Write(t.Value)
+			if t.IsCode() {
+				// A typographer's quotes and dashes, written as entities.
+				b.WriteString(stdhtml.UnescapeString(string(t.Value)))
+			} else {
+				b.Write(t.Value)
+			}
 		case *ast.AutoLink:
 			b.Write(t.URL(src))
 		}

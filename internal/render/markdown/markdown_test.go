@@ -188,6 +188,23 @@ func TestPlainTextReadsEscapesAndReferences(t *testing.T) {
 	}
 }
 
+// A typographer writes its quotes and dashes as entities, which a reader of
+// the excerpt, a heading or the text sees as the characters they stand for.
+// Read as text, their names were counted as words.
+func TestTypographerKeepsPlainText(t *testing.T) {
+	src := "## Don't panic\n\nIt's here -- \"quoted\" ...\n"
+	doc := render(t, src, func(o *markdown.Options) { o.Typographer = true })
+	if want := "It\u2019s here \u2013 \u201cquoted\u201d \u2026"; doc.Excerpt != want {
+		t.Errorf("Excerpt = %q, want %q", doc.Excerpt, want)
+	}
+	if want := "Don\u2019t panic"; len(doc.TOC) != 1 || doc.TOC[0].Text != want {
+		t.Errorf("TOC = %+v, want one heading %q", doc.TOC, want)
+	}
+	if plain := render(t, src, nil); doc.WordCount != plain.WordCount {
+		t.Errorf("WordCount = %d, want %d as without the typographer", doc.WordCount, plain.WordCount)
+	}
+}
+
 // A Chinese paragraph has no spaces, so counting fields called a whole article
 // a handful of words and every post a one minute read.
 func TestWordCountCountsCJKCharacters(t *testing.T) {
