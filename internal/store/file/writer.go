@@ -45,16 +45,24 @@ type Writer struct {
 	codec *Codec
 	now   func() time.Time
 
-	mu sync.Mutex
+	// mu is shared by every writer of the same project, so that a revision
+	// check and the write after it never interleave with another request's.
+	mu *sync.Mutex
 }
+
+// projectLocks holds one lock per project directory. A server builds a
+// writer for each request, so a lock of the writer's own would not hold.
+var projectLocks sync.Map
 
 // NewWriter returns a writer rooted at a project directory.
 func NewWriter(root string, types *content.Registry) *Writer {
+	lock, _ := projectLocks.LoadOrStore(filepath.Clean(root), new(sync.Mutex))
 	return &Writer{
 		root:  root,
 		types: types,
 		codec: NewCodec(types),
 		now:   time.Now,
+		mu:    lock.(*sync.Mutex),
 	}
 }
 

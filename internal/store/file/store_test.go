@@ -256,6 +256,50 @@ func TestRevisionConflict(t *testing.T) {
 	}
 }
 
+// Two writers of one project, as two requests of a server make, cannot both
+// pass the same revision check: one edit wins and the other is refused.
+func TestConcurrentEditsOfOneRevisionConflict(t *testing.T) {
+	root, types, _ := newTestProject(t)
+	writeFile(t, root, "content/posts/a/index.md", "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZABC\ntitle: A\nslug: a\n---\nbody\n")
+
+	scan, err := NewScanner(root, types).Scan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded := scan.Entries[0].Item
+	revision := scan.Entries[0].Hash
+
+	const writers = 8
+	errs := make(chan error, writers)
+	start := make(chan struct{})
+	for i := range writers {
+		go func() {
+			item := *loaded
+			item.Title = fmt.Sprintf("Edit %d", i)
+			<-start
+			_, err := NewWriter(root, types).Apply(t.Context(), content.ChangeSet{Ops: []content.Op{
+				content.PutContent{Content: &item, IfRevision: revision},
+			}})
+			errs <- err
+		}()
+	}
+	close(start)
+
+	won := 0
+	for range writers {
+		err := <-errs
+		switch {
+		case err == nil:
+			won++
+		case !errors.Is(err, content.ErrConflict):
+			t.Errorf("a losing edit failed with %v, want a conflict", err)
+		}
+	}
+	if won != 1 {
+		t.Fatalf("%d edits of one revision were written, want exactly 1", won)
+	}
+}
+
 // A set that conflicts on a later item must not have written the earlier
 // ones: renaming a term across many items is all or nothing.
 func TestASetThatConflictsAnywhereWritesNothing(t *testing.T) {
