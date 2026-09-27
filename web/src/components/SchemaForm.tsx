@@ -1,31 +1,14 @@
 import { useRef, useState, type ReactNode } from "react";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
-  ImagePlus,
-  ImageUp,
-  MoreHorizontal,
-  Plus,
-  RotateCcw,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ChevronDown, ImagePlus, ImageUp, RotateCcw, X } from "lucide-react";
 
 import type { Field } from "@/api/client";
 import { locales, useI18n, type Key } from "@/i18n";
 import { resolveLink } from "@/lib/links";
-import { defaultOf, problemOf, sameValue, valueFields } from "@/lib/schema";
+import { defaultOf, problemOf, sameValue } from "@/lib/schema";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -43,6 +26,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CodeField } from "@/components/CodeField";
 import { ColorField } from "@/components/ColorField";
 import { DateTimePicker } from "@/components/DateTimePicker";
+import { RepeatField } from "@/components/RepeatField";
 
 /** What an image field needs to take a file: somewhere to put it. */
 export interface Uploads {
@@ -209,7 +193,7 @@ function FieldRow({
   // A switch reads better beside its label than under it.
   if (field.type === "boolean") {
     return (
-      <div className={cn("flex items-center justify-between gap-4", !plain && "rounded-lg border p-4")}>
+      <div data-field={field.key} className={cn("flex items-center justify-between gap-4", !plain && "rounded-lg border p-4")}>
         <div className="space-y-1">
           <Label htmlFor={id}>{label}</Label>
           {field.help && <Help>{field.help}</Help>}
@@ -225,7 +209,7 @@ function FieldRow({
   const chosen = Array.isArray(value) ? (value as string[]) : [];
 
   return (
-    <div className="grid gap-2">
+    <div data-field={field.key} className="grid gap-2">
       <div className="flex min-h-5 items-center justify-between gap-2">
         <Label htmlFor={id}>
           {label}
@@ -338,188 +322,6 @@ function FieldRow({
       {field.help && <Help>{field.help}</Help>}
       {problem && field.type !== "repeat" && field.type !== "group" && <Problem>{problem}</Problem>}
     </div>
-  );
-}
-
-// Entries whose fields fit on one line are edited as rows of a table, with
-// the labels once above them rather than once per entry.
-const inline = new Set(["string", "url", "number", "select", "date"]);
-
-/** RepeatField edits a list of entries, each a small form of its own. */
-function RepeatField({
-  id,
-  field,
-  value,
-  onChange,
-  uploads,
-}: {
-  id: string;
-  field: Field;
-  value: unknown;
-  onChange: (value: unknown) => void;
-  uploads?: Uploads;
-}) {
-  const { t } = useI18n();
-  const entries = Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
-  const children = valueFields(field.fields);
-  const rows = children.length > 0 && children.length <= 3 && children.every((child) => inline.has(child.type));
-
-  const blank = () =>
-    Object.fromEntries(
-      children.map((child) => [child.key, defaultOf(child)] as const).filter(([, v]) => v !== undefined),
-    );
-  const move = (from: number, to: number) => {
-    const next = [...entries];
-    const [entry] = next.splice(from, 1);
-    next.splice(to, 0, entry);
-    onChange(next);
-  };
-
-  const actions = (i: number) => (
-    <div className="flex shrink-0 items-center">
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" aria-label={t("form.entryMenu")}>
-            <MoreHorizontal />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem disabled={i === 0} onSelect={() => move(i, i - 1)}>
-            <ArrowUp />
-            {t("form.moveUp")}
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled={i === entries.length - 1} onSelect={() => move(i, i + 1)}>
-            <ArrowDown />
-            {t("form.moveDown")}
-          </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onSelect={() => onChange(entries.filter((_, j) => j !== i))}>
-            <Trash2 />
-            {t("form.removeEntry")}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-
-  return (
-    <div className="grid gap-2" id={id}>
-      {entries.length === 0 ? (
-        <p className="rounded-md border border-dashed px-3 py-3 text-center text-sm text-muted-foreground">
-          {t("form.noEntries")}
-        </p>
-      ) : rows ? (
-        <div className="grid gap-1.5">
-          <div className="flex gap-2 pe-10 text-xs text-muted-foreground">
-            {children.map((child) => (
-              <span key={child.key} className="min-w-0 flex-1 truncate">
-                {child.label || child.key}
-              </span>
-            ))}
-          </div>
-          {entries.map((entry, i) => {
-            const problem = children
-              .map((child) => problemOf(child, entry[child.key], t))
-              .find((each) => each !== null);
-            return (
-              <div key={i} className="grid gap-1">
-                <div className="flex items-center gap-2">
-                  {children.map((child) => (
-                    <Cell
-                      key={child.key}
-                      id={`${id}-${i}-${child.key}`}
-                      field={child}
-                      value={entry[child.key]}
-                      onChange={(next) => onChange(replace(entries, i, { ...entry, [child.key]: next }))}
-                    />
-                  ))}
-                  {actions(i)}
-                </div>
-                {problem && <Problem>{problem}</Problem>}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        entries.map((entry, i) => (
-          <div key={i} className="flex items-start gap-2 rounded-lg border p-3">
-            <span className="mt-1 w-4 shrink-0 text-center text-xs text-muted-foreground tabular-nums">{i + 1}</span>
-            <div className="min-w-0 flex-1">
-              <SchemaForm
-                fields={field.fields ?? []}
-                values={entry}
-                onChange={(next) => onChange(replace(entries, i, next))}
-                uploads={uploads}
-                idPrefix={`${id}-${i}-`}
-              />
-            </div>
-            {actions(i)}
-          </div>
-        ))
-      )}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="justify-self-start"
-        onClick={() => onChange([...entries, blank()])}
-      >
-        <Plus />
-        {t("form.addEntry")}
-      </Button>
-    </div>
-  );
-}
-
-/** Cell is one field of an entry drawn as a row, labelled by its column. */
-function Cell({
-  id,
-  field,
-  value,
-  onChange,
-}: {
-  id: string;
-  field: Field;
-  value: unknown;
-  onChange: (value: unknown) => void;
-}) {
-  const { t } = useI18n();
-  const label = field.label || field.key;
-  if (field.type === "select") {
-    return (
-      <Select value={asString(value)} onValueChange={(next) => next && onChange(next)}>
-        <SelectTrigger id={id} aria-label={label} className="min-w-0 flex-1">
-          <SelectValue placeholder={field.placeholder ?? t("form.choose")} />
-        </SelectTrigger>
-        <SelectContent>
-          {field.options?.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label || option.value}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
-  }
-  return (
-    <Input
-      id={id}
-      aria-label={label}
-      className="min-w-0 flex-1"
-      type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-      spellCheck={field.type === "url" ? false : undefined}
-      value={asString(value)}
-      placeholder={field.placeholder}
-      aria-invalid={problemOf(field, value, t) !== null}
-      onChange={(event) =>
-        onChange(
-          field.type === "number"
-            ? event.target.value === ""
-              ? undefined
-              : Number(event.target.value)
-            : event.target.value,
-        )
-      }
-    />
   );
 }
 
@@ -678,10 +480,6 @@ function fromLocal(value: string): string | undefined {
 function asString(value: unknown): string {
   if (value === undefined || value === null) return "";
   return String(value);
-}
-
-function replace<T>(list: T[], at: number, item: T): T[] {
-  return list.map((each, i) => (i === at ? item : each));
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
