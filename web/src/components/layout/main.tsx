@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { StudioFooter } from './studio-footer'
 
 type MainProps = React.HTMLAttributes<HTMLElement> & {
   fixed?: boolean
@@ -6,7 +7,9 @@ type MainProps = React.HTMLAttributes<HTMLElement> & {
   ref?: React.Ref<HTMLElement>
 }
 
-export function Main({ fixed, className, fluid, ...props }: MainProps) {
+// Kite: every page closes with the studio's footer, at the foot of the
+// window when the page is short, and under what scrolls when it is fixed.
+export function Main({ fixed, className, fluid, children, ...props }: MainProps) {
   return (
     <main
       data-layout={fixed ? 'fixed' : 'auto'}
@@ -22,6 +25,9 @@ export function Main({ fixed, className, fluid, ...props }: MainProps) {
         className
       )}
       {...props}
-    />
+    >
+      {children}
+      <StudioFooter className={fixed ? 'mt-4 shrink-0' : 'mt-auto'} />
+    </main>
   )
 }

@@ -14,7 +14,9 @@ type ContentSectionProps = {
 // its title, since the app sidebar is the menu of the sections.
 export function ContentSection({ title, desc, children, wide }: ContentSectionProps) {
   return (
-    <div className='flex flex-1 flex-col overflow-hidden'>
+    // Positioned, so the scroll area's fade ends at the column's foot, above
+    // the studio's footer rather than over it.
+    <div className='relative flex flex-1 flex-col overflow-hidden'>
       <div className='flex-none space-y-0.5'>
         <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>{title}</h1>
         <p className='text-muted-foreground'>{desc}</p>

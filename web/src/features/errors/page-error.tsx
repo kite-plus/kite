@@ -12,7 +12,7 @@ export function PageError(props: ErrorComponentProps) {
   return (
     <>
       <AppHeader />
-      <Main className='flex flex-1'>
+      <Main className='flex flex-1 flex-col'>
         <GeneralError {...props} className='h-auto flex-1' />
       </Main>
     </>
