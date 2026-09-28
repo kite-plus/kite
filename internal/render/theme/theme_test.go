@@ -143,17 +143,20 @@ func TestSitePartialOverridesThemePartial(t *testing.T) {
 // {{ ns.Method }} form has to keep working.
 func TestNamespacedFunctions(t *testing.T) {
 	cases := map[string]string{
-		`{{ str.Upper "abc" }}`:               "ABC",
-		`{{ str.Title "hello world" }}`:       "Hello World",
-		`{{ str.Truncate 5 "abcdefgh" }}`:     "abcde…",
-		`{{ math.Add 2 3 }}`:                  "5",
-		`{{ url.Anchorize "Web Dev!" }}`:      "web-dev",
-		`{{ url.Anchorize "近况，与工作" }}`:        "近况与工作",
-		`{{ time.Format "2006" .When }}`:      "2026",
-		`{{ time.Minutes .Dur }}`:             "3",
-		`{{ collections.Len (slice 1 2 3) }}`: "3",
-		`{{ default "fallback" "" }}`:         "fallback",
-		`{{ (dict "k" "v").k }}`:              "v",
+		`{{ str.Upper "abc" }}`:                                      "ABC",
+		`{{ str.Title "hello world" }}`:                              "Hello World",
+		`{{ str.Truncate 5 "abcdefgh" }}`:                            "abcde…",
+		`{{ math.Add 2 3 }}`:                                         "5",
+		`{{ url.Anchorize "Web Dev!" }}`:                             "web-dev",
+		`{{ url.Anchorize "近况，与工作" }}`:                               "近况与工作",
+		`{{ time.Format "2006" .When }}`:                             "2026",
+		`{{ time.Minutes .Dur }}`:                                    "3",
+		`{{ time.Format "Jan 2" (time.AsTime "2026-03-04") }}`:       "Mar 4",
+		`{{ time.Format "15:04" (time.AsTime "2026-03-04 09:30") }}`: "09:30",
+		`{{ time.Year (time.AsTime .When) }}`:                        "2026",
+		`{{ collections.Len (slice 1 2 3) }}`:                        "3",
+		`{{ default "fallback" "" }}`:                                "fallback",
+		`{{ (dict "k" "v").k }}`:                                     "v",
 	}
 	for src, want := range cases {
 		t.Run(src, func(t *testing.T) {

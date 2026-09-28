@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/index/metajson"
 )
 
 // Reader queries the read model.
@@ -147,7 +148,7 @@ func (r *Reader) Query(ctx context.Context, q content.Query) (content.Page[conte
 		if err := json.Unmarshal([]byte(imagesJSON), &s.Images); err != nil {
 			return page, fmt.Errorf("reader: decode images of %s: %w", s.ID, err)
 		}
-		if err := json.Unmarshal([]byte(metaJSON), &s.Meta); err != nil {
+		if s.Meta, err = metajson.Unmarshal([]byte(metaJSON)); err != nil {
 			return page, fmt.Errorf("reader: decode meta of %s: %w", s.ID, err)
 		}
 		// Only a JSON true pins an item, which is what Summarize reads too.
@@ -263,7 +264,7 @@ func scanContent(row scanner) (*content.Content, error) {
 	item.PublishedAt = fromNullUnix(publishedAt)
 	item.DeletedAt = fromNullUnix(deleted)
 
-	if err := json.Unmarshal([]byte(metaJSON), &item.Meta); err != nil {
+	if item.Meta, err = metajson.Unmarshal([]byte(metaJSON)); err != nil {
 		return nil, fmt.Errorf("reader: decode meta of %s: %w", item.ID, err)
 	}
 	if err := json.Unmarshal([]byte(aliasesJSON), &item.Aliases); err != nil {

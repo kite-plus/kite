@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/index/metajson"
 	"github.com/kite-plus/kite/internal/store/file"
 )
 
@@ -282,9 +283,9 @@ func (s *statements) close() {
 func upsert(ctx context.Context, s *statements, e *file.Entry, nowNS int64) error {
 	item := e.Item
 
-	meta, err := json.Marshal(orEmptyMap(item.Meta))
+	meta, err := metajson.Marshal(item.Meta)
 	if err != nil {
-		return err
+		return fmt.Errorf("index: %s: %w", e.Path, err)
 	}
 	aliases, err := json.Marshal(orEmptySlice(item.Aliases))
 	if err != nil {
@@ -355,13 +356,6 @@ func unixPtr(t *time.Time) any {
 		return nil
 	}
 	return t.Unix()
-}
-
-func orEmptyMap(m map[string]any) map[string]any {
-	if m == nil {
-		return map[string]any{}
-	}
-	return m
 }
 
 func orEmptySlice(s []string) []string {

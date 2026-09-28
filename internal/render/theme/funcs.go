@@ -318,6 +318,32 @@ func (timeNS) Parse(layout, value string) (time.Time, error) {
 	return time.Parse(layout, value)
 }
 
+// dateLayouts are the ways front matter writes a date as text, as Kite reads
+// the dates it knows.
+var dateLayouts = []string{
+	time.RFC3339Nano,
+	"2006-01-02T15:04:05",
+	"2006-01-02 15:04:05",
+	"2006-01-02 15:04",
+	"2006-01-02",
+}
+
+// AsTime reads a time, or a date written as text in any of the layouts front
+// matter uses, so a theme need not know which layout a value was written in.
+func (timeNS) AsTime(v any) (time.Time, error) {
+	switch x := v.(type) {
+	case time.Time:
+		return x, nil
+	case string:
+		for _, layout := range dateLayouts {
+			if t, err := time.Parse(layout, strings.TrimSpace(x)); err == nil {
+				return t, nil
+			}
+		}
+	}
+	return time.Time{}, fmt.Errorf("time.AsTime: %v is not a date", v)
+}
+
 // Links is what the url namespace asks of the site it renders, which is its
 // URL resolver.
 type Links interface {

@@ -420,6 +420,8 @@ collections.Apply  collections.Seq
 time.Format  time.Parse  time.Since  time.Unix  time.Duration  time.AsTime
 ```
 
+front matter 里的值到模板里仍是原来的类型，在单页和列表里一样：日期（无论写在哪一层，YAML 和 TOML 都一样）是 `time.Time`，整数是 `int`，小数是 `float64`。`time.AsTime` 把时间原样返回，把用 front matter 常见写法写成文字的日期（`2026-03-04`、`2026-03-04 09:30`、RFC 3339）读成时间，其余的值报错。
+
 > **`time.Now` 不存在。** 模板获取当前时间的唯一途径是 `.Site.BuildTime`。
 > 这不是疏漏，是[构建纯度](architecture.md#142-现在必须做对的四件事回填--重写)的强制执行点——`time.Now()` 是一个隐藏输入，会永久毒化增量构建的可缓存性。
 

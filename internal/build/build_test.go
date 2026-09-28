@@ -1179,3 +1179,62 @@ func TestTheFeedIsAlsoWrittenToItsAliases(t *testing.T) {
 		t.Error("the sitemap lists a feed")
 	}
 }
+
+// A date in front matter reaches a template as a time and a count as an int,
+// on the item's own page and in a list alike, in YAML and in TOML, so a theme
+// formats a date and compares a count without parsing text.
+func TestFrontMatterKeepsItsTypesInTemplates(t *testing.T) {
+	f := newFixture(t, 0)
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const types = `{{ printf "%T %T %T %T" .Params.day (index .Params.events 0).at .Params.count .Params.rating }}`
+	site := fstest.MapFS{
+		"post/single.html": {Data: []byte(`{{ define "main" }}<p id="types">{{ with .Page }}` + types + `{{ end }}</p>{{ end }}`)},
+		"post/list.html":   {Data: []byte(`{{ define "main" }}{{ range .Pages }}<p class="types">` + types + `</p>{{ end }}{{ end }}`)},
+	}
+	f.engine = theme.NewEngine(theme.Options{
+		Sources: []theme.Source{{Name: "site", FS: site}, {Name: "default", FS: th.Layouts}},
+		Links:   f.resolve,
+	})
+	f.add(t, "content/posts/yaml/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZYML
+title: In YAML
+status: published
+published_at: 2026-02-01T00:00:00Z
+day: 2026-03-04
+events:
+  - at: 2026-03-05 09:30:00
+count: 3
+rating: 4.0
+---
+Body.
+`)
+	f.add(t, "content/posts/toml/index.md", `+++
+id = "01J8KQ2P3R4S5T6V7W8X9YZTML"
+title = "In TOML"
+status = "published"
+published_at = 2026-02-02T00:00:00Z
+day = 2026-03-04
+events = [{at = 2026-03-05T09:30:00}]
+count = 3
+rating = 4.0
++++
+Body.
+`)
+	f.run(t, f.out, nil)
+
+	printed := regexp.MustCompile(`types">([^<]*)<`)
+	for page, n := range map[string]int{"posts/yaml/index.html": 1, "posts/toml/index.html": 1, "posts/index.html": 2} {
+		found := printed.FindAllStringSubmatch(readFile(t, f.out, page), -1)
+		if len(found) != n {
+			t.Errorf("%s: %d items printed their types, want %d", page, len(found), n)
+		}
+		for _, m := range found {
+			if m[1] != "time.Time time.Time int float64" {
+				t.Errorf("%s: types are %q", page, m[1])
+			}
+		}
+	}
+}
