@@ -55,19 +55,26 @@ func LocatorFor(t *content.Type, key string) content.Locator {
 // SourcePath returns the markdown file inside a locator, relative to the
 // project root and slash separated.
 func SourcePath(t *content.Type, loc content.Locator) string {
-	if t.Layout == content.LayoutBundle {
+	if isBundle(t, loc) {
 		return path.Join(string(loc), BundleIndex)
 	}
 	return string(loc)
 }
 
 // MediaDir returns the directory an item's media belongs in, or "" when the
-// layout has no bundle to hold it.
+// item is a single file with no bundle to hold it.
 func MediaDir(t *content.Type, loc content.Locator) string {
-	if t.Layout == content.LayoutBundle {
+	if isBundle(t, loc) {
 		return string(loc)
 	}
 	return ""
+}
+
+// isBundle reports whether an item is kept as a bundle. A type that keeps
+// its items in bundles may still hold single files, as Hugo sites write most
+// posts, and a single file's locator is the file itself.
+func isBundle(t *content.Type, loc content.Locator) bool {
+	return t.Layout == content.LayoutBundle && !IsMarkdown(string(loc))
 }
 
 // abs joins a slash separated project-relative path onto the root.

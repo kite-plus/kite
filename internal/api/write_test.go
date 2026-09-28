@@ -637,6 +637,26 @@ func TestDroppedFilesLandInTheBundleAndReportALinkTheMarkdownCanUse(t *testing.T
 	}
 }
 
+// A page, or a post kept as a single file, has no bundle to hold a file, so a
+// picture dropped on it goes among the site's own files and is linked from the
+// site's root, rather than refused.
+func TestAFileDroppedOnASingleFileItemGoesAmongTheSitesOwn(t *testing.T) {
+	root := newProject(t, 1)
+	h, _ := newWritableServer(t, root)
+
+	rec := upload(t, h, "01J8KQ2P3R4S5T6V7W8X9YZ900", "portrait.png", []byte("pretend png"))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201\n%s", rec.Code, rec.Body.String())
+	}
+	media := decode[api.Media](t, rec)
+	if media.Path != "static/uploads/portrait.png" || media.Link != "/uploads/portrait.png" {
+		t.Errorf("stored at %q and linked as %q, want the site's uploads", media.Path, media.Link)
+	}
+	if _, err := os.Stat(filepath.Join(root, "static", "uploads", "portrait.png")); err != nil {
+		t.Errorf("nothing was written: %v", err)
+	}
+}
+
 // Two screenshots are both called screenshot.png. Losing one of them is not a
 // reasonable reading of "put this here".
 func TestASecondFileOfTheSameNameDoesNotReplaceTheFirst(t *testing.T) {

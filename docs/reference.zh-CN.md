@@ -379,6 +379,11 @@ Hugo 站点的内容原地就能打开。在站点目录里运行 `kite init .`�
 kite doctor --fix-ids
 ```
 
+文章可以是单个文件 `content/posts/hello.md`，Hugo 站点大多这样写；也可以是 bundle
+`content/posts/hello/index.md`，图片放在旁边，后台新建的文章就是这种。两种不论放在
+`content/posts/` 的哪一层，地址都是 `/posts/<slug>/`；Hugo 的 `_index.md` 不读。拖到
+单文件文章里的图片存进站点自己的 `static/uploads/`。
+
 Hugo 写的 front matter 键，Kite 当作自己的来读：`date` 是发布时间，`lastmod` 是最后
 修改时间，`draft: true` 是草稿；没有 `description` 时，`summary` 就是摘要，列表里显示
 的是你写的摘要，而不是正文的开头。保存一篇内容时，Kite 会在旁边写上自己的键，并用

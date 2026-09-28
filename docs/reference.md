@@ -434,6 +434,13 @@ item the id Kite keeps it by, which Hugo does not write:
 kite doctor --fix-ids
 ```
 
+A post can be a single file, `content/posts/hello.md`, as Hugo sites mostly
+write them, or a bundle, `content/posts/hello/index.md` with its pictures
+beside it, which is what the studio creates. Either is published at
+`/posts/<slug>/` wherever in `content/posts/` it sits, and Hugo's `_index.md`
+is left out. A picture dropped on a post kept as a single file goes among the
+site's own files, in `static/uploads/`.
+
 Kite reads the front matter keys Hugo writes as its own: `date` is when an
 item was published, `lastmod` when it last changed, `draft: true` makes it a
 draft, and `summary` is its description when it has none, so a list shows the

@@ -559,6 +559,78 @@ legacy body
 	}
 }
 
+// Hugo writes most posts as single files, content/posts/hello.md, and a site
+// moved from it must not lose them. Markdown inside a bundle is still one of
+// the bundle's files, and _index.md, which describes a Hugo list, no item.
+func TestPostsWrittenAsSingleFilesAreItems(t *testing.T) {
+	root, types, w := newTestProject(t)
+	writeFile(t, root, "content/posts/flat.md", "---\ntitle: Flat\n---\nFlat body.\n")
+	writeFile(t, root, "content/posts/2024/older.md", "---\ntitle: Older\n---\nOlder body.\n")
+	writeFile(t, root, "content/posts/_index.md", "---\ntitle: Posts\n---\nAll of them.\n")
+	writeFile(t, root, "content/posts/trip/index.md", "---\ntitle: Trip\n---\nTrip body.\n")
+	writeFile(t, root, "content/posts/trip/notes.md", "notes kept beside the trip\n")
+	writeFile(t, root, "content/posts/trip/days/day-1.md", "a day of the trip\n")
+
+	scan, err := NewScanner(root, types).Scan()
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	got := map[string]content.Locator{}
+	for _, e := range scan.Entries {
+		got[e.Item.Slug] = e.Locator
+	}
+	want := map[string]content.Locator{
+		"flat":  "content/posts/flat.md",
+		"older": "content/posts/2024/older.md",
+		"trip":  "content/posts/trip",
+	}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("items = %v, want %v", got, want)
+	}
+
+	var flat *content.Content
+	for _, e := range scan.Entries {
+		if e.Item.Slug == "flat" {
+			flat = e.Item
+		}
+	}
+	flat.Title = "Still Flat"
+	res, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{
+		content.PutContent{Content: flat, IfRevision: flat.Revision},
+	}})
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if !slices.Equal(res.Written, []string{"content/posts/flat.md"}) {
+		t.Errorf("Written = %v, want the file itself", res.Written)
+	}
+	if got := readFile(t, root, "content/posts/flat.md"); !strings.Contains(got, "title: Still Flat") {
+		t.Errorf("the file was not saved in place:\n%s", got)
+	}
+
+	// A single file has no bundle, so its files go among the site's own.
+	res, err = w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{
+		content.PutMedia{Owner: flat.ID, Name: "shot.png", Data: []byte("png")},
+	}})
+	if err != nil {
+		t.Fatalf("PutMedia: %v", err)
+	}
+	if !slices.Equal(res.Written, []string{"static/uploads/shot.png"}) {
+		t.Errorf("Written = %v, want the site's uploads", res.Written)
+	}
+
+	res, err = w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.DeleteContent{ID: flat.ID}}})
+	if err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if !slices.Equal(res.Removed, []string{"content/posts/flat.md"}) {
+		t.Errorf("Removed = %v", res.Removed)
+	}
+	if _, err := os.Stat(filepath.Join(root, "content", "posts", "2024", "older.md")); err != nil {
+		t.Error("deleting one single file took another with it")
+	}
+}
+
 // Hugo writes a hand-written summary as summary. A site moved from Hugo must
 // not lose it to the opening of the body, and a save leaves one key, not two
 // that could disagree.

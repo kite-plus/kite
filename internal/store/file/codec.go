@@ -342,7 +342,7 @@ func defaultSlug(t *content.Type, loc content.Locator) string {
 	if i := strings.LastIndex(name, "/"); i >= 0 {
 		name = name[i+1:]
 	}
-	if t.Layout == content.LayoutSingleFile {
+	if !isBundle(t, loc) {
 		name = strings.TrimSuffix(name, markdownExt)
 	}
 	return name

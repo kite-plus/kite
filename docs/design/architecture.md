@@ -472,9 +472,10 @@ my-blog/
 ├── kite.lock                  # 版本锁（生成，入 Git，M6）
 ├── content/
 │   ├── posts/
-│   │   └── hello-world/       # Page Bundle：内容与其资源同目录
-│   │       ├── index.md
-│   │       └── cover.webp
+│   │   ├── hello-world/       # Page Bundle：内容与其资源同目录
+│   │   │   ├── index.md
+│   │   │   └── cover.webp
+│   │   └── notes.md           # 单文件也是一篇文章，Hugo 大多这样写；新建的文章是 bundle
 │   └── pages/
 │       └── about.md           # 单文件布局同样合法
 ├── static/                    # 原样拷贝到输出根

@@ -112,6 +112,7 @@ func (s *Scanner) Walk(fn func(Stat) error) error {
 }
 
 func (s *Scanner) walkType(t *content.Type, dir string, fn func(Stat) error) error {
+	bundled := s.bundledDirs(dir)
 	return filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -131,14 +132,18 @@ func (s *Scanner) walkType(t *content.Type, dir string, fn func(Stat) error) err
 			return err
 		}
 
-		// In a bundle layout only index.md carries the item; other markdown
-		// files inside the bundle are just resources.
+		// In a bundle layout index.md carries a bundle's item, and any other
+		// markdown inside a bundle is one of its files. Outside one, a file
+		// is an item of its own, as Hugo writes most posts. Hugo's _index.md
+		// describes a list, which Kite does not take from content.
 		loc := content.Locator(relPath)
 		if t.Layout == content.LayoutBundle {
-			if d.Name() != BundleIndex {
+			switch {
+			case d.Name() == BundleIndex:
+				loc = content.Locator(path.Dir(relPath))
+			case strings.EqualFold(d.Name(), hugoListIndex), bundled(filepath.Dir(p)):
 				return nil
 			}
-			loc = content.Locator(path.Dir(relPath))
 		}
 
 		info, err := d.Info()
@@ -153,6 +158,30 @@ func (s *Scanner) walkType(t *content.Type, dir string, fn func(Stat) error) err
 			ModTime: info.ModTime().UnixNano(),
 		})
 	})
+}
+
+// hugoListIndex is the file Hugo keeps a list page's own content in.
+const hugoListIndex = "_index.md"
+
+// bundledDirs reports whether a directory under root is a bundle or inside
+// one, remembering each directory it has looked at.
+func (s *Scanner) bundledDirs(root string) func(dir string) bool {
+	known := map[string]bool{}
+	var bundled func(dir string) bool
+	bundled = func(dir string) bool {
+		if v, ok := known[dir]; ok {
+			return v
+		}
+		v := false
+		if _, err := os.Stat(filepath.Join(dir, BundleIndex)); err == nil {
+			v = true
+		} else if parent := filepath.Dir(dir); dir != root && parent != dir {
+			v = bundled(parent)
+		}
+		known[dir] = v
+		return v
+	}
+	return bundled
 }
 
 // Load reads and decodes one source file.

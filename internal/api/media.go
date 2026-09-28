@@ -106,17 +106,18 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request, view View, owner
 		Size: len(data),
 		Type: mime.TypeByExtension(ext),
 	}
-	if owner != nil {
+	if site, ok := strings.CutPrefix(stored, "static/"); ok {
+		// static/ is published at the root of the site, so a file of the
+		// site's own, or of an item kept as a single file, is named by its
+		// path there.
+		media.Link = "/" + site
+		media.URL = view.Resolver.Rel(media.Link)
+	} else {
 		// A bundle publishes its files beside the page, so the markdown links
 		// them by name alone. That is what keeps the source readable in an
 		// editor and on GitHub.
 		media.Link = path.Base(stored)
 		media.URL = path.Join(view.Resolver.For(owner), path.Base(stored))
-	} else {
-		// static/ is published at the root of the site, so a file of the
-		// site's own is named by its path there.
-		media.Link = "/" + strings.TrimPrefix(stored, "static/")
-		media.URL = view.Resolver.Rel(media.Link)
 	}
 	writeJSON(w, http.StatusCreated, media)
 }

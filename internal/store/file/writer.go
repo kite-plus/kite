@@ -326,7 +326,7 @@ func (w *Writer) deleteContent(op content.DeleteContent, located map[content.ID]
 	}
 
 	// A bundle owns its media, so removing the item removes the directory.
-	if e.Type.Layout == content.LayoutBundle {
+	if isBundle(e.Type, e.Locator) {
 		removed, err := w.removeTree(string(e.Locator))
 		if err != nil {
 			return err
@@ -426,9 +426,10 @@ func (w *Writer) putMedia(op content.PutMedia, located map[content.ID]*Entry, re
 		if !ok {
 			return fmt.Errorf("%w: media owner %s", content.ErrNotFound, op.Owner)
 		}
-		dir = MediaDir(e.Type, e.Locator)
-		if dir == "" {
-			return fmt.Errorf("file store: content type %q stores items as single files and cannot hold media", e.Type.Kind)
+		// A single file has no bundle to keep its files beside it, so they
+		// go among the site's own.
+		if bundle := MediaDir(e.Type, e.Locator); bundle != "" {
+			dir = bundle
 		}
 	}
 	name := filepath.Base(filepath.FromSlash(op.Name))
