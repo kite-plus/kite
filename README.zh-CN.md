@@ -49,6 +49,8 @@ kite run
 
 浏览器会打开一个建站页面，填上站点名称和你的名字（它会作为文章的作者）就进入了[管理后台](http://localhost:1717/admin/)。想在终端里回答这些问题，可以改用 `kite init`。后续只需在 `blog` 目录运行 `kite run`。
 
+从其他博客程序迁移过来？Hugo 站点的内容原地就能打开；`kite import hexo ../old-blog blog` 会把 Hexo 站点的内容连同旧地址一起导入一个新站点。详见[从 Hugo 迁移](docs/reference.zh-CN.md#从-hugo-迁移)和[从 Hexo 迁移](docs/reference.zh-CN.md#从-hexo-迁移)。
+
 在 macOS 上，下载的程序第一次运行会被系统拦下，运行 `xattr -d com.apple.quarantine kite` 即可放行。每个压缩包都可以用版本附带的 `checksums.txt` 校验。
 
 ### Docker

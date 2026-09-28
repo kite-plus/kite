@@ -485,6 +485,36 @@ build:
   feedAliases: [index.xml, posts/index.xml]
 ```
 
+## Moving from Hexo
+
+A Hexo site keeps its content another way, so it is imported rather than
+opened:
+
+```bash
+kite import hexo ../old-blog blog
+```
+
+The Hexo site is read and left as it is. An empty or missing folder becomes
+a new project with the title, address, language, author and time zone the
+Hexo site's `_config.yml` gives; a Kite project gets the content added to its
+own, and a slug it already uses gets a number.
+
+- Posts and drafts become posts, each a bundle holding the files of its
+  asset folder. Pages become pages, and every other file in `source/`
+  becomes one of the site's static files. Folders whose names start with
+  `_`, which Hexo does not publish, are left out.
+- `date` and `updated` are read in the site's time zone, nested categories
+  are flattened, `published: false` makes a draft, an `excerpt` is the
+  description when there is none, and a picture a Hexo theme names, such as
+  `thumbnail` or `index_img`, is the cover when none is named.
+- Every address Hexo published a post or page at, by the site's `permalink`
+  pattern or a post's own, becomes an alias, so links to the old site keep
+  working.
+- `{% asset_img %}`, `{% asset_link %}` and `{% asset_path %}` become
+  markdown. Other Hexo tags, such as `{% note %}`, stay as written and show
+  as text; the import lists the items that hold them. `<!-- more -->` ends
+  an excerpt as it did.
+
 ## Deploying
 
 A site can be built into files and hosted anywhere, or run as a server that

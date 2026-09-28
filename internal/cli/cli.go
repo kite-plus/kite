@@ -28,6 +28,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(
 		newVersionCmd(),
 		newInitCmd(),
+		newImportCmd(),
 		newNewCmd(),
 		newDoctorCmd(),
 		newIndexCmd(),

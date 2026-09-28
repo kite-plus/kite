@@ -1,0 +1,16 @@
+# Hexo Configuration
+title: 旧博客
+subtitle: 'A subtitle'
+description: 'Notes on things'
+author: Amy
+language: zh-CN
+timezone: Asia/Shanghai
+
+url: https://example.com/blog
+root: /blog/
+permalink: :year/:month/:day/:title/
+permalink_defaults:
+
+source_dir: source
+new_post_name: :title.md
+post_asset_folder: true

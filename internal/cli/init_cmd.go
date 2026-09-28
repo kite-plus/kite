@@ -42,6 +42,9 @@ type plan struct {
 	// setup; the wizard leaves it for the settings page.
 	Description string
 
+	// Timezone is the zone dates are shown in, which only an import knows.
+	Timezone string
+
 	// Workflow writes the GitHub Pages deploy workflow.
 	Workflow bool
 	// Git runs git init, which the workflow is useless without.
@@ -280,18 +283,22 @@ func starterConfig(p plan) string {
 	if author := strings.TrimSpace(p.Author); author != "" {
 		about += "  author: " + yamlScalar(author) + "\n"
 	}
+	zone := ""
+	if tz := strings.TrimSpace(p.Timezone); tz != "" {
+		zone = "  timezone: " + yamlScalar(tz) + "\n"
+	}
 	return fmt.Sprintf(`site:
   title: %s
 %s  baseURL: %s
   language: %s
-
+%s
 content:
   store: file
   dir: content
 
 build:
   output: public
-`, yamlScalar(p.Title), about, yamlScalar(p.BaseURL), yamlScalar(p.Language))
+`, yamlScalar(p.Title), about, yamlScalar(p.BaseURL), yamlScalar(p.Language), zone)
 }
 
 // yamlScalar quotes a value the way YAML needs it quoted, if it does.

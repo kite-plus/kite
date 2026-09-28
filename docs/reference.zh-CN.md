@@ -421,6 +421,29 @@ build:
   feedAliases: [index.xml, posts/index.xml]
 ```
 
+## 从 Hexo 迁移
+
+Hexo 站点的内容组织方式不同，所以是导入，而不是原地打开：
+
+```bash
+kite import hexo ../old-blog blog
+```
+
+Hexo 站点只读不改。目标文件夹为空或不存在时，会按 Hexo 的 `_config.yml` 新建一个站点，
+标题、地址、语言、作者和时区都照搬；目标已经是 Kite 站点时，内容加进去，和已有的 slug
+重复时加上编号。
+
+- 文章和草稿都成为文章，各自是一个 bundle，放着它资源文件夹里的文件。页面成为页面，
+  `source/` 里的其他文件成为站点的静态文件。以 `_` 开头、Hexo 不发布的文件夹不导入。
+- `date` 和 `updated` 按站点的时区读取，多层分类展开成一层，`published: false` 成为
+  草稿；没有 `description` 时 `excerpt` 就是摘要；没写 `cover` 时，Hexo 主题用的图片，
+  如 `thumbnail`、`index_img`，就是封面。
+- Hexo 按站点的 `permalink` 规则（或文章自己的 `permalink`）发布过的每个地址都成为
+  别名，指向旧站点的链接继续有效。
+- `{% asset_img %}`、`{% asset_link %}` 和 `{% asset_path %}` 转成 Markdown。其他
+  Hexo 标签，如 `{% note %}`，原样保留、显示为文字，导入结束时会列出含有它们的内容。
+  `<!-- more -->` 照旧截断摘要。
+
 ## 部署
 
 站点可以构成静态文件托管在任何地方，也可以作为一个自己管自己的服务跑着。两边的内容

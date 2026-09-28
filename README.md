@@ -49,6 +49,8 @@ kite run
 
 The browser opens on a page that asks what the site is called and what your name is, which the site shows as its author; answer it and you are in the [studio](http://localhost:1717/admin/). `kite init` asks the same questions in the terminal instead. Next time, run `kite run` from the `blog` folder.
 
+Coming from another generator? A Hugo site's content opens where it is, and `kite import hexo ../old-blog blog` brings a Hexo site's into a new one, old addresses included; see [Moving from Hugo](docs/reference.md#moving-from-hugo) and [Moving from Hexo](docs/reference.md#moving-from-hexo).
+
 On macOS, a downloaded program is held back the first time it runs; `xattr -d com.apple.quarantine kite` lets it through. Every archive can be checked against `checksums.txt` in the release.
 
 ### Docker
