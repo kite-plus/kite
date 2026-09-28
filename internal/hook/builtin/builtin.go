@@ -29,9 +29,10 @@ func Register(bus *hook.Bus, opts Options) {
 			kinds = []string{"post"}
 		}
 		bus.Register(&Feed{
-			Base:  hook.Base{HookName: "feed", HookPhase: hook.PhaseBuild, HookVersion: "1"},
-			Limit: opts.FeedLimit,
-			Kinds: kinds,
+			Base:    hook.Base{HookName: "feed", HookPhase: hook.PhaseBuild, HookVersion: "1"},
+			Limit:   opts.FeedLimit,
+			Kinds:   kinds,
+			Aliases: opts.FeedAliases,
 		}, hook.DefaultPriority)
 	}
 }
@@ -46,6 +47,10 @@ type Options struct {
 	// such as "about" is part of the site but is not news, so it does not
 	// belong in a feed readers subscribe to.
 	FeedKinds []string
+
+	// FeedAliases are more files the same feed is written to, for readers
+	// subscribed at an address the site used before.
+	FeedAliases []string
 }
 
 // DefaultOptions enables the hooks every site wants.
@@ -92,11 +97,12 @@ func (s *Sitemap) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 	return b.Emit("sitemap.xml", buf.Bytes())
 }
 
-// Feed writes an RSS 2.0 feed.
+// Feed writes an RSS 2.0 feed to rss.xml and to each of its aliases.
 type Feed struct {
 	hook.Base
-	Limit int
-	Kinds []string
+	Limit   int
+	Kinds   []string
+	Aliases []string
 }
 
 type rssItem struct {
@@ -164,7 +170,12 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		return err
 	}
 	buf.WriteByte('\n')
-	return b.Emit("rss.xml", buf.Bytes())
+	for _, name := range append([]string{"rss.xml"}, f.Aliases...) {
+		if err := b.Emit(name, buf.Bytes()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // absolute makes a page's link absolute with the base URL. The link already

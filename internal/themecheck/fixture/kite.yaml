@@ -5,3 +5,4 @@ site:
   language: en
 build:
   pageSize: 3
+  feedAliases: [index.xml]

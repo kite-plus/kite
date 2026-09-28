@@ -1155,3 +1155,27 @@ Body.
 		})
 	}
 }
+
+// Feed readers do not follow a page that redirects, so a site that moved from
+// Hugo keeps its subscribers by writing the same feed where they subscribed.
+func TestTheFeedIsAlsoWrittenToItsAliases(t *testing.T) {
+	f := newFixture(t, 2)
+	f.hooks = hook.NewBus()
+	opts := builtin.DefaultOptions()
+	opts.FeedAliases = []string{"index.xml", "posts/index.xml"}
+	builtin.Register(f.hooks, opts)
+
+	_, files := f.run(t, f.out, nil)
+	feed := readFile(t, f.out, "rss.xml")
+	for _, alias := range opts.FeedAliases {
+		if !slices.Contains(files, alias) {
+			t.Fatalf("no feed at %s\ngot: %v", alias, files)
+		}
+		if got := readFile(t, f.out, alias); got != feed {
+			t.Errorf("%s differs from rss.xml", alias)
+		}
+	}
+	if strings.Contains(readFile(t, f.out, "sitemap.xml"), "index.xml") {
+		t.Error("the sitemap lists a feed")
+	}
+}

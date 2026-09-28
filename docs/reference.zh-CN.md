@@ -348,6 +348,7 @@ build:
   sitemap: true
   feed: true
   feedLimit: 20
+  feedAliases: []      # 订阅另外还写到哪些文件，例如 index.xml
 
 publish:
   publisher: git
@@ -407,6 +408,14 @@ aliases: [/2019/05/trip/, /travel/trip.html, old-trip]
 每个别名处都会发布一个页面，把浏览器立即带到这篇内容，并告诉搜索引擎该收录哪个地址。
 它是一个页面，不是托管平台的跳转规则，所以在 GitHub Pages 上也能用，`kite serve` 也
 返回同样的页面。别名和另一个页面的地址相同时，构建会停下并指出是哪个。
+
+Kite 的订阅地址是 `rss.xml`，Hugo 的是 `index.xml`，每个栏目还各有一个。订阅器不会
+跟着跳转页走，所以要留住在旧地址订阅的读者，就让同一份订阅也写到那里：
+
+```yaml
+build:
+  feedAliases: [index.xml, posts/index.xml]
+```
 
 ## 部署
 

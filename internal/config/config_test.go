@@ -112,3 +112,21 @@ func TestAPluginIsNamedByAnIdOnce(t *testing.T) {
 		t.Errorf("valid ids were refused: %v", err)
 	}
 }
+
+// A site moved from Hugo keeps its subscribers by writing the feed where they
+// subscribed too. Each such path is a feed's own file within the site.
+func TestFeedAliasesAreFilesOfTheirOwn(t *testing.T) {
+	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
+	cfg, err := load(t, site+"build:\n  feedAliases: [/index.xml, posts/index.xml, ' atom.xml ']\n")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if want := []string{"index.xml", "posts/index.xml", "atom.xml"}; !slices.Equal(cfg.Build.FeedAliases, want) {
+		t.Errorf("feedAliases = %q, want %q", cfg.Build.FeedAliases, want)
+	}
+	for _, list := range []string{"['']", "[feed/]", "[../out.xml]", "[index.html]", "[feed]", "[rss.xml]", "[sitemap.xml]", "[a.xml, /a.xml]"} {
+		if _, err := load(t, site+"build:\n  feedAliases: "+list+"\n"); err == nil || !strings.Contains(err.Error(), "build.feedAliases") {
+			t.Errorf("feedAliases: %s = %v, want a refusal naming build.feedAliases", list, err)
+		}
+	}
+}

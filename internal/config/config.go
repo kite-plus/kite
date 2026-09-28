@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -165,6 +166,11 @@ type Build struct {
 	Sitemap   bool   `yaml:"sitemap,omitempty"`
 	Feed      bool   `yaml:"feed,omitempty"`
 	FeedLimit int    `yaml:"feedLimit,omitempty"`
+
+	// FeedAliases are more files the feed is written to beside rss.xml, from
+	// the site's root, such as the index.xml a site moved from Hugo was
+	// subscribed at. Feed readers do not follow a page that redirects.
+	FeedAliases []string `yaml:"feedAliases,omitempty"`
 }
 
 // Plugins chooses the plugins a site runs and holds their settings.
@@ -211,6 +217,27 @@ type Config struct {
 	Build    Build    `yaml:"build,omitempty"`
 	Publish  Publish  `yaml:"publish,omitempty"`
 	Plugins  Plugins  `yaml:"plugins,omitempty"`
+}
+
+// validFeedAliases checks that each feed alias is a file of its own within
+// the site that no other output is written to.
+func validFeedAliases(aliases []string) error {
+	seen := make(map[string]bool, len(aliases))
+	for _, p := range aliases {
+		ext := strings.ToLower(path.Ext(p))
+		switch {
+		case p == "" || strings.HasSuffix(p, "/") || strings.Contains(p, ".."):
+			return fmt.Errorf("config: build.feedAliases: %q is not a file within the site", p)
+		case ext == "" || ext == ".html" || ext == ".htm":
+			return fmt.Errorf("config: build.feedAliases: %q is not a feed's file name (want something like index.xml)", p)
+		case p == "rss.xml" || p == "sitemap.xml":
+			return fmt.Errorf("config: build.feedAliases: Kite writes %s itself", p)
+		case seen[p]:
+			return fmt.Errorf("config: build.feedAliases lists %q twice", p)
+		}
+		seen[p] = true
+	}
+	return nil
 }
 
 // Default returns the configuration of a site that specifies nothing.
@@ -285,6 +312,9 @@ func (c *Config) normalize() {
 	if c.Build.FeedLimit <= 0 {
 		c.Build.FeedLimit = 20
 	}
+	for i, p := range c.Build.FeedAliases {
+		c.Build.FeedAliases[i] = strings.TrimLeft(strings.TrimSpace(p), "/")
+	}
 	if c.Build.Output == "" {
 		c.Build.Output = "public"
 	}
@@ -322,6 +352,9 @@ func (c *Config) Validate() error {
 	}
 	if strings.Contains(c.Build.Output, "..") {
 		return fmt.Errorf("config: build.output must stay inside the project")
+	}
+	if err := validFeedAliases(c.Build.FeedAliases); err != nil {
+		return err
 	}
 	seen := make(map[string]bool, len(c.Plugins.Enabled))
 	for _, id := range c.Plugins.Enabled {

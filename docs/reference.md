@@ -398,6 +398,7 @@ build:
   sitemap: true
   feed: true
   feedLimit: 20
+  feedAliases: []      # more files the feed is written to, such as index.xml
 
 publish:
   publisher: git
@@ -469,6 +470,15 @@ browser on to the item at once and tells search engines which address to
 keep. It is a page rather than a redirect of the host's, so it works on
 GitHub Pages too, and `kite serve` answers with the same page. An alias that
 is another page's address stops the build and says which.
+
+Kite's feed is `rss.xml`, and Hugo's was `index.xml`, with one more per
+section. Feed readers do not follow a page that redirects, so to keep the
+people subscribed at the old addresses, have the same feed written there too:
+
+```yaml
+build:
+  feedAliases: [index.xml, posts/index.xml]
+```
 
 ## Deploying
 

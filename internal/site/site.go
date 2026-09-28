@@ -136,9 +136,10 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 
 	bus := hook.NewBus()
 	builtin.Register(bus, builtin.Options{
-		Sitemap:   cfg.Build.Sitemap,
-		Feed:      cfg.Build.Feed,
-		FeedLimit: cfg.Build.FeedLimit,
+		Sitemap:     cfg.Build.Sitemap,
+		Feed:        cfg.Build.Feed,
+		FeedLimit:   cfg.Build.FeedLimit,
+		FeedAliases: cfg.Build.FeedAliases,
 	})
 	plugins, pluginProblems := loadPlugins(p.Root, cfg, resolver, bus)
 
