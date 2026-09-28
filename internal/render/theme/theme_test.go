@@ -148,6 +148,7 @@ func TestNamespacedFunctions(t *testing.T) {
 		`{{ str.Truncate 5 "abcdefgh" }}`:     "abcde…",
 		`{{ math.Add 2 3 }}`:                  "5",
 		`{{ url.Anchorize "Web Dev!" }}`:      "web-dev",
+		`{{ url.Anchorize "近况，与工作" }}`:        "近况与工作",
 		`{{ time.Format "2006" .When }}`:      "2026",
 		`{{ time.Minutes .Dur }}`:             "3",
 		`{{ collections.Len (slice 1 2 3) }}`: "3",

@@ -89,6 +89,43 @@ more
 	}
 }
 
+// A heading is reached by the anchor of its text, as on GitHub and in Hugo, so
+// an address says which section it points at in any script and does not
+// change when another heading is added before it.
+func TestHeadingsAreAnchoredByTheirText(t *testing.T) {
+	doc := render(t, `## 近况
+
+## 工作与生活，2026
+
+## Using `+"`kite build`"+`
+
+## [Kite](https://example.com) docs
+
+## snake_case and Café!
+
+## 近况
+
+## Custom {#mine}
+
+## mine
+
+## 🎉
+`, nil)
+	var got []string
+	for _, h := range doc.TOC {
+		got = append(got, h.ID)
+	}
+	want := []string{"近况", "工作与生活2026", "using-kite-build", "kite-docs", "snake_case-and-café", "近况-1", "mine", "mine-1", "heading"}
+	if !slices.Equal(got, want) {
+		t.Errorf("ids = %q\nwant  %q", got, want)
+	}
+	for _, id := range want {
+		if !strings.Contains(doc.HTML, `id="`+id+`"`) {
+			t.Errorf("the page has no heading with id %q:\n%s", id, doc.HTML)
+		}
+	}
+}
+
 func TestCollectsLinksAndImages(t *testing.T) {
 	doc := render(t, `[a](/one/) and ![img](cover.webp)
 

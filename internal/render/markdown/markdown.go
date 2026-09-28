@@ -7,6 +7,7 @@ package markdown
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	stdhtml "html"
 	"regexp"
@@ -145,9 +146,8 @@ func New(opts Options) *Renderer {
 	}
 
 	parserOpts := []parser.Option{
-		parser.WithAutoHeadingID(),
 		parser.WithAttribute(),
-		parser.WithASTTransformers(util.Prioritized(summaryEnd{}, 100)),
+		parser.WithASTTransformers(util.Prioritized(summaryEnd{}, 100), util.Prioritized(headingIDs{}, 100)),
 	}
 	if base := strings.TrimSuffix(opts.BasePath, "/"); base != "" {
 		parserOpts = append(parserOpts, parser.WithASTTransformers(util.Prioritized(siteLinks{base: base}, 1000)))
@@ -159,6 +159,55 @@ func New(opts Options) *Renderer {
 		goldmark.WithParserOptions(parserOpts...),
 		goldmark.WithRendererOptions(rendererOpts...),
 	)}
+}
+
+// Anchor turns a heading's text into the id a link reaches it by, the way
+// GitHub does: in lower case, letters and digits of any script kept along
+// with - and _, a space made a -, and other punctuation dropped. So 近况 stays
+// 近况 and says which section a link points at.
+func Anchor(text string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(text) {
+		switch {
+		case unicode.IsLetter(r), unicode.IsNumber(r), unicode.IsMark(r), r == '-', r == '_':
+			b.WriteRune(r)
+		case r == ' ':
+			b.WriteByte('-')
+		}
+	}
+	return b.String()
+}
+
+// headingIDs gives every heading that names no id of its own the Anchor of
+// its text, and a repeat -1, -2 and so on after it. A heading whose text
+// keeps nothing is called heading. Ids an author wrote are kept and never
+// given to another heading.
+type headingIDs struct{}
+
+func (headingIDs) Transform(doc *ast.Document, reader text.Reader, _ parser.Context) {
+	taken := map[string]bool{}
+	var unnamed []*ast.Heading
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		h, ok := n.(*ast.Heading)
+		if !ok || !entering {
+			return ast.WalkContinue, nil
+		}
+		if id := headingID(h); id != "" {
+			taken[id] = true
+		} else {
+			unnamed = append(unnamed, h)
+		}
+		return ast.WalkSkipChildren, nil
+	})
+	for _, h := range unnamed {
+		base := cmp.Or(Anchor(readText(h, reader.Source())), "heading")
+		id := base
+		for i := 1; taken[id]; i++ {
+			id = fmt.Sprintf("%s-%d", base, i)
+		}
+		taken[id] = true
+		h.SetAttributeString("id", []byte(id))
+	}
 }
 
 // more stands where an author ended a post's summary with <!--more-->, as

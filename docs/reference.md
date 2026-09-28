@@ -451,6 +451,10 @@ A summary can also be ended in the text, as Hugo and Hexo both allow: a line
 holding only `<!--more-->` makes the prose before it the excerpt, however
 long, and the page shows nothing where it stands.
 
+Headings are anchored by their text the way Hugo and GitHub anchor them, so
+a link into a section keeps working after the move: `## 近况` is reached at
+`#近况`, and `## Getting Started` at `#getting-started`.
+
 ## Deploying
 
 A site can be built into files and hosted anywhere, or run as a server that

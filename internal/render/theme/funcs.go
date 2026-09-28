@@ -13,6 +13,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/kite-plus/kite/internal/render/markdown"
 )
 
 // Namespaces exist because a flat function table is a permanent compatibility
@@ -373,22 +375,9 @@ func (urlNS) Join(parts ...string) string {
 	return "/" + strings.Join(cleaned, "/")
 }
 
-// Anchorize turns arbitrary text into an id usable as a fragment.
-func (urlNS) Anchorize(s string) string {
-	var b strings.Builder
-	lastDash := true
-	for _, r := range strings.ToLower(strings.TrimSpace(s)) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r > 127:
-			b.WriteRune(r)
-			lastDash = false
-		case !lastDash:
-			b.WriteByte('-')
-			lastDash = true
-		}
-	}
-	return strings.Trim(b.String(), "-")
-}
+// Anchorize turns text into an id usable as a fragment, by the rule headings
+// get theirs, so a link a theme builds from a heading's text reaches it.
+func (urlNS) Anchorize(s string) string { return markdown.Anchor(strings.TrimSpace(s)) }
 
 // mathNS holds arithmetic helpers. They take numbers of any Go type, and
 // integers stay integers: the result is an int when every argument is one,
