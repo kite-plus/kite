@@ -277,6 +277,34 @@ func TestExcerptIsTheOpeningProse(t *testing.T) {
 	}
 }
 
+// Hugo and Hexo end a summary with <!--more-->. The author has said where it
+// ends, so the excerpt is all the prose before it however long, and the page
+// does not show the divider, even as an omitted-markup comment.
+func TestADividerEndsTheExcerpt(t *testing.T) {
+	long := strings.Repeat("word ", 60)
+	for _, tc := range []struct{ name, src, want string }{
+		{"Hugo's spelling", "First words.\n\n" + long + "\n\n<!--more-->\n\nThe rest.\n", "First words. " + strings.TrimSpace(long)},
+		{"Hexo's spelling", "# Title\n\nOpening.\n<!-- more -->\nThe rest.\n", "Opening."},
+		{"any case", "Opening.\n\n<!--MORE-->\n\nThe rest.\n", "Opening."},
+		{"the first of two", "One.\n\n<!--more-->\n\nTwo.\n\n<!--more-->\n\nThree.\n", "One."},
+		{"nothing before it", "<!--more-->\n\nThe rest.\n", "The rest."},
+		{"another comment", "Opening.\n\n<!-- note -->\n\nThe rest.\n", "Opening. The rest."},
+	} {
+		for _, unsafe := range []bool{false, true} {
+			doc := render(t, tc.src, func(o *markdown.Options) { o.UnsafeHTML = unsafe })
+			if doc.Excerpt != tc.want {
+				t.Errorf("%s: Excerpt = %q, want %q", tc.name, doc.Excerpt, tc.want)
+			}
+			if strings.Contains(strings.ToLower(doc.HTML), "more") {
+				t.Errorf("%s: the page shows the divider:\n%s", tc.name, doc.HTML)
+			}
+		}
+		if got := markdown.Skim(tc.src).Excerpt; got != tc.want {
+			t.Errorf("%s: Skim = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 // A list shows what the index read of a source without rendering it, and
 // has to say what the item's own page says.
 func TestSkimReadsAsRenderDoes(t *testing.T) {

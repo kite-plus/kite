@@ -447,6 +447,10 @@ draft, and `summary` is its description when it has none, so a list shows the
 summary you wrote rather than the opening of the text. Saving an item writes
 Kite's own keys beside them, and those replace `draft` and `summary`.
 
+A summary can also be ended in the text, as Hugo and Hexo both allow: a line
+holding only `<!--more-->` makes the prose before it the excerpt, however
+long, and the page shows nothing where it stands.
+
 ## Deploying
 
 A site can be built into files and hosted anywhere, or run as a server that

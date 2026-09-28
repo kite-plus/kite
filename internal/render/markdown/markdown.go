@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	stdhtml "html"
+	"regexp"
 	"strings"
 	"sync"
 	"unicode"
@@ -143,16 +144,68 @@ func New(opts Options) *Renderer {
 		rendererOpts = append(rendererOpts, html.WithHardWraps())
 	}
 
-	parserOpts := []parser.Option{parser.WithAutoHeadingID(), parser.WithAttribute()}
+	parserOpts := []parser.Option{
+		parser.WithAutoHeadingID(),
+		parser.WithAttribute(),
+		parser.WithASTTransformers(util.Prioritized(summaryEnd{}, 100)),
+	}
 	if base := strings.TrimSuffix(opts.BasePath, "/"); base != "" {
 		parserOpts = append(parserOpts, parser.WithASTTransformers(util.Prioritized(siteLinks{base: base}, 1000)))
 	}
+	rendererOpts = append(rendererOpts, renderer.WithNodeRenderers(util.Prioritized(moreRenderer{}, 100)))
 
 	return &Renderer{md: goldmark.New(
 		goldmark.WithExtensions(extensions...),
 		goldmark.WithParserOptions(parserOpts...),
 		goldmark.WithRendererOptions(rendererOpts...),
 	)}
+}
+
+// more stands where an author ended a post's summary with <!--more-->, as
+// Hugo and Hexo write it. The excerpt is the prose before it, and the page
+// shows nothing in its place.
+type more struct{ ast.BaseBlock }
+
+var kindMore = ast.NewNodeKind("More")
+
+func (*more) Kind() ast.NodeKind              { return kindMore }
+func (m *more) Dump(source []byte, level int) { ast.DumpHelper(m, source, level, nil, nil) }
+
+// moreRenderer writes nothing for a more node.
+type moreRenderer struct{}
+
+func (moreRenderer) RegisterFuncs(r renderer.NodeRendererFuncRegisterer) {
+	r.Register(kindMore, func(util.BufWriter, []byte, ast.Node, bool) (ast.WalkStatus, error) {
+		return ast.WalkSkipChildren, nil
+	})
+}
+
+// moreComment is the divider, spaced or not, in any case: <!--more--> or
+// <!-- more -->.
+var moreComment = regexp.MustCompile(`(?i)^<!--\s*more\s*-->$`)
+
+// summaryEnd turns each divider on a line of its own at the top level of a
+// body into a more node.
+type summaryEnd struct{}
+
+func (summaryEnd) Transform(doc *ast.Document, reader text.Reader, _ parser.Context) {
+	src := reader.Source()
+	for n := doc.FirstChild(); n != nil; {
+		next := n.NextSibling()
+		if isMoreComment(n, src) {
+			doc.ReplaceChild(doc, n, &more{})
+		}
+		n = next
+	}
+}
+
+func isMoreComment(n ast.Node, src []byte) bool {
+	block, ok := n.(*ast.HTMLBlock)
+	if !ok || block.HTMLBlockType != ast.HTMLBlockType2 || block.Lines().Len() != 1 || block.HasClosure() {
+		return false
+	}
+	line := block.Lines().At(0)
+	return moreComment.Match(bytes.TrimSpace(line.Value(src)))
 }
 
 // langPre writes the pre element chroma writes, naming the block's language
@@ -325,31 +378,56 @@ var excerptParser = sync.OnceValue(func() parser.Parser { return New(DefaultOpti
 // and list items in order, without the headings, quotations, tables, code,
 // raw HTML and footnotes between them, cut at a word near ExcerptLimit.
 //
+// An author who ends the summary with <!--more--> has said where it ends, so
+// then it is all the prose before the divider, however long, unless there is
+// none.
+//
 // It is read from the tree rather than the source, which is what keeps an
 // underscore inside a word and an escaped asterisk: neither is emphasis.
 func opening(root ast.Node, src []byte) string {
+	for n := root.FirstChild(); n != nil; n = n.NextSibling() {
+		if n.Kind() == kindMore {
+			if summary := strings.Join(prosePrefix(root, n, src, -1), " "); summary != "" {
+				return summary
+			}
+			break
+		}
+	}
+	return truncate(strings.Join(prosePrefix(root, nil, src, ExcerptLimit), " "), ExcerptLimit)
+}
+
+// prosePrefix is the prose of the blocks of root before end, stopping once
+// it is longer than limit characters when limit is not negative.
+func prosePrefix(root, end ast.Node, src []byte, limit int) []string {
 	var parts []string
 	length := 0
-	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
+	for block := root.FirstChild(); block != nil && block != end; block = block.NextSibling() {
+		status := ast.WalkContinue
+		_ = ast.Walk(block, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+			if !entering {
+				return ast.WalkContinue, nil
+			}
+			switch n.(type) {
+			case *ast.Heading, *ast.Blockquote, *ast.HTMLBlock, *east.Table, *east.FootnoteList:
+				return ast.WalkSkipChildren, nil
+			case *ast.Paragraph, *ast.TextBlock:
+				if text := strings.Join(strings.Fields(readText(n, src)), " "); text != "" {
+					parts = append(parts, text)
+					length += utf8.RuneCountInString(text) + 1
+				}
+				if limit >= 0 && length > limit {
+					status = ast.WalkStop
+					return ast.WalkStop, nil
+				}
+				return ast.WalkSkipChildren, nil
+			}
 			return ast.WalkContinue, nil
+		})
+		if status == ast.WalkStop {
+			break
 		}
-		switch n.(type) {
-		case *ast.Heading, *ast.Blockquote, *ast.HTMLBlock, *east.Table, *east.FootnoteList:
-			return ast.WalkSkipChildren, nil
-		case *ast.Paragraph, *ast.TextBlock:
-			if text := strings.Join(strings.Fields(readText(n, src)), " "); text != "" {
-				parts = append(parts, text)
-				length += utf8.RuneCountInString(text) + 1
-			}
-			if length > ExcerptLimit {
-				return ast.WalkStop, nil
-			}
-			return ast.WalkSkipChildren, nil
-		}
-		return ast.WalkContinue, nil
-	})
-	return truncate(strings.Join(parts, " "), ExcerptLimit)
+	}
+	return parts
 }
 
 // prose reports a block whose text is read: a paragraph wherever it sits, the
