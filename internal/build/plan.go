@@ -3,6 +3,7 @@ package build
 import (
 	"cmp"
 	"slices"
+	"strings"
 
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render"
@@ -52,6 +53,10 @@ type Target struct {
 	// Layout overrides the template base name.
 	Layout string
 
+	// Redirect is where an alias sends a reader: the link of the item it
+	// names.
+	Redirect string
+
 	// Title is what a listing calls itself. It is set here rather than derived
 	// while rendering, because what a page is called is a question about the
 	// site, not about the template that happens to draw it.
@@ -60,6 +65,23 @@ type Target struct {
 
 // ID is a stable identifier used for cache keys and logs.
 func (t Target) ID() string { return string(t.Kind) + " " + t.URL }
+
+// Address reduces the spellings of one address to a single key.
+//
+// A static host serves /posts/hello/, /posts/hello and /posts/hello/index.html
+// as the same page, and so does a server, which is why two targets at one
+// address cannot both be published.
+func Address(p string) string {
+	if i := strings.IndexAny(p, "?#"); i >= 0 {
+		p = p[:i]
+	}
+	p = strings.TrimSuffix(p, "index.html")
+	p = "/" + strings.Trim(p, "/")
+	if p == "/" {
+		return p
+	}
+	return strings.TrimSuffix(p, ".html")
+}
 
 // Plan is the ordered set of targets a build will render.
 type Plan struct {

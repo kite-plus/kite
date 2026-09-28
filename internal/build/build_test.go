@@ -1051,3 +1051,107 @@ func TestAPageIsDrawnWithTheLayoutItNames(t *testing.T) {
 		}
 	}
 }
+
+// An address that changed has to keep working, which is what aliases say, and
+// a static host can only redirect with a page: one that sends a browser on and
+// tells a search engine which address to keep, at every alias. It belongs to
+// nobody's listing, sitemap or feed.
+func TestAnAliasSendsAReaderOnToWhereTheItemIsNow(t *testing.T) {
+	f := newFixtureAt(t, 1, "https://example.com/blog/")
+	f.add(t, "content/posts/trip/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZTRP
+title: A <trip>
+status: published
+published_at: 2026-02-01T00:00:00Z
+aliases: [/travel/trip/, old-trip, /2019/05/trip.html, "/旅行/", /blog-posts/trip, /posts/trip/]
+---
+Body.
+`)
+	_, files := f.run(t, f.out, nil)
+
+	for _, want := range []string{
+		"travel/trip/index.html",
+		"posts/old-trip/index.html",
+		"2019/05/trip.html",
+		"旅行/index.html",
+		"blog-posts/trip/index.html",
+	} {
+		if !slices.Contains(files, want) {
+			t.Errorf("no page at the alias %s\ngot: %v", want, files)
+		}
+	}
+
+	page := readFile(t, f.out, "travel/trip/index.html")
+	for _, want := range []string{
+		`<meta http-equiv="refresh" content="0; url=/blog/posts/trip/">`,
+		`<link rel="canonical" href="https://example.com/blog/posts/trip/">`,
+		`<meta name="robots" content="noindex">`,
+		`<a href="/blog/posts/trip/">A &lt;trip&gt;</a>`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the alias page lacks %s:\n%s", want, page)
+		}
+	}
+	for _, listing := range []string{"sitemap.xml", "rss.xml", "index.html"} {
+		if strings.Contains(readFile(t, f.out, listing), "travel") {
+			t.Errorf("%s lists an alias", listing)
+		}
+	}
+}
+
+// An alias at another page's address would leave one of the two unreachable,
+// and nothing would say which, so the build says so instead.
+func TestAnAliasCannotTakeAnotherPagesAddress(t *testing.T) {
+	for _, alias := range []string{"/posts/post-00/", "/tags/", "/"} {
+		t.Run(alias, func(t *testing.T) {
+			f := newFixture(t, 1)
+			f.add(t, "content/posts/trip/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZTRP
+title: Trip
+status: published
+published_at: 2026-02-01T00:00:00Z
+aliases: ["`+alias+`"]
+---
+Body.
+`)
+			emitter, err := build.NewEmitter(f.out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = f.builder(t, emitter, nil).Run(t.Context())
+			if err == nil || !strings.Contains(err.Error(), "content/posts/trip") {
+				t.Errorf("err = %v, want a refusal naming the item", err)
+			}
+		})
+	}
+}
+
+// Two items may not claim one old address, and an alias must be a path.
+func TestAnAliasIsOneItemsPathWithinTheSite(t *testing.T) {
+	for name, aliases := range map[string][2]string{
+		"claimed twice": {"/old/", "/old/"},
+		"a full URL":    {"https://elsewhere.example/x/", "/fine/"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t, 0)
+			for i, alias := range aliases {
+				f.add(t, fmt.Sprintf("content/posts/p%d/index.md", i), fmt.Sprintf(`---
+id: 01J8KQ2P3R4S5T6V7W8X9YZP%02d
+title: P%d
+status: published
+published_at: 2026-02-0%dT00:00:00Z
+aliases: [%q]
+---
+Body.
+`, i, i, i+1, alias))
+			}
+			emitter, err := build.NewEmitter(f.out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.builder(t, emitter, nil).Run(t.Context()); err == nil {
+				t.Error("the build went ahead")
+			}
+		})
+	}
+}

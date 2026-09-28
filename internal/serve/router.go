@@ -100,19 +100,7 @@ func (r *router) size() int {
 	return len(r.byURL)
 }
 
-// normalize reduces the spellings of one address to a single key.
-//
-// A static host serves /posts/hello/, /posts/hello and /posts/hello/index.html
-// as the same page. A preview that disagreed about which of those exist would
-// send authors chasing a difference that is not in their content.
-func normalize(p string) string {
-	if i := strings.IndexAny(p, "?#"); i >= 0 {
-		p = p[:i]
-	}
-	p = strings.TrimSuffix(p, "index.html")
-	p = "/" + strings.Trim(p, "/")
-	if p == "/" {
-		return p
-	}
-	return strings.TrimSuffix(p, ".html")
-}
+// normalize reduces the spellings of one address to a single key, the way a
+// build does. A preview that disagreed about which of them exist would send
+// authors chasing a difference that is not in their content.
+func normalize(p string) string { return build.Address(p) }

@@ -25,9 +25,9 @@ func TestTheBuiltInThemeDrawsTheSamePagesBuiltAndServed(t *testing.T) {
 	// Every kind of page: seven posts and a page, three pages of the home
 	// listing and of the posts, the pages listing, both taxonomies, their
 	// five terms and the 404. Then the feed, the sitemap and the two images
-	// a page bundle carries, one in a folder, and a page for the links
-	// layout the theme offers.
-	if want := 8 + 3 + 3 + 1 + 2 + 5 + 1 + 4 + 1; report.Compared != want {
+	// a page bundle carries, one in a folder, a page for the links layout
+	// the theme offers, and the page at a post's old address.
+	if want := 8 + 3 + 3 + 1 + 2 + 5 + 1 + 4 + 1 + 1; report.Compared != want {
 		t.Errorf("%d files compared, want %d; the fixture no longer covers what it did", report.Compared, want)
 	}
 	if !report.OK() {

@@ -6,6 +6,7 @@ status: published
 published_at: 2026-05-20T09:00:00Z
 tags: [Kite, Notes]
 categories: [Guides]
+aliases: [/2026/05/with-image/]
 ---
 
 A page bundle keeps its image beside the text.

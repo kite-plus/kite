@@ -457,6 +457,19 @@ Headings are anchored by their text the way Hugo and GitHub anchor them, so
 a link into a section keeps working after the move: `## 近况` is reached at
 `#近况`, and `## Getting Started` at `#getting-started`.
 
+An address that changed keeps working through `aliases`, as in Hugo:
+
+```yaml
+aliases: [/2019/05/trip/, /travel/trip.html, old-trip]
+```
+
+Each alias is a path from the site's root, or, without a leading slash, one
+beside the item's own address, and a page is published there that sends a
+browser on to the item at once and tells search engines which address to
+keep. It is a page rather than a redirect of the host's, so it works on
+GitHub Pages too, and `kite serve` answers with the same page. An alias that
+is another page's address stops the build and says which.
+
 ## Deploying
 
 A site can be built into files and hosted anywhere, or run as a server that

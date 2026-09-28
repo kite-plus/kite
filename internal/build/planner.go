@@ -30,6 +30,9 @@ func (b *Builder) plan(ctx context.Context, c *Context) (*Plan, error) {
 	b.planLists(p, all)
 	b.planTaxonomies(p, all)
 	b.planNotFound(p)
+	if err := b.planAliases(p); err != nil {
+		return nil, err
+	}
 
 	p.sort()
 	return p, nil

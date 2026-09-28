@@ -276,7 +276,7 @@ type Content struct {
     Body        Body                   // { Format: markdown|html, Raw: string }
     Meta        Meta                   // 受 ContentType.Fields 约束
     Taxonomies  map[string][]string    // {"tag": [...], "category": [...]}，是字符串不是实体
-    Aliases     []string               // 旧 URL → 301
+    Aliases     []string               // 旧 URL：每个都发布一个跳转页，静态托管也能跳
     Locale      string                 // i18n 预留，V1 单值
     Path        ResourceLocator        // 字节存在哪；与 URL 无关
     Revision    Revision               // 不透明：File=内容 hash，SQL=版本号

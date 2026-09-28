@@ -477,6 +477,10 @@ func (b *Builder) NextDue(ctx context.Context) (time.Time, error) {
 // renderTarget produces the bytes of one output.
 func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req render.Request) ([]byte, hook.PageInfo, error) {
 	var info hook.PageInfo
+	if t.Kind == render.KindAlias {
+		page := aliasPage(b.opts.Site.Language, t.Title, t.Redirect, b.opts.Resolver.Absolute(t.Redirect))
+		return page, describe(t, nil, nil), nil
+	}
 
 	page, body, err := b.page(ctx, out, t)
 	if err != nil {
@@ -542,7 +546,7 @@ func describe(t Target, page render.Page, body *markdown.Document) hook.PageInfo
 		URL:        t.URL,
 		OutputPath: t.Path,
 		Kind:       hookKind(t.Kind),
-		Indexable:  t.Kind != render.KindNotFound,
+		Indexable:  t.Kind != render.KindNotFound && t.Kind != render.KindAlias,
 	}
 	if page != nil {
 		info.Title = page.Title()

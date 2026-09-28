@@ -22,6 +22,10 @@ const (
 	KindTaxonomy Kind = "taxonomy"
 	KindTerm     Kind = "term"
 	KindNotFound Kind = "404"
+
+	// KindAlias is an address an item was once published at, which sends a
+	// reader on to where it is now. No template draws it.
+	KindAlias Kind = "alias"
 )
 
 // Context is the value a template receives as dot.
