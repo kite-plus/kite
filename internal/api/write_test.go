@@ -1063,3 +1063,45 @@ func TestClearingTheLanguageFallsBackToTheDefault(t *testing.T) {
 		t.Errorf("language = %q, want the default", settings.Site.Language)
 	}
 }
+
+// JSON has no dates, so a date in front matter goes out to the studio as text
+// and comes back as text. Written back as it came, it would turn every date
+// in the file into a quoted string on the next save of anything, and a
+// template would read text where it had a time.
+func TestASaveKeepsTheDatesAndNumbersOfFrontMatter(t *testing.T) {
+	root := newProject(t, 0)
+	src := `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZDAT
+title: Dated
+slug: dated
+status: published
+published_at: 2026-02-01T00:00:00Z
+day: 2026-03-04
+at: 2026-03-04T09:30:00+08:00
+events:
+  - at: 2026-03-05
+count: 3
+rating: 4.0
+---
+
+Body.
+`
+	path := filepath.Join(root, "content", "posts", "dated", "index.md")
+	write(t, path, src)
+	h, _ := newWritableServer(t, root)
+
+	item, tag := load(t, h, "01J8KQ2P3R4S5T6V7W8X9YZDAT")
+	draft := draftOf(item)
+	draft.Title = "Still dated"
+	rec := send(t, h, http.MethodPut, api.Prefix+"/contents/"+item.ID, draft, map[string]string{"If-Match": tag})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed := changedLines(src, string(after)); len(changed) != 1 || !strings.Contains(changed[0], "Still dated") {
+		t.Errorf("a title change changed %d lines, want the title only:\n%s", len(changed), strings.Join(changed, "\n"))
+	}
+}

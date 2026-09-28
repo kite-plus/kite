@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/kite-plus/kite/internal/content"
 )
@@ -97,6 +98,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	item.Kind = existing.Kind
 	item.Locator = existing.Locator
 	item.CreatedAt = existing.CreatedAt
+	item.Meta = keepTypes(item.Meta, existing.Meta)
 
 	if _, err := s.apply(r, view, content.ChangeSet{
 		Ops:     []content.Op{content.PutContent{Content: item, IfRevision: revision}},
@@ -283,3 +285,38 @@ func (s *Server) failConflict(w http.ResponseWriter, view View, r *http.Request,
 
 // etag formats a revision as a strong entity tag.
 func etag(rev content.Revision) string { return `"` + string(rev) + `"` }
+
+// keepTypes gives back every value a draft returned unchanged as the Go value
+// the item held. A draft travels as JSON, which has no dates: a date goes out
+// as its RFC 3339 text and comes back as that text, which would be written
+// into the file as a quoted string and reach a template as one.
+func keepTypes(sent, held map[string]any) map[string]any {
+	for k, v := range sent {
+		sent[k] = keepType(v, held[k])
+	}
+	return sent
+}
+
+func keepType(sent, held any) any {
+	switch h := held.(type) {
+	case time.Time:
+		if s, ok := sent.(string); ok && s == h.Format(time.RFC3339Nano) {
+			return h
+		}
+	case int:
+		if f, ok := sent.(float64); ok && f == float64(h) {
+			return h
+		}
+	case map[string]any:
+		if m, ok := sent.(map[string]any); ok {
+			return keepTypes(m, h)
+		}
+	case []any:
+		if l, ok := sent.([]any); ok {
+			for i := range min(len(l), len(h)) {
+				l[i] = keepType(l[i], h[i])
+			}
+		}
+	}
+	return sent
+}

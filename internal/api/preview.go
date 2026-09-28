@@ -82,6 +82,7 @@ func draftItem(r *http.Request, view View, draft Draft) *content.Content {
 	if existing, err := view.Reader.Get(r.Context(), item.ID); err == nil {
 		item.Locator = existing.Locator
 		item.CreatedAt = existing.CreatedAt
+		item.Meta = keepTypes(item.Meta, existing.Meta)
 	}
 	return item
 }
