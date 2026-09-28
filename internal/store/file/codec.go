@@ -40,6 +40,13 @@ const (
 	legacyDraft   = "draft"
 )
 
+// Hugo keeps a hand-written summary under summary. With no description to
+// contradict it, it is read as the description, and a save writes it as one.
+const (
+	keyDescription = "description"
+	legacySummary  = "summary"
+)
+
 var reservedKeys = []string{
 	keyID, keyTitle, keySlug, keyStatus,
 	keyCreatedAt, keyUpdatedAt, keyPublishedAt, keyDeletedAt,
@@ -179,6 +186,13 @@ func (c *Codec) Encode(t *content.Type, item *content.Content, existing []byte) 
 	if _, ok := doc.Get(legacyDraft); ok {
 		doc.Delete(legacyDraft)
 	}
+	// A summary read as the description goes once the description is written
+	// or cleared, or it would come back as the description on the next read.
+	if _, described := item.Meta[keyDescription]; described {
+		if _, kept := item.Meta[legacySummary]; !kept {
+			doc.Delete(legacySummary)
+		}
+	}
 
 	for _, name := range t.Taxonomies {
 		terms := item.Taxonomies[name]
@@ -312,6 +326,12 @@ func decodeMeta(doc *frontmatter.Document, t *content.Type) map[string]any {
 			out = make(map[string]any)
 		}
 		out[key] = v
+	}
+	if summary, ok := out[legacySummary].(string); ok {
+		if _, described := out[keyDescription]; !described {
+			out[keyDescription] = summary
+			delete(out, legacySummary)
+		}
 	}
 	return out
 }

@@ -370,6 +370,20 @@ plugins:
 `KITE_SITE_BASEURL`、`KITE_SITE_LANGUAGE`、`KITE_THEME`、`KITE_BUILD_OUTPUT`、
 `KITE_BUILD_URLSTYLE` 和 `KITE_BUILD_PAGESIZE`。
 
+## 从 Hugo 迁移
+
+Hugo 站点的内容原地就能打开。在站点目录里运行 `kite init .`，它只添加 `kite.yaml`，
+不动 `content/`；再给每一篇内容分配 Kite 用来识别它的 ID，Hugo 不写这个：
+
+```bash
+kite doctor --fix-ids
+```
+
+Hugo 写的 front matter 键，Kite 当作自己的来读：`date` 是发布时间，`lastmod` 是最后
+修改时间，`draft: true` 是草稿；没有 `description` 时，`summary` 就是摘要，列表里显示
+的是你写的摘要，而不是正文的开头。保存一篇内容时，Kite 会在旁边写上自己的键，并用
+它们替换 `draft` 和 `summary`。
+
 ## 部署
 
 站点可以构成静态文件托管在任何地方，也可以作为一个自己管自己的服务跑着。两边的内容

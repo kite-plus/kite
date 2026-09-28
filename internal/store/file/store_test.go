@@ -559,6 +559,100 @@ legacy body
 	}
 }
 
+// Hugo writes a hand-written summary as summary. A site moved from Hugo must
+// not lose it to the opening of the body, and a save leaves one key, not two
+// that could disagree.
+func TestAHugoSummaryIsReadAsTheDescription(t *testing.T) {
+	root, types, w := newTestProject(t)
+	writeFile(t, root, "content/posts/moved/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZSMM
+title: Moved
+summary: A summary written in front matter.
+---
+First paragraph of the body.
+`)
+	writeFile(t, root, "content/posts/both/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZBTH
+title: Both
+description: The description.
+summary: Something else.
+---
+Body.
+`)
+
+	scan, err := NewScanner(root, types).Scan()
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	items := map[string]*content.Content{}
+	for _, e := range scan.Entries {
+		items[e.Item.Slug] = e.Item
+	}
+	moved, both := items["moved"], items["both"]
+	if moved == nil || both == nil {
+		t.Fatalf("items = %v (%v)", items, scan.Problems)
+	}
+	if moved.Meta["description"] != "A summary written in front matter." {
+		t.Errorf("description = %v, want the summary", moved.Meta["description"])
+	}
+	if _, ok := moved.Meta["summary"]; ok {
+		t.Error("the summary is also a param of its own")
+	}
+	// A description the author wrote wins, and the summary beside it is left
+	// alone as a param.
+	if both.Meta["description"] != "The description." || both.Meta["summary"] != "Something else." {
+		t.Errorf("meta = %v", both.Meta)
+	}
+
+	moved.Title = "Moved Here"
+	if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{
+		content.PutContent{Content: moved, IfRevision: moved.Revision},
+	}}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	got := readFile(t, root, "content/posts/moved/index.md")
+	if !strings.Contains(got, "description: A summary written in front matter.") || strings.Contains(got, "summary:") {
+		t.Errorf("the save did not move the summary to the description:\n%s", got)
+	}
+
+	both.Title = "Both Here"
+	if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{
+		content.PutContent{Content: both, IfRevision: both.Revision},
+	}}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got := readFile(t, root, "content/posts/both/index.md"); !strings.Contains(got, "summary: Something else.") {
+		t.Errorf("a summary beside a description was dropped:\n%s", got)
+	}
+}
+
+// Clearing the description of a file that only has a summary clears it, rather
+// than leaving the summary to be read back as the description.
+func TestClearingADescriptionReadFromASummaryClearsIt(t *testing.T) {
+	root, types, w := newTestProject(t)
+	writeFile(t, root, "content/posts/moved/index.md", `---
+id: 01J8KQ2P3R4S5T6V7W8X9YZSMM
+title: Moved
+summary: A summary written in front matter.
+---
+Body.
+`)
+	scan, err := NewScanner(root, types).Scan()
+	if err != nil || len(scan.Entries) != 1 {
+		t.Fatalf("Scan: %v %v", err, scan)
+	}
+	item := scan.Entries[0].Item
+	item.Meta["description"] = nil
+	if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{
+		content.PutContent{Content: item, IfRevision: item.Revision},
+	}}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got := readFile(t, root, "content/posts/moved/index.md"); strings.Contains(got, "summary") || strings.Contains(got, "description") {
+		t.Errorf("the description was not cleared:\n%s", got)
+	}
+}
+
 func TestSinglePageLayout(t *testing.T) {
 	root, _, w := newTestProject(t)
 	item := &content.Content{

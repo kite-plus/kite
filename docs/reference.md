@@ -424,6 +424,22 @@ depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,
 `KITE_SITE_LANGUAGE`, `KITE_THEME`, `KITE_BUILD_OUTPUT`,
 `KITE_BUILD_URLSTYLE` and `KITE_BUILD_PAGESIZE`.
 
+## Moving from Hugo
+
+A Hugo site's content opens where it is. Run `kite init .` in the site's
+folder, which adds `kite.yaml` and leaves `content/` alone, then give every
+item the id Kite keeps it by, which Hugo does not write:
+
+```bash
+kite doctor --fix-ids
+```
+
+Kite reads the front matter keys Hugo writes as its own: `date` is when an
+item was published, `lastmod` when it last changed, `draft: true` makes it a
+draft, and `summary` is its description when it has none, so a list shows the
+summary you wrote rather than the opening of the text. Saving an item writes
+Kite's own keys beside them, and those replace `draft` and `summary`.
+
 ## Deploying
 
 A site can be built into files and hosted anywhere, or run as a server that
