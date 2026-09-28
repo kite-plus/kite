@@ -30,6 +30,9 @@ func (b *Builder) plan(ctx context.Context, c *Context) (*Plan, error) {
 	b.planLists(p, all)
 	b.planTaxonomies(p, all)
 	b.planNotFound(p)
+	if err := distinctPages(p); err != nil {
+		return nil, err
+	}
 	if err := b.planAliases(p); err != nil {
 		return nil, err
 	}
@@ -81,6 +84,30 @@ func (b *Builder) planSingles(ctx context.Context, p *Plan, all []content.Summar
 			Type:   string(item.Kind),
 			Layout: LayoutOf(item),
 		})
+	}
+	return nil
+}
+
+// distinctPages refuses an item whose address another page already has, as
+// a page whose slug is posts or tags/go would: a host serves one file there,
+// and the other page would be lost with nothing said.
+func distinctPages(p *Plan) error {
+	seen := make(map[string]Target, len(p.Targets))
+	for _, t := range p.Targets {
+		if t.Kind != render.KindSingle && t.Kind != render.KindNotFound {
+			seen[Address(t.URL)] = t
+		}
+	}
+	for _, t := range p.Targets {
+		if t.Kind != render.KindSingle {
+			continue
+		}
+		key := Address(t.URL)
+		if held, ok := seen[key]; ok {
+			return fmt.Errorf("build: %s is at %s, which is %s's address too; give it another slug",
+				describeTarget(t), t.URL, describeTarget(held))
+		}
+		seen[key] = t
 	}
 	return nil
 }

@@ -64,7 +64,7 @@ func describeTarget(t Target) string {
 	if t.Item != nil {
 		return string(t.Item.Locator)
 	}
-	return "the page at " + t.URL
+	return "the " + string(t.Kind) + " page"
 }
 
 // aliasPath reads an alias as a path within the site, relative to the item's

@@ -299,7 +299,7 @@ func expand(pattern string, values map[string]string) string {
 	for _, seg := range segments {
 		if after, ok := strings.CutPrefix(seg, ":"); ok {
 			if v, found := values[after]; found {
-				out = append(out, pathEscape(v))
+				out = append(out, pathSegments(v))
 				continue
 			}
 			continue
@@ -307,6 +307,26 @@ func expand(pattern string, values map[string]string) string {
 		out = append(out, seg)
 	}
 	return "/" + strings.Join(out, "/")
+}
+
+// pathSegments escapes each part of a value between slashes on its own, so a
+// slug such as projects/tideline is a path two segments deep rather than one
+// segment holding %2F. Empty parts are dropped, and . and .. stay names
+// rather than steps up the path.
+func pathSegments(v string) string {
+	var parts []string
+	for part := range strings.SplitSeq(v, "/") {
+		switch part {
+		case "":
+			continue
+		case ".", "..":
+			part = strings.Repeat("%2E", len(part))
+		default:
+			part = pathEscape(part)
+		}
+		parts = append(parts, part)
+	}
+	return strings.Join(parts, "/")
 }
 
 // slugSegment normalizes a taxonomy or term name for use in a path. Terms are

@@ -387,6 +387,10 @@ kite doctor --fix-ids
 `/posts/<slug>/`；Hugo 的 `_index.md` 不读。拖到单文件文章里的图片存进站点自己的
 `static/uploads/`。
 
+slug 里可以带路径：slug 是 `projects/tideline` 的页面发布在 `/projects/tideline/`，
+和 Hugo 里放在文件夹中的页面一样。地址和另一个页面相同的内容，比如叫 `posts` 的页面，
+会让构建停下并指出是哪个。
+
 Hugo 写的 front matter 键，Kite 当作自己的来读：`date` 是发布时间，`lastmod` 是最后
 修改时间，`draft: true` 是草稿；没有 `description` 时，`summary` 就是摘要，列表里显示
 的是你写的摘要，而不是正文的开头。保存一篇内容时，Kite 会在旁边写上自己的键，并用

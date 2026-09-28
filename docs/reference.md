@@ -444,6 +444,11 @@ published at `/posts/<slug>/` wherever in `content/posts/` it sits, and
 Hugo's `_index.md` is left out. A picture dropped on a post kept as a single
 file goes among the site's own files, in `static/uploads/`.
 
+A slug may hold a path: a page whose slug is `projects/tideline` is published
+at `/projects/tideline/`, as pages kept in folders were in Hugo. An item whose
+address is already another page's, such as a page called `posts`, stops the
+build and says which.
+
 Kite reads the front matter keys Hugo writes as its own: `date` is when an
 item was published, `lastmod` when it last changed, `draft: true` makes it a
 draft, and `summary` is its description when it has none, so a list shows the

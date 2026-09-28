@@ -1238,3 +1238,33 @@ Body.
 		}
 	}
 }
+
+// A page can live under a path, and one whose address another page already
+// has is refused rather than published over it or under it.
+func TestAPageSlugMayBeAPathButNotAnotherPagesAddress(t *testing.T) {
+	page := func(id, slug string) string {
+		return fmt.Sprintf("---\nid: %s\ntitle: %s\nslug: %s\nstatus: published\n"+
+			"published_at: 2026-01-10T00:00:00Z\n---\n\nBody.\n", id, slug, slug)
+	}
+	f := newFixture(t, 1)
+	f.add(t, "content/pages/tideline.md", page("01J8KQ2P3R4S5T6V7W8X9YZ901", "projects/tideline"))
+	_, files := f.run(t, f.out, nil)
+	if !slices.Contains(files, "projects/tideline/index.html") {
+		t.Errorf("no page under its path\ngot: %v", files)
+	}
+
+	for _, slug := range []string{"posts", "tags/go", "page/2", "posts/post-00"} {
+		t.Run(slug, func(t *testing.T) {
+			f := newFixture(t, 4)
+			f.add(t, "content/pages/clash.md", page("01J8KQ2P3R4S5T6V7W8X9YZ902", slug))
+			emitter, err := build.NewEmitter(f.out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = f.builder(t, emitter, nil).Run(t.Context())
+			if err == nil || !strings.Contains(err.Error(), "content/pages/clash.md") {
+				t.Errorf("err = %v, want a refusal naming the page", err)
+			}
+		})
+	}
+}

@@ -284,3 +284,32 @@ func TestInvalidBaseURLIsRejected(t *testing.T) {
 		t.Fatal("expected an error for an unparsable base URL")
 	}
 }
+
+// A slug may hold a path, as a project page under /projects/ or a document in
+// a folder of documents does. Each part is a segment of its own, escaped on its
+// own, never one segment holding %2F, and never a step up the path.
+func TestASlugWithSlashesIsAPath(t *testing.T) {
+	page := func(slug string) *content.Content { return &content.Content{Kind: "page", Slug: slug} }
+	r := newResolver(t, nil)
+	for slug, want := range map[string]string{
+		"projects/tideline":    "/projects/tideline/",
+		"/projects//tideline/": "/projects/tideline/",
+		"项目/潮汐":                "/项目/潮汐/",
+		"a b/c?d":              "/a%20b/c%3Fd/",
+		"../up/./here":         "/%2E%2E/up/%2E/here/",
+	} {
+		if got := r.For(page(slug)); got != want {
+			t.Errorf("slug %q: For = %q, want %q", slug, got, want)
+		}
+	}
+	if got := r.For(post("2024/trip")); got != "/posts/2024/trip/" {
+		t.Errorf("post For = %q", got)
+	}
+	if got := r.OutputPath(r.For(page("projects/tideline"))); got != "projects/tideline/index.html" {
+		t.Errorf("OutputPath = %q", got)
+	}
+	ext := newResolver(t, func(o *kurl.Options) { o.Style = kurl.StyleExtension })
+	if got := ext.For(page("projects/tideline")); got != "/projects/tideline.html" {
+		t.Errorf("extension style For = %q", got)
+	}
+}
