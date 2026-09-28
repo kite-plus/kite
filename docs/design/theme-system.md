@@ -462,8 +462,14 @@ i18n.T  i18n.Lang  i18n.Translate
 
 ```
 math.Add  math.Sub  math.Mul  math.Div  math.Mod  math.Ceil  math.Floor  math.Round  math.Max  math.Min
+math.Int  math.Float
 debug.Dump  debug.Timer
 ```
+
+已实现的 `math.*` 和 `collections.*` 对参数类型的约定：
+
+- `math.*` 接受任意整数和浮点数。参数都是整数时结果是 `int`，所以 `range` 里用 `math.Add` 数出来的数能直接和 `8` 比较；有一个是浮点数，结果就是 `float64`。`math.Div 7 2` 是 3，和 Go、Hugo 一样舍去余数，`math.Div 7.0 2` 是 3.5。`math.Mod` 和集合函数的个数参数也接受没有小数部分的浮点数。`math.Int`、`math.Float` 把数字或写成文字的数字（`"8"`）转成整数（舍去小数）或浮点数，没有设置的值转成 0。
+- `collections.*` 接受任意切片和数组，如 `.Pages`（`[]Page`）、`str.Split` 的结果（`[]string`），返回的列表和传入的元素类型相同；`str.Join` 同样接受任意列表。`collections.Len` 还能数 map 和字符串（按字符），没有设置的值是 0，其余的值报错，而不是返回 0。`collections.Sort` 按大小排数字、按先后排时间，其余按字符串。
 
 ### 7.3 新增函数的规则
 

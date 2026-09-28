@@ -172,6 +172,88 @@ func TestNamespacedFunctions(t *testing.T) {
 	}
 }
 
+type listed struct{ Title string }
+
+// render draws src with data.
+func render(t *testing.T, src string, data any) (string, error) {
+	t.Helper()
+	th := fstest.MapFS{"single.html": file(src)}
+	e := theme.NewEngine(theme.Options{Sources: []theme.Source{{Name: "theme", FS: th}}})
+	out, err := e.Render(theme.Target{Kind: "single"}, data)
+	return strings.TrimSpace(string(out)), err
+}
+
+// Counts come from range, len and coll.Len as ints, lists come as []Page or
+// []string, and a theme should not have to count from 0.0 or loop with an
+// index to get along with them.
+func TestNumbersAndListsOfAnyType(t *testing.T) {
+	data := map[string]any{
+		"Pages": []listed{{"a"}, {"b"}, {"c"}},
+		"Words": []string{"b", "a", "b"},
+		"Tags":  []any{"go", "web"},
+		"Nums":  [3]int{10, 9, 1},
+		"None":  []string{},
+	}
+	cases := map[string]string{
+		// Integers stay integers, so they compare with integer literals.
+		`{{ $n := 0 }}{{ range .Pages }}{{ $n = math.Add $n 1 }}{{ end }}{{ if lt $n 8 }}{{ $n }}{{ end }}`: "3",
+		`{{ math.Add (len .Pages) 1 }}`:                            "4",
+		`{{ math.Sub 2 5 }} {{ math.Mul 3 4 }}`:                    "-3 12",
+		`{{ math.Div 7 2 }} {{ math.Div 7.0 2 }}`:                  "3 3.5",
+		`{{ math.Max 2 9 }} {{ math.Min 2.5 9 }}`:                  "9 2.5",
+		`{{ math.Ceil 3 }} {{ math.Ceil 2.1 }}`:                    "3 3",
+		`{{ math.Add 0.5 1 }}`:                                     "1.5",
+		`{{ $n := 0.0 }}{{ $n = math.Add $n 1 }}{{ $n }}`:          "1",
+		`{{ math.Mod 7 2 }} {{ math.Mod 7.0 2 }}`:                  "1 1",
+		`{{ math.Int "8" }} {{ math.Int 2.7 }} {{ math.Int nil }}`: "8 2 0",
+		`{{ math.Float "2.5" }} {{ math.Float 3 }}`:                "2.5 3",
+		// Any slice or array, and what comes back has the same element type.
+		`{{ coll.Len .Pages }} {{ coll.Len .Words }} {{ coll.Len "你好" }} {{ coll.Len nil }}`: "3 3 2 0",
+		`{{ range coll.First 2 .Pages }}{{ .Title }}{{ end }}`:                               "ab",
+		`{{ range coll.Last 1 .Pages }}{{ .Title }}{{ end }}`:                                "c",
+		`{{ range coll.After 1 .Pages }}{{ .Title }}{{ end }}`:                               "bc",
+		`{{ range coll.First 2.0 .Pages }}{{ .Title }}{{ end }}`:                             "ab",
+		`{{ range coll.Reverse .Pages }}{{ .Title }}{{ end }}`:                               "cba",
+		`{{ coll.In .Words "a" }} {{ coll.In .Words "z" }} {{ coll.In .Nums "9" }}`:          "true false true",
+		`{{ coll.Uniq .Words }}`:                              "[b a]",
+		`{{ coll.Sort .Words }} {{ coll.Sort .Nums }}`:        "[a b b] [1 9 10]",
+		`{{ printf "%T" (coll.First 1 .Words) }}`:             "[]string",
+		`{{ str.Join ", " .Tags }} {{ str.Join "/" .Words }}`: "go, web b/a/b",
+		`{{ default "none" .None }}`:                          "none",
+	}
+	for src, want := range cases {
+		t.Run(src, func(t *testing.T) {
+			got, err := render(t, src, data)
+			if err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			if got != want {
+				t.Errorf("got %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// Asking for what makes no sense is an error, not a quiet zero a page would
+// print as if it were true.
+func TestNumbersAndListsRefuseWhatTheyCannotRead(t *testing.T) {
+	for _, src := range []string{
+		`{{ coll.Len 3 }}`,
+		`{{ coll.First 1 "abc" }}`,
+		`{{ coll.First 1.5 .Pages }}`,
+		`{{ math.Add "1" 2 }}`,
+		`{{ math.Div 1 0 }}`,
+		`{{ math.Mod 7.5 2 }}`,
+		`{{ math.Int "eight" }}`,
+	} {
+		t.Run(src, func(t *testing.T) {
+			if got, err := render(t, src, map[string]any{"Pages": []listed{{"a"}}}); err == nil {
+				t.Errorf("rendered %q, want an error", got)
+			}
+		})
+	}
+}
+
 // A template that could read the clock would be a hidden build input.
 func TestThereIsNoTimeNow(t *testing.T) {
 	th := fstest.MapFS{"single.html": file(`{{ time.Now }}`)}

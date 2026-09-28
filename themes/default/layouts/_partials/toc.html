@@ -2,11 +2,10 @@
        Called as: partial "toc.html" (dict "page" PAGE "site" .Site).
 
        Only the top two heading levels are listed, and only when there are at
-       least two of them: a contents line with one entry helps nobody. The
-       count is a float because that is what math.Add returns. */ -}}
-{{- $count := 0.0 -}}
+       least two of them: a contents line with one entry helps nobody. */ -}}
+{{- $count := 0 -}}
 {{- range .page.TableOfContents }}{{ if and .ID (le .Level 2) }}{{ $count = math.Add $count 1 }}{{ end }}{{ end -}}
-{{- if ge $count 2.0 }}
+{{- if ge $count 2 }}
 <nav class="toc">
   {{- partial "t.html" (dict "k" "toc" "lang" .site.Language) }}
   {{- $more := false }}

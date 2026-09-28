@@ -1,15 +1,18 @@
 package theme
 
 import (
+	"cmp"
 	"fmt"
 	"html/template"
 	"math"
 	"net/url"
+	"reflect"
 	"slices"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Namespaces exist because a flat function table is a permanent compatibility
@@ -68,21 +71,17 @@ func defaultValue(fallback, value any) any {
 }
 
 func isEmpty(v any) bool {
-	switch x := v.(type) {
-	case nil:
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Invalid:
 		return true
-	case string:
-		return x == ""
-	case bool:
-		return !x
-	case int:
-		return x == 0
-	case float64:
-		return x == 0
-	case []any:
-		return len(x) == 0
-	case map[string]any:
-		return len(x) == 0
+	case reflect.String, reflect.Slice, reflect.Array, reflect.Map:
+		return rv.Len() == 0
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64, reflect.Pointer, reflect.Interface:
+		return rv.IsZero()
 	default:
 		return false
 	}
@@ -105,19 +104,32 @@ func (strNS) Title(s string) string {
 	}, s)
 }
 
-func (strNS) Upper(s string) string                  { return strings.ToUpper(s) }
-func (strNS) Lower(s string) string                  { return strings.ToLower(s) }
-func (strNS) Trim(s string) string                   { return strings.TrimSpace(s) }
-func (strNS) TrimPrefix(p, s string) string          { return strings.TrimPrefix(s, p) }
-func (strNS) TrimSuffix(p, s string) string          { return strings.TrimSuffix(s, p) }
-func (strNS) Replace(old, new, s string) string      { return strings.ReplaceAll(s, old, new) }
-func (strNS) Split(sep, s string) []string           { return strings.Split(s, sep) }
-func (strNS) Join(sep string, parts []string) string { return strings.Join(parts, sep) }
-func (strNS) HasPrefix(p, s string) bool             { return strings.HasPrefix(s, p) }
-func (strNS) HasSuffix(p, s string) bool             { return strings.HasSuffix(s, p) }
-func (strNS) Contains(sub, s string) bool            { return strings.Contains(s, sub) }
-func (strNS) Repeat(n int, s string) string          { return strings.Repeat(s, max(0, n)) }
-func (strNS) CountWords(s string) int                { return len(strings.Fields(s)) }
+func (strNS) Upper(s string) string             { return strings.ToUpper(s) }
+func (strNS) Lower(s string) string             { return strings.ToLower(s) }
+func (strNS) Trim(s string) string              { return strings.TrimSpace(s) }
+func (strNS) TrimPrefix(p, s string) string     { return strings.TrimPrefix(s, p) }
+func (strNS) TrimSuffix(p, s string) string     { return strings.TrimSuffix(s, p) }
+func (strNS) Replace(old, new, s string) string { return strings.ReplaceAll(s, old, new) }
+func (strNS) Split(sep, s string) []string      { return strings.Split(s, sep) }
+func (strNS) HasPrefix(p, s string) bool        { return strings.HasPrefix(s, p) }
+func (strNS) HasSuffix(p, s string) bool        { return strings.HasSuffix(s, p) }
+func (strNS) Contains(sub, s string) bool       { return strings.Contains(s, sub) }
+func (strNS) Repeat(n int, s string) string     { return strings.Repeat(s, max(0, n)) }
+func (strNS) CountWords(s string) int           { return len(strings.Fields(s)) }
+
+// Join joins the items of any list, each in its string form, so the []any
+// that front matter lists read as joins like a []string.
+func (strNS) Join(sep string, items any) (string, error) {
+	s, err := list("str.Join", items)
+	if err != nil {
+		return "", err
+	}
+	parts := make([]string, s.Len())
+	for i := range parts {
+		parts[i] = fmt.Sprint(s.Index(i).Interface())
+	}
+	return strings.Join(parts, sep), nil
+}
 
 // Truncate cuts a string to n runes, appending an ellipsis when it had to cut.
 func (strNS) Truncate(n int, s string) string {
@@ -128,78 +140,162 @@ func (strNS) Truncate(n int, s string) string {
 	return strings.TrimSpace(string(runes[:n])) + "…"
 }
 
-// collNS holds collection helpers.
+// collNS holds collection helpers. They take any slice or array, such as
+// .Pages or what str.Split returns, and a list they return has the element
+// type of the one they were given.
 type collNS struct{}
 
-func (collNS) Len(v any) int {
-	switch x := v.(type) {
-	case []any:
-		return len(x)
-	case []string:
-		return len(x)
-	case string:
-		return len([]rune(x))
-	case map[string]any:
-		return len(x)
+// list reads v as a slice for fn. An array is copied into one, and nil, a
+// value that is not set, reads as an empty list.
+func list(fn string, v any) (reflect.Value, error) {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Invalid:
+		return reflect.ValueOf([]any{}), nil
+	case reflect.Slice:
+		return rv, nil
+	case reflect.Array:
+		s := reflect.MakeSlice(reflect.SliceOf(rv.Type().Elem()), rv.Len(), rv.Len())
+		reflect.Copy(s, rv)
+		return s, nil
 	default:
-		return 0
+		return reflect.Value{}, fmt.Errorf("%s: %T is not a list", fn, v)
 	}
 }
 
-func (collNS) First(n int, items []any) []any {
-	if n < 0 || n > len(items) {
-		n = len(items)
+// Len counts the items of a list or map, or the characters of a string. Not
+// set counts as none; anything else cannot be counted.
+func (collNS) Len(v any) (int, error) {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Invalid:
+		return 0, nil
+	case reflect.String:
+		return utf8.RuneCountInString(rv.String()), nil
+	case reflect.Slice, reflect.Array, reflect.Map:
+		return rv.Len(), nil
+	default:
+		return 0, fmt.Errorf("coll.Len: cannot count %T", v)
 	}
-	return items[:n]
 }
 
-func (collNS) Last(n int, items []any) []any {
-	if n < 0 || n > len(items) {
-		n = len(items)
+// First keeps the first n items; a negative n keeps them all.
+func (collNS) First(n, items any) (any, error) {
+	s, k, err := listAndCount("coll.First", n, items)
+	if err != nil {
+		return nil, err
 	}
-	return items[len(items)-n:]
-}
-
-func (collNS) After(n int, items []any) []any {
-	if n < 0 {
-		n = 0
+	if k < 0 || k > s.Len() {
+		k = s.Len()
 	}
-	if n > len(items) {
-		return nil
+	return s.Slice(0, k).Interface(), nil
+}
+
+// Last keeps the last n items; a negative n keeps them all.
+func (collNS) Last(n, items any) (any, error) {
+	s, k, err := listAndCount("coll.Last", n, items)
+	if err != nil {
+		return nil, err
 	}
-	return items[n:]
+	if k < 0 || k > s.Len() {
+		k = s.Len()
+	}
+	return s.Slice(s.Len()-k, s.Len()).Interface(), nil
 }
 
-func (collNS) Reverse(items []any) []any {
-	out := slices.Clone(items)
-	slices.Reverse(out)
-	return out
+// After drops the first n items.
+func (collNS) After(n, items any) (any, error) {
+	s, k, err := listAndCount("coll.After", n, items)
+	if err != nil {
+		return nil, err
+	}
+	return s.Slice(min(max(k, 0), s.Len()), s.Len()).Interface(), nil
 }
 
-func (collNS) In(items []any, needle any) bool {
-	return slices.ContainsFunc(items, func(v any) bool { return fmt.Sprint(v) == fmt.Sprint(needle) })
+func listAndCount(fn string, n, items any) (reflect.Value, int, error) {
+	k, err := whole(fn, n)
+	if err != nil {
+		return reflect.Value{}, 0, err
+	}
+	s, err := list(fn, items)
+	return s, k, err
 }
 
-func (collNS) Uniq(items []any) []any {
-	seen := make(map[string]struct{}, len(items))
-	var out []any
-	for _, v := range items {
-		k := fmt.Sprint(v)
+func (collNS) Reverse(items any) (any, error) {
+	s, err := list("coll.Reverse", items)
+	if err != nil {
+		return nil, err
+	}
+	out := reflect.MakeSlice(s.Type(), s.Len(), s.Len())
+	for i := range s.Len() {
+		out.Index(s.Len() - 1 - i).Set(s.Index(i))
+	}
+	return out.Interface(), nil
+}
+
+// In reports whether a list holds needle, comparing string forms so that the
+// 1 a template writes finds the "1" a list read from text holds.
+func (collNS) In(items, needle any) (bool, error) {
+	s, err := list("coll.In", items)
+	if err != nil {
+		return false, err
+	}
+	want := fmt.Sprint(needle)
+	for i := range s.Len() {
+		if fmt.Sprint(s.Index(i).Interface()) == want {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Uniq keeps the first of the items that have the same string form.
+func (collNS) Uniq(items any) (any, error) {
+	s, err := list("coll.Uniq", items)
+	if err != nil {
+		return nil, err
+	}
+	out := reflect.MakeSlice(s.Type(), 0, s.Len())
+	seen := make(map[string]struct{}, s.Len())
+	for i := range s.Len() {
+		k := fmt.Sprint(s.Index(i).Interface())
 		if _, dup := seen[k]; dup {
 			continue
 		}
 		seen[k] = struct{}{}
-		out = append(out, v)
+		out = reflect.Append(out, s.Index(i))
 	}
-	return out
+	return out.Interface(), nil
 }
 
-// Sort orders values by their string form, which is enough for the tag lists
-// and menus a theme sorts.
-func (collNS) Sort(items []any) []any {
-	out := slices.Clone(items)
-	sort.SliceStable(out, func(i, j int) bool { return fmt.Sprint(out[i]) < fmt.Sprint(out[j]) })
-	return out
+// Sort orders numbers by value, times by time and anything else by its
+// string form, which is enough for the tag lists and menus a theme sorts.
+func (collNS) Sort(items any) (any, error) {
+	s, err := list("coll.Sort", items)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]reflect.Value, s.Len())
+	for i := range out {
+		out[i] = s.Index(i)
+	}
+	slices.SortStableFunc(out, func(a, b reflect.Value) int { return compare(a.Interface(), b.Interface()) })
+	sorted := reflect.MakeSlice(s.Type(), 0, len(out))
+	return reflect.Append(sorted, out...).Interface(), nil
+}
+
+func compare(a, b any) int {
+	if x, err := asNumber("", a); err == nil {
+		if y, err := asNumber("", b); err == nil {
+			return cmp.Compare(x.f, y.f)
+		}
+	}
+	if x, ok := a.(time.Time); ok {
+		if y, ok := b.(time.Time); ok {
+			return x.Compare(y)
+		}
+	}
+	return strings.Compare(fmt.Sprint(a), fmt.Sprint(b))
 }
 
 // timeNS holds time helpers.
@@ -294,28 +390,205 @@ func (urlNS) Anchorize(s string) string {
 	return strings.Trim(b.String(), "-")
 }
 
-// mathNS holds arithmetic helpers.
+// mathNS holds arithmetic helpers. They take numbers of any Go type, and
+// integers stay integers: the result is an int when every argument is one,
+// so a count kept with math.Add compares with the 8 a template writes, and a
+// float64 as soon as any argument is a float.
 type mathNS struct{}
 
-func (mathNS) Add(a, b float64) float64 { return a + b }
-func (mathNS) Sub(a, b float64) float64 { return a - b }
-func (mathNS) Mul(a, b float64) float64 { return a * b }
-func (mathNS) Max(a, b float64) float64 { return math.Max(a, b) }
-func (mathNS) Min(a, b float64) float64 { return math.Min(a, b) }
-func (mathNS) Ceil(a float64) float64   { return math.Ceil(a) }
-func (mathNS) Floor(a float64) float64  { return math.Floor(a) }
-func (mathNS) Round(a float64) float64  { return math.Round(a) }
-
-func (mathNS) Div(a, b float64) (float64, error) {
-	if b == 0 {
-		return 0, fmt.Errorf("math.Div: division by zero")
-	}
-	return a / b, nil
+// number is a template value read as a number: i holds it when isInt, and f
+// holds it either way.
+type number struct {
+	i     int
+	f     float64
+	isInt bool
 }
 
-func (mathNS) Mod(a, b int) (int, error) {
-	if b == 0 {
+func asNumber(fn string, v any) (number, error) {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return number{i: int(rv.Int()), f: float64(rv.Int()), isInt: true}, nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return number{i: int(rv.Uint()), f: float64(rv.Uint()), isInt: true}, nil
+	case reflect.Float32, reflect.Float64:
+		return number{f: rv.Float()}, nil
+	default:
+		return number{}, fmt.Errorf("%s: %v is %T, not a number", fn, v, v)
+	}
+}
+
+// whole reads a count, which may come from a template that counts in floats
+// as long as it has no fraction.
+func whole(fn string, v any) (int, error) {
+	n, err := asNumber(fn, v)
+	switch {
+	case err != nil:
+		return 0, err
+	case n.isInt:
+		return n.i, nil
+	case n.f != math.Trunc(n.f) || math.IsInf(n.f, 0):
+		return 0, fmt.Errorf("%s: %v is not a whole number", fn, v)
+	default:
+		return int(n.f), nil
+	}
+}
+
+// operands reads the two arguments of fn; ints reports whether both are
+// integers, and so whether to work in integers.
+func operands(fn string, a, b any) (x, y number, ints bool, err error) {
+	if x, err = asNumber(fn, a); err != nil {
+		return x, y, false, err
+	}
+	if y, err = asNumber(fn, b); err != nil {
+		return x, y, false, err
+	}
+	return x, y, x.isInt && y.isInt, nil
+}
+
+func (mathNS) Add(a, b any) (any, error) {
+	x, y, ints, err := operands("math.Add", a, b)
+	switch {
+	case err != nil:
+		return nil, err
+	case ints:
+		return x.i + y.i, nil
+	}
+	return x.f + y.f, nil
+}
+
+func (mathNS) Sub(a, b any) (any, error) {
+	x, y, ints, err := operands("math.Sub", a, b)
+	switch {
+	case err != nil:
+		return nil, err
+	case ints:
+		return x.i - y.i, nil
+	}
+	return x.f - y.f, nil
+}
+
+func (mathNS) Mul(a, b any) (any, error) {
+	x, y, ints, err := operands("math.Mul", a, b)
+	switch {
+	case err != nil:
+		return nil, err
+	case ints:
+		return x.i * y.i, nil
+	}
+	return x.f * y.f, nil
+}
+
+// Div divides two integers as Go does, dropping the remainder; with a float
+// on either side the result keeps its fraction.
+func (mathNS) Div(a, b any) (any, error) {
+	x, y, ints, err := operands("math.Div", a, b)
+	switch {
+	case err != nil:
+		return nil, err
+	case y.f == 0:
+		return nil, fmt.Errorf("math.Div: division by zero")
+	case ints:
+		return x.i / y.i, nil
+	}
+	return x.f / y.f, nil
+}
+
+func (mathNS) Mod(a, b any) (int, error) {
+	x, err := whole("math.Mod", a)
+	if err != nil {
+		return 0, err
+	}
+	y, err := whole("math.Mod", b)
+	if err != nil {
+		return 0, err
+	}
+	if y == 0 {
 		return 0, fmt.Errorf("math.Mod: division by zero")
 	}
-	return a % b, nil
+	return x % y, nil
+}
+
+func (mathNS) Max(a, b any) (any, error) {
+	x, y, ints, err := operands("math.Max", a, b)
+	switch {
+	case err != nil:
+		return nil, err
+	case ints:
+		return max(x.i, y.i), nil
+	}
+	return math.Max(x.f, y.f), nil
+}
+
+func (mathNS) Min(a, b any) (any, error) {
+	x, y, ints, err := operands("math.Min", a, b)
+	switch {
+	case err != nil:
+		return nil, err
+	case ints:
+		return min(x.i, y.i), nil
+	}
+	return math.Min(x.f, y.f), nil
+}
+
+func (mathNS) Ceil(a any) (any, error)  { return rounded("math.Ceil", a, math.Ceil) }
+func (mathNS) Floor(a any) (any, error) { return rounded("math.Floor", a, math.Floor) }
+func (mathNS) Round(a any) (any, error) { return rounded("math.Round", a, math.Round) }
+
+// rounded leaves an integer as it is, having nothing to round.
+func rounded(fn string, a any, round func(float64) float64) (any, error) {
+	x, err := asNumber(fn, a)
+	switch {
+	case err != nil:
+		return nil, err
+	case x.isInt:
+		return x.i, nil
+	}
+	return round(x.f), nil
+}
+
+// Int converts a number or the text of one to an int, dropping any fraction.
+// Not set converts to 0.
+func (mathNS) Int(v any) (int, error) {
+	if s, ok := v.(string); ok {
+		s = strings.TrimSpace(s)
+		if i, err := strconv.Atoi(s); err == nil {
+			return i, nil
+		}
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, fmt.Errorf("math.Int: %q is not a number", v)
+		}
+		v = f
+	}
+	if v == nil {
+		return 0, nil
+	}
+	n, err := asNumber("math.Int", v)
+	switch {
+	case err != nil:
+		return 0, err
+	case n.isInt:
+		return n.i, nil
+	case math.IsNaN(n.f) || math.IsInf(n.f, 0):
+		return 0, fmt.Errorf("math.Int: %v is not a finite number", v)
+	}
+	return int(n.f), nil
+}
+
+// Float converts a number or the text of one to a float64. Not set converts
+// to 0.
+func (mathNS) Float(v any) (float64, error) {
+	if s, ok := v.(string); ok {
+		f, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+		if err != nil {
+			return 0, fmt.Errorf("math.Float: %q is not a number", v)
+		}
+		return f, nil
+	}
+	if v == nil {
+		return 0, nil
+	}
+	n, err := asNumber("math.Float", v)
+	return n.f, err
 }
