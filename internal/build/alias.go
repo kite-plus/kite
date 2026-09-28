@@ -15,14 +15,17 @@ import (
 // it is now.
 //
 // An alias is a path from the site's root or, without a leading slash, one
-// beside the item's own address, as Hugo reads it. An alias that is the item's
-// own address is left out, since the page itself answers there. One that is
-// another page's address, or another alias's, is refused: publishing both
-// would leave one of them unreachable, and nothing would say which.
+// beside the item's own address, as Hugo reads it. What decides whether two
+// addresses are one is the file a static host serves for them: /about.html
+// is not /about/, and an old /about.html needs a page of its own. An alias
+// whose file is the item's own is left out, since the page itself answers
+// there. One whose file is another page's, or another alias's, is refused:
+// publishing both would leave one of them unreachable, and nothing would say
+// which.
 func (b *Builder) planAliases(p *Plan) error {
 	taken := make(map[string]string, len(p.Targets))
 	for _, t := range p.Targets {
-		taken[Address(t.URL)] = describeTarget(t)
+		taken[t.Path] = describeTarget(t)
 	}
 
 	var aliases []Target
@@ -36,20 +39,19 @@ func (b *Builder) planAliases(p *Plan) error {
 			if err != nil {
 				return fmt.Errorf("build: %s: %w", t.Item.Locator, err)
 			}
-			link := b.opts.Resolver.Rel(site)
-			key := Address(link)
-			if key == Address(t.URL) {
+			file := aliasFile(site)
+			if file == t.Path {
 				continue
 			}
-			if held, ok := taken[key]; ok {
+			if held, ok := taken[file]; ok {
 				return fmt.Errorf("build: %s: the alias %s is the address of %s; take it out of one of them",
 					t.Item.Locator, alias, held)
 			}
-			taken[key] = "an alias of " + string(t.Item.Locator)
+			taken[file] = "an alias of " + string(t.Item.Locator)
 			aliases = append(aliases, Target{
 				Kind:     render.KindAlias,
-				URL:      link,
-				Path:     aliasFile(site),
+				URL:      b.opts.Resolver.Rel(site),
+				Path:     file,
 				Type:     t.Type,
 				Title:    t.Item.Title,
 				Redirect: t.URL,

@@ -21,6 +21,11 @@ type router struct {
 	byItem   map[content.ID]build.Target
 	notFound *build.Target
 
+	// exact holds the pages at old addresses by the spellings a static host
+	// serves them at. /about.html is not /about/ to a host, so an old
+	// /about.html answers with its own page while /about/ is the item.
+	exact map[string]build.Target
+
 	// media maps an output path to the file inside a page bundle it is read
 	// from, using the same table the build publishes from.
 	media map[string]string
@@ -49,12 +54,19 @@ func (r *router) bundleFile(p string) (string, bool) {
 func (r *router) load(p *build.Plan) {
 	byURL := make(map[string]build.Target, p.Len())
 	byItem := make(map[content.ID]build.Target)
+	exact := make(map[string]build.Target)
 	var notFound *build.Target
 
 	for _, t := range p.Targets {
-		if t.Kind == render.KindNotFound {
+		switch t.Kind {
+		case render.KindNotFound:
 			target := t
 			notFound = &target
+			continue
+		case render.KindAlias:
+			for _, spelling := range spellings(t.URL) {
+				exact[spelling] = t
+			}
 			continue
 		}
 		byURL[normalize(t.URL)] = t
@@ -65,7 +77,18 @@ func (r *router) load(p *build.Plan) {
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.byURL, r.byItem, r.notFound = byURL, byItem, notFound
+	r.byURL, r.byItem, r.exact, r.notFound = byURL, byItem, exact, notFound
+}
+
+// spellings are the request paths a static host serves a page's file at: a
+// folder's index at the folder with or without its slash, a file at its own
+// name only.
+func spellings(link string) []string {
+	folder, ok := strings.CutSuffix(link, "/")
+	if !ok {
+		return []string{link}
+	}
+	return []string{link, folder, link + "index.html"}
 }
 
 // planned returns the target the plan holds for an item, whatever address a
@@ -81,6 +104,9 @@ func (r *router) planned(id content.ID) (build.Target, bool) {
 func (r *router) lookup(path string) (build.Target, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	if t, ok := r.exact[path]; ok {
+		return t, true
+	}
 	t, ok := r.byURL[normalize(path)]
 	return t, ok
 }
@@ -97,7 +123,7 @@ func (r *router) notFoundTarget() (build.Target, bool) {
 func (r *router) size() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return len(r.byURL)
+	return len(r.byURL) + len(r.exact)
 }
 
 // normalize reduces the spellings of one address to a single key, the way a

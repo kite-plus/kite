@@ -1063,7 +1063,7 @@ id: 01J8KQ2P3R4S5T6V7W8X9YZTRP
 title: A <trip>
 status: published
 published_at: 2026-02-01T00:00:00Z
-aliases: [/travel/trip/, old-trip, /2019/05/trip.html, "/旅行/", /blog-posts/trip, /posts/trip/]
+aliases: [/travel/trip/, old-trip, /2019/05/trip.html, "/旅行/", /blog-posts/trip, /posts/trip/, /posts/trip.html]
 ---
 Body.
 `)
@@ -1075,6 +1075,7 @@ Body.
 		"2019/05/trip.html",
 		"旅行/index.html",
 		"blog-posts/trip/index.html",
+		"posts/trip.html",
 	} {
 		if !slices.Contains(files, want) {
 			t.Errorf("no page at the alias %s\ngot: %v", want, files)

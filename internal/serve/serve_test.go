@@ -324,6 +324,37 @@ func TestURLSpellingsResolveToOnePage(t *testing.T) {
 	}
 }
 
+// An old address is served as a static host serves the page built for it.
+// /about.html is not /about/ to a host, so it answers with the page sending a
+// reader on, while every spelling of /about/ is the item itself.
+func TestAnOldAddressIsServedAsItIsBuilt(t *testing.T) {
+	root := newProject(t, 1)
+	about := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ900\ntitle: About\nslug: about\nstatus: published\n" +
+		"aliases: [/about.html, /me/]\n---\n\nAbout this site.\n"
+	if err := os.WriteFile(filepath.Join(root, "content", "pages", "about.md"), []byte(about), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler := newServer(t, root, serve.Options{}).Handler()
+	get := func(url string) string {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s: status %d", url, rec.Code)
+		}
+		return rec.Body.String()
+	}
+	for _, url := range []string{"/about.html", "/me/", "/me", "/me/index.html"} {
+		if body := get(url); !strings.Contains(body, `http-equiv="refresh"`) {
+			t.Errorf("%s is not the page at the old address:\n%s", url, body)
+		}
+	}
+	for _, url := range []string{"/about/", "/about", "/about/index.html"} {
+		if body := get(url); strings.Contains(body, `http-equiv="refresh"`) || !strings.Contains(body, "About this site.") {
+			t.Errorf("%s is not the page itself:\n%s", url, body)
+		}
+	}
+}
+
 func TestUnknownPathServesTheNotFoundPage(t *testing.T) {
 	root := newProject(t, 2)
 	handler := newServer(t, root, serve.Options{}).Handler()
