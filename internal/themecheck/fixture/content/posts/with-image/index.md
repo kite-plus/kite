@@ -12,4 +12,6 @@ A page bundle keeps its image beside the text.
 
 ![A square of colour](square.png)
 
-The image is published next to the page.
+The image is published next to the page, and so is one kept in a folder.
+
+![A detail](images/detail.png)

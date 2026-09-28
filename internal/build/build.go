@@ -344,6 +344,10 @@ func (b *Builder) observe(ctx context.Context, pages []hook.PageInfo) error {
 // Both runtimes read this one table rather than each deciding for itself,
 // which is what keeps a preview from showing an image the built site would
 // not have, or the reverse.
+//
+// A bundle's folders are published as they are, so ![](images/01.png) finds
+// its picture, as it does in Hugo. A folder holding an index.md of its own is
+// another item's bundle, and publishes with that item instead.
 func MediaFiles(plan *Plan, media fs.FS) (map[string]string, error) {
 	if media == nil {
 		return nil, nil
@@ -356,38 +360,54 @@ func MediaFiles(plan *Plan, media fs.FS) (map[string]string, error) {
 			continue
 		}
 		dir := string(t.Item.Locator)
-		entries, err := fs.ReadDir(media, dir)
-		if err != nil {
-			// A single-file item has no directory of its own, which is not a
-			// problem to report: it simply owns nothing.
+		// A single-file item has no directory of its own, which is not a
+		// problem to report: it simply owns nothing.
+		if info, err := fs.Stat(media, dir); err != nil || !info.IsDir() {
 			continue
 		}
 
 		outDir := path.Dir(t.Path)
-		for _, e := range entries {
-			name := e.Name()
-			switch {
-			case e.IsDir(), strings.HasPrefix(name, "."):
-				continue
-			case strings.EqualFold(path.Ext(name), ".md"):
-				continue // the source is rendered, not published
+		err := fs.WalkDir(media, dir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || p == dir {
+				return err
+			}
+			name := d.Name()
+			if d.IsDir() {
+				if strings.HasPrefix(name, ".") || isBundle(media, p) {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			if strings.HasPrefix(name, ".") || strings.EqualFold(path.Ext(name), ".md") {
+				return nil // a source is rendered, not published
 			}
 
-			target := path.Join(outDir, name)
+			within := strings.TrimPrefix(p, dir+"/")
+			target := path.Join(outDir, within)
 			// Under the extension style every bundle in a section shares one
 			// output directory, so two items can own a file of the same name.
 			// Publishing one over the other would leave a page showing
 			// another page's picture, with nothing said.
 			if held, taken := owner[target]; taken && held != t.Item.Locator {
-				return nil, fmt.Errorf(
+				return fmt.Errorf(
 					"build: %s and %s both own %s; rename one, or use the directory url style",
-					held, t.Item.Locator, name)
+					held, t.Item.Locator, within)
 			}
 			owner[target] = t.Item.Locator
-			out[target] = path.Join(dir, name)
+			out[target] = p
+			return nil
+		})
+		if err != nil {
+			return nil, err
 		}
 	}
 	return out, nil
+}
+
+// isBundle reports whether a directory holds an item of its own.
+func isBundle(media fs.FS, dir string) bool {
+	_, err := fs.Stat(media, path.Join(dir, "index.md"))
+	return err == nil
 }
 
 // cached reports whether a target's previous output is still valid.

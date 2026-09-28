@@ -436,10 +436,12 @@ kite doctor --fix-ids
 
 A post can be a single file, `content/posts/hello.md`, as Hugo sites mostly
 write them, or a bundle, `content/posts/hello/index.md` with its pictures
-beside it, which is what the studio creates. Either is published at
-`/posts/<slug>/` wherever in `content/posts/` it sits, and Hugo's `_index.md`
-is left out. A picture dropped on a post kept as a single file goes among the
-site's own files, in `static/uploads/`.
+beside it, which is what the studio creates. A bundle's folders are published
+with it as they are, so a picture kept in `images/` shows where the text
+links it; a folder with an `index.md` of its own is another post. Either is
+published at `/posts/<slug>/` wherever in `content/posts/` it sits, and
+Hugo's `_index.md` is left out. A picture dropped on a post kept as a single
+file goes among the site's own files, in `static/uploads/`.
 
 Kite reads the front matter keys Hugo writes as its own: `date` is when an
 item was published, `lastmod` when it last changed, `draft: true` makes it a

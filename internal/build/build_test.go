@@ -954,6 +954,66 @@ func TestBundlesWithTheirOwnDirectoriesDoNotCollide(t *testing.T) {
 	}
 }
 
+// A bundle that keeps its pictures in a folder, as many Hugo sites do, has
+// them published at the same place under the page, or ![](images/01.png) is
+// a broken picture. A folder that is another item's bundle publishes with it,
+// not twice.
+func TestABundlesFoldersArePublishedWithIt(t *testing.T) {
+	plan := &build.Plan{Targets: []build.Target{
+		{Kind: render.KindSingle, Path: "posts/trip/index.html",
+			Item: &content.Content{ID: "1", Locator: "content/posts/trip"}},
+		{Kind: render.KindSingle, Path: "posts/day/index.html",
+			Item: &content.Content{ID: "2", Locator: "content/posts/trip/day"}},
+		{Kind: render.KindSingle, Path: "posts/flat/index.html",
+			Item: &content.Content{ID: "3", Locator: "content/posts/flat.md"}},
+	}}
+	media := fstest.MapFS{
+		"content/posts/trip/index.md":          {Data: []byte("x")},
+		"content/posts/trip/cover.jpg":         {Data: []byte("cover")},
+		"content/posts/trip/images/01.png":     {Data: []byte("one")},
+		"content/posts/trip/images/raw/02.png": {Data: []byte("two")},
+		"content/posts/trip/images/notes.md":   {Data: []byte("a source, not published")},
+		"content/posts/trip/.hidden/x.png":     {Data: []byte("hidden")},
+		"content/posts/trip/day/index.md":      {Data: []byte("x")},
+		"content/posts/trip/day/sea.jpg":       {Data: []byte("sea")},
+		"content/posts/flat.md":                {Data: []byte("x")},
+	}
+
+	files, err := build.MediaFiles(plan, media)
+	if err != nil {
+		t.Fatalf("MediaFiles: %v", err)
+	}
+	want := map[string]string{
+		"posts/trip/cover.jpg":         "content/posts/trip/cover.jpg",
+		"posts/trip/images/01.png":     "content/posts/trip/images/01.png",
+		"posts/trip/images/raw/02.png": "content/posts/trip/images/raw/02.png",
+		"posts/day/sea.jpg":            "content/posts/trip/day/sea.jpg",
+	}
+	if !maps.Equal(files, want) {
+		t.Errorf("files = %v\nwant %v", files, want)
+	}
+}
+
+// Under the extension style two bundles' folders land in one directory too,
+// and a file both would publish is refused by its whole path.
+func TestTwoBundlesCannotQuietlyPublishOneFileInAFolder(t *testing.T) {
+	plan := &build.Plan{Targets: []build.Target{
+		{Kind: render.KindSingle, Path: "posts/one.html",
+			Item: &content.Content{ID: "1", Locator: "content/posts/one"}},
+		{Kind: render.KindSingle, Path: "posts/two.html",
+			Item: &content.Content{ID: "2", Locator: "content/posts/two"}},
+	}}
+	media := fstest.MapFS{
+		"content/posts/one/images/a.png": {Data: []byte("one")},
+		"content/posts/two/images/a.png": {Data: []byte("two")},
+		"content/posts/two/images/b.png": {Data: []byte("two")},
+	}
+	_, err := build.MediaFiles(plan, media)
+	if err == nil || !strings.Contains(err.Error(), "images/a.png") {
+		t.Errorf("err = %v, want a refusal naming images/a.png", err)
+	}
+}
+
 // A page is drawn with the layout its front matter names, as Hugo writes it.
 // A page that names none, or names something that could not be a template's
 // file name, keeps its type's own template.
