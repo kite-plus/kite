@@ -140,8 +140,10 @@ func New(opts Options) *Renderer {
 	}
 
 	var rendererOpts []renderer.Option
+	var htmlOpts []html.Option
 	if opts.UnsafeHTML {
 		rendererOpts = append(rendererOpts, html.WithUnsafe())
+		htmlOpts = append(htmlOpts, html.WithUnsafe())
 	}
 	if opts.HardWraps {
 		rendererOpts = append(rendererOpts, html.WithHardWraps())
@@ -166,6 +168,7 @@ func New(opts Options) *Renderer {
 	rendererOpts = append(rendererOpts, renderer.WithNodeRenderers(
 		util.Prioritized(moreRenderer{}, 100),
 		util.Prioritized(tagRenderer{}, 100),
+		util.Prioritized(newPictureRenderer(htmlOpts...), 100),
 	))
 
 	return &Renderer{md: goldmark.New(
@@ -358,6 +361,11 @@ func (r *Renderer) Render(source string, sc Shortcodes) (*Document, error) {
 	if s != nil && s.err != nil {
 		return nil, s.err
 	}
+	written, _ := pc.Get(writtenKey).(map[ast.Node][]byte)
+	if pictures, ok := sc.(Pictures); ok {
+		drawing.Store(root, &picturing{pictures: pictures, written: written})
+		defer drawing.Delete(root)
+	}
 
 	var buf bytes.Buffer
 	if err := r.md.Renderer().Render(&buf, src, root); err != nil {
@@ -374,7 +382,6 @@ func (r *Renderer) Render(source string, sc Shortcodes) (*Document, error) {
 	}
 
 	doc := &Document{HTML: html}
-	written, _ := pc.Get(writtenKey).(map[ast.Node][]byte)
 	if err := collect(root, src, doc, written); err != nil {
 		return nil, err
 	}

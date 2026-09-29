@@ -227,6 +227,23 @@ web-dev 都是 `/tags/web-dev/`。它的页面列出带着其中任何一种写�
 源文件旁边，名字是 `river_<key>.jpg`，并保存在 `.kite/cache/images/`，之后的构建和
 `kite serve` 直接用。
 
+正文里的图片，站点或主题有 `layouts/_markup/render-image.html` 时由它来画，和 Hugo 一样；
+手机拍的照片就这样缩小后再发布：
+
+```html
+{{- with .Page.Resources.Get .Destination -}}
+  {{- with img.Fit "1600x1600" . -}}
+  <img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $.Text }}">
+  {{- end -}}
+{{- else -}}
+  <img src="{{ .Src }}" alt="{{ .Text }}"{{ with .Title }} title="{{ . }}"{{ end }}>
+{{- end -}}
+```
+
+`.Destination` 是正文里写的图片地址，写的是 bundle 里的文件时，正好是 `.Resources.Get` 要的名字；
+`.Src` 是没有这个模板时页面引用它的地址，正文从站点根开始写的，前面带上站点的路径。
+`.Text` 是图片的替代文字，`.Title` 是标题。
+
 文章的封面是 front matter 里的 `cover`，模板从 `.Params.cover` 读到的就是作者写的原文；
 `.Images` 按出现顺序列出正文里的图片，也是原文。列表里的页面同样带着这两样。主题解析它们的方式，
 和浏览器解析正文里的图片一样：完整地址原样用，从站点根开始写的用 `url.Rel`，其余的相对于页面地址。

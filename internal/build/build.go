@@ -86,6 +86,9 @@ type Builder struct {
 	draws     bool
 	summaries sync.Map
 
+	// drawsPictures says the site or the theme draws a body's pictures.
+	drawsPictures bool
+
 	// made holds the pictures templates had made, by the path each is
 	// published at.
 	made sync.Map
@@ -114,7 +117,12 @@ func New(opts Options) (*Builder, error) {
 		opts.Now = time.Now()
 	}
 
-	b := &Builder{opts: opts, rewrites: opts.Hooks.TransformsMarkdown(), draws: opts.Engine.HasShortcodes()}
+	b := &Builder{
+		opts:          opts,
+		rewrites:      opts.Hooks.TransformsMarkdown(),
+		draws:         opts.Engine.HasShortcodes(),
+		drawsPictures: opts.Engine.HasMarkup("render-image"),
+	}
 	b.buildCtx = NewContext(opts.Now, b.sharedKey()...)
 	b.site = b.newSite(b.buildCtx)
 	return b, nil
@@ -806,7 +814,22 @@ type shortcodes struct {
 }
 
 func (s *shortcodes) Draw(call *markdown.Call) (string, error) {
-	// Made on the first call, since most bodies make none.
+	return s.b.opts.Engine.Shortcode(call.Name, render.NewShortcode(call, s.pageOf(), s.b.site))
+}
+
+// Picture draws a picture the body shows with layouts/_markup/render-image.html,
+// when the site or its theme has one.
+func (s *shortcodes) Picture(p markdown.Picture) (string, bool, error) {
+	if !s.b.drawsPictures {
+		return "", false, nil
+	}
+	out, err := s.b.opts.Engine.Markup("render-image", render.NewBodyImage(p, s.pageOf(), s.b.site))
+	return out, true, err
+}
+
+// pageOf is the page whose body is drawn, made on the first call, since most
+// bodies make none.
+func (s *shortcodes) pageOf() render.Page {
 	if s.page == nil {
 		out := s.b.opts.Resolver.OutputPath(s.b.opts.Resolver.For(s.item))
 		s.page = render.NewPage(s.item, render.PageOptions{
@@ -816,7 +839,7 @@ func (s *shortcodes) Draw(call *markdown.Call) (string, error) {
 			Resources: s.b.resources(s.item.Locator, out),
 		})
 	}
-	return s.b.opts.Engine.Shortcode(call.Name, render.NewShortcode(call, s.page, s.b.site))
+	return s.page
 }
 
 // lineOf names the place in an item's file a line of its body is at: file

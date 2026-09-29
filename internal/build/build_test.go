@@ -1694,3 +1694,45 @@ func TestTemplatesMakePicturesFromABundle(t *testing.T) {
 		t.Errorf("the thumbnail is %+v, %v; want 40x40", cfg, err)
 	}
 }
+
+// A site draws the pictures a post's text shows with a template of its own,
+// which can publish a smaller copy of a large photo in its place, as a phone's
+// photos want; a picture outside the bundle is drawn from where it is.
+func TestTheTextsPicturesAreDrawnByTheSite(t *testing.T) {
+	f := newFixtureAt(t, 1, "https://example.com/blog/")
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	hook := `{{ with .Page.Resources.Get .Destination }}{{ with img.Fit "100x100" . }}` +
+		`<img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $.Text }}">{{ end }}` +
+		`{{ else }}<img src="{{ .Src }}" alt="{{ .Text }}">{{ end }}`
+	f.engine = theme.NewEngine(theme.Options{
+		Sources: []theme.Source{
+			{Name: "site", FS: fstest.MapFS{"_markup/render-image.html": {Data: []byte(hook)}}},
+			{Name: "default", FS: th.Layouts},
+		},
+		Links: f.resolve,
+	})
+	f.add(t, "content/posts/trip/index.md", post("01J8KQ2P3R4S5T6V7W8X9YZTRP", "trip", "2026-01-20T00:00:00Z", "")+
+		"\n![The river](river.png)\n\n![A logo](/uploads/logo.png)\n")
+	if err := os.WriteFile(filepath.Join(f.root, "content", "posts", "trip", "river.png"), pictureFile(t, 400, 200), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.run(t, f.out, func(o *build.Options) {
+		o.Media = os.DirFS(f.root)
+		o.Images = img.NewProcessor("")
+		o.Markdown = markdown.New(markdown.Options{BasePath: "/blog/"})
+	})
+	page := readFile(t, f.out, "posts/trip/index.html")
+	made := regexp.MustCompile(`<img src="/blog/(posts/trip/river_[0-9a-f]{16}\.png)" width="100" height="50" alt="The river">`).FindStringSubmatch(page)
+	if made == nil {
+		t.Fatalf("the photo is not drawn smaller: %s", excerptOf(page, "<img"))
+	}
+	if _, err := os.Stat(filepath.Join(f.out, filepath.FromSlash(made[1]))); err != nil {
+		t.Errorf("the smaller photo was not written: %v", err)
+	}
+	if !strings.Contains(page, `<img src="/blog/uploads/logo.png" alt="A logo">`) {
+		t.Errorf("a picture outside the bundle is not drawn from where it is: %s", excerptOf(page, "A logo"))
+	}
+}

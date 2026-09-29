@@ -273,6 +273,25 @@ A picture is made once, the first time a template asks where it is or how
 large, published beside its source as `river_<key>.jpg`, and kept in
 `.kite/cache/images/`, which a later build and `kite serve` use.
 
+The pictures a post's text shows are drawn by `layouts/_markup/render-image.html`
+when the site or its theme has one, as in Hugo, which is how a phone's photos
+go out smaller than they were taken:
+
+```html
+{{- with .Page.Resources.Get .Destination -}}
+  {{- with img.Fit "1600x1600" . -}}
+  <img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $.Text }}">
+  {{- end -}}
+{{- else -}}
+  <img src="{{ .Src }}" alt="{{ .Text }}"{{ with .Title }} title="{{ . }}"{{ end }}>
+{{- end -}}
+```
+
+`.Destination` is the picture's address as the text writes it, which names a
+file of the bundle as `.Resources.Get` takes it; `.Src` is where a page shows
+it from without the template, under the site's path when the text names it
+from the site's root. `.Text` is its alternative text and `.Title` its title.
+
 A post's cover is the `cover` in its front matter, which a template reads as
 written in `.Params.cover`, and `.Images` lists the pictures its text shows,
 in order and as written; a listed page carries both. A theme resolves either

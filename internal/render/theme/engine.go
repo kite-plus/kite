@@ -115,6 +115,27 @@ func (e *Engine) Shortcode(name string, data any) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return execute(tmpl, data)
+}
+
+// HasMarkup reports whether the site or the theme draws a kind of markdown
+// node itself, as layouts/_markup/render-image.html draws a body's pictures.
+func (e *Engine) HasMarkup(name string) bool {
+	_, err := e.read(MarkupDir + "/" + name + ".html")
+	return err == nil
+}
+
+// Markup draws a markdown node with the site's or the theme's template for
+// its kind, with data as dot.
+func (e *Engine) Markup(name string, data any) (string, error) {
+	tmpl, err := e.special(MarkupDir, name)
+	if err != nil {
+		return "", err
+	}
+	return execute(tmpl, data)
+}
+
+func execute(tmpl *template.Template, data any) (string, error) {
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", err
@@ -142,7 +163,20 @@ func (e *Engine) HasShortcodes() bool {
 
 func (e *Engine) shortcode(name string) (*template.Template, error) {
 	file := ShortcodesDir + "/" + name + ".html"
-	key := "shortcode|" + name
+	if !fs.ValidPath(file) {
+		return nil, fmt.Errorf("%w: %q cannot name a template", ErrNoShortcode, name)
+	}
+	if _, err := e.read(file); err != nil {
+		return nil, fmt.Errorf("%w: add %s/%s to the site or the theme", ErrNoShortcode, LayoutsDir, file)
+	}
+	return e.special(ShortcodesDir, name)
+}
+
+// special loads a template of a reserved directory, a shortcode or a render
+// hook, with every partial.
+func (e *Engine) special(dir, name string) (*template.Template, error) {
+	file := dir + "/" + name + ".html"
+	key := dir + "|" + name
 
 	e.mu.RLock()
 	cached, ok := e.cache[key]
@@ -151,12 +185,9 @@ func (e *Engine) shortcode(name string) (*template.Template, error) {
 		return cached, nil
 	}
 
-	if !fs.ValidPath(file) {
-		return nil, fmt.Errorf("%w: %q cannot name a template", ErrNoShortcode, name)
-	}
 	src, err := e.read(file)
 	if err != nil {
-		return nil, fmt.Errorf("%w: add %s/%s to the site or the theme", ErrNoShortcode, LayoutsDir, file)
+		return nil, err
 	}
 	root := template.New("kite").Funcs(e.funcs)
 	root = root.Funcs(template.FuncMap{

@@ -410,7 +410,9 @@ type Shortcode interface {
 - **只有模板显示出来的内容才算数。** 模板没有调用 `.Inner` 时，里面的字不计入页面的 `WordCount`、摘要和交给钩子的正文（比如搜索索引），里面的标题也不进 `TableOfContents`。索引不知道模板显示什么，所以调用了短代码的条目，列表里的摘要和字数由构建按页面的算法重新算出。
 - 没有模板的短代码、写错的标签都让构建停下，并给出文件和行号，而不是把标签原样发布；后台的预览同样报出这个错误。
 
-参数没有 schema、不做校验，见 [§11.3](#113-明确不做的东西)。`kite theme verify` 的夹具站点自带两个短代码，所以正文里的短代码也在 build 与 serve 的逐字节比较之内。
+参数没有 schema、不做校验，见 [§11.3](#113-明确不做的东西)。
+
+**render hook**：正文里的图片由 `layouts/_markup/render-image.html` 画（站点的优先于主题的），没有这个模板时按 Markdown 原样输出。模板拿到的 `.` 是 `BodyImage`：`Destination`（正文里写的地址，写 bundle 里的文件时就是 `.Resources.Get` 要的名字）、`Src`（没有模板时页面引用它的地址，从站点根写的带上站点路径）、`Text`（替代文字）、`Title`、`Page`、`Site`。配合 [§6.7](#67-resourceasset-pipeline-的产物已冻结) 的 `img.*`，正文里的照片可以缩小后再发布。链接、标题、代码块的 hook 还没有。`kite theme verify` 的夹具站点自带两个短代码，所以正文里的短代码也在 build 与 serve 的逐字节比较之内。
 
 ---
 

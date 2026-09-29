@@ -38,6 +38,10 @@ const PartialsDir = "_partials"
 // {{< figure src="a.jpg" >}} calls _shortcodes/figure.html.
 const ShortcodesDir = "_shortcodes"
 
+// MarkupDir holds the templates that draw kinds of markdown node in a body,
+// as _markup/render-image.html draws its pictures.
+const MarkupDir = "_markup"
+
 // ManifestName is the theme descriptor.
 const ManifestName = "theme.yaml"
 

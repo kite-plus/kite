@@ -63,3 +63,36 @@ func (s shortcodeModel) Parent() Shortcode {
 	}
 	return shortcodeModel{call: s.call.Parent, page: s.page, site: s.site}
 }
+
+// BodyImage is what a render-image template receives as dot: a picture a
+// page's body shows, ![Text](Destination "Title").
+type BodyImage interface {
+	// Destination is the picture's address as the body writes it, which
+	// names a file of the page's bundle as .Resources.Get takes it.
+	Destination() string
+	// Src is the address a page shows the picture from without a template:
+	// under the site's path when the body names it from the site's root.
+	Src() string
+	Text() string
+	Title() string
+	Page() Page
+	Site() Site
+}
+
+type bodyImageModel struct {
+	p    markdown.Picture
+	page Page
+	site Site
+}
+
+// NewBodyImage returns the BodyImage view of a picture a page's body shows.
+func NewBodyImage(p markdown.Picture, page Page, site Site) BodyImage {
+	return bodyImageModel{p: p, page: page, site: site}
+}
+
+func (b bodyImageModel) Destination() string { return b.p.Destination }
+func (b bodyImageModel) Src() string         { return b.p.Src }
+func (b bodyImageModel) Text() string        { return b.p.Text }
+func (b bodyImageModel) Title() string       { return b.p.Title }
+func (b bodyImageModel) Page() Page          { return b.page }
+func (b bodyImageModel) Site() Site          { return b.site }
