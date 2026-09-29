@@ -43,6 +43,34 @@ func TestCandidateOrder(t *testing.T) {
 	}
 }
 
+// A home, taxonomy or term page falls back to list.html, as the contract
+// says, so a theme needs no more than a list and a single template.
+func TestListingsFallBackToTheListTemplate(t *testing.T) {
+	for kind, want := range map[string][]string{
+		"home":     {"post/home.html", "home.html", "list.html"},
+		"taxonomy": {"tags/taxonomy.html", "taxonomy.html", "list.html"},
+		"term":     {"tags/term.html", "term.html", "list.html"},
+		"list":     {"tags/list.html", "list.html"},
+		"404":      {"tags/404.html", "404.html"},
+	} {
+		typ := "tags"
+		if kind == "home" {
+			typ = "post"
+		}
+		if got := theme.Candidates(theme.Target{Kind: kind, Type: typ}, nil); !slices.Equal(got, want) {
+			t.Errorf("%s: candidates = %v, want %v", kind, got, want)
+		}
+	}
+
+	th := fstest.MapFS{"list.html": file(`listed`), "single.html": file(`single`)}
+	e := theme.NewEngine(theme.Options{Sources: []theme.Source{{Name: "theme", FS: th}}})
+	for _, kind := range []string{"home", "taxonomy", "term"} {
+		if out, err := e.Render(theme.Target{Kind: kind, Type: "tags"}, nil); err != nil || string(out) != "listed" {
+			t.Errorf("%s drew %q, %v; want list.html", kind, out, err)
+		}
+	}
+}
+
 func TestNoCandidateRecursesThroughSections(t *testing.T) {
 	// Section-path recursion is what makes a lookup order impossible to
 	// explain, so a deep type name must not expand into a ladder of parents.

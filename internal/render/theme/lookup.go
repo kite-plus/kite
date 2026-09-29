@@ -83,6 +83,15 @@ func Candidates(t Target, formats map[string]Format) []string {
 			out = append(out, prefix+filename(base, "", format))
 		}
 	}
+	// A home, taxonomy or term page is a listing, and one a theme draws no
+	// template of its own for is drawn as any listing is.
+	switch t.Kind {
+	case "home", "taxonomy", "term":
+		if t.Lang != "" {
+			out = append(out, filename("list", t.Lang, format))
+		}
+		out = append(out, filename("list", "", format))
+	}
 	return out
 }
 
