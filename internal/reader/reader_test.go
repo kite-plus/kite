@@ -260,8 +260,11 @@ func TestTermsAreCountedAndFoundBySlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CountTerms: %v", err)
 	}
-	want := []content.TermCount{{Taxonomy: "tags", Term: "Go", Count: 3}, {Taxonomy: "tags", Term: "Web Dev", Count: 2}}
-	if !slices.Equal(counts, want) {
+	want := []content.TermCount{
+		{Taxonomy: "tags", Term: "Go", Count: 3, Variants: []string{"GO", "go"}},
+		{Taxonomy: "tags", Term: "Web Dev", Count: 2, Variants: []string{"web-dev"}},
+	}
+	if !reflect.DeepEqual(counts, want) {
 		t.Errorf("counts = %v, want %v", counts, want)
 	}
 

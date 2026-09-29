@@ -23,6 +23,7 @@ import { useTerms } from "@/hooks/useContents";
 import { useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { composing } from "@/lib/ime";
 import { resolveLink } from "@/lib/links";
+import { termSlug } from "@/lib/terms";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -382,7 +383,9 @@ function FieldChip({
 /**
  * TermsChip holds the terms an item carries in one taxonomy. Terms the
  * project already uses are offered, since a tag typed slightly differently
- * is a second tag; anything else typed becomes a new one.
+ * is a second tag; anything else typed becomes a new one. A term is matched
+ * by its slug, as the site does: one written another way is the term the
+ * list already has, not a new one.
  */
 function TermsChip({
   taxonomy,
@@ -403,14 +406,18 @@ function TermsChip({
   const [held, setHeld] = useState<string[]>([]);
 
   const known = terms.data?.items ?? [];
-  const count = new Map(known.map((item) => [item.term, item.count]));
+  const count = new Map(known.map((item) => [termSlug(item.term), item.count]));
+  const heldSlugs = new Set(held.map(termSlug));
   const listed = [
     ...held,
-    ...value.filter((term) => !held.includes(term) && !count.has(term)),
-    ...known.map((item) => item.term).filter((term) => !held.includes(term)),
+    ...value.filter((term) => !held.includes(term) && !count.has(termSlug(term))),
+    ...known.map((item) => item.term).filter((term) => !heldSlugs.has(termSlug(term))),
   ];
   const typed = query.trim();
-  const fresh = typed !== "" && !listed.includes(typed);
+  // The listed term the typed text writes another way, if any. Its row takes
+  // the typed text as its value, so the filter keeps it in sight.
+  const same = typed === "" ? undefined : listed.find((term) => termSlug(term) === termSlug(typed));
+  const fresh = typed !== "" && same === undefined && termSlug(typed) !== "";
   const Icon = taxonomy === "tags" ? Tags : taxonomy === "categories" ? Folder : Tag;
 
   const toggle = (term: string) => {
@@ -455,10 +462,14 @@ function TermsChip({
                 </CommandItem>
               )}
               {listed.map((term) => (
-                <CommandItem key={term} value={term} onSelect={() => toggle(term)}>
+                <CommandItem
+                  key={term}
+                  value={term === same ? `create:${typed}` : term}
+                  onSelect={() => toggle(term)}
+                >
                   <Check className={cn("text-primary", !value.includes(term) && "invisible")} />
                   <span className="flex-1 truncate">{term}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">{count.get(term)}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{count.get(termSlug(term))}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

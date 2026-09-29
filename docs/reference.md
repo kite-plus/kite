@@ -24,6 +24,13 @@ An item that changed on disk since it was loaded is refused rather than
 overwritten, and the studio says so. Editing is available in English and
 简体中文, chosen from the browser.
 
+Tags and categories are counted the way the site lists them, so Go, go and
+GO are one tag, called the way most posts write it, and its card says how
+else it is written. Renaming a tag writes the new name on every post that
+carries it, however each wrote it, so renaming Go to Go writes it one way;
+removing one takes off every way of writing it. The editor offers a tag in
+use when it is typed another way, rather than starting a new one.
+
 ### Signing in
 
 On localhost a project with no password is open, because there is nobody else

@@ -288,14 +288,17 @@ func TestATermIsEveryWayItIsWritten(t *testing.T) {
 			t.Errorf("%s = %s on %d of %d items at %s, want Go on 4 at /tags/go/",
 				asked, term.Term, term.Count, len(term.Items), term.URL)
 		}
+		if !slices.Equal(term.Variants, []string{"GO", "go"}) {
+			t.Errorf("%s is also written %v, want GO and go", asked, term.Variants)
+		}
 	}
 
 	terms := get[api.List[api.TermCount]](t, h, api.Prefix+"/taxonomies/tags/terms", http.StatusOK)
 	var names []string
 	for _, tc := range terms.Items {
-		names = append(names, fmt.Sprintf("%s:%d", tc.Term, tc.Count))
+		names = append(names, fmt.Sprintf("%s:%d%v", tc.Term, tc.Count, tc.Variants))
 	}
-	if want := []string{"Go:4", "Notes:2"}; !slices.Equal(names, want) {
+	if want := []string{"Go:4[GO go]", "Notes:2[]"}; !slices.Equal(names, want) {
 		t.Errorf("terms = %v, want %v", names, want)
 	}
 

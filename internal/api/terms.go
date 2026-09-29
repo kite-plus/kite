@@ -120,12 +120,13 @@ func (s *Server) writeTerm(w http.ResponseWriter, r *http.Request, view View, ta
 		return
 	}
 
-	name := termName(items, trashed, taxonomy, term)
+	names := spellings(items, trashed, taxonomy, term)
 	out := TermDetail{
-		Term:  name,
-		Count: len(items) - len(trashed),
-		URL:   view.Resolver.ForTerm(taxonomy, name, view.Site.Language),
-		Items: make([]TermItem, 0, len(items)),
+		Term:     names[0],
+		Count:    len(items) - len(trashed),
+		URL:      view.Resolver.ForTerm(taxonomy, names[0], view.Site.Language),
+		Variants: names[1:],
+		Items:    make([]TermItem, 0, len(items)),
 	}
 	for _, item := range items {
 		out.Items = append(out.Items, TermItem{
@@ -137,28 +138,29 @@ func (s *Server) writeTerm(w http.ResponseWriter, r *http.Request, view View, ta
 	writeJSON(w, http.StatusOK, out)
 }
 
-// termName is what the term list calls a term: the way most of the items
-// outside the trash write it, or all of them when every one is trashed.
-func termName(items []content.Summary, trashed map[content.ID]bool, taxonomy, term string) string {
+// spellings lists the ways a term's items write it, its name first, as the
+// term list gives them: over the items outside the trash, or all of them
+// when every one is trashed.
+func spellings(items []content.Summary, trashed map[content.ID]bool, taxonomy, term string) []string {
 	slug := content.TermSlug(term)
 	count := func(withTrashed bool) map[string]int {
-		spellings := make(map[string]int)
+		counts := make(map[string]int)
 		for _, item := range items {
 			if trashed[item.ID] && !withTrashed {
 				continue
 			}
 			for _, t := range item.Taxonomies[taxonomy] {
 				if content.TermSlug(t) == slug {
-					spellings[t]++
+					counts[t]++
 				}
 			}
 		}
-		return spellings
+		return counts
 	}
-	if spellings := count(false); len(spellings) > 0 {
-		return content.TermName(spellings)
+	if live := count(false); len(live) > 0 {
+		return content.TermSpellings(live)
 	}
-	return content.TermName(count(true))
+	return content.TermSpellings(count(true))
 }
 
 // changeTerm renames the term to to, or removes it when to is empty, on every

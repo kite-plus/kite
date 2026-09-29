@@ -103,9 +103,10 @@ func (s *Server) handleTerms(w http.ResponseWriter, r *http.Request) {
 	out := make([]TermCount, 0, len(counts))
 	for _, c := range counts {
 		out = append(out, TermCount{
-			Term:  c.Term,
-			Count: c.Count,
-			URL:   view.Resolver.ForTerm(taxonomy, c.Term, view.Site.Language),
+			Term:     c.Term,
+			Count:    c.Count,
+			URL:      view.Resolver.ForTerm(taxonomy, c.Term, view.Site.Language),
+			Variants: c.Variants,
 		})
 	}
 	writeJSON(w, http.StatusOK, List[TermCount]{Items: out})

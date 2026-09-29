@@ -550,9 +550,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read one term with every item that carries it, trashed ones included. */
+        /** Read one term with every item that carries it, however each writes it, trashed ones included. */
         get: operations["getTerm"];
-        /** Rename a term on every item that carries it, merging it into another term when the new name is already in use. */
+        /** Rename a term on every item that carries it, however each writes it, merging it into another term when the new name is already in use. */
         put: operations["renameTerm"];
         post?: never;
         /** Take a term off every item that carries it. The items stay. */
@@ -1026,6 +1026,7 @@ export interface components {
             count: number;
             term: string;
             url: string;
+            variants?: string[];
         };
         TermCountList: {
             has_more: boolean;
@@ -1038,6 +1039,7 @@ export interface components {
             items: components["schemas"]["TermItem"][];
             term: string;
             url: string;
+            variants?: string[];
         };
         TermItem: {
             /** Format: date-time */

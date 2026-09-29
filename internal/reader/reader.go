@@ -263,7 +263,12 @@ func (r *Reader) CountTerms(ctx context.Context, taxonomy string, q content.Quer
 
 	out := make([]content.TermCount, 0, len(bySlug))
 	for _, t := range bySlug {
-		out = append(out, content.TermCount{Taxonomy: taxonomy, Term: content.TermName(t.spellings), Count: t.items})
+		names := content.TermSpellings(t.spellings)
+		tc := content.TermCount{Taxonomy: taxonomy, Term: names[0], Count: t.items}
+		if len(names) > 1 {
+			tc.Variants = names[1:]
+		}
+		out = append(out, tc)
 	}
 	// Most used first, then by name, so that a tag cloud keeps its order.
 	slices.SortFunc(out, func(a, b content.TermCount) int {

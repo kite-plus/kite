@@ -1,6 +1,11 @@
 package content
 
-import "strings"
+import (
+	"cmp"
+	"maps"
+	"slices"
+	"strings"
+)
 
 // TermSlug is a term as its address writes it: trimmed, with A to Z in lower
 // case and each run of spaces, tabs and slashes one dash, so "Web Dev" is
@@ -27,16 +32,20 @@ func TermSlug(term string) string {
 	return strings.Trim(b.String(), "-")
 }
 
-// TermName is what a term written more than one way is called, given how
-// many items write it each way: the way most of them do, and of ways used
-// alike, the first in byte order, so Go before go.
+// TermSpellings lists the ways items write one term, given how many items
+// write it each way: the way most of them do first, and ways used alike in
+// byte order, so Go before go. The first is what the term is called.
+func TermSpellings(spellings map[string]int) []string {
+	return slices.SortedFunc(maps.Keys(spellings), func(a, b string) int {
+		return cmp.Or(cmp.Compare(spellings[b], spellings[a]), strings.Compare(a, b))
+	})
+}
+
+// TermName is what a term written more than one way is called: the first of
+// its [TermSpellings].
 func TermName(spellings map[string]int) string {
-	var name string
-	most := 0
-	for spelling, n := range spellings {
-		if n > most || n == most && spelling < name {
-			name, most = spelling, n
-		}
+	if names := TermSpellings(spellings); len(names) > 0 {
+		return names[0]
 	}
-	return name
+	return ""
 }

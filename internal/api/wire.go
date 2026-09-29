@@ -84,6 +84,9 @@ type TermCount struct {
 	Term  string `json:"term"`
 	Count int    `json:"count"`
 	URL   string `json:"url"`
+	// Variants are the other ways the items write the term, such as go
+	// beside Go, the most used first.
+	Variants []string `json:"variants,omitempty"`
 }
 
 // ContentType describes one kind of content, including the field schema an
@@ -170,6 +173,9 @@ type TermDetail struct {
 	// list counts it.
 	Count int    `json:"count"`
 	URL   string `json:"url"`
+	// Variants are the other ways its items write the term, as the term list
+	// gives them.
+	Variants []string `json:"variants,omitempty"`
 	// Items lists every item carrying the term, trashed ones included and
 	// marked: a change to the term reaches them too, so that restoring one
 	// does not bring back a term that was renamed or removed.

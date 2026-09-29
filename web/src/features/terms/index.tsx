@@ -59,7 +59,8 @@ const grid = "grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3";
  *
  * A term is only a name and a count, so each gets a card in a grid rather
  * than a table row stretched across the page. Renaming, merging or deleting
- * one rewrites every item that carries it.
+ * one rewrites every item that carries it. Terms with one slug are one card,
+ * named as most items write it, with the other ways it is written under it.
  */
 export function Terms() {
   const { taxonomy } = route.useParams();
@@ -87,7 +88,11 @@ export function Terms() {
     () => [
       {
         accessorKey: "term",
-        filterFn: "includesString",
+        // A term is found by any of the ways it is written.
+        filterFn: (row, _id, search: string) =>
+          [row.original.term, ...(row.original.variants ?? [])].some((name) =>
+            name.toLowerCase().includes(search.toLowerCase()),
+          ),
         sortingFn: (a, b) => a.original.term.localeCompare(b.original.term, locale),
       },
       {
@@ -309,6 +314,11 @@ function TermCard({
         <span className="me-1 text-2xl font-semibold text-foreground tabular-nums">{term.count}</span>
         {unit}
       </p>
+      {term.variants?.length ? (
+        <p className="-mt-2 truncate text-xs text-muted-foreground">
+          {t("terms.variants", { list: term.variants.join(t("form.listJoin")) })}
+        </p>
+      ) : null}
     </div>
   );
 }

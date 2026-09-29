@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
 import { useTerm, useTermChanges } from "@/hooks/useTerm";
+import { termSlug } from "@/lib/terms";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   Command,
@@ -29,6 +30,10 @@ export interface TermAction {
  * TermDialog renames, merges or deletes a term. Each is a change to every
  * item carrying the term, so the dialog lists those items first, and the
  * change is refused if any of them changed after the list was read.
+ *
+ * Terms with one slug are one term, as on the site: a rename writes the new
+ * name over every way the items write it, so renaming a term to its own name
+ * writes it one way, and only a name with another term's slug merges.
  */
 export function TermDialog({
   taxonomy,
@@ -66,17 +71,29 @@ export function TermDialog({
 
   const { mode, term } = action;
   const target = value.trim();
-  const merging = mode === "merge" || (target !== term && terms.some((other) => other.term === target));
+  const slug = termSlug(term);
+  const variants = detail.data?.variants ?? [];
+  const respelled = mode === "rename" && termSlug(target) === slug;
+  const into = respelled ? undefined : terms.find((other) => termSlug(other.term) === termSlug(target));
+  const merging = mode === "merge" || into !== undefined;
+  const unifying = respelled && target === term;
   // The terms to merge into, by name, as a list to search rather than scroll.
   const others = useMemo(
     () =>
       terms
-        .filter((other) => other.term !== term)
+        .filter((other) => termSlug(other.term) !== slug)
         .sort((a, b) => a.term.localeCompare(b.term, locale)),
-    [terms, term, locale],
+    [terms, slug, locale],
   );
-  const valid = mode === "remove" || (target !== "" && target !== term);
+  const valid =
+    mode === "remove" || (termSlug(target) !== "" && (target !== term || variants.length > 0));
   const pending = rename.isPending || remove.isPending;
+  // Writing a term another way leaves the items that already write it so.
+  const affected = (detail.data?.items ?? []).filter(
+    (item) =>
+      !respelled ||
+      (item.taxonomies?.[taxonomy] ?? []).some((each) => termSlug(each) === slug && each !== target),
+  );
 
   const confirm = async () => {
     const revision = detail.data?.revision;
@@ -87,7 +104,11 @@ export function TermDialog({
         toast.success(t("terms.removed", { term }));
       } else {
         await rename.mutateAsync({ term, name: target, revision });
-        toast.success(t(merging ? "terms.merged" : "terms.renamed", { from: term, to: target }));
+        toast.success(
+          unifying
+            ? t("terms.unified", { term: target })
+            : t(merging ? "terms.merged" : "terms.renamed", { from: term, to: into?.term ?? target }),
+        );
       }
       onClose();
     } catch (error) {
@@ -110,7 +131,7 @@ export function TermDialog({
     void confirm();
   };
 
-  const count = detail.data?.items.length ?? 0;
+  const count = affected.length;
   const titles = {
     rename: t("terms.renameTitle", { term }),
     merge: t("terms.mergeTitle", { term }),
@@ -132,7 +153,13 @@ export function TermDialog({
       desc={notes[mode]}
       destructive={mode === "remove"}
       confirmText={
-        mode === "remove" ? t("terms.remove") : merging ? t("terms.mergeAction") : t("terms.rename")
+        mode === "remove"
+          ? t("terms.remove")
+          : merging
+            ? t("terms.mergeAction")
+            : unifying
+              ? t("terms.unify")
+              : t("terms.rename")
       }
       isLoading={pending}
       disabled={!detail.data || !valid}
@@ -149,7 +176,12 @@ export function TermDialog({
             autoComplete="off"
           />
           {merging && target !== "" && (
-            <p className="text-sm text-warning">{t("terms.mergesInto", { term: target })}</p>
+            <p className="text-sm text-warning">{t("terms.mergesInto", { term: into?.term ?? target })}</p>
+          )}
+          {variants.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {t("terms.variantsNote", { list: variants.join(t("form.listJoin")) })}
+            </p>
           )}
         </form>
       )}
@@ -185,7 +217,7 @@ export function TermDialog({
             {t("terms.affected", { count, kind: count === 1 ? one : many })}
           </p>
           <ul className="max-h-48 divide-y overflow-auto rounded-md border text-sm">
-            {detail.data.items.map((item) => (
+            {affected.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <span className="min-w-0 truncate">{item.title || item.slug}</span>
                 {item.trashed ? (

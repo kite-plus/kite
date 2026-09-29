@@ -178,6 +178,10 @@ type TermCount struct {
 	Taxonomy string
 	Term     string
 	Count    int
+
+	// Variants are the other ways the items write the term, in the order of
+	// [TermSpellings], such as go beside Go.
+	Variants []string
 }
 
 // Reader is the read side of the content store.

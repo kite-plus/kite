@@ -503,15 +503,15 @@ func openAPI() *document {
 			"/taxonomies/{taxonomy}/terms/{term}": {
 				Get: &operation{
 					OperationID: "getTerm",
-					Summary:     "Read one term with every item that carries it, trashed ones included.",
+					Summary:     "Read one term with every item that carries it, however each writes it, trashed ones included.",
 					Parameters:  []parameter{pathParam("taxonomy"), pathParam("term")},
 					Responses: ok(ref(TermDetail{}),
 						"The term and its items. ETag fingerprints them for a rename or removal.", "404"),
 				},
 				Put: &operation{
 					OperationID: "renameTerm",
-					Summary: "Rename a term on every item that carries it, merging it into " +
-						"another term when the new name is already in use.",
+					Summary: "Rename a term on every item that carries it, however each writes it, " +
+						"merging it into another term when the new name is already in use.",
 					Parameters:  []parameter{pathParam("taxonomy"), pathParam("term"), ifMatch(true)},
 					RequestBody: body(ref(TermRename{})),
 					Responses: ok(ref(TermDetail{}), "The term under its new name.",
