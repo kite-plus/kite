@@ -2,6 +2,7 @@ package theme
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -96,6 +97,80 @@ func (e *Engine) Render(t Target, data any) ([]byte, error) {
 func (e *Engine) HasTemplate(t Target) bool {
 	_, _, ok := e.Lookup(t)
 	return ok
+}
+
+// ErrNoShortcode is the reply for a shortcode neither the site nor the theme
+// defines.
+var ErrNoShortcode = errors.New("not defined")
+
+// Shortcode draws the shortcode a body calls by name, with data as dot. Its
+// template is layouts/_shortcodes/<name>.html, the site's before the
+// theme's, and it can call every partial a page can.
+func (e *Engine) Shortcode(name string, data any) (string, error) {
+	tmpl, err := e.shortcode(name)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// HasShortcodes reports whether the site or the theme defines a shortcode.
+func (e *Engine) HasShortcodes() bool {
+	for _, src := range e.sources {
+		found := false
+		_ = fs.WalkDir(src.FS, ShortcodesDir, func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() && path.Ext(p) == ".html" {
+				found = true
+				return fs.SkipAll
+			}
+			return nil
+		})
+		if found {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Engine) shortcode(name string) (*template.Template, error) {
+	file := ShortcodesDir + "/" + name + ".html"
+	key := "shortcode|" + name
+
+	e.mu.RLock()
+	cached, ok := e.cache[key]
+	e.mu.RUnlock()
+	if ok {
+		return cached, nil
+	}
+
+	if !fs.ValidPath(file) {
+		return nil, fmt.Errorf("%w: %q cannot name a template", ErrNoShortcode, name)
+	}
+	src, err := e.read(file)
+	if err != nil {
+		return nil, fmt.Errorf("%w: add %s/%s to the site or the theme", ErrNoShortcode, LayoutsDir, file)
+	}
+	root := template.New("kite").Funcs(e.funcs)
+	root = root.Funcs(template.FuncMap{
+		"partial":       partialFunc(root),
+		"partialCached": partialFunc(root),
+	})
+	if err := e.parsePartials(root); err != nil {
+		return nil, err
+	}
+	tmpl, err := root.New(file).Parse(string(src))
+	if err != nil {
+		return nil, fmt.Errorf("theme: parse %s: %w", file, err)
+	}
+
+	e.mu.Lock()
+	e.cache[key] = tmpl
+	e.mu.Unlock()
+	return tmpl, nil
 }
 
 func (e *Engine) template(t Target) (*template.Template, error) {

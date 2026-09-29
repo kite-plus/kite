@@ -2,12 +2,14 @@
 export type Mode = "visual" | "source";
 
 /** What the visual editor cannot carry through a save, named so a notice can say which. */
-export type Loss = "footnotes" | "html" | "entities";
+export type Loss = "footnotes" | "html" | "entities" | "shortcodes";
 
 const checks: [Loss, RegExp][] = [
   ["footnotes", /\[\^[^\]\s]+\]/],
   ["html", /<\/?[a-zA-Z][\w-]*(?:\s[^>]*)?>|<!--/],
   ["entities", /&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/i],
+  // {{< name >}} and {{% name %}}, which the editor would save as {{&lt; name &gt;}}.
+  ["shortcodes", /\{\{[<%]/],
 ];
 
 /**

@@ -14,7 +14,7 @@ func render(t *testing.T, src string, mutate func(*markdown.Options)) *markdown.
 	if mutate != nil {
 		mutate(&opts)
 	}
-	doc, err := markdown.New(opts).Render(src)
+	doc, err := markdown.New(opts).Render(src, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -373,7 +373,7 @@ func TestPicturesAreListedAsWritten(t *testing.T) {
 		"![far](https://example.com/far.jpg) ![under](/blog/under.jpg)\n"
 	want := []string{"/uploads/river.jpg", "near.png", "https://example.com/far.jpg", "/blog/under.jpg"}
 
-	doc, err := markdown.New(markdown.Options{BasePath: "/blog/"}).Render(src)
+	doc, err := markdown.New(markdown.Options{BasePath: "/blog/"}).Render(src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +398,7 @@ func TestSiteLinksFollowTheBasePath(t *testing.T) {
 	src := "[about](/about/) ![river](/uploads/river.jpg) [again](/blog/about/) " +
 		"[cdn](//cdn.example.com/x.js) [out](https://example.com/) [near](notes.md) " +
 		"[top](#top) [ref][r]\n\n[r]: /posts/hello/\n"
-	doc, err := markdown.New(markdown.Options{BasePath: "/blog/"}).Render(src)
+	doc, err := markdown.New(markdown.Options{BasePath: "/blog/"}).Render(src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,12 +454,12 @@ func TestFootnotes(t *testing.T) {
 func TestRenderIsDeterministic(t *testing.T) {
 	const src = "# A\n\ntext [l](/x/) ![i](y.png)\n\n## B\n"
 	r := markdown.New(markdown.DefaultOptions())
-	first, err := r.Render(src)
+	first, err := r.Render(src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for range 5 {
-		next, err := r.Render(src)
+		next, err := r.Render(src, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

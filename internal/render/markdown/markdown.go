@@ -8,8 +8,10 @@ package markdown
 import (
 	"bytes"
 	"cmp"
+	"errors"
 	"fmt"
 	stdhtml "html"
+	"io"
 	"regexp"
 	"strings"
 	"sync"
@@ -147,12 +149,24 @@ func New(opts Options) *Renderer {
 
 	parserOpts := []parser.Option{
 		parser.WithAttribute(),
-		parser.WithASTTransformers(util.Prioritized(summaryEnd{}, 100), util.Prioritized(headingIDs{}, 100)),
+		parser.WithBlockParsers(util.Prioritized(tagLines{pairs: true}, 50), util.Prioritized(tagLines{}, 51)),
+		parser.WithInlineParsers(util.Prioritized(tagWords{}, 50)),
+		parser.WithASTTransformers(
+			util.Prioritized(pairTags{}, 0),
+			util.Prioritized(summaryEnd{}, 100),
+			util.Prioritized(headingIDs{}, 100),
+			// Before siteLinks, so an address a shortcode gives is put under
+			// the site's path like any other.
+			util.Prioritized(tagAddresses{}, 500),
+		),
 	}
 	if base := strings.TrimSuffix(opts.BasePath, "/"); base != "" {
 		parserOpts = append(parserOpts, parser.WithASTTransformers(util.Prioritized(siteLinks{base: base}, 1000)))
 	}
-	rendererOpts = append(rendererOpts, renderer.WithNodeRenderers(util.Prioritized(moreRenderer{}, 100)))
+	rendererOpts = append(rendererOpts, renderer.WithNodeRenderers(
+		util.Prioritized(moreRenderer{}, 100),
+		util.Prioritized(tagRenderer{}, 100),
+	))
 
 	return &Renderer{md: goldmark.New(
 		goldmark.WithExtensions(extensions...),
@@ -200,7 +214,7 @@ func (headingIDs) Transform(doc *ast.Document, reader text.Reader, _ parser.Cont
 		return ast.WalkSkipChildren, nil
 	})
 	for _, h := range unnamed {
-		base := cmp.Or(Anchor(readText(h, reader.Source())), "heading")
+		base := cmp.Or(Anchor(strings.TrimSpace(readText(h, reader.Source()))), "heading")
 		id := base
 		for i := 1; taken[id]; i++ {
 			id = fmt.Sprintf("%s-%d", base, i)
@@ -326,17 +340,40 @@ func asWritten(n ast.Node, dest []byte, written map[ast.Node][]byte) string {
 }
 
 // Render converts a markdown body into HTML plus the metadata a theme needs.
-func (r *Renderer) Render(source string) (*Document, error) {
-	src := []byte(source)
+// The shortcodes the body calls are drawn by sc; with none, a body that calls
+// one cannot be rendered.
+func (r *Renderer) Render(source string, sc Shortcodes) (*Document, error) {
+	body, s, err := prepare(r.md.Parser(), source)
+	if err != nil {
+		return nil, err
+	}
+	src := []byte(body)
 	pc := parser.NewContext()
+	if s != nil {
+		s.draw = sc
+		s.render = func(w io.Writer, n ast.Node) error { return r.md.Renderer().Render(w, src, n) }
+		pc.Set(sessionKey, s)
+	}
 	root := r.md.Parser().Parse(text.NewReader(src), parser.WithContext(pc))
+	if s != nil && s.err != nil {
+		return nil, s.err
+	}
 
 	var buf bytes.Buffer
 	if err := r.md.Renderer().Render(&buf, src, root); err != nil {
+		if drawn, ok := errors.AsType[*ShortcodeError](err); ok {
+			return nil, drawn
+		}
 		return nil, fmt.Errorf("markdown: render: %w", err)
 	}
+	html := buf.String()
+	if s != nil {
+		if html, err = s.expand(html); err != nil {
+			return nil, err
+		}
+	}
 
-	doc := &Document{HTML: buf.String()}
+	doc := &Document{HTML: html}
 	written, _ := pc.Get(writtenKey).(map[ast.Node][]byte)
 	if err := collect(root, src, doc, written); err != nil {
 		return nil, err
@@ -352,12 +389,15 @@ func collect(root ast.Node, src []byte, doc *Document, written map[ast.Node][]by
 		if !entering {
 			return ast.WalkContinue, nil
 		}
+		if hiddenTag(n) {
+			return ast.WalkSkipChildren, nil
+		}
 		switch node := n.(type) {
 		case *ast.Heading:
 			doc.TOC = append(doc.TOC, Heading{
 				Level: node.Level,
 				ID:    headingID(node),
-				Text:  plainText(node, src),
+				Text:  strings.TrimSpace(plainText(node, src)),
 			})
 		case *ast.Link:
 			doc.Links = append(doc.Links, asWritten(node, node.Destination, written))
@@ -392,17 +432,16 @@ func (doc *Document) count(n ast.Node, src []byte) string {
 // Excerpt is the prose a markdown source opens with, as a Document of it
 // would have it, read without rendering the source.
 func Excerpt(source string) string {
-	src := []byte(source)
-	root := excerptParser().Parse(text.NewReader(src), parser.WithContext(parser.NewContext()))
+	root, src := skim(source)
 	return opening(root, src)
 }
 
 // Skim reads a markdown source without rendering it, for what a list shows of
 // it: a Document with only its Excerpt, WordCount, CJKCount and Images, as
-// Render would have them.
+// Render would have them. Not knowing what a shortcode draws, it counts what
+// every pair of tags encloses.
 func Skim(source string) *Document {
-	src := []byte(source)
-	root := excerptParser().Parse(text.NewReader(src), parser.WithContext(parser.NewContext()))
+	root, src := skim(source)
 	doc := &Document{Excerpt: opening(root, src)}
 	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
@@ -422,6 +461,23 @@ func Skim(source string) *Document {
 // excerptParser reads sources the way the renderer does, so that an excerpt
 // sees the same tables, footnotes and lists a page does.
 var excerptParser = sync.OnceValue(func() parser.Parser { return New(DefaultOptions()).md.Parser() })
+
+// skim parses a source as the renderer would, with its shortcodes left
+// undrawn. A body whose tags cannot be read is read as it is written: the
+// page reports what is wrong with them.
+func skim(source string) (ast.Node, []byte) {
+	p := excerptParser()
+	body, s, err := prepare(p, source)
+	if err != nil {
+		body, s = source, nil
+	}
+	src := []byte(body)
+	pc := parser.NewContext()
+	if s != nil {
+		pc.Set(sessionKey, s)
+	}
+	return p.Parse(text.NewReader(src), parser.WithContext(pc)), src
+}
 
 // opening is the prose a document opens with, as plain text: its paragraphs
 // and list items in order, without the headings, quotations, tables, code,
@@ -457,7 +513,7 @@ func prosePrefix(root, end ast.Node, src []byte, limit int) []string {
 				return ast.WalkContinue, nil
 			}
 			switch n.(type) {
-			case *ast.Heading, *ast.Blockquote, *ast.HTMLBlock, *east.Table, *east.FootnoteList:
+			case *ast.Heading, *ast.Blockquote, *ast.HTMLBlock, *east.Table, *east.FootnoteList, *tagBlock:
 				return ast.WalkSkipChildren, nil
 			case *ast.Paragraph, *ast.TextBlock:
 				if text := strings.Join(strings.Fields(readText(n, src)), " "); text != "" {
@@ -517,6 +573,10 @@ func literal(n ast.Node, src []byte, withoutImages bool) string {
 			return ast.WalkContinue, nil
 		}
 		switch t := child.(type) {
+		case *tagInline:
+			if t.hidden() {
+				return ast.WalkSkipChildren, nil
+			}
 		case *ast.Image:
 			if withoutImages {
 				return ast.WalkSkipChildren, nil
@@ -526,7 +586,7 @@ func literal(n ast.Node, src []byte, withoutImages bool) string {
 			if !t.IsRaw() {
 				value = unescape(value)
 			}
-			b.Write(value)
+			b.Write(withoutTokens(value))
 			if t.SoftLineBreak() || t.HardLineBreak() {
 				b.WriteByte(' ')
 			}

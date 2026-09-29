@@ -156,6 +156,37 @@ type Paginator interface {
 	URL(n int) string
 }
 
+// Shortcode is what a shortcode's template receives as dot: one call a body
+// makes, as {{< figure src="a.jpg" >}}.
+type Shortcode interface {
+	Name() string
+
+	// Get is a parameter: by position, as .Get 0, or by name, as
+	// .Get "src". It is nil when the call does not give it.
+	Get(key any) any
+	// Params is every parameter: a list when they are given in order, a map
+	// when by name.
+	Params() any
+	IsNamedParams() bool
+
+	// Inner is what the call encloses, rendered as markdown; RawInner is it
+	// as written, for a shortcode that reads it as something else, such as a
+	// diagram. Only the words of an inner content that is shown count as the
+	// page's words.
+	Inner() (template.HTML, error)
+	RawInner() string
+
+	// Ordinal counts the calls before this one in the same parent, from 0,
+	// and Parent is the call this one is inside, nil at the top of a body.
+	Ordinal() int
+	Parent() Shortcode
+
+	// Page is the page whose body makes the call. Its body is being drawn,
+	// so what is derived from it, such as Content, is empty.
+	Page() Page
+	Site() Site
+}
+
 // Request exposes the parts of an HTTP request a theme may use. It is nil in a
 // static build.
 type Request interface {

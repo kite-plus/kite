@@ -2,6 +2,7 @@ package build
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -70,9 +71,11 @@ type Builder struct {
 	buildCtx *Context
 	site     render.Site
 
-	// rewrites says a hook rewrites markdown, and summaries then keeps what
-	// listings say about each item, by id and revision.
+	// rewrites says a hook rewrites markdown, and draws that the site or the
+	// theme defines shortcodes; summaries then keeps what listings say about
+	// an item they can change, by id and revision.
 	rewrites  bool
+	draws     bool
 	summaries sync.Map
 }
 
@@ -99,7 +102,7 @@ func New(opts Options) (*Builder, error) {
 		opts.Now = time.Now()
 	}
 
-	b := &Builder{opts: opts, rewrites: opts.Hooks.TransformsMarkdown()}
+	b := &Builder{opts: opts, rewrites: opts.Hooks.TransformsMarkdown(), draws: opts.Engine.HasShortcodes()}
 	b.buildCtx = NewContext(opts.Now, b.sharedKey()...)
 	b.site = b.newSite(b.buildCtx)
 	return b, nil
@@ -240,6 +243,11 @@ func (b *Builder) Extras(ctx context.Context, plan *Plan) (map[string][]byte, er
 	pages := make([]hook.PageInfo, plan.Len())
 	err := eachTarget(ctx, plan, func(ctx context.Context, i int, t Target) error {
 		page, body, err := b.page(ctx, b.buildCtx.ForOutput(), t)
+		if _, wrong := errors.AsType[*BodyError](err); wrong {
+			// The feed and the sitemap still hold an item whose body cannot
+			// be drawn, as its listings do, while its own page says why.
+			page, body, err = b.skimmed(t), nil, nil
+		}
 		if err != nil {
 			return err
 		}
@@ -610,6 +618,18 @@ func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page
 	return page, body, nil
 }
 
+// skimmed is the Page of a target whose item's body cannot be drawn, with what
+// the index reads of the body.
+func (b *Builder) skimmed(t Target) render.Page {
+	return render.NewPage(t.Item, render.PageOptions{
+		Kind:     t.Kind,
+		Rendered: markdown.Skim(t.Item.Body.Raw),
+		Resolver: b.opts.Resolver,
+		Terms:    b.termsOf(t.Item),
+		Location: b.opts.Site.Location,
+	})
+}
+
 // listedPage is the Page of an item that another page links to: an entry in a
 // listing, or a neighbor of a single page.
 func (b *Builder) listedPage(ctx context.Context, out *Context, s content.Summary) (render.Page, error) {
@@ -631,13 +651,15 @@ func (b *Builder) listedPage(ctx context.Context, out *Context, s content.Summar
 }
 
 // summary is what a listing says about an item's body: its excerpt, its length
-// and its pictures, as the index keeps them, unless a hook rewrites markdown.
-// The index knows nothing of hooks, so its summary would show what a plugin
-// turns into something else, such as math, as its source; the listing says
-// what the item's own page says instead.
+// and its pictures, as the index keeps them, unless a hook rewrites markdown
+// or the body calls a shortcode. The index knows nothing of hooks or
+// templates, so its summary would show what a plugin turns into something
+// else, such as math, as its source, and count the words a shortcode keeps
+// off the page; the listing says what the item's own page says instead.
 func (b *Builder) summary(ctx context.Context, s content.Summary) (markdown.Document, error) {
-	if !b.rewrites {
-		return markdown.Document{Excerpt: s.Excerpt, WordCount: s.WordCount, CJKCount: s.CJKCount, Images: s.Images}, nil
+	indexed := markdown.Document{Excerpt: s.Excerpt, WordCount: s.WordCount, CJKCount: s.CJKCount, Images: s.Images}
+	if !b.rewrites && !b.draws {
+		return indexed, nil
 	}
 	key := string(s.ID) + "@" + string(s.Revision)
 	if v, ok := b.summaries.Load(key); ok {
@@ -647,14 +669,23 @@ func (b *Builder) summary(ctx context.Context, s content.Summary) (markdown.Docu
 	if err != nil {
 		return markdown.Document{}, fmt.Errorf("build: summary of %s: %w", s.ID, err)
 	}
-	doc, err := b.renderBody(ctx, item)
-	if err != nil {
-		return markdown.Document{}, err
-	}
-	summary := markdown.Document{Excerpt: doc.Excerpt, WordCount: doc.WordCount, CJKCount: doc.CJKCount, Images: doc.Images}
-	description, _ := item.Meta["description"].(string)
-	if text := markdown.Excerpt(description); text != "" {
-		summary.Excerpt = text
+	summary := indexed
+	if b.rewrites || markdown.CallsShortcodes(item.Body.Raw) {
+		doc, err := b.renderBody(ctx, item)
+		_, wrong := errors.AsType[*BodyError](err)
+		switch {
+		case wrong:
+			// The item's own page says what is wrong with its body, and a
+			// build stops there; a listing need not break with it.
+		case err != nil:
+			return markdown.Document{}, err
+		default:
+			summary = markdown.Document{Excerpt: doc.Excerpt, WordCount: doc.WordCount, CJKCount: doc.CJKCount, Images: doc.Images}
+			description, _ := item.Meta["description"].(string)
+			if text := markdown.Excerpt(description); text != "" {
+				summary.Excerpt = text
+			}
+		}
 	}
 	b.summaries.Store(key, summary)
 	return summary, nil
@@ -666,11 +697,70 @@ func (b *Builder) renderBody(ctx context.Context, item *content.Content) (*markd
 	if err := b.opts.Hooks.TransformMarkdown(ctx, &src); err != nil {
 		return nil, err
 	}
-	doc, err := b.opts.Markdown.Render(src.Source)
+	doc, err := b.opts.Markdown.Render(src.Source, &shortcodes{b: b, item: item})
 	if err != nil {
+		if sc, ok := errors.AsType[*markdown.ShortcodeError](err); ok {
+			return nil, &BodyError{
+				Where: b.lineOf(item, sc.Line),
+				Err:   fmt.Errorf("shortcode %s: %w", cmp.Or(sc.Name, "tag"), sc.Err),
+			}
+		}
 		return nil, fmt.Errorf("build: render %s: %w", item.ID, err)
 	}
 	return doc, nil
+}
+
+// BodyError is a problem with what an item's body says, such as a shortcode
+// that nobody defines. It is the author's to fix, so it counts as invalid
+// content, which a studio shows its author, rather than as a failure.
+type BodyError struct {
+	// Where is the file and line, or the item and the line of its body.
+	Where string
+	Err   error
+}
+
+func (e *BodyError) Error() string        { return "build: " + e.Where + ": " + e.Err.Error() }
+func (e *BodyError) Unwrap() error        { return e.Err }
+func (e *BodyError) Is(target error) bool { return target == content.ErrInvalid }
+
+// shortcodes draws the shortcodes an item's body calls with the templates of
+// the site and its theme.
+type shortcodes struct {
+	b    *Builder
+	item *content.Content
+	page render.Page
+}
+
+func (s *shortcodes) Draw(call *markdown.Call) (string, error) {
+	// Made on the first call, since most bodies make none.
+	if s.page == nil {
+		s.page = render.NewPage(s.item, render.PageOptions{
+			Resolver: s.b.opts.Resolver,
+			Terms:    s.b.termsOf(s.item),
+			Location: s.b.opts.Site.Location,
+		})
+	}
+	return s.b.opts.Engine.Shortcode(call.Name, render.NewShortcode(call, s.page, s.b.site))
+}
+
+// lineOf names the place in an item's file a line of its body is at: file
+// and line when the file on disk holds the body, and the line of the body
+// otherwise, as for an item that is being edited.
+func (b *Builder) lineOf(item *content.Content, line int) string {
+	file := string(item.Locator)
+	if file == "" {
+		return fmt.Sprintf("%s, line %d of the body", item.ID, line)
+	}
+	if !strings.EqualFold(path.Ext(file), ".md") {
+		file = path.Join(file, "index.md")
+	}
+	if b.opts.Media != nil && item.Body.Raw != "" {
+		data, err := fs.ReadFile(b.opts.Media, file)
+		if i := bytes.LastIndex(data, []byte(item.Body.Raw)); err == nil && i >= 0 {
+			return fmt.Sprintf("%s:%d", file, bytes.Count(data[:i], []byte("\n"))+line)
+		}
+	}
+	return fmt.Sprintf("%s, line %d of the body", file, line)
 }
 
 // listingPage synthesizes the Page of a listing, so that a theme can write

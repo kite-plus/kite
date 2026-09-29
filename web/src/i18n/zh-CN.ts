@@ -318,6 +318,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "editor.loss.footnotes": "脚注",
   "editor.loss.html": "内嵌 HTML",
   "editor.loss.entities": "HTML 实体",
+  "editor.loss.shortcodes": "短代码",
   "editor.switchTitle": "切换到可视化编辑器？",
   "editor.switchNote": "它无法保留{what}，你下一次修改内容时，它们会变成普通文本。",
   "editor.switchAnyway": "仍然切换",

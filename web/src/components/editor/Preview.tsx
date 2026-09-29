@@ -186,7 +186,8 @@ export function Preview({ draft, id, base, live, onClose, onFrame }: Props) {
         {failed && (
           <Alert variant="destructive" className="absolute inset-x-0 top-0 z-10 rounded-none">
             <XCircle />
-            <AlertTitle>{failed}</AlertTitle>
+            {/* A problem in the body names its file and line, which is long and read whole. */}
+            <AlertTitle className="line-clamp-none wrap-anywhere">{failed}</AlertTitle>
           </Alert>
         )}
         <iframe

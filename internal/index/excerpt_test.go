@@ -137,7 +137,7 @@ func TestSummarizeCountsTheBody(t *testing.T) {
 	if got.WordCount != 8 || got.CJKCount != 2 {
 		t.Errorf("WordCount, CJKCount = %d, %d, want 8, 2", got.WordCount, got.CJKCount)
 	}
-	page, err := markdown.New(markdown.DefaultOptions()).Render(body)
+	page, err := markdown.New(markdown.DefaultOptions()).Render(body, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

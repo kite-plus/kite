@@ -2,6 +2,7 @@ package build_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -1413,5 +1414,140 @@ func TestAPageSlugMayBeAPathButNotAnotherPagesAddress(t *testing.T) {
 				t.Errorf("err = %v, want a refusal naming the page", err)
 			}
 		})
+	}
+}
+
+// A body calls the shortcodes the site and its theme define, the site's
+// before the theme's, and a shortcode's template is handed the call, the page
+// and the site, and can call the theme's partials as a page can.
+func TestABodyCallsTheShortcodesOfTheSiteAndItsTheme(t *testing.T) {
+	f := newFixture(t, 1)
+	fallback, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	th := fstest.MapFS{
+		"single.html":              {Data: []byte(`<main>{{ .Page.Content }}</main>`)},
+		"_partials/frame.html":     {Data: []byte(`<figure>{{ . }}</figure>`)},
+		"_shortcodes/pic.html":     {Data: []byte(`theme pic`)},
+		"_shortcodes/caption.html": {Data: []byte(`{{ partial "frame.html" (.Get "text") }}`)},
+	}
+	site := fstest.MapFS{
+		"_shortcodes/pic.html": {Data: []byte(`<img src="{{ .Get 0 }}" alt="{{ .Page.Title }} on {{ .Site.Title }}" data-n="{{ .Ordinal }}"` +
+			`{{ with .Parent }} data-in="{{ .Name }}"{{ end }}>`)},
+		"_shortcodes/gallery.html": {Data: []byte(`<div class="gallery">{{ .Inner }}</div>`)},
+	}
+	f.engine = theme.NewEngine(theme.Options{
+		Sources: []theme.Source{{Name: "site", FS: site}, {Name: "theme", FS: th}, {Name: "default", FS: fallback.Layouts}},
+		Links:   f.resolve,
+	})
+	f.add(t, "content/posts/trip/index.md", post("01J8KQ2P3R4S5T6V7W8X9YZTRP", "trip", "2026-01-20T00:00:00Z", "")+
+		"{{< gallery >}}\n{{< pic \"a.jpg\" >}}\n{{< pic \"b.jpg\" >}}\n{{< /gallery >}}\n\n{{< caption text=\"By the river\" >}}\n")
+
+	f.run(t, f.out, nil)
+	page := readFile(t, f.out, "posts/trip/index.html")
+	for _, want := range []string{
+		`<div class="gallery"><img src="a.jpg" alt="trip on Test" data-n="0" data-in="gallery">` + "\n" +
+			`<img src="b.jpg" alt="trip on Test" data-n="1" data-in="gallery">` + "\n</div>",
+		`<figure>By the river</figure>`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page does not hold %q:\n%s", want, page)
+		}
+	}
+}
+
+// A listing says of an item what its page says, and a shortcode that keeps
+// what it encloses off the page keeps it out of both. The index cannot know
+// what a template shows, so the listing asks the page.
+func TestAListingCountsOnlyTheWordsAShortcodeShows(t *testing.T) {
+	f := newFixture(t, 1)
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const show = `{{ .Title }}|{{ .WordCount }}|{{ .Excerpt }};`
+	layouts := fstest.MapFS{
+		"home.html":                {Data: []byte(`{{ define "main" }}{{ range .Pages }}` + show + `{{ end }}{{ end }}`)},
+		"single.html":              {Data: []byte(`{{ define "main" }}{{ with .Page }}` + show + `{{ end }}{{ end }}`)},
+		"_shortcodes/private.html": {Data: []byte(``)},
+		"_shortcodes/mark.html":    {Data: []byte(`<mark>{{ .Inner }}</mark>`)},
+	}
+	f.engine = theme.NewEngine(theme.Options{
+		Sources: []theme.Source{{Name: "site", FS: layouts}, {Name: "default", FS: th.Layouts}},
+		Links:   f.resolve,
+	})
+	f.add(t, "content/posts/kept/index.md", post("01J8KQ2P3R4S5T6V7W8X9YZKPT", "kept", "2026-01-20T00:00:00Z", "")+
+		"Four {{< mark >}}words are{{< /mark >}} shown {{< private >}}and five are not shown{{< /private >}}.\n")
+
+	f.run(t, f.out, nil)
+	const want = "kept|5|Body. Four words are shown .;"
+	if page := readFile(t, f.out, "posts/kept/index.html"); !strings.Contains(page, want) {
+		t.Errorf("the page says %q, want %q", excerptOf(page, "kept|"), want)
+	}
+	if home := readFile(t, f.out, "index.html"); !strings.Contains(home, want) {
+		t.Errorf("the home page lists %q, want %q", excerptOf(home, "kept|"), want)
+	}
+}
+
+// A shortcode nobody defines stops the build at its file and line, rather than
+// publishing the tag as text. A server shows the problem on the item's page
+// and lists the item as the index knows it, so the rest of the site can
+// still be looked at.
+func TestAnUndefinedShortcodeStopsTheBuildAtItsLine(t *testing.T) {
+	f := newFixture(t, 1)
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.engine = theme.NewEngine(theme.Options{
+		Sources: []theme.Source{
+			{Name: "site", FS: fstest.MapFS{"_shortcodes/note.html": {Data: []byte(`{{ .Inner }}`)}}},
+			{Name: "default", FS: th.Layouts},
+		},
+		Links: f.resolve,
+	})
+	f.add(t, "content/posts/trip/index.md", post("01J8KQ2P3R4S5T6V7W8X9YZTRP", "trip", "2026-01-20T00:00:00Z", "")+
+		"First paragraph.\n\n{{< gallery >}}\n")
+
+	emitter, err := build.NewEmitter(f.out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := f.builder(t, emitter, func(o *build.Options) {
+		o.Media = os.DirFS(f.root)
+		o.Site.ThemeSettings = map[string]any{"show_summary": true}
+	})
+	_, err = b.Run(t.Context())
+	const want = "content/posts/trip/index.md:12: shortcode gallery: not defined: add layouts/_shortcodes/gallery.html to the site or the theme"
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want one containing %q", err, want)
+	}
+	if !errors.Is(err, content.ErrInvalid) {
+		t.Errorf("%v is not reported as invalid content", err)
+	}
+
+	plan, err := b.Plan(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range plan.Targets {
+		if target.Kind != render.KindHome {
+			continue
+		}
+		home, _, err := b.Render(t.Context(), target, nil)
+		if err != nil {
+			t.Fatalf("the home page failed with the post: %v", err)
+		}
+		if !strings.Contains(string(home), "First paragraph.") {
+			t.Errorf("the home page does not list the post as the index knows it")
+		}
+	}
+	extras, err := b.Extras(t.Context(), plan)
+	if err != nil {
+		t.Fatalf("the feed and the sitemap failed with the post: %v", err)
+	}
+	if !strings.Contains(string(extras["rss.xml"]), "First paragraph.") {
+		t.Errorf("the feed does not hold the post as the index knows it:\n%s", extras["rss.xml"])
 	}
 }

@@ -32,6 +32,12 @@ func main() {
 
 A sentence with a footnote.[^1]
 
+{{< note title="A shortcode" >}}
+A note the site's own shortcode draws, around **markdown**.
+{{< /note >}}
+
+Press {{< kbd Enter >}} to go on.
+
 ### A third level heading
 
 Closing words.

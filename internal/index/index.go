@@ -24,10 +24,11 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-// SchemaVersion is bumped whenever the shape of the read model changes. A
-// mismatch discards the database rather than migrating it, which is safe
-// precisely because nothing here is a source of truth.
-const SchemaVersion = 5
+// SchemaVersion is bumped whenever the shape of the read model changes, or
+// what it reads from a body does, as when shortcodes stopped being counted
+// as words. A mismatch discards the database rather than migrating it, which
+// is safe precisely because nothing here is a source of truth.
+const SchemaVersion = 6
 
 // Path is where the derived index lives, relative to the project root.
 const Path = ".kite/cache/index.db"

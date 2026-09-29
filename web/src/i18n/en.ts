@@ -329,6 +329,7 @@ export const en = {
   "editor.loss.footnotes": "footnotes",
   "editor.loss.html": "raw HTML",
   "editor.loss.entities": "HTML entities",
+  "editor.loss.shortcodes": "shortcodes",
   "editor.switchTitle": "Switch to the visual editor?",
   "editor.switchNote":
     "It cannot keep {what}. They become plain text the next time you change something.",

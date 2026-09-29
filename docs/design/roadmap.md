@@ -1,6 +1,6 @@
 # Kite 路线图与实现现状
 
-> 状态：持续更新 · 最近核对：2026-09-25
+> 状态：持续更新 · 最近核对：2026-09-29
 > 里程碑的原始定义见 [architecture.md §28 Roadmap](architecture.md#28-roadmap)，验收标准见 [§29](architecture.md#29-每阶段验收标准)。
 > 本文记录的是**对照代码和测试逐项核实后**的进度，不是对计划的复述；有疑问的项都实际运行确认过。
 
@@ -46,7 +46,7 @@
 
 | 里程碑 | 标准 | 结果 | 依据 |
 |---|---|---|---|
-| M0 | 在真实的 Hugo 内容仓库上产出可用站点 | 部分 | YAML 和 TOML（`+++`）front matter 都能读写（`TestATOMLPostReadsLikeItsYAMLTwin`）。还差 Hugo 的 shortcode：`{{< >}}` 会原样输出，语法要等 [theme-system.md §14](theme-system.md) 的开放问题定下来 |
+| M0 | 在真实的 Hugo 内容仓库上产出可用站点 | 通过 | YAML 和 TOML（`+++`）front matter 都能读写（`TestATOMLPostReadsLikeItsYAMLTwin`）。Hugo 的 shortcode 用同样的语法调用站点或主题的模板（[theme-system.md §6.8](theme-system.md#68-shortcode)），没有模板的短代码让构建停在它所在的行（`TestABodyCallsTheShortcodesOfTheSiteAndItsTheme`、`TestAnUndefinedShortcodeStopsTheBuildAtItsLine`）；Hugo 内置的 `figure`、`youtube` 等要由站点或主题写模板 |
 | M0 | 2000 篇全量构建小于 2 秒 | 通过 | `make perf`：没有任何缓存时约 1.5 秒（其中建索引约 0.7 秒），索引已在时约 0.9 秒 |
 | M0 | `kite build --verify` 在 CI 通过 | 通过 | CI 的可重现性步骤；`TestBuildIsReproducible` |
 | M0 | `internal/content` 的 import 边界检查 | 通过 | `scripts/check-imports.sh`，由 CI 执行 |

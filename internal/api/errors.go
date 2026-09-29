@@ -87,6 +87,10 @@ func (s *Server) failErr(w http.ResponseWriter, err error) {
 		fail(w, http.StatusNotFound, CodeNotFound, err.Error())
 	case errors.Is(err, content.ErrUnsupportedQuery):
 		fail(w, http.StatusBadRequest, CodeUnsupportedQuery, err.Error())
+	case errors.Is(err, content.ErrInvalid):
+		// What the content says is wrong, such as a body calling a shortcode
+		// nobody defines: its author is told where, to fix it.
+		fail(w, http.StatusBadRequest, CodeInvalidRequest, err.Error())
 	default:
 		// The detail goes to the log, not to the client: it may name paths on
 		// the machine the server runs on.

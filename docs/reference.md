@@ -236,6 +236,63 @@ for `cover: false`, which is what the editor's No cover writes.
 The theme contract is not frozen yet; it freezes at M5, after a second theme
 has been written against it.
 
+## Shortcodes
+
+A shortcode puts into a page what markdown has no syntax for, such as a video,
+a gallery or a note, by calling a template by name. The syntax is Hugo's, so
+content moved from a Hugo site keeps working once the templates are there:
+
+```markdown
+{{< figure src="river.jpg" caption="Upstream" >}}
+
+{{< note title="Heads up" >}}
+Markdown **inside** a pair of tags is rendered too.
+{{< /note >}}
+
+Press {{< kbd Enter >}} to go on.
+```
+
+`{{% %}}` is read the same way. A tag on a line of its own is a block, which
+no paragraph wraps, and a pair of them encloses the blocks between; a tag
+inside a line is a word of it, and a pair there encloses the words between.
+Parameters are given in order, `{{< kbd Enter >}}`, or by name,
+`{{< figure src="river.jpg" >}}`, not both. A quoted value is text, and a
+word written without quotes that reads as `true`, `false` or a number is that
+value. A tag in code is shown as written, and `{{</* figure */>}}` shows the
+tag it comments out anywhere, which is how to write about shortcodes.
+
+The template is `layouts/_shortcodes/<name>.html`, in the site or in its
+theme, the site's first; a name may hold folders, as `docs/note` does for
+`layouts/_shortcodes/docs/note.html`. It receives the call:
+
+```html
+<!-- layouts/_shortcodes/note.html -->
+<aside class="note">
+  {{ with .Get "title" }}<strong>{{ . }}</strong>{{ end }}
+  {{ .Inner }}
+</aside>
+```
+
+- `.Get` is a parameter by position, `.Get 0`, or by name, `.Get "src"`, and
+  nothing when the call does not give it. `.Params` is all of them, and
+  `.IsNamedParams` says which way they were given.
+- `.Inner` is what a pair encloses, rendered as markdown, and `.RawInner` is
+  it as written, for a shortcode that reads it as something else, such as a
+  diagram.
+- `.Parent` is the shortcode a call sits inside, and `.Ordinal` counts the
+  calls before it there, from 0.
+- `.Page` is the page whose text makes the call, and `.Site` the site. The
+  page's own content is still being drawn, so `.Page.Content` is empty. The
+  template can call the partials a page can.
+
+Only what a template shows counts: the words of an `.Inner` it leaves out are
+not the page's words, text or excerpt, so an empty
+`layouts/_shortcodes/private.html` keeps what it encloses off the site. A
+shortcode nobody defines stops the build and names its file and line rather
+than printing the tag, and the studio's preview says the same while you write.
+The visual editor cannot keep shortcodes, so an item that calls one opens as
+markdown.
+
 ## Plugins
 
 A plugin adds to a site what its theme does not: comments, analytics, search,
@@ -484,6 +541,11 @@ Kite's own keys beside them, and those replace `draft` and `summary`.
 A summary can also be ended in the text, as Hugo and Hexo both allow: a line
 holding only `<!--more-->` makes the prose before it the excerpt, however
 long, and the page shows nothing where it stands.
+
+Shortcodes keep working once the site or its theme has a template for each
+one the content calls; see [Shortcodes](#shortcodes). Hugo's built-in ones,
+such as `figure` and `youtube`, are not built into Kite: a build that meets
+one names it and its line, and a template for it takes a few lines.
 
 Headings are anchored by their text the way Hugo and GitHub anchor them, so
 a link into a section keeps working after the move: `## 近况` is reached at

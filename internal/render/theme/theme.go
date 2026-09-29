@@ -33,6 +33,10 @@ const LayoutsDir = "layouts"
 // PartialsDir holds non-routable templates.
 const PartialsDir = "_partials"
 
+// ShortcodesDir holds the templates a body calls by name, as
+// {{< figure src="a.jpg" >}} calls _shortcodes/figure.html.
+const ShortcodesDir = "_shortcodes"
+
 // ManifestName is the theme descriptor.
 const ManifestName = "theme.yaml"
 
