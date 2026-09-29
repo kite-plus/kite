@@ -394,6 +394,7 @@ export const en = {
   "editor.upload.tooLarge": "{name} is larger than {size} MB",
   "editor.upload.tooMany_one": "One image at a time",
   "editor.upload.tooMany_other": "Up to {count} images at a time",
+  "media.locationRemoved": "The photo's location was removed, so it won't be published with it",
 
   // Find and replace.
   "editor.search.title": "Find and replace",

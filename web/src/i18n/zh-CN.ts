@@ -380,6 +380,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "editor.upload.tooLarge": "{name} 超过了 {size} MB",
   "editor.upload.tooMany_one": "一次只能上传一张图片",
   "editor.upload.tooMany_other": "一次最多上传 {count} 张图片",
+  "media.locationRemoved": "已去掉照片里的拍摄位置，它不会随网站发布",
 
   "editor.search.title": "查找和替换",
   "editor.search.find": "查找",

@@ -15,6 +15,7 @@ import { uploadSiteMedia, useSaveTheme, useTheme } from "@/hooks/useThemes";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { resolveLink, siteHome } from "@/lib/links";
 import { changesOf, defaultOf, problemOf, sameValue, valueFields } from "@/lib/schema";
+import { stored } from "@/lib/uploads";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -673,10 +674,11 @@ function inPreview(home: string, path: string): string {
  * and shows one by where the site serves it, under its base path.
  */
 function useSiteUploads(): Uploads {
+  const { t } = useI18n();
   const site = useSite();
   const home = siteHome(site.data);
   return {
-    upload: uploadSiteMedia,
+    upload: async (file) => stored(await uploadSiteMedia(file), t),
     resolve: (link) => resolveLink(link, undefined, home),
   };
 }

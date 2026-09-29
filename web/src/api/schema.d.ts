@@ -802,6 +802,7 @@ export interface components {
         };
         Media: {
             link: string;
+            location_removed?: boolean;
             name: string;
             path: string;
             size: number;

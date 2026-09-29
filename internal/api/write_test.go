@@ -3,7 +3,10 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
+	"image"
+	"image/jpeg"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -634,6 +637,79 @@ func TestDroppedFilesLandInTheBundleAndReportALinkTheMarkdownCanUse(t *testing.T
 	}
 	if got, want := filepath.Dir(stored), filepath.Join(root, filepath.FromSlash(item.Locator)); got != want {
 		t.Errorf("stored in %s, want the item's own bundle %s", got, want)
+	}
+}
+
+// photoWithPlace is a JPEG as a phone writes one: its EXIF says how to turn
+// it and where it was taken.
+func photoWithPlace(t *testing.T) []byte {
+	t.Helper()
+	var pic bytes.Buffer
+	if err := jpeg.Encode(&pic, image.NewGray(image.Rect(0, 0, 8, 8)), nil); err != nil {
+		t.Fatal(err)
+	}
+	be := binary.BigEndian
+	tiff := append([]byte("MM\x00\x2a\x00\x00\x00\x08"), make([]byte, 72)...)
+	entry := func(at int, tag, typ uint16, count, value uint32) {
+		be.PutUint16(tiff[at:], tag)
+		be.PutUint16(tiff[at+2:], typ)
+		be.PutUint32(tiff[at+4:], count)
+		be.PutUint32(tiff[at+8:], value)
+	}
+	be.PutUint16(tiff[8:], 2)
+	entry(10, 0x0112, 3, 1, 6<<16) // Orientation, a short at the start of its value
+	entry(22, 0x8825, 4, 1, 38)    // GPSInfo
+	be.PutUint16(tiff[38:], 1)
+	entry(40, 0x0002, 5, 3, 56) // GPSLatitude
+	for i, v := range []uint32{31, 1, 13, 1, 4512, 100} {
+		be.PutUint32(tiff[56+4*i:], v)
+	}
+	exif := append([]byte("Exif\x00\x00"), tiff...)
+	segment := append([]byte{0xFF, 0xE1, byte((len(exif) + 2) >> 8), byte(len(exif) + 2)}, exif...)
+	jpg := pic.Bytes()
+	return slices.Concat(jpg[:2], segment, jpg[2:])
+}
+
+// What is uploaded is published, and a phone writes where it was taken into
+// every photo, so that goes before the photo is stored, and the studio is
+// told. How to turn it stays, and a file that names no place is stored as it
+// came.
+func TestAnUploadedPhotoLosesWhereItWasTaken(t *testing.T) {
+	root := newProject(t, 2)
+	h, _ := newWritableServer(t, root)
+
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
+	item, _ := load(t, h, list.Items[0].ID)
+
+	photo := photoWithPlace(t)
+	rec := upload(t, h, item.ID, "river.jpg", photo)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201\n%s", rec.Code, rec.Body.String())
+	}
+	media := decode[api.Media](t, rec)
+	if !media.LocationRemoved {
+		t.Error("the studio was not told the place was taken out")
+	}
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(media.Path)))
+	if err != nil {
+		t.Fatalf("nothing was written: %v", err)
+	}
+	if bytes.Contains(data, []byte{0, 0, 0, 31, 0, 0, 0, 1, 0, 0, 0, 13, 0, 0, 0, 1}) {
+		t.Error("the latitude was stored")
+	}
+	if !bytes.Contains(data, []byte{0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6}) {
+		t.Error("the orientation went with the place")
+	}
+	if len(data) != len(photo) || media.Size != len(data) {
+		t.Errorf("%d bytes were stored and %d reported, of %d uploaded", len(data), media.Size, len(photo))
+	}
+	if _, err := jpeg.Decode(bytes.NewReader(data)); err != nil {
+		t.Errorf("the photo no longer decodes: %v", err)
+	}
+
+	rec = upload(t, h, item.ID, "notes.png", []byte("pretend png"))
+	if strings.Contains(rec.Body.String(), "location_removed") {
+		t.Errorf("a file that named no place was said to: %s", rec.Body.String())
 	}
 }
 

@@ -330,6 +330,10 @@ type Media struct {
 
 	Size int    `json:"size"`
 	Type string `json:"type,omitempty"`
+
+	// LocationRemoved says the photo named where it was taken, and that was
+	// taken out before it was stored.
+	LocationRemoved bool `json:"location_removed,omitempty"`
 }
 
 // Settings is what a project exposes to a configuration form.

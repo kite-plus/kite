@@ -24,6 +24,13 @@ An item that changed on disk since it was loaded is refused rather than
 overwritten, and the studio says so. Editing is available in English and
 简体中文, chosen from the browser.
 
+A photo added in the studio loses where it was taken before it is stored,
+since what is stored is published: the GPS of its EXIF and whatever of its
+XMP gives the place, in a JPEG, PNG, WebP or AVIF, and in the previews some
+cameras keep inside a JPEG. How to turn it, what took it and when stay, its
+pixels are not touched, and the studio says when it has taken a place out.
+A file added with git is published as it is.
+
 Tags and categories are counted the way the site lists them, so Go, go and
 GO are one tag, called the way most posts write it, and its card says how
 else it is written. Renaming a tag writes the new name on every post that
@@ -268,7 +275,7 @@ to its ratio and scales to it, keeping the part an anchor names; `img.Crop`
 cuts without scaling; `img.Format` writes `webp`, `jpeg`, `png` or `gif`,
 and `img.Quality` a WebP's or a JPEG's quality, 75 unless asked. A photo is
 turned upright as its EXIF says first, and what is made carries none of it,
-so where a photo was taken is not published. Kite reads and writes JPEG, PNG,
+so it never says where a photo was taken. Kite reads and writes JPEG, PNG,
 GIF and WebP with code of its own, the same on every machine, so a site built
 on a laptop and on a CI runner publishes the same bytes. A WebP is lossy and
 keeps what is transparent; a picture written as a JPEG is put on white.

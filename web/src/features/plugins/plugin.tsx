@@ -11,6 +11,7 @@ import { useSettingsDraft } from "@/hooks/useSettingsDraft";
 import { uploadSiteMedia } from "@/hooks/useThemes";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { changesOf, defaultOf, problemOf, valueFields } from "@/lib/schema";
+import { stored } from "@/lib/uploads";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -147,7 +148,7 @@ export function PluginSettings({ id }: { id: string }) {
                     fields={detail.schema ?? []}
                     values={values}
                     onChange={form.change}
-                    uploads={{ upload: uploadSiteMedia }}
+                    uploads={{ upload: async (file) => stored(await uploadSiteMedia(file), t) }}
                     onReset={(key) => {
                       const field = fields.find((each) => each.key === key);
                       if (field) form.change({ ...values, [key]: defaultOf(field) });

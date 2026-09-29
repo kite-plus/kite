@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { api, ApiError, type Draft, type Item } from "@/api/client";
+import { api, ApiError, type Draft, type Item, type Media } from "@/api/client";
 import { dropUnsaved, readUnsaved, sameDraft, unsavedKey, writeUnsaved } from "@/lib/unsaved";
 
 /** failureOf describes a request that threw instead of being answered. */
@@ -445,9 +445,9 @@ export function useItem(
   }, [queryClient, mark, forget]);
 
   /**
-   * attach uploads a file into an item's bundle and returns its link. The
-   * item is this one unless said otherwise: a first save hands out an id
-   * before this hook has been rendered with it.
+   * attach uploads a file into an item's bundle and returns what was stored,
+   * its link among it. The item is this one unless said otherwise: a first
+   * save hands out an id before this hook has been rendered with it.
    */
   const attach = useCallback(
     (
@@ -456,7 +456,7 @@ export function useItem(
       /** onProgress hears the share of the file sent so far, from 0 to 100. */
       onProgress?: (percent: number) => void,
       signal?: AbortSignal,
-    ): Promise<string> => {
+    ): Promise<Media> => {
       if (!into) {
         return Promise.reject(new ApiError("invalid_request", "save this item before adding files"));
       }
@@ -475,9 +475,9 @@ export function useItem(
           if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
         };
         request.onload = () => {
-          const body = request.response as { link?: string; error?: { code?: string; message?: string } } | null;
+          const body = request.response as (Media & { error?: { code?: string; message?: string } }) | null;
           if (request.status >= 200 && request.status < 300 && body?.link) {
-            resolve(body.link);
+            resolve(body);
             return;
           }
           reject(new ApiError(body?.error?.code ?? "internal", body?.error?.message ?? "upload failed"));

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/render/img"
 )
 
 // maxUpload bounds one uploaded file.
@@ -79,6 +80,9 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request, view View, owner
 		fail(w, http.StatusRequestEntityTooLarge, CodeInvalidRequest, "the file is too large")
 		return
 	}
+	// What is uploaded is published, and a phone writes where it was taken
+	// into every photo, so that goes before the photo is stored.
+	data, located := img.WithoutLocation(data)
 
 	var id content.ID
 	if owner != nil {
@@ -101,10 +105,11 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request, view View, owner
 	// the link is built from what it actually wrote.
 	stored := res.Written[len(res.Written)-1]
 	media := Media{
-		Name: path.Base(stored),
-		Path: stored,
-		Size: len(data),
-		Type: mime.TypeByExtension(ext),
+		Name:            path.Base(stored),
+		Path:            stored,
+		Size:            len(data),
+		Type:            mime.TypeByExtension(ext),
+		LocationRemoved: located,
 	}
 	if site, ok := strings.CutPrefix(stored, "static/"); ok {
 		// static/ is published at the root of the site, so a file of the

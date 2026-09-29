@@ -15,7 +15,7 @@ import (
 
 // picture is a w by h JPEG, red in its top left quarter and blue elsewhere,
 // so a test can tell which way it was turned or which part was kept.
-func picture(t *testing.T, w, h int) []byte {
+func picture(t testing.TB, w, h int) []byte {
 	t.Helper()
 	m := image.NewRGBA(image.Rect(0, 0, w, h))
 	for y := range h {

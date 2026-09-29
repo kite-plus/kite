@@ -17,6 +17,7 @@ import { useWordCount } from "@/hooks/useWordCount";
 import { siteHome } from "@/lib/links";
 import { isoDate } from "@/lib/dates";
 import { composing } from "@/lib/ime";
+import { stored } from "@/lib/uploads";
 import { cn } from "@/lib/utils";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -220,7 +221,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
       try {
         const target = id ?? (await save());
         if (!target) throw new Error(t("editor.saveFirst"));
-        return await item.attach(file, target, (progress) => onProgress?.({ progress }), signal);
+        return stored(await item.attach(file, target, (progress) => onProgress?.({ progress }), signal), t);
       } catch (err) {
         // A cancelled upload was the author's doing, not a failure to report.
         if (!signal?.aborted) {

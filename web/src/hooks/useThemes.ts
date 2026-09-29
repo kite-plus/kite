@@ -106,8 +106,8 @@ export function useSaveTheme() {
   });
 }
 
-/** uploadSiteMedia stores a file of the site's own and resolves to its path in the site. */
-export async function uploadSiteMedia(file: File): Promise<string> {
+/** uploadSiteMedia stores a file of the site's own and resolves to what was stored, its link among it. */
+export async function uploadSiteMedia(file: File): Promise<Media> {
   const form = new FormData();
   form.append("file", file);
   const response = await fetch("/api/v1/media", { method: "POST", body: form, credentials: "same-origin" });
@@ -117,5 +117,5 @@ export async function uploadSiteMedia(file: File): Promise<string> {
   if (!response.ok || !body?.link) {
     throw new ApiError(body?.error?.code ?? "internal", body?.error?.message ?? "upload failed");
   }
-  return body.link;
+  return body;
 }
