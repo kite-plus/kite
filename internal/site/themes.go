@@ -124,7 +124,7 @@ func (s *Site) With(v Variant) (*Site, error) {
 	if v.BaseURL != "" {
 		cfg.Site.BaseURL = strings.TrimRight(v.BaseURL, "/")
 	}
-	out, err := assemble(s.Project, &cfg, s.Index)
+	out, err := assemble(s.Project, &cfg, s.Index, s.Images)
 	if err != nil {
 		return nil, err
 	}

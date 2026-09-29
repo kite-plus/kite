@@ -14,6 +14,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/kite-plus/kite/internal/render"
+	"github.com/kite-plus/kite/internal/render/img"
 	"github.com/kite-plus/kite/internal/render/markdown"
 )
 
@@ -35,6 +37,7 @@ func baseFuncs(links Links, words *Words) template.FuncMap {
 		"url":         func() urlNS { return urlNS{links: links} },
 		"math":        func() mathNS { return mathNS{} },
 		"i18n":        func() i18nNS { return i18nNS{words: words} },
+		"img":         func() imgNS { return imgNS{} },
 
 		// Top level, because the template language cannot express them any
 		// other way, or, as T, because a page says so many words.
@@ -608,4 +611,80 @@ func (mathNS) Float(v any) (float64, error) {
 	}
 	n, err := asNumber("math.Float", v)
 	return n.f, err
+}
+
+// imgNS makes pictures from the pictures of a page's bundle, as
+// {{ (.Resources.Get "river.jpg" | img.Fit "1600x1600").RelPermalink }}.
+// Each function takes a picture and returns one to be made: nothing is made
+// until a template asks where the result is or how large it is, so steps can
+// be chained and only the last is made.
+type imgNS struct{}
+
+// Resize scales a picture to a size, keeping its ratio when a side is left
+// out, as "800x".
+func (imgNS) Resize(spec string, p any) (*render.Image, error) { return imgStep("resize", spec, p) }
+
+// Fit scales a picture down, never up, to fit inside a size.
+func (imgNS) Fit(spec string, p any) (*render.Image, error) { return imgStep("fit", spec, p) }
+
+// Fill crops a picture to a size's ratio and scales it to the size, keeping
+// the part an anchor names, as "600x400 top".
+func (imgNS) Fill(spec string, p any) (*render.Image, error) { return imgStep("fill", spec, p) }
+
+// Crop cuts a size out of a picture without scaling it.
+func (imgNS) Crop(spec string, p any) (*render.Image, error) { return imgStep("crop", spec, p) }
+
+// Format writes a picture as jpeg, png or gif.
+func (imgNS) Format(format string, p any) (*render.Image, error) {
+	f, err := img.ParseFormat(format)
+	if err != nil {
+		return nil, err
+	}
+	pic, err := picture("Format", p)
+	if err != nil {
+		return nil, err
+	}
+	r := pic.Recipe()
+	r.Format = f
+	return pic.Make(r)
+}
+
+// Quality is a JPEG's quality, from 1 to 100.
+func (imgNS) Quality(q, p any) (*render.Image, error) {
+	n, err := whole("img.Quality", q)
+	if err != nil {
+		return nil, err
+	}
+	if n < 1 || n > 100 {
+		return nil, fmt.Errorf("img.Quality: %d is not from 1 to 100", n)
+	}
+	pic, err := picture("Quality", p)
+	if err != nil {
+		return nil, err
+	}
+	r := pic.Recipe()
+	r.Quality = n
+	return pic.Make(r)
+}
+
+func imgStep(op, spec string, p any) (*render.Image, error) {
+	s, err := img.ParseStep(op, spec)
+	if err != nil {
+		return nil, err
+	}
+	pic, err := picture(img.Title(op), p)
+	if err != nil {
+		return nil, err
+	}
+	return pic.Make(pic.Recipe().With(s))
+}
+
+func picture(fn string, p any) (render.Picture, error) {
+	switch v := p.(type) {
+	case render.Picture:
+		return v, nil
+	case nil:
+		return nil, fmt.Errorf("img.%s: there is no picture; is the name given to .Resources.Get right?", fn)
+	}
+	return nil, fmt.Errorf("img.%s: %T is not a picture of a page's bundle", fn, p)
 }

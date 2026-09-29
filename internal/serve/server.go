@@ -35,6 +35,7 @@ import (
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/render"
+	"github.com/kite-plus/kite/internal/render/img"
 	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/setup"
 	"github.com/kite-plus/kite/internal/site"
@@ -600,7 +601,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	// for the bare host is sent to the home page.
 	current := s.project()
 	if within, ok := current.Resolver.SitePath(r.URL.Path); ok {
-		if s.serveExtra(w, r, within) || s.serveStatic(w, r, within) {
+		if s.serveExtra(w, r, within) || s.serveStatic(w, r, within) || serveMade(w, r, within, current.Images) {
 			return
 		}
 	} else if r.URL.Path == "/" {
@@ -682,6 +683,26 @@ func serveFile(w http.ResponseWriter, r *http.Request, within, root string, rout
 		return true
 	}
 	return false
+}
+
+// serveMade answers for a picture a template had made, which a build writes
+// beside the file it was made from and names by what went into it.
+func serveMade(w http.ResponseWriter, r *http.Request, within string, images *img.Processor) bool {
+	if images == nil {
+		return false
+	}
+	made, ok := images.Lookup(within)
+	if !ok {
+		return false
+	}
+	data, err := made.Bytes()
+	if err != nil {
+		return false
+	}
+	w.Header().Set("Content-Type", made.MediaType())
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeContent(w, r, path.Base(within), time.Time{}, bytes.NewReader(data))
+	return true
 }
 
 // staticRoots lists where unprocessed files live, in the order a build copies

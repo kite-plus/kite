@@ -18,6 +18,7 @@ import (
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/hook"
 	"github.com/kite-plus/kite/internal/render"
+	"github.com/kite-plus/kite/internal/render/img"
 	"github.com/kite-plus/kite/internal/render/markdown"
 	"github.com/kite-plus/kite/internal/render/theme"
 	kurl "github.com/kite-plus/kite/internal/render/url"
@@ -47,6 +48,10 @@ type Options struct {
 	// 0 puts all of a listing's items on one page.
 	PageSize  int
 	PageSizes map[render.Kind]int
+
+	// Images makes the pictures templates ask for from those of a page's
+	// bundle. Without it no picture is made.
+	Images *img.Processor
 
 	// IncludeDrafts renders unpublished items, for local preview.
 	IncludeDrafts bool
@@ -80,6 +85,10 @@ type Builder struct {
 	rewrites  bool
 	draws     bool
 	summaries sync.Map
+
+	// made holds the pictures templates had made, by the path each is
+	// published at.
+	made sync.Map
 }
 
 // New returns a builder.
@@ -161,6 +170,24 @@ func (b *Builder) Run(ctx context.Context) (Stats, error) {
 	}
 	stats.Rendered = len(pages)
 	stats.Skipped = plan.Len() - len(pages)
+
+	var made []string
+	b.made.Range(func(out, _ any) bool {
+		made = append(made, out.(string))
+		return true
+	})
+	slices.Sort(made)
+	for _, out := range made {
+		m, _ := b.made.Load(out)
+		data, err := m.(*img.Made).Bytes()
+		if err != nil {
+			return stats, fmt.Errorf("build: %s: %w", out, err)
+		}
+		if err := b.opts.Emitter.Write(out, data); err != nil {
+			return stats, err
+		}
+		stats.Extra++
+	}
 
 	if err := b.observe(ctx, pages); err != nil {
 		return stats, err
@@ -371,48 +398,78 @@ func MediaFiles(plan *Plan, media fs.FS) (map[string]string, error) {
 			continue
 		}
 		dir := string(t.Item.Locator)
-		// A single-file item has no directory of its own, which is not a
-		// problem to report: it simply owns nothing.
-		if info, err := fs.Stat(media, dir); err != nil || !info.IsDir() {
-			continue
+		names, err := bundleFiles(media, dir)
+		if err != nil {
+			return nil, err
 		}
-
 		outDir := path.Dir(t.Path)
-		err := fs.WalkDir(media, dir, func(p string, d fs.DirEntry, err error) error {
-			if err != nil || p == dir {
-				return err
-			}
-			name := d.Name()
-			if d.IsDir() {
-				if strings.HasPrefix(name, ".") || isBundle(media, p) {
-					return fs.SkipDir
-				}
-				return nil
-			}
-			if strings.HasPrefix(name, ".") || strings.EqualFold(path.Ext(name), ".md") {
-				return nil // a source is rendered, not published
-			}
-
-			within := strings.TrimPrefix(p, dir+"/")
+		for _, within := range names {
 			target := path.Join(outDir, within)
 			// Under the extension style every bundle in a section shares one
 			// output directory, so two items can own a file of the same name.
 			// Publishing one over the other would leave a page showing
 			// another page's picture, with nothing said.
 			if held, taken := owner[target]; taken && held != t.Item.Locator {
-				return fmt.Errorf(
+				return nil, fmt.Errorf(
 					"build: %s and %s both own %s; rename one, or use the directory url style",
 					held, t.Item.Locator, within)
 			}
 			owner[target] = t.Item.Locator
-			out[target] = p
-			return nil
-		})
-		if err != nil {
-			return nil, err
+			out[target] = path.Join(dir, within)
 		}
 	}
 	return out, nil
+}
+
+// bundleFiles lists what an item's bundle publishes beside its page, by path
+// within the bundle and in name order: every file but its sources and hidden
+// ones, in folders that are not another item's bundle. A single-file item
+// has no folder of its own and publishes nothing, which is not a problem.
+func bundleFiles(media fs.FS, dir string) ([]string, error) {
+	if info, err := fs.Stat(media, dir); err != nil || !info.IsDir() {
+		return nil, nil
+	}
+	var names []string
+	err := fs.WalkDir(media, dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || p == dir {
+			return err
+		}
+		name := d.Name()
+		if d.IsDir() {
+			if strings.HasPrefix(name, ".") || isBundle(media, p) {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if strings.HasPrefix(name, ".") || strings.EqualFold(path.Ext(name), ".md") {
+			return nil // a source is rendered, not published
+		}
+		names = append(names, strings.TrimPrefix(p, dir+"/"))
+		return nil
+	})
+	return names, err
+}
+
+// resources lists the files of an item's bundle for a page published at
+// out, when a template first asks for them.
+func (b *Builder) resources(loc content.Locator, out string) func() render.ResourceList {
+	return func() render.ResourceList {
+		if b.opts.Media == nil {
+			return nil
+		}
+		names, err := bundleFiles(b.opts.Media, string(loc))
+		if err != nil || len(names) == 0 {
+			return nil // MediaFiles reports what cannot be read
+		}
+		return render.Bundle{
+			Media:  b.opts.Media,
+			Dir:    string(loc),
+			Out:    path.Dir(out),
+			Links:  b.opts.Resolver,
+			Images: b.opts.Images,
+			Made:   func(out string, m *img.Made) { b.made.Store(out, m) },
+		}.Files(names)
+	}
 }
 
 // isBundle reports whether a directory holds an item of its own.
@@ -608,11 +665,12 @@ func (b *Builder) page(ctx context.Context, out *Context, t Target) (render.Page
 		out.Read(Node{Kind: NodeContent, ID: string(t.Item.ID)}, string(t.Item.Revision),
 			"title", "slug", "body", "params", "published_at", "updated_at", "taxonomies")
 		opts := render.PageOptions{
-			Kind:     t.Kind,
-			Rendered: body,
-			Resolver: b.opts.Resolver,
-			Terms:    b.termsOf(t.Item),
-			Location: b.opts.Site.Location,
+			Kind:      t.Kind,
+			Rendered:  body,
+			Resolver:  b.opts.Resolver,
+			Terms:     b.termsOf(t.Item),
+			Location:  b.opts.Site.Location,
+			Resources: b.resources(t.Item.Locator, t.Path),
 		}
 		// Assigned only when present: a nil *Summary stored in the interface
 		// field would not be nil to a template.
@@ -657,11 +715,12 @@ func (b *Builder) listedPage(ctx context.Context, out *Context, s content.Summar
 		return nil, err
 	}
 	return render.NewPage(summaryToContent(s), render.PageOptions{
-		Kind:     render.KindSingle,
-		Rendered: &summary,
-		Resolver: b.opts.Resolver,
-		Terms:    b.termsOfMap(s.Taxonomies),
-		Location: b.opts.Site.Location,
+		Kind:      render.KindSingle,
+		Rendered:  &summary,
+		Resolver:  b.opts.Resolver,
+		Terms:     b.termsOfMap(s.Taxonomies),
+		Location:  b.opts.Site.Location,
+		Resources: b.resources(s.Locator, b.opts.Resolver.OutputPath(b.opts.Resolver.ForSummary(s))),
 	}), nil
 }
 
@@ -749,10 +808,12 @@ type shortcodes struct {
 func (s *shortcodes) Draw(call *markdown.Call) (string, error) {
 	// Made on the first call, since most bodies make none.
 	if s.page == nil {
+		out := s.b.opts.Resolver.OutputPath(s.b.opts.Resolver.For(s.item))
 		s.page = render.NewPage(s.item, render.PageOptions{
-			Resolver: s.b.opts.Resolver,
-			Terms:    s.b.termsOf(s.item),
-			Location: s.b.opts.Site.Location,
+			Resolver:  s.b.opts.Resolver,
+			Terms:     s.b.termsOf(s.item),
+			Location:  s.b.opts.Site.Location,
+			Resources: s.b.resources(s.item.Locator, out),
 		})
 	}
 	return s.b.opts.Engine.Shortcode(call.Name, render.NewShortcode(call, s.page, s.b.site))

@@ -113,7 +113,8 @@ func (p *previews) Serve(w http.ResponseWriter, r *http.Request, token, path str
 		return true
 	}
 	if within, ok := drawn.site.Resolver.SitePath(path); ok &&
-		serveFile(w, r, within, p.server.root, drawn.routes, staticRoots(p.server.root, drawn.site)) {
+		(serveFile(w, r, within, p.server.root, drawn.routes, staticRoots(p.server.root, drawn.site)) ||
+			serveMade(w, r, within, drawn.site.Images)) {
 		return true
 	}
 	if target, ok := drawn.routes.notFoundTarget(); ok {

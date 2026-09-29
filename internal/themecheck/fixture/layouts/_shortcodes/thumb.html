@@ -1,0 +1,1 @@
+{{ with .Page.Resources.Get (.Get 0) }}{{ with img.Fill "8x8" . }}<img class="thumb" src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="">{{ end }}{{ end }}

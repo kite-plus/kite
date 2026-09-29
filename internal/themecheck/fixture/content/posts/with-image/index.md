@@ -16,3 +16,6 @@ A page bundle keeps its image beside the text.
 The image is published next to the page, and so is one kept in a folder.
 
 ![A detail](images/detail.png)
+
+A picture made from the square, as a theme or a shortcode makes one:
+{{< thumb "square.png" >}}

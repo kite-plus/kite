@@ -27,6 +27,7 @@ import (
 	gitpub "github.com/kite-plus/kite/internal/publish/git"
 	"github.com/kite-plus/kite/internal/reader"
 	"github.com/kite-plus/kite/internal/render"
+	"github.com/kite-plus/kite/internal/render/img"
 	"github.com/kite-plus/kite/internal/render/markdown"
 	"github.com/kite-plus/kite/internal/render/theme"
 	kurl "github.com/kite-plus/kite/internal/render/url"
@@ -52,6 +53,10 @@ type Site struct {
 	Engine   *theme.Engine
 	Markdown *markdown.Renderer
 	Hooks    *hook.Bus
+
+	// Images keeps the pictures templates had made, in ImagesDir, where a
+	// later build or server finds them.
+	Images *img.Processor
 
 	// Plugins are the enabled plugins that loaded, in the order they run.
 	Plugins []*plugin.Plugin
@@ -86,7 +91,7 @@ func Open(ctx context.Context, dir string) (*Site, error) {
 		problems = strings.Split(err.Error(), "\n")
 	}
 
-	s, err := assemble(p, cfg, ix)
+	s, err := assemble(p, cfg, ix, img.NewProcessor(filepath.Join(p.Root, filepath.FromSlash(ImagesDir))))
 	if err != nil {
 		_ = ix.Close()
 		return nil, err
@@ -113,7 +118,7 @@ func (s *Site) Reconfigure() (*Site, error) {
 	if err := s.Project.Types.Declare(cfg.Content.ContentTypes()...); err != nil {
 		return nil, fmt.Errorf("config: content.types: %w", err)
 	}
-	out, err := assemble(s.Project, cfg, s.Index)
+	out, err := assemble(s.Project, cfg, s.Index, s.Images)
 	if err != nil {
 		_ = s.Project.Types.Declare(before...)
 		return nil, err
@@ -122,8 +127,12 @@ func (s *Site) Reconfigure() (*Site, error) {
 	return out, nil
 }
 
+// ImagesDir is where the pictures templates had made are kept, derived like
+// the index and as safe to delete.
+const ImagesDir = ".kite/cache/images"
+
 // assemble builds the half of a site that comes from its configuration.
-func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, error) {
+func assemble(p *project.Project, cfg *config.Config, ix *index.Index, images *img.Processor) (*Site, error) {
 	resolver, err := kurl.New(kurl.Options{
 		BaseURL:        cfg.Site.BaseURL,
 		Style:          kurl.Style(cfg.Build.URLStyle),
@@ -177,6 +186,7 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 			BasePath:       strings.TrimSuffix(resolver.Rel("/"), "/"),
 		}),
 		Hooks:          bus,
+		Images:         images,
 		Plugins:        plugins,
 		PluginProblems: pluginProblems,
 		publisher:      newPublisher(p, cfg),
@@ -340,6 +350,7 @@ func (s *Site) newBuilder(opts BuildOptions, emitter *build.Emitter) (*build.Bui
 		Types:         s.Project.Types,
 		Emitter:       emitter,
 		Media:         os.DirFS(s.Project.Root),
+		Images:        s.Images,
 		PageSize:      s.Config.Build.PageSize,
 		PageSizes:     sizes,
 		IncludeDrafts: opts.Drafts,

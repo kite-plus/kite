@@ -1,9 +1,12 @@
 package build_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"maps"
 	"os"
 	"path/filepath"
@@ -21,6 +24,7 @@ import (
 	"github.com/kite-plus/kite/internal/index"
 	"github.com/kite-plus/kite/internal/reader"
 	"github.com/kite-plus/kite/internal/render"
+	"github.com/kite-plus/kite/internal/render/img"
 	"github.com/kite-plus/kite/internal/render/markdown"
 	"github.com/kite-plus/kite/internal/render/theme"
 	kurl "github.com/kite-plus/kite/internal/render/url"
@@ -1592,5 +1596,101 @@ func TestAnUndefinedShortcodeStopsTheBuildAtItsLine(t *testing.T) {
 	}
 	if !strings.Contains(string(extras["rss.xml"]), "First paragraph.") {
 		t.Errorf("the feed does not hold the post as the index knows it:\n%s", extras["rss.xml"])
+	}
+}
+
+// pictureFile is a w by h PNG.
+func pictureFile(t *testing.T, w, h int) []byte {
+	t.Helper()
+	m := image.NewRGBA(image.Rect(0, 0, w, h))
+	for i := range m.Pix {
+		m.Pix[i] = byte(i)
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, m); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// A template reads the files of a page's bundle and has pictures made from
+// them: on the page itself, for the pages a listing shows, and in a
+// shortcode through the page it is called on. A build writes each made
+// picture beside the file it was made from, once, however many pages ask.
+func TestTemplatesMakePicturesFromABundle(t *testing.T) {
+	f := newFixture(t, 1)
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const thumb = `{{ with .Resources.Get "river.png" }}{{ with img.Fill "40x40" . }}` +
+		`<img class="thumb" src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}">{{ end }}{{ end }}`
+	layouts := fstest.MapFS{
+		"home.html": {Data: []byte(`{{ define "main" }}{{ range .Pages }}` + thumb + `{{ end }}{{ end }}`)},
+		"single.html": {Data: []byte(`{{ define "main" }}{{ with .Page }}` +
+			`{{ range .Resources }}[{{ .Name }} {{ .MediaType }}]{{ end }}` +
+			`{{ len (.Resources.Match "*.png") }} {{ len (.Resources.Match "**.PNG") }} {{ len (.Resources.ByType "image") }} ` +
+			`{{ with .Resources.Get "river.png" }}{{ .RelPermalink }} {{ .Width }}x{{ .Height }} ` +
+			`{{ (. | img.Resize "50x" | img.Format "jpeg" | img.Quality 80).RelPermalink }}{{ end }}` +
+			thumb + `{{ .Content }}{{ end }}{{ end }}`)},
+		"_shortcodes/gallery.html": {Data: []byte(`{{ range .Page.Resources.ByType "image" }}` +
+			`{{ with img.Fit "20x20" . }}<img class="gallery" src="{{ .RelPermalink }}">{{ end }}{{ end }}`)},
+	}
+	f.engine = theme.NewEngine(theme.Options{
+		Sources: []theme.Source{{Name: "site", FS: layouts}, {Name: "default", FS: th.Layouts}},
+		Links:   f.resolve,
+	})
+	f.add(t, "content/posts/trip/index.md", post("01J8KQ2P3R4S5T6V7W8X9YZTRP", "trip", "2026-01-20T00:00:00Z", "")+
+		"\n{{< gallery >}}\n")
+	for name, data := range map[string][]byte{
+		"content/posts/trip/river.png":         pictureFile(t, 200, 100),
+		"content/posts/trip/notes.txt":         []byte("notes"),
+		"content/posts/trip/images/bridge.png": pictureFile(t, 60, 60),
+	} {
+		if err := os.MkdirAll(filepath.Join(f.root, filepath.Dir(name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(f.root, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	images := img.NewProcessor(filepath.Join(f.root, ".kite", "cache", "images"))
+	_, files := f.run(t, f.out, func(o *build.Options) {
+		o.Media = os.DirFS(f.root)
+		o.Images = images
+	})
+
+	page := readFile(t, f.out, "posts/trip/index.html")
+	for _, want := range []string{
+		"[images/bridge.png image/png][notes.txt text/plain][river.png image/png]",
+		"1 2 2 /posts/trip/river.png 200x100 /posts/trip/river_",
+		`width="40" height="40"`,
+		`<img class="gallery" src="/posts/trip/images/bridge_`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page does not say %q: %s", want, excerptOf(page, "[images"))
+		}
+	}
+	thumbs := regexp.MustCompile(`class="thumb" src="/(posts/trip/river_[0-9a-f]{16}\.png)"`)
+	onPage := thumbs.FindStringSubmatch(page)
+	onHome := thumbs.FindStringSubmatch(readFile(t, f.out, "index.html"))
+	if onPage == nil || onHome == nil || onPage[1] != onHome[1] {
+		t.Fatalf("the page and the home page show thumbnails %v and %v, want one picture", onPage, onHome)
+	}
+	var made []string
+	for _, file := range files {
+		if strings.Contains(file, "_") && strings.HasPrefix(file, "posts/trip/") {
+			made = append(made, file)
+		}
+	}
+	if len(made) != 4 { // the thumbnail, the JPEG, and one gallery picture of each
+		t.Errorf("made %v, want four pictures", made)
+	}
+	data, err := os.ReadFile(filepath.Join(f.out, filepath.FromSlash(onPage[1])))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg, err := png.DecodeConfig(bytes.NewReader(data)); err != nil || cfg.Width != 40 || cfg.Height != 40 {
+		t.Errorf("the thumbnail is %+v, %v; want 40x40", cfg, err)
 	}
 }

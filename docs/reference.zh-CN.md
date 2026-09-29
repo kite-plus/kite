@@ -206,6 +206,27 @@ web-dev 都是 `/tags/web-dev/`。它的页面列出带着其中任何一种写�
 它算一次，文章自己的 `.Terms` 按这篇文章的写法显示。只由短横线、斜杠或空格组成的词条
 没有自己的页面。
 
+以 bundle 保存的页面，它的文件在 `.Resources` 里，按 bundle 里的名字取：
+`.Resources.Get "cover.jpg"`、`.Resources.Match "images/*"` 或 `.Resources.ByType "image"`。
+其中的图片可以做成另一张：更小、裁过或者换格式，主题就这样给列表配小封面，或者给图片写
+`srcset`：
+
+```html
+{{ with .Resources.Get "river.jpg" }}
+  {{ $small := img.Fit "800x800" . }}
+  {{ $card := . | img.Fill "600x400" | img.Quality 80 }}
+  <img src="{{ $small.RelPermalink }}" width="{{ $small.Width }}" height="{{ $small.Height }}">
+{{ end }}
+```
+
+`img.Resize "800x"` 缩放到这个尺寸，缺的一边按比例；`img.Fit` 只缩小，放进这个框；
+`img.Fill "600x400 top"` 先按比例裁、再缩放到正好这个尺寸，锚点指定保留哪一部分；
+`img.Crop` 只裁不缩；`img.Format` 写成 `jpeg`、`png` 或 `gif`；`img.Quality` 是 JPEG 的质量。
+照片先按 EXIF 转正，做出的图不带任何 EXIF，拍摄地点不会随图发布。Kite 读 JPEG、PNG、GIF
+和 WebP，写 JPEG、PNG 和 GIF。每张图只做一次：模板第一次问它的地址或尺寸时才做，发布在
+源文件旁边，名字是 `river_<key>.jpg`，并保存在 `.kite/cache/images/`，之后的构建和
+`kite serve` 直接用。
+
 文章的封面是 front matter 里的 `cover`，模板从 `.Params.cover` 读到的就是作者写的原文；
 `.Images` 按出现顺序列出正文里的图片，也是原文。列表里的页面同样带着这两样。主题解析它们的方式，
 和浏览器解析正文里的图片一样：完整地址原样用，从站点根开始写的用 `url.Rel`，其余的相对于页面地址。

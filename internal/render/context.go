@@ -110,6 +110,10 @@ type Page interface {
 	Params() map[string]any
 	Terms(taxonomy string) []Term
 
+	// Resources are the files of the page's bundle, such as the pictures
+	// beside its text; none for a page kept as a single file.
+	Resources() ResourceList
+
 	// Prev and Next are the neighbors of a single page among the items of its
 	// own kind, by publish date: Prev is the older one, Next the newer. Each
 	// is nil at its end of the run, and both are on a page that is listed

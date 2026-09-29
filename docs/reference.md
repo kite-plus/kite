@@ -248,6 +248,31 @@ in character order, Go before go. A taxonomy page's `.Terms` count such a term
 once, and a post's own `.Terms` show it as that post writes it. A term of
 nothing but dashes, slashes or spaces has no page.
 
+A page kept as a bundle has its files in `.Resources`, by their names in it:
+`.Resources.Get "cover.jpg"`, `.Resources.Match "images/*"` or
+`.Resources.ByType "image"`. A picture among them can be made into another,
+smaller, cropped or in another format, which is how a theme gives a list a
+small cover or a picture a `srcset`:
+
+```html
+{{ with .Resources.Get "river.jpg" }}
+  {{ $small := img.Fit "800x800" . }}
+  {{ $card := . | img.Fill "600x400" | img.Quality 80 }}
+  <img src="{{ $small.RelPermalink }}" width="{{ $small.Width }}" height="{{ $small.Height }}">
+{{ end }}
+```
+
+`img.Resize "800x"` scales to a size, keeping the ratio where a side is left
+out; `img.Fit` scales down to fit inside one; `img.Fill "600x400 top"` crops
+to its ratio and scales to it, keeping the part an anchor names; `img.Crop`
+cuts without scaling; `img.Format` writes `jpeg`, `png` or `gif`, and
+`img.Quality` a JPEG's quality. A photo is turned upright as its EXIF says
+first, and what is made carries none of it, so where a photo was taken is not
+published. Kite reads JPEG, PNG, GIF and WebP and writes JPEG, PNG and GIF.
+A picture is made once, the first time a template asks where it is or how
+large, published beside its source as `river_<key>.jpg`, and kept in
+`.kite/cache/images/`, which a later build and `kite serve` use.
+
 A post's cover is the `cover` in its front matter, which a template reads as
 written in `.Params.cover`, and `.Images` lists the pictures its text shows,
 in order and as written; a listed page carries both. A theme resolves either

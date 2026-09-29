@@ -5,6 +5,7 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/kite-plus/kite/internal/content"
@@ -98,6 +99,10 @@ type pageModel struct {
 	terms      map[string][]Term
 	prev, next Page
 	loc        *time.Location
+
+	resources func() ResourceList
+	listed    sync.Once
+	files     ResourceList
 }
 
 // PageOptions carries what a page needs beyond the stored item.
@@ -116,6 +121,10 @@ type PageOptions struct {
 	// Prev and Next are the neighbors of a single page, nil where there is
 	// none.
 	Prev, Next Page
+
+	// Resources lists the files of the page's bundle when a template first
+	// asks for them.
+	Resources func() ResourceList
 }
 
 // NewPage returns the Page view of a stored item.
@@ -124,15 +133,16 @@ func NewPage(item *content.Content, opts PageOptions) Page {
 		opts.Kind = KindSingle
 	}
 	return &pageModel{
-		item:     item,
-		kind:     opts.Kind,
-		doc:      opts.Rendered,
-		resolver: opts.Resolver,
-		url:      opts.URL,
-		terms:    opts.Terms,
-		prev:     opts.Prev,
-		next:     opts.Next,
-		loc:      opts.Location,
+		item:      item,
+		kind:      opts.Kind,
+		doc:       opts.Rendered,
+		resolver:  opts.Resolver,
+		url:       opts.URL,
+		terms:     opts.Terms,
+		prev:      opts.Prev,
+		next:      opts.Next,
+		loc:       opts.Location,
+		resources: opts.Resources,
 	}
 }
 
@@ -236,6 +246,15 @@ func (p *pageModel) Draft() bool            { return p.item.Status == content.St
 func (p *pageModel) Params() map[string]any { return maps.Clone(p.item.Meta) }
 
 func (p *pageModel) Terms(taxonomy string) []Term { return p.terms[taxonomy] }
+
+func (p *pageModel) Resources() ResourceList {
+	p.listed.Do(func() {
+		if p.resources != nil {
+			p.files = p.resources()
+		}
+	})
+	return p.files
+}
 
 // The fields are interfaces, so a missing neighbor is an untyped nil and
 // {{ with .Page.Next }} skips it.
