@@ -487,8 +487,10 @@ asset.Get  asset.CSS  asset.JS  asset.Fingerprint  asset.Minify  asset.Bundle  a
 **`i18n.*`**
 
 ```
-i18n.T  i18n.Lang  i18n.Translate
+i18n.T  i18n.Has  i18n.Words  i18n.Lang  i18n.Translate
 ```
+
+`T`、`i18n.T`、`i18n.Has` 和 `i18n.Words` 已实现，语义见 [§12](#12-i18n)。
 
 **`math.*`** / **`debug.*`**
 
@@ -793,7 +795,16 @@ posts_count:
   other: "{{.Count}} 篇文章"
 ```
 
-**主题在后台里的文字已经用上这套目录**：`theme` 键下放 `theme.yaml` 里给后台看的文字——`title`、`description`、`settings.<key>.label` / `help` / `placeholder` / `options.<value>`、`group` 和 `repeat` 的 `settings.<key>.fields.<子键>...`、`layouts.<name>.label` / `description`；`section` 里的字段与 section 同层，直接用自己的键。API 按请求的 `Accept-Language` 选最接近的语言包（完全匹配 → 基础语言 → 同一语言的其他地区），语言包里没有的回退到 `theme.yaml` 原文。`theme` 以外的键留给模板的 `T`，函数本身仍按上面第 2 条待定。
+**主题在后台里的文字已经用上这套目录**：`theme` 键下放 `theme.yaml` 里给后台看的文字——`title`、`description`、`settings.<key>.label` / `help` / `placeholder` / `options.<value>`、`group` 和 `repeat` 的 `settings.<key>.fields.<子键>...`、`layouts.<name>.label` / `description`；`section` 里的字段与 section 同层，直接用自己的键。API 按请求的 `Accept-Language` 选最接近的语言包（完全匹配 → 基础语言 → 同一语言的其他地区），语言包里没有的回退到 `theme.yaml` 原文。
+
+**`theme` 以外的键是页面上的词，模板用 `T` 读**（已实现，一个站点一种语言）：
+
+- `T "read_more"` 按站点的 `site.language` 选语言包，选法同上。站点自己的 `i18n/<lang>.yaml` 盖过主题的同名键，站点不用覆盖模板就能改主题的用词。语言包里没有的词用英文包里的，英文包也没有就是键本身。
+- 要放进词里的值作为第二个参数：一个数字就是词里的 `.Count`，如 `T "posts" 8`；一个 map 原样交给词，如 `T "of" (dict "Count" 8 "Total" 13)` 配 `"{{ .Count }} of {{ .Total }}"`。带 `.Count` 时按这门语言的复数规则选 `one` / `few` / `many` / `other`，词缺那一种就用 `other`：英文 1 是 `one`；中文、日文、韩文等没有复数，总是 `other`；法文 0 和 1 是 `one`；俄文、乌克兰文、波兰文、捷克文、斯洛伐克文按各自的 CLDR 规则；其余语言按英文。
+- `T` 返回的是文字，不是 HTML：落在哪里（正文、属性、脚本）就按那里的规则转义一次，所以能放进 `title=""` 或 `printf`。要带标记的词拆成几个词，把标记写在模板里。
+- `i18n.Has "key"` 判断站点语言或英文里有没有这个词，给「有译名用译名，没有用原名」这类写法用。`i18n.Words "copy" "copied"` 返回这几个词的 map，写进 `<script>` 里就是一个 JSON 对象，交给主题的脚本；词里的占位符原样保留，由脚本自己替换。
+
+默认主题就这样说它的词：`i18n/en.yaml` 和 `i18n/zh-CN.yaml`。页面标题里 Kite 用英文起的名字（如列表页 Posts），由语言包里的 `title.<kind>.<type>`（如 `title.list.post`）改写，没有就用 Kite 的名字。
 
 ---
 

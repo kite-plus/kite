@@ -172,6 +172,29 @@ theme:
     links: {label: 友链}
 ```
 
+The same packs hold the words a theme's pages say, outside `theme`, and a
+template says one with `T`: `{{ T "read_more" }}`. The word comes from the
+pack for the site's language, the site's own `i18n/<lang>.yaml` over the
+theme's, so a site says a theme's words its own way without replacing a
+template; a word the language lacks is said in English, and one nobody has is
+its key. A word can hold what a template puts in it, and a count chooses its
+plural form:
+
+```yaml
+# i18n/en.yaml
+posts:
+  one: "{{ .Count }} post"
+  other: "{{ .Count }} posts"
+of: "{{ .Count }} of {{ .Total }}"
+```
+
+`{{ T "posts" 8 }}` says `8 posts`, and `{{ T "of" (dict "Count" 8 "Total" 13) }}`
+says `8 of 13`. A word is text, escaped wherever it lands, so it can go in an
+attribute. `i18n.Has "key"` says whether there is a word for a key, and
+`{{ i18n.Words "copy" "copied" }}` hands several to a script as a JSON object.
+The built-in theme says its words in English and Chinese; a site written in
+another language translates it with a pack of its own.
+
 A theme can show itself with `screenshot.png`, `.jpg` or `.webp` in its
 folder, or name another file with `screenshot:` in `theme.yaml`.
 

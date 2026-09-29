@@ -25,7 +25,7 @@ import (
 //
 // Only the handful of helpers that the template language itself needs are
 // registered at the top level.
-func baseFuncs(links Links) template.FuncMap {
+func baseFuncs(links Links, words *Words) template.FuncMap {
 	return template.FuncMap{
 		// Namespaces.
 		"str":         func() strNS { return strNS{} },
@@ -34,9 +34,11 @@ func baseFuncs(links Links) template.FuncMap {
 		"time":        func() timeNS { return timeNS{} },
 		"url":         func() urlNS { return urlNS{links: links} },
 		"math":        func() mathNS { return mathNS{} },
+		"i18n":        func() i18nNS { return i18nNS{words: words} },
 
 		// Top level, because the template language cannot express them any
-		// other way.
+		// other way, or, as T, because a page says so many words.
+		"T":            words.T,
 		"dict":         dict,
 		"slice":        func(items ...any) []any { return items },
 		"default":      defaultValue,

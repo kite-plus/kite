@@ -20,6 +20,7 @@ import (
 	"github.com/kite-plus/kite/internal/hook"
 	"github.com/kite-plus/kite/internal/hook/builtin"
 	"github.com/kite-plus/kite/internal/index"
+	"github.com/kite-plus/kite/internal/pack"
 	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/project"
 	"github.com/kite-plus/kite/internal/publish"
@@ -133,6 +134,11 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 	if err != nil {
 		return nil, err
 	}
+	// A site's own packs say a theme's words its own way.
+	packs, err := pack.Load(os.DirFS(p.Root), "site")
+	if err != nil {
+		return nil, err
+	}
 
 	bus := hook.NewBus()
 	builtin.Register(bus, builtin.Options{
@@ -150,7 +156,11 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 		Reader:   reader.New(ix.DB()),
 		Resolver: resolver,
 		Theme:    th,
-		Engine:   theme.NewEngine(theme.Options{Sources: sources, Links: resolver}),
+		Engine: theme.NewEngine(theme.Options{
+			Sources: sources,
+			Links:   resolver,
+			Words:   theme.NewWords(cfg.Site.Language, packs, th.Packs),
+		}),
 		Markdown: markdown.New(markdown.Options{
 			UnsafeHTML:     cfg.Markdown.UnsafeHTML,
 			Typographer:    cfg.Markdown.Typographer,

@@ -1,5 +1,5 @@
 {{ define "main" }}
-  <h1 class="label">{{ partial "t.html" (dict "k" "recent" "lang" .Site.Language) }}</h1>
+  <h1 class="label">{{ T "recent" }}</h1>
   {{ partial "post-list.html" . }}
   {{ partial "pagination.html" . }}
 {{ end }}

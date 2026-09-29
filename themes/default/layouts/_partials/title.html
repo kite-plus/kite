@@ -1,0 +1,10 @@
+{{- /*
+  What a page calls itself. Kite titles its listings in English, so a
+  language pack may name one as title.<kind>.<type>, as zh-CN.yaml names
+  title.list.post; any other page keeps its own title.
+
+  Called as: partial "title.html" PAGE.
+*/ -}}
+{{- $key := printf "title.%s" .Kind -}}
+{{- with .Type }}{{ $key = printf "%s.%s" $key . }}{{ end -}}
+{{- if i18n.Has $key }}{{ T $key }}{{ else }}{{ .Title }}{{ end -}}

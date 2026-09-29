@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {{- $title := "" }}
-  {{- with .Page }}{{ $title = partial "t.html" (dict "k" "title" "lang" $.Site.Language "page" .) }}{{ end }}
+  {{- with .Page }}{{ $title = partial "title.html" . }}{{ end }}
   <title>{{ with $title }}{{ . }} · {{ end }}{{ .Site.Title }}</title>
   {{- $description := .Site.Description }}
   {{- with .Page }}{{ with .Description }}{{ $description = . }}{{ end }}{{ end }}
@@ -35,7 +35,7 @@
   {{ .Site.HeadHTML }}
 </head>
 <body>
-  <a class="skip" href="#main">{{ partial "t.html" (dict "k" "skip" "lang" .Site.Language) }}</a>
+  <a class="skip" href="#main">{{ T "skip" }}</a>
   {{ partial "header.html" . }}
   <main id="main">{{ block "main" . }}{{ end }}</main>
   {{ partial "footer.html" . }}

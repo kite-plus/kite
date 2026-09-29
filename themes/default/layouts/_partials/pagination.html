@@ -1,10 +1,9 @@
-{{- $lang := .Site.Language -}}
 {{- with .Paginator }}
   {{- if gt .TotalPages 1 }}
 <nav class="pagination">
-  {{ if .HasPrev }}<a rel="prev" href="{{ .PrevURL }}">← {{ partial "t.html" (dict "k" "newer" "lang" $lang) }}</a>{{ end }}
+  {{ if .HasPrev }}<a rel="prev" href="{{ .PrevURL }}">← {{ T "newer" }}</a>{{ end }}
   <span class="position">{{ .PageNumber }} / {{ .TotalPages }}</span>
-  {{ if .HasNext }}<a class="older" rel="next" href="{{ .NextURL }}">{{ partial "t.html" (dict "k" "older" "lang" $lang) }} →</a>{{ end }}
+  {{ if .HasNext }}<a class="older" rel="next" href="{{ .NextURL }}">{{ T "older" }} →</a>{{ end }}
 </nav>
   {{- end }}
 {{- end }}

@@ -60,3 +60,46 @@ theme:
     links:
       label: 友链
       description: 把页面里的链接列表排成卡片，适合友链或博客圈。
+
+# What the theme's pages say, in Chinese. A page names a listing Kite titled
+# in English by title.<kind>.<type>, and keeps Kite's title for the rest.
+home: 首页
+archive: 归档
+recent: 最近文章
+skip: 跳到正文
+toggle: 切换深浅色
+back: 返回首页
+toc: 目录：
+prev: 上一篇
+next: 下一篇
+newer: 较新
+older: 较旧
+sep: 、
+words: "{{ .Count }} 字"
+minutes: "约 {{ .Count }} 分钟"
+total: "共 {{ .Count }} 篇"
+year: "{{ .Year }} 年"
+date:
+  short: 1 月 2 日
+  long: 2006 年 1 月 2 日
+filed:
+  before: 收录于「
+  after: 」
+clear: 清除
+empty: 这里还没有文章。
+notfound: 页面不存在
+notfound_body: 这个地址下没有内容。
+powered:
+  before: "由 "
+  after: " 驱动"
+taxonomy:
+  tags: 标签
+  categories: 分类
+title:
+  "404": 页面不存在
+  list:
+    post: 归档
+    page: 页面
+  taxonomy:
+    tags: 标签
+    categories: 分类

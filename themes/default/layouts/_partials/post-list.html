@@ -1,4 +1,3 @@
-{{- $lang := .Site.Language -}}
 {{- $site := .Site -}}
 {{- $summary := .Site.ThemeSettings.show_summary -}}
 {{- $thisYear := time.Year .Site.BuildTime -}}
@@ -6,7 +5,7 @@
   {{- range .Pages }}
   <article class="post">
     <time datetime="{{ time.Format "2006-01-02" .PublishDate }}">
-      {{- partial "t.html" (dict "k" "date" "lang" $lang "t" .PublishDate) }}
+      {{- time.Format (T "date.short") .PublishDate }}
       {{- /* A date with no year reads as this year, so an older one says so. */ -}}
       {{- $year := time.Year .PublishDate }}
       {{- if ne $year $thisYear }}<span class="year">{{ $year }}</span>{{ end -}}
@@ -22,6 +21,6 @@
     </div>
   </article>
   {{- else }}
-  <p class="empty">{{ partial "t.html" (dict "k" "empty" "lang" $lang) }}</p>
+  <p class="empty">{{ T "empty" }}</p>
   {{- end }}
 </div>

@@ -146,6 +146,24 @@ theme:
     links: {label: 友链}
 ```
 
+同一套语言包里 `theme` 以外的键，是主题页面上的词，模板用 `T` 读：`{{ T "read_more" }}`。
+词取自站点语言对应的语言包，站点自己的 `i18n/<语言>.yaml` 盖过主题的，所以站点不用替换模板
+就能改主题的用词；这门语言里没有的词用英文的，都没有就是键本身。词里可以放模板给的值，
+带数量时按复数规则选形式：
+
+```yaml
+# i18n/en.yaml
+posts:
+  one: "{{ .Count }} post"
+  other: "{{ .Count }} posts"
+of: "{{ .Count }} of {{ .Total }}"
+```
+
+`{{ T "posts" 8 }}` 是 `8 posts`，`{{ T "of" (dict "Count" 8 "Total" 13) }}` 是
+`8 of 13`。词是文字，落在哪里就在哪里转义，所以能放进属性里。`i18n.Has "key"` 说明有没有
+这个词，`{{ i18n.Words "copy" "copied" }}` 把几个词作为一个 JSON 对象交给脚本。内置主题
+带英文和中文的词；用其他语言写的站点，加一个自己的语言包就能翻译它。
+
 主题目录里放 `screenshot.png`、`.jpg` 或 `.webp` 作为截图，也可以在 `theme.yaml` 里用
 `screenshot:` 指定其他文件。
 

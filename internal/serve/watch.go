@@ -41,7 +41,7 @@ func newWatcher(root string, log *slog.Logger) (*watcher, error) {
 
 	// Directories are watched, not files: a rename replaces the file's inode
 	// but leaves the directory's intact.
-	for _, dir := range []string{"content", "layouts", "themes", "static"} {
+	for _, dir := range []string{"content", "layouts", "i18n", "themes", "static"} {
 		w.addTree(filepath.Join(root, dir))
 	}
 	if entries, err := os.ReadDir(filepath.Join(root, "themes")); err == nil {

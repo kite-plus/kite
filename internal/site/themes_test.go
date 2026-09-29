@@ -132,3 +132,33 @@ func TestAVariantTriesAThemeWithoutSavingIt(t *testing.T) {
 		t.Errorf("accent = %v", settings["accent"])
 	}
 }
+
+// A theme says its words in the site's language, and a site says any of them
+// its own way with a pack of its own, as i18n/zh-CN.yaml.
+func TestASitesPackSaysTheThemesWordsItsOwnWay(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"kite.yaml": "site:\n  title: T\n  baseURL: https://example.com\n  language: zh-CN\n",
+		"content/posts/one/index.md": "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ001\ntitle: One\nstatus: published\n" +
+			"published_at: 2026-01-02T00:00:00Z\n---\n\nHi.\n",
+		"i18n/zh-CN.yaml": "recent: 近作\n",
+	})
+	s, err := site.Open(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	out := filepath.Join(t.TempDir(), "public")
+	if _, _, err := s.Build(context.Background(), site.BuildOptions{OutDir: out}); err != nil {
+		t.Fatal(err)
+	}
+	home, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{">近作</h1>", ">归档</a>", "1 月 2 日"} {
+		if !strings.Contains(string(home), want) {
+			t.Errorf("the home page does not say %q", want)
+		}
+	}
+}

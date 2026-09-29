@@ -3,8 +3,8 @@ package theme
 import "github.com/kite-plus/kite/internal/pack"
 
 // PacksDir holds a theme's language packs; see package pack for their shape.
-// The rest of a pack, beyond the words under "theme", is left for the words
-// a theme's pages say.
+// The rest of a pack, beyond the words under "theme", is what a theme's pages
+// say, which templates read with T; see [Words].
 const PacksDir = pack.Dir
 
 // Pack returns the words of the pack that best suits a language, or nil when

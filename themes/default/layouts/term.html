@@ -1,9 +1,8 @@
 {{ define "main" }}
-  {{- $lang := .Site.Language }}
   <header class="filter">
-    <h1>{{ partial "t.html" (dict "k" "filed" "lang" $lang "x" .Page.Title) }}</h1>
-    {{ with .Paginator }}<span>· {{ partial "t.html" (dict "k" "total" "lang" $lang "n" .TotalItems) }}</span>{{ end }}
-    <span>· <a href="{{ url.For "home" }}">{{ partial "t.html" (dict "k" "clear" "lang" $lang) }} ×</a></span>
+    <h1>{{ T "filed.before" }}<span class="term">{{ .Page.Title }}</span>{{ T "filed.after" }}</h1>
+    {{ with .Paginator }}<span>· {{ T "total" .TotalItems }}</span>{{ end }}
+    <span>· <a href="{{ url.For "home" }}">{{ T "clear" }} ×</a></span>
   </header>
   {{ partial "post-list.html" . }}
   {{ partial "pagination.html" . }}

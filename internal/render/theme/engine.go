@@ -44,6 +44,10 @@ type Options struct {
 	// Links answers url.For, url.Rel and url.Abs. Without it url.For fails
 	// and the other two return what they are given.
 	Links Links
+
+	// Words are what T says, in the site's language. Without them T says
+	// every key as it is.
+	Words *Words
 }
 
 // NewEngine returns an engine.
@@ -53,7 +57,7 @@ func NewEngine(opts Options) *Engine {
 		formats = map[string]Format{FormatHTML.Name: FormatHTML}
 	}
 
-	funcs := baseFuncs(opts.Links)
+	funcs := baseFuncs(opts.Links, opts.Words)
 	for name, fn := range opts.Funcs {
 		funcs[name] = fn
 	}

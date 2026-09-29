@@ -7,7 +7,7 @@
 {{- range .page.TableOfContents }}{{ if and .ID (le .Level 2) }}{{ $count = math.Add $count 1 }}{{ end }}{{ end -}}
 {{- if ge $count 2 }}
 <nav class="toc">
-  {{- partial "t.html" (dict "k" "toc" "lang" .site.Language) }}
+  {{- T "toc" }}
   {{- $more := false }}
   {{- range .page.TableOfContents }}
     {{- if and .ID (le .Level 2) }}

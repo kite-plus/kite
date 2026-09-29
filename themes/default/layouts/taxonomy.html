@@ -1,7 +1,6 @@
 {{ define "main" }}
-  {{- $lang := .Site.Language }}
   <header class="heading">
-    <h1>{{ partial "t.html" (dict "k" "title" "lang" $lang "page" .Page) }}</h1>
+    <h1>{{ partial "title.html" .Page }}</h1>
   </header>
   <ul class="terms">
     {{- range .Terms }}

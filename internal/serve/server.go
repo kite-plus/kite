@@ -450,13 +450,13 @@ func (s *Server) reconfigureIfChanged() error {
 	return nil
 }
 
-// templatesStamp fingerprints the site's own layouts, what an installed theme
-// is assembled from, its manifest, layouts and language packs, and the
-// directory of each enabled plugin, by path, size and modification time. A
-// theme's static files are read on every request.
+// templatesStamp fingerprints the site's own layouts and language packs, what
+// an installed theme is assembled from, its manifest, layouts and language
+// packs, and the directory of each enabled plugin, by path, size and
+// modification time. A theme's static files are read on every request.
 func (s *Server) templatesStamp(cfg *config.Config) string {
 	themeName := cfg.Theme.Name
-	paths := []string{filepath.Join(s.root, theme.LayoutsDir)}
+	paths := []string{filepath.Join(s.root, theme.LayoutsDir), filepath.Join(s.root, theme.PacksDir)}
 	for _, id := range cfg.Plugins.Enabled {
 		if config.ValidPluginID(id) {
 			paths = append(paths, filepath.Join(s.root, plugin.Dir, id))
