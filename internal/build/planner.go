@@ -239,13 +239,17 @@ func (b *Builder) planNotFound(p *Plan) {
 	})
 }
 
-// paginate appends one target per page of a listing.
+// paginate appends one target per page of a listing, or a single one for a
+// kind of listing that shows every item on one page.
 //
 // Every page of a listing is its own target with its own cache key, rather
 // than a by-product of rendering the first one. That is what makes paginated
 // sections eligible for incremental rebuilds later.
 func (b *Builder) paginate(p *Plan, kind render.Kind, base, typ, term, title string, items []content.Summary) {
-	size := b.opts.PageSize
+	size := b.pageSize(kind)
+	if size == 0 {
+		size = max(1, len(items))
+	}
 	pages := max(1, (len(items)+size-1)/size)
 
 	for n := 1; n <= pages; n++ {

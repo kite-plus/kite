@@ -211,6 +211,20 @@ web-dev 都是 `/tags/web-dev/`。它的页面列出带着其中任何一种写�
 和浏览器解析正文里的图片一样：完整地址原样用，从站点根开始写的用 `url.Rel`，其余的相对于页面地址。
 没写封面时，主题可以改用正文第一张图；写了 `cover: false` 就不显示封面，编辑器里的「不用封面」写的就是它。
 
+主题可以按列表的种类规定分页，用在设计需要的地方：首页不是一页页翻的文章列表，或者归档页
+要列出所有文章。
+
+```yaml
+pagination:
+  home: 0    # 全部显示在一页
+  list: 0
+  term: 20   # 每页 20 条
+```
+
+没写到的种类按站点的 `build.pageSize` 分页，站点的 `build.pagination` 可以替换其中任何
+一种。`.Paginator` 描述的是页面最终的分页；全部显示在一页的列表是第 1 页、共 1 页，
+`PageSize` 是条目的数目。
+
 主题契约尚未冻结；它会在 M5、也就是有了第二套按它写出来的主题之后再冻结。
 
 ## 短代码
@@ -421,6 +435,7 @@ build:
   output: public
   urlStyle: directory  # 或 extension，产出 /posts/hello.html
   pageSize: 10
+  pagination: {}       # 按列表的种类，如 {home: 0, term: 20}
   sitemap: true
   feed: true
   feedLimit: 20
@@ -442,6 +457,11 @@ plugins:
 `.Site.HeadHTML` 和 `.Site.FooterHTML`，默认主题都写了。单个页面可以在 front matter 里
 用 `keywords` 写自己的关键词。这些设置，连同每页文章数和订阅文章数，都可以在后台的
 设置 → 站点里修改。
+
+列表每页显示 `pageSize` 条，除非主题在 `theme.yaml` 里给这种列表另定了分页。
+`build.pagination` 替站点规定，盖过主题：`home` 是首页，`list` 是某一种内容的列表，
+如 `/posts/`，`term` 是某个标签或分类的页面。数目写 0 就是全部显示在一页，归档页可以这样
+列出所有文章，而不用把每个标签的页面也拉得一样长。
 
 少数几个键可以用环境变量覆盖，供产出依赖运行环境的构建使用：`KITE_SITE_TITLE`、
 `KITE_SITE_BASEURL`、`KITE_SITE_LANGUAGE`、`KITE_THEME`、`KITE_BUILD_OUTPUT`、

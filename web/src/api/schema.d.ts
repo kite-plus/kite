@@ -656,6 +656,9 @@ export interface components {
         BuildSettings: {
             feed_limit: number;
             page_size: number;
+            pagination?: {
+                [key: string]: number;
+            };
         };
         Commit: {
             /** Format: date-time */

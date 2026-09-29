@@ -364,6 +364,11 @@ type SiteSettings struct {
 type BuildSettings struct {
 	PageSize  int `json:"page_size"`
 	FeedLimit int `json:"feed_limit"`
+
+	// Pagination holds the kinds of listing that do not page by PageSize,
+	// home, list or term, and how many items a page of each shows, 0 for all
+	// of them on one: what the theme declares, and over it build.pagination.
+	Pagination map[string]int `json:"pagination,omitempty"`
 }
 
 // ThemeSettings carries a theme's declared settings and their current values.

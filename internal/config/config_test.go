@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -179,6 +180,28 @@ func TestFeedAliasesAreFilesOfTheirOwn(t *testing.T) {
 	for _, list := range []string{"['']", "[feed/]", "[../out.xml]", "[index.html]", "[feed]", "[rss.xml]", "[sitemap.xml]", "[a.xml, /a.xml]"} {
 		if _, err := load(t, site+"build:\n  feedAliases: "+list+"\n"); err == nil || !strings.Contains(err.Error(), "build.feedAliases") {
 			t.Errorf("feedAliases: %s = %v, want a refusal naming build.feedAliases", list, err)
+		}
+	}
+}
+
+// A site sizes the pages of each kind of listing, 0 for all on one, over what
+// its theme declares; a kind it does not know or a size below 0 is refused.
+func TestPaginationSizesEachKindOfListing(t *testing.T) {
+	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
+	cfg, err := load(t, site+"build:\n  pageSize: 12\n  pagination: {home: 0, term: 30}\n")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	got := cfg.Build.PageSizes(map[string]int{"home": 5, "list": 0})
+	if want := map[string]int{"home": 0, "list": 0, "term": 30}; !maps.Equal(got, want) {
+		t.Errorf("PageSizes = %v, want %v", got, want)
+	}
+	if cfg.Build.PageSize != 12 {
+		t.Errorf("pageSize = %d, want 12 for the kinds nothing sizes", cfg.Build.PageSize)
+	}
+	for _, sizes := range []string{"{taxonomy: 0}", "{single: 3}", "{home: -1}"} {
+		if _, err := load(t, site+"build:\n  pagination: "+sizes+"\n"); err == nil || !strings.Contains(err.Error(), "build.pagination") {
+			t.Errorf("pagination: %s = %v, want a refusal naming build.pagination", sizes, err)
 		}
 	}
 }

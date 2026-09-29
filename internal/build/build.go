@@ -42,8 +42,11 @@ type Options struct {
 	// is what this is for.
 	Media fs.FS
 
-	// PageSize is how many items a listing shows.
-	PageSize int
+	// PageSize is how many items a page of a listing shows, and PageSizes
+	// says otherwise for some kinds of listing: home, list or term. A size of
+	// 0 puts all of a listing's items on one page.
+	PageSize  int
+	PageSizes map[render.Kind]int
 
 	// IncludeDrafts renders unpublished items, for local preview.
 	IncludeDrafts bool
@@ -513,7 +516,11 @@ func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req 
 
 	var paginator render.Paginator
 	if t.Kind != render.KindSingle {
-		paginator = render.NewPaginator(b.listBase(t), max(1, t.Page), b.opts.PageSize, t.TotalItems, b.opts.Resolver)
+		size := b.pageSize(t.Kind)
+		if size == 0 {
+			size = t.TotalItems // one page holds them all
+		}
+		paginator = render.NewPaginator(b.listBase(t), max(1, t.Page), size, t.TotalItems, b.opts.Resolver)
 	}
 
 	data := render.NewContext(render.ContextOptions{
@@ -535,6 +542,14 @@ func (b *Builder) renderTarget(ctx context.Context, out *Context, t Target, req 
 		return nil, info, err
 	}
 	return []byte(doc.HTML), describe(t, page, body), nil
+}
+
+// pageSize is how many items a page of a kind of listing shows, 0 for all.
+func (b *Builder) pageSize(kind render.Kind) int {
+	if size, ok := b.opts.PageSizes[kind]; ok {
+		return size
+	}
+	return b.opts.PageSize
 }
 
 // hookKind names a kind of page for hooks, which read "notFound" more easily

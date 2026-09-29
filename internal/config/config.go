@@ -9,10 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -159,18 +161,36 @@ type Markdown struct {
 
 // Build configures output.
 type Build struct {
-	Output    string `yaml:"output,omitempty"`
-	URLStyle  string `yaml:"urlStyle,omitempty"`
-	PageSize  int    `yaml:"pageSize,omitempty"`
-	Minify    bool   `yaml:"minify,omitempty"`
-	Sitemap   bool   `yaml:"sitemap,omitempty"`
-	Feed      bool   `yaml:"feed,omitempty"`
-	FeedLimit int    `yaml:"feedLimit,omitempty"`
+	Output   string `yaml:"output,omitempty"`
+	URLStyle string `yaml:"urlStyle,omitempty"`
+
+	// PageSize is how many items a page of a listing shows, unless the theme
+	// or Pagination says otherwise for that kind of listing.
+	PageSize int `yaml:"pageSize,omitempty"`
+
+	// Pagination is how each kind of listing pages, by kind (home, list or
+	// term): how many items a page shows, 0 for all of them on one. It
+	// stands in for what the theme declares.
+	Pagination map[string]int `yaml:"pagination,omitempty"`
+
+	Minify    bool `yaml:"minify,omitempty"`
+	Sitemap   bool `yaml:"sitemap,omitempty"`
+	Feed      bool `yaml:"feed,omitempty"`
+	FeedLimit int  `yaml:"feedLimit,omitempty"`
 
 	// FeedAliases are more files the feed is written to beside rss.xml, from
 	// the site's root, such as the index.xml a site moved from Hugo was
 	// subscribed at. Feed readers do not follow a page that redirects.
 	FeedAliases []string `yaml:"feedAliases,omitempty"`
+}
+
+// PageSizes is how each kind of listing pages when not by PageSize: what a
+// theme declares, with the site's Pagination over it.
+func (b Build) PageSizes(theme map[string]int) map[string]int {
+	out := make(map[string]int, len(theme)+len(b.Pagination))
+	maps.Copy(out, theme)
+	maps.Copy(out, b.Pagination)
+	return out
 }
 
 // OutputDir is the directory a build writes the site to. An absolute output
@@ -342,6 +362,22 @@ func (c *Config) normalize() {
 	}
 }
 
+// Listings are the kinds of listing whose pages a site or a theme can size.
+var Listings = []string{"home", "list", "term"}
+
+// ValidPagination checks the page size of each kind of listing.
+func ValidPagination(sizes map[string]int) error {
+	for _, kind := range slices.Sorted(maps.Keys(sizes)) {
+		switch {
+		case !slices.Contains(Listings, kind):
+			return fmt.Errorf("%q is not a kind of listing (want home, list or term)", kind)
+		case sizes[kind] < 0:
+			return fmt.Errorf("%s: %d is not a page size (want 0 for all on one page, or more)", kind, sizes[kind])
+		}
+	}
+	return nil
+}
+
 // Validate rejects configurations that would fail later in a confusing place.
 func (c *Config) Validate() error {
 	switch c.Build.URLStyle {
@@ -366,6 +402,9 @@ func (c *Config) Validate() error {
 	}
 	if err := validFeedAliases(c.Build.FeedAliases); err != nil {
 		return err
+	}
+	if err := ValidPagination(c.Build.Pagination); err != nil {
+		return fmt.Errorf("config: build.pagination: %w", err)
 	}
 	seen := make(map[string]bool, len(c.Plugins.Enabled))
 	for _, id := range c.Plugins.Enabled {

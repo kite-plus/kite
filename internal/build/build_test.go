@@ -252,6 +252,49 @@ func TestPaginationSplitsListings(t *testing.T) {
 	}
 }
 
+// Each kind of listing may page its own way: the home page of a theme that is
+// not a list of posts has one page, an archive lists every post, and a tag's
+// page pages by a size of its own. The paginator agrees with the pages.
+func TestEachKindOfListingPagesItsOwnWay(t *testing.T) {
+	f := newFixture(t, 7) // every post is tagged Go
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const show = `{{ define "main" }}{{ len .Pages }} of {{ .Paginator.TotalItems }}, ` +
+		`page {{ .Paginator.PageNumber }} / {{ .Paginator.TotalPages }} by {{ .Paginator.PageSize }}{{ end }}`
+	f.engine = theme.NewEngine(theme.Options{
+		Sources: []theme.Source{
+			{Name: "site", FS: fstest.MapFS{
+				"home.html": {Data: []byte(show)},
+				"list.html": {Data: []byte(show)},
+				"term.html": {Data: []byte(show)},
+			}},
+			{Name: "default", FS: th.Layouts},
+		},
+		Links: f.resolve,
+	})
+	_, files := f.run(t, f.out, func(o *build.Options) {
+		o.PageSizes = map[render.Kind]int{render.KindHome: 0, render.KindList: 0, render.KindTerm: 2}
+	})
+
+	for file, want := range map[string]string{
+		"index.html":                "7 of 7, page 1 / 1 by 7",
+		"posts/index.html":          "7 of 7, page 1 / 1 by 7",
+		"tags/go/index.html":        "2 of 7, page 1 / 4 by 2",
+		"tags/go/page/4/index.html": "1 of 7, page 4 / 4 by 2",
+	} {
+		if page := readFile(t, f.out, file); !strings.Contains(page, want) {
+			t.Errorf("%s does not say %q: %s", file, want, excerptOf(page, "of 7"))
+		}
+	}
+	for _, unwanted := range []string{"page/2/index.html", "posts/page/2/index.html", "tags/go/page/5/index.html"} {
+		if slices.Contains(files, unwanted) {
+			t.Errorf("%s was written", unwanted)
+		}
+	}
+}
+
 // A post links to the one published before it and the one after, and a page
 // stays out of that run: the neighbors of an essay are essays.
 func TestSinglePagesKnowTheirNeighbors(t *testing.T) {

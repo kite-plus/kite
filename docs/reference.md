@@ -256,6 +256,22 @@ from the site's root with `url.Rel`, and any other from the page's address.
 It may fall back to the first picture when no cover is named, and shows none
 for `cover: false`, which is what the editor's No cover writes.
 
+A theme says how its listings page, by kind, where its design needs it: a home
+page that is not a list of posts to page through, or an archive that lists
+every post.
+
+```yaml
+pagination:
+  home: 0    # every item on one page
+  list: 0
+  term: 20   # 20 a page
+```
+
+A kind it leaves out pages by the site's `build.pageSize`, and a site's
+`build.pagination` stands in for any of them. `.Paginator` describes whatever
+a page ends up with; on a listing with every item on one page it is page 1 of
+1, and its `PageSize` is the number of items.
+
 The theme contract is not frozen yet; it freezes at M5, after a second theme
 has been written against it.
 
@@ -490,6 +506,7 @@ build:
   output: public
   urlStyle: directory  # or extension, for /posts/hello.html
   pageSize: 10
+  pagination: {}       # by kind of listing, as {home: 0, term: 20}
   sitemap: true
   feed: true
   feedLimit: 20
@@ -514,6 +531,13 @@ through the theme, which writes them into the page as `.Site.Keywords`,
 default theme does. A page can give its own keywords with `keywords` in its
 front matter. The studio edits all of these, and the page size and feed limit,
 under Settings → Site.
+
+A listing shows `pageSize` items a page unless its theme says otherwise for
+that kind of listing in `theme.yaml`. `build.pagination` says it for the site,
+over the theme: `home` for the home page, `list` for the list of a kind of
+item, such as `/posts/`, and `term` for the page of a tag or a category. A
+size of 0 puts every item on one page, which is how an archive lists every
+post without making every tag's page as long.
 
 A few keys can be overridden from the environment, for a build whose output
 depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,

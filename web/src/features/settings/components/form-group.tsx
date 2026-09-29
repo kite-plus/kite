@@ -26,14 +26,30 @@ export function Group({
   );
 }
 
-/** Row is one labelled field, with a line of help under it when it needs one. */
-export function Row({ id, label, help, children }: { id: string; label: Key; help?: Key; children: ReactNode }) {
+/**
+ * Row is one labelled field, with a line of help under it when it needs one,
+ * and a note after that about what else decides the setting.
+ */
+export function Row({
+  id,
+  label,
+  help,
+  note,
+  children,
+}: {
+  id: string;
+  label: Key;
+  help?: Key;
+  note?: ReactNode;
+  children: ReactNode;
+}) {
   const { t } = useI18n();
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{t(label)}</Label>
       {children}
       {help && <p className="text-sm text-muted-foreground">{t(help)}</p>}
+      {note && <p className="text-sm text-muted-foreground">{note}</p>}
     </div>
   );
 }

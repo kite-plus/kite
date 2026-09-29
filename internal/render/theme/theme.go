@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/kite-plus/kite/internal/buildinfo"
+	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/pack"
 	"github.com/kite-plus/kite/internal/schema"
 )
@@ -103,6 +104,13 @@ type Manifest struct {
 
 	// Layouts are the templates an item may choose besides its type's own.
 	Layouts []Layout `yaml:"layouts,omitempty"`
+
+	// Pagination is how the theme pages each kind of listing, by kind (home,
+	// list or term): how many items a page shows, 0 for all of them on one,
+	// as a home page that is not a list of posts to page through wants. A
+	// kind it leaves out pages by the site's build.pageSize, and a site's
+	// build.pagination stands in for it.
+	Pagination map[string]int `yaml:"pagination,omitempty"`
 }
 
 // Validate checks a manifest.
@@ -123,6 +131,9 @@ func (m *Manifest) Validate() error {
 	}
 	if err := m.Settings.Validate(); err != nil {
 		return fmt.Errorf("theme %s: %w", m.Name, err)
+	}
+	if err := config.ValidPagination(m.Pagination); err != nil {
+		return fmt.Errorf("theme %s: pagination: %w", m.Name, err)
 	}
 	seen := make(map[string]bool, len(m.Layouts))
 	for _, l := range m.Layouts {

@@ -1,5 +1,5 @@
 import type { Settings } from "@/api/client";
-import { useI18n } from "@/i18n";
+import { useI18n, type Key } from "@/i18n";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -115,7 +115,12 @@ export function SiteSettings() {
 
             <Group title={t("settings.groupReading")}>
               <div className="grid gap-6 sm:grid-cols-2">
-                <Row id="page_size" label="settings.pageSize" help="settings.pageSizeHelp">
+                <Row
+                  id="page_size"
+                  label="settings.pageSize"
+                  help="settings.pageSizeHelp"
+                  note={pagedOtherwise(form.settings?.build.pagination, t)}
+                >
                   <Input
                     id="page_size"
                     type="number"
@@ -169,4 +174,26 @@ export function SiteSettings() {
       </div>
     </ContentSection>
   );
+}
+
+const listings = ["home", "list", "term"] as const;
+
+/**
+ * pagedOtherwise names the listings that do not page by the page size, as
+ * the theme or build.pagination in kite.yaml has them, so the number is not
+ * taken to rule them too. It is null when every listing pages by it.
+ */
+function pagedOtherwise(
+  pagination: Record<string, number> | undefined,
+  t: ReturnType<typeof useI18n>["t"],
+): string | null {
+  const own = listings.filter((kind) => pagination?.[kind] !== undefined);
+  if (!pagination || own.length === 0) return null;
+  const items = own.map((kind) =>
+    t("settings.pagedAs", {
+      listing: t(`settings.paged.${kind}` as Key),
+      size: pagination[kind] === 0 ? t("settings.pagedAll") : t("settings.pagedBy", { n: pagination[kind] }),
+    }),
+  );
+  return t("settings.pagedOtherwise", { listings: items.join(t("settings.pagedSep")) });
 }

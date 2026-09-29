@@ -171,13 +171,15 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			FooterHTML:  view.Site.FooterHTML,
 		},
 		Build: BuildSettings{
-			PageSize:  view.Build.PageSize,
-			FeedLimit: view.Build.FeedLimit,
+			PageSize:   view.Build.PageSize,
+			FeedLimit:  view.Build.FeedLimit,
+			Pagination: view.Build.PageSizes(nil),
 		},
 		Theme:    ThemeSettings{Name: view.Theme},
 		Writable: append(slices.Clone(settable), settablePrefix+"*"),
 	}
 	if th := view.ActiveTheme; th != nil {
+		settings.Build.Pagination = view.Build.PageSizes(th.Manifest.Pagination)
 		// The schema comes from the theme's own manifest, so a theme author
 		// gets a settings form without writing any admin code.
 		settings.Theme.Schema = described(th, r).Settings

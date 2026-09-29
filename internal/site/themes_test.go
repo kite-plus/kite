@@ -2,6 +2,7 @@ package site_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -160,5 +161,52 @@ func TestASitesPackSaysTheThemesWordsItsOwnWay(t *testing.T) {
 		if !strings.Contains(string(home), want) {
 			t.Errorf("the home page does not say %q", want)
 		}
+	}
+}
+
+// A theme says how its listings page, and a site's build.pagination stands in
+// for it kind by kind; the rest page by build.pageSize.
+func TestAListingPagesAsTheThemeAndThenTheSiteSay(t *testing.T) {
+	root := t.TempDir()
+	post := func(n int) string {
+		return fmt.Sprintf("---\nid: 01J8KQ2P3R4S5T6V7W8X9YZ00%d\ntitle: Post %d\nstatus: published\n"+
+			"published_at: 2026-01-0%dT00:00:00Z\ntags: [Go]\n---\n\nHi.\n", n, n, n)
+	}
+	write(t, root, map[string]string{
+		"kite.yaml": "site:\n  title: T\n  baseURL: https://example.com\ntheme:\n  name: paper\n" +
+			"build:\n  pageSize: 1\n  pagination: {list: 2}\n",
+		"content/posts/one/index.md":         post(1),
+		"content/posts/two/index.md":         post(2),
+		"content/posts/three/index.md":       post(3),
+		"themes/paper/theme.yaml":            paper + "pagination: {home: 0, list: 0}\n",
+		"themes/paper/layouts/single.html":   "{{ .Page.Title }}",
+		"themes/paper/layouts/list.html":     "{{ len .Pages }}/{{ .Paginator.TotalPages }}",
+		"themes/paper/layouts/home.html":     "{{ len .Pages }}/{{ .Paginator.TotalPages }}",
+		"themes/paper/layouts/term.html":     "{{ len .Pages }}/{{ .Paginator.TotalPages }}",
+		"themes/paper/layouts/taxonomy.html": "{{ len .Terms }}",
+	})
+	s, err := site.Open(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	out := filepath.Join(t.TempDir(), "public")
+	_, files, err := s.Build(context.Background(), site.BuildOptions{OutDir: out})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for file, want := range map[string]string{
+		"index.html":                "3/1", // the theme's
+		"posts/index.html":          "2/2", // the site's, over the theme's
+		"tags/go/page/3/index.html": "1/3", // build.pageSize
+	} {
+		if data, err := os.ReadFile(filepath.Join(out, file)); err != nil || string(data) != want {
+			t.Errorf("%s = %q, %v; want %q (files %v)", file, data, err, want, files)
+		}
+	}
+
+	write(t, root, map[string]string{"themes/paper/theme.yaml": paper + "pagination: {archive: 0}\n"})
+	if _, err := site.LoadTheme(root, "paper"); err == nil || !strings.Contains(err.Error(), "pagination") {
+		t.Errorf("a theme paging a kind of listing that does not exist loaded: %v", err)
 	}
 }

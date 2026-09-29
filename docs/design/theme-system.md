@@ -332,6 +332,8 @@ type Paginator interface {
 
 **URL 的生成规则（`/page/2/` 还是 `?page=2`）是站点配置**，但模板可见的 API 固定。这样 Build 模式展开成静态页、Serve 模式走查询参数，主题**完全不需要知道**。
 
+**每种列表怎么分页由主题声明**（`theme.yaml` 的 `pagination`，见 [§8.1](#81-完整-schema)），站点的 `build.pagination` 按种类盖过它，都没写的按 `build.pageSize`。数目是 0 的列表只有一页，放全部条目，`PageSize` 等于条目数；每一页仍是一个独立的构建目标。
+
 ### 6.6 `Taxonomy` / `Term`
 
 ```go
@@ -549,6 +551,12 @@ templates:
   - taxonomy
   - term
   - 404
+
+# ── 分页：按列表的种类（home / list / term），每页几条，0 是全部在一页 ──
+# 没写的种类按站点的 build.pageSize；站点的 build.pagination 盖过这里。
+pagination:
+  home: 0                           # 首页不是一页页翻的文章列表
+  term: 20
 
 # ── 可选布局：作者按页面选用，front matter 写 layout: links ──
 # 查找顺序同 §5：layouts/page/links.html，再 layouts/links.html。

@@ -303,6 +303,10 @@ func (s *Site) Builder(opts BuildOptions) (*build.Builder, error) {
 func (s *Site) newBuilder(opts BuildOptions, emitter *build.Emitter) (*build.Builder, error) {
 	// Checked when the configuration was loaded.
 	loc, _ := s.Config.Site.Location()
+	sizes := make(map[render.Kind]int)
+	for kind, size := range s.Config.Build.PageSizes(s.Theme.Manifest.Pagination) {
+		sizes[render.Kind(kind)] = size
+	}
 	return build.New(build.Options{
 		Site: render.SiteInfo{
 			Title:         s.Config.Site.Title,
@@ -329,6 +333,7 @@ func (s *Site) newBuilder(opts BuildOptions, emitter *build.Emitter) (*build.Bui
 		Emitter:       emitter,
 		Media:         os.DirFS(s.Project.Root),
 		PageSize:      s.Config.Build.PageSize,
+		PageSizes:     sizes,
 		IncludeDrafts: opts.Drafts,
 		Now:           opts.Now,
 	})
