@@ -380,7 +380,7 @@ type Resource interface {
 已实现的是 page bundle 里的文件（`.Resources`）和从图片做出的图（`img.*`）：
 
 - `.Resources` 按名字排序列出 bundle 发布的每个文件（`.md` 和隐藏文件除外，另一篇内容的 bundle 目录除外），`Name` 是 bundle 里的路径，如 `images/01.jpg`。`.Resources.Get "cover.jpg"` 按名字取一个，没有是 nil；`.Resources.Match "*.jpg"` 按通配符取，不分大小写，`*` 不跨 `/`，`**` 跨；`.Resources.ByType "image"` 按媒体类型的大类取。单页、列表里的页、前后篇和短代码的 `.Page` 都有。图片另有 `Width`、`Height`（按 EXIF 方向转正后的尺寸）。
-- `img.Resize "800x"`（缺一边就按比例）、`img.Fit "1200x1200"`（只缩小，放进这个框）、`img.Fill "600x400 top"`（先按比例裁、再缩放到正好这个尺寸，锚点可选）、`img.Crop "600x400"`（只裁不缩）、`img.Format "png"`（jpeg / png / gif）、`img.Quality 80`（JPEG 质量）。它们接一张图、返回一张待做的图，可以串起来；模板第一次问它的地址或尺寸时才真正去做，所以中间步骤不会多做。读 JPEG、PNG、GIF 和 WebP，写 JPEG、PNG、GIF；WebP 没指定格式时写成 JPEG（透明的写成 PNG）。手机照片先按 EXIF 方向转正；做出的图不带源文件的 EXIF，拍摄地点之类不会随图发布。`img.Filter` 还没有实现。
+- `img.Resize "800x"`（缺一边就按比例）、`img.Fit "1200x1200"`（只缩小，放进这个框）、`img.Fill "600x400 top"`（先按比例裁、再缩放到正好这个尺寸，锚点可选）、`img.Crop "600x400"`（只裁不缩）、`img.Format "webp"`（webp / jpeg / png / gif）、`img.Quality 80`（WebP 和 JPEG 的质量，默认 75）。它们接一张图、返回一张待做的图，可以串起来；模板第一次问它的地址或尺寸时才真正去做，所以中间步骤不会多做。JPEG、PNG、GIF 和 WebP 都能读写，全是纯 Go：WebP 用 `github.com/deepteams/webp`（不查找系统里的 libwebp；不用 `golang.org/x/image/webp`，它把 WebP 的黑和白读成 16 和 235 的灰），缩放用 `x/image/draw` 的 Catmull-Rom。固定输入做出的字节由测试核对 hash，CI 在 amd64 和 arm64 上都跑，所以不同机器做出同样的图。WebP 是有损的，保留透明；写成 JPEG 时透明部分铺白。没指定格式就保持源文件的格式。手机照片先按 EXIF 方向转正；做出的图不带源文件的 EXIF，拍摄地点之类不会随图发布。`img.Filter` 还没有实现。
 - 做出的图发布在源文件旁边，名字是源文件名加上 16 位 key：`river_<key>.jpg`。key 是源文件内容、整条做法和做图代码版本的 hash，符合 §10.1 的要求。做出的图缓存在 `.kite/cache/images/`，下一次构建和 serve 直接用；serve 按文件名里的 key 找到它，所以 build 和 serve 给出的是同一份字节，`kite theme verify` 的夹具也有一张。
 
 ### 6.8 `Shortcode`
@@ -744,7 +744,7 @@ resource_hash = SHA256( source_bytes ‖ transform_chain_spec ‖ transform_para
 | `asset.Inline` | 内联进 HTML | ✅ |
 | `asset.Bundle` | 多文件合并 | M5 |
 | `img.Resize` / `Fit` / `Fill` / `Crop` | 图片缩放、裁切 | ✅ |
-| `img.Format` | JPEG / PNG / GIF；写 WebP / AVIF 待定 | 部分 |
+| `img.Format` | WebP / JPEG / PNG / GIF；AVIF 暂不做 | ✅ |
 | SCSS / PostCSS | —— | **不做**，见 [§11.3](#113-明确不做的东西) |
 
 **v1 的主题用纯 CSS。** 需要构建步骤的主题可以自己在发布前编译好，产物放进 `assets/`。

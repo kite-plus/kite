@@ -1631,7 +1631,7 @@ func TestTemplatesMakePicturesFromABundle(t *testing.T) {
 			`{{ range .Resources }}[{{ .Name }} {{ .MediaType }}]{{ end }}` +
 			`{{ len (.Resources.Match "*.png") }} {{ len (.Resources.Match "**.PNG") }} {{ len (.Resources.ByType "image") }} ` +
 			`{{ with .Resources.Get "river.png" }}{{ .RelPermalink }} {{ .Width }}x{{ .Height }} ` +
-			`{{ (. | img.Resize "50x" | img.Format "jpeg" | img.Quality 80).RelPermalink }}{{ end }}` +
+			`{{ (. | img.Resize "50x" | img.Format "webp" | img.Quality 80).RelPermalink }}{{ end }}` +
 			thumb + `{{ .Content }}{{ end }}{{ end }}`)},
 		"_shortcodes/gallery.html": {Data: []byte(`{{ range .Page.Resources.ByType "image" }}` +
 			`{{ with img.Fit "20x20" . }}<img class="gallery" src="{{ .RelPermalink }}">{{ end }}{{ end }}`)},
@@ -1664,6 +1664,7 @@ func TestTemplatesMakePicturesFromABundle(t *testing.T) {
 	for _, want := range []string{
 		"[images/bridge.png image/png][notes.txt text/plain][river.png image/png]",
 		"1 2 2 /posts/trip/river.png 200x100 /posts/trip/river_",
+		".webp<img class=\"thumb\"",
 		`width="40" height="40"`,
 		`<img class="gallery" src="/posts/trip/images/bridge_`,
 	} {
@@ -1683,7 +1684,7 @@ func TestTemplatesMakePicturesFromABundle(t *testing.T) {
 			made = append(made, file)
 		}
 	}
-	if len(made) != 4 { // the thumbnail, the JPEG, and one gallery picture of each
+	if len(made) != 4 { // the thumbnail, the WebP, and one gallery picture of each
 		t.Errorf("made %v, want four pictures", made)
 	}
 	data, err := os.ReadFile(filepath.Join(f.out, filepath.FromSlash(onPage[1])))

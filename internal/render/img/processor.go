@@ -166,7 +166,7 @@ func (p *Processor) stored(key string) (*Made, bool) {
 	if p.dir == "" {
 		return nil, false
 	}
-	for _, format := range []string{"jpeg", "png", "gif"} {
+	for _, format := range []string{"jpeg", "png", "gif", "webp"} {
 		file := filepath.Join(p.dir, key+"."+extension(format))
 		data, err := os.ReadFile(file)
 		if err != nil {
@@ -183,7 +183,7 @@ func (p *Processor) stored(key string) (*Made, bool) {
 
 // madeName is how the file a made picture is published as ends: an
 // underscore, its key and its extension.
-var madeName = regexp.MustCompile(`_([0-9a-f]{16})\.(jpg|png|gif)$`)
+var madeName = regexp.MustCompile(`_([0-9a-f]{16})\.(jpg|png|gif|webp)$`)
 
 // Lookup finds the picture a published file name holds, among the pictures
 // made before, as a server answers a request for one.

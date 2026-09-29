@@ -214,16 +214,18 @@ web-dev 都是 `/tags/web-dev/`。它的页面列出带着其中任何一种写�
 ```html
 {{ with .Resources.Get "river.jpg" }}
   {{ $small := img.Fit "800x800" . }}
-  {{ $card := . | img.Fill "600x400" | img.Quality 80 }}
+  {{ $card := . | img.Fill "600x400" | img.Format "webp" | img.Quality 80 }}
   <img src="{{ $small.RelPermalink }}" width="{{ $small.Width }}" height="{{ $small.Height }}">
 {{ end }}
 ```
 
 `img.Resize "800x"` 缩放到这个尺寸，缺的一边按比例；`img.Fit` 只缩小，放进这个框；
 `img.Fill "600x400 top"` 先按比例裁、再缩放到正好这个尺寸，锚点指定保留哪一部分；
-`img.Crop` 只裁不缩；`img.Format` 写成 `jpeg`、`png` 或 `gif`；`img.Quality` 是 JPEG 的质量。
-照片先按 EXIF 转正，做出的图不带任何 EXIF，拍摄地点不会随图发布。Kite 读 JPEG、PNG、GIF
-和 WebP，写 JPEG、PNG 和 GIF。每张图只做一次：模板第一次问它的地址或尺寸时才做，发布在
+`img.Crop` 只裁不缩；`img.Format` 写成 `webp`、`jpeg`、`png` 或 `gif`；`img.Quality` 是 WebP
+或 JPEG 的质量，不写就是 75。照片先按 EXIF 转正，做出的图不带任何 EXIF，拍摄地点不会随图
+发布。JPEG、PNG、GIF 和 WebP 都能读写，用的是 Kite 自己的代码，在每台机器上做出同样的字节，
+所以在笔记本上和在 CI 里构建的站点发布的是同样的文件。WebP 是有损压缩，保留透明；写成 JPEG
+时透明的部分铺成白色。每张图只做一次：模板第一次问它的地址或尺寸时才做，发布在
 源文件旁边，名字是 `river_<key>.jpg`，并保存在 `.kite/cache/images/`，之后的构建和
 `kite serve` 直接用。
 

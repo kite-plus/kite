@@ -11,8 +11,8 @@ import (
 	"image/png"
 	"math"
 
+	"github.com/deepteams/webp"
 	"golang.org/x/image/draw"
-	_ "golang.org/x/image/webp" // reads WebP, which a phone or an export may give
 )
 
 // maxPixels bounds what is decoded: a small file can hold a picture that
@@ -65,20 +65,17 @@ func produce(data []byte, r Recipe) ([]byte, Info, error) {
 	if out == "" {
 		out = format
 	}
-	if out == "webp" {
-		out = "jpeg"
-		if !opaque(m) {
-			out = "png"
-		}
+	q := r.Quality
+	if q <= 0 {
+		q = DefaultQuality
 	}
 	var buf bytes.Buffer
 	switch out {
 	case "jpeg":
-		q := r.Quality
-		if q <= 0 {
-			q = DefaultQuality
-		}
 		err = jpeg.Encode(&buf, flatten(m), &jpeg.Options{Quality: min(q, 100)})
+	case "webp":
+		// Lossy, as libwebp does by default, keeping what is transparent.
+		err = webp.Encode(&buf, m, &webp.EncoderOptions{Quality: float32(min(q, 100)), Method: 4})
 	case "png":
 		err = png.Encode(&buf, m)
 	case "gif":

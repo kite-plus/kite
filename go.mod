@@ -9,6 +9,7 @@ toolchain go1.26.8
 
 require (
 	github.com/alecthomas/chroma/v2 v2.27.0
+	github.com/deepteams/webp v1.2.8
 	github.com/extism/go-pdk v1.1.3
 	github.com/extism/go-sdk v1.7.1
 	github.com/fsnotify/fsnotify v1.10.1

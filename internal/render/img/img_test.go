@@ -2,7 +2,9 @@ package img
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -129,13 +131,16 @@ func TestAPhotoIsTurnedAsItsEXIFSays(t *testing.T) {
 	}
 }
 
-// A picture is written in the format asked for, a transparent one on white
-// when that is a JPEG, and a WebP, which cannot be written, as a JPEG.
+// A picture is written in the format asked for, and as its source is
+// otherwise: a transparent one on white when it is written as a JPEG, which
+// holds no transparency, and kept transparent in a WebP.
 func TestAPictureIsWrittenAsAsked(t *testing.T) {
 	src := picture(t, 40, 20)
-	_, info := made(t, src, Recipe{Format: "png"})
-	if info.Format != "png" {
-		t.Errorf("format = %s, want png", info.Format)
+	for _, format := range []string{"png", "gif", "webp"} {
+		m, info := made(t, src, Recipe{Format: format})
+		if info.Format != format || m.Bounds().Dx() != 40 {
+			t.Errorf("written as %s: %+v, %v", format, info, m.Bounds())
+		}
 	}
 
 	clear := image.NewNRGBA(image.Rect(0, 0, 4, 4))
@@ -147,6 +152,10 @@ func TestAPictureIsWrittenAsAsked(t *testing.T) {
 	if r, g, b, _ := m.At(1, 1).RGBA(); info.Format != "jpeg" || r < 0xf000 || g < 0xf000 || b < 0xf000 {
 		t.Errorf("a transparent picture written as %s is %v, want white", info.Format, m.At(1, 1))
 	}
+	m, info = made(t, buf.Bytes(), Recipe{Format: "webp"})
+	if _, _, _, a := m.At(1, 1).RGBA(); info.Format != "webp" || a != 0 {
+		t.Errorf("a transparent picture written as %s is %v, want transparent", info.Format, m.At(1, 1))
+	}
 
 	// The 1x1 lossy WebP browsers are tested for support with.
 	webp, _ := base64.StdEncoding.DecodeString("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA")
@@ -154,8 +163,90 @@ func TestAPictureIsWrittenAsAsked(t *testing.T) {
 		t.Fatalf("Inspect(webp) = %+v, %v", info, err)
 	}
 	_, info = made(t, webp, Recipe{Steps: []Step{step(t, "resize", "4x")}})
-	if info.Format != "jpeg" || info.Width != 4 {
-		t.Errorf("a WebP was made into %+v, want a 4x4 JPEG", info)
+	if info.Format != "webp" || info.Width != 4 {
+		t.Errorf("a WebP was made into %+v, want a 4x4 WebP", info)
+	}
+}
+
+// A WebP keeps its black black and its white white when it is made into
+// another picture. Its colors are stored in the range video uses, 16 for
+// black and 235 for white, and read as JPEG's they came out grey.
+func TestAWebPKeepsItsBlackAndWhite(t *testing.T) {
+	m := image.NewRGBA(image.Rect(0, 0, 64, 32))
+	for y := range 32 {
+		for x := range 64 {
+			c := color.RGBA{0, 0, 0, 255}
+			if x >= 32 {
+				c = color.RGBA{255, 255, 255, 255}
+			}
+			m.Set(x, y, c)
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, m); err != nil {
+		t.Fatal(err)
+	}
+	webp, _, err := produce(buf.Bytes(), Recipe{Format: "webp", Quality: 90})
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, _ := made(t, webp, Recipe{Format: "png"})
+	black, _, _, _ := back.At(8, 16).RGBA()
+	white, _, _, _ := back.At(56, 16).RGBA()
+	if black>>8 > 4 || white>>8 < 251 {
+		t.Errorf("black reads as %d and white as %d, want 0 and 255", black>>8, white>>8)
+	}
+}
+
+// The same source and recipe make the same bytes on every machine, which is
+// what lets a site built on a laptop and on a CI runner publish the same
+// files, and a cache made on one be trusted on another. CI runs this on
+// amd64 and arm64, whose floating point differs where a compiler fuses a
+// multiplication and an addition; a change here means a machine now makes
+// other bytes, or the code that makes pictures changed and its version with
+// it.
+func TestAPictureIsTheSameOnEveryMachine(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 160, 120))
+	seed := uint32(7)
+	for y := range 120 {
+		for x := range 160 {
+			seed = seed*1664525 + 1013904223
+			noise := uint8(seed >> 28)
+			c := color.NRGBA{uint8(x + int(noise)), uint8(y*2 + int(noise)), uint8((x+y)/2 + int(noise)), 255}
+			if (x-50)*(x-50)+(y-40)*(y-40) < 400 {
+				c = color.NRGBA{230, 60, 40, 255}
+			}
+			if x > 140 {
+				c.A = uint8(y * 2)
+			}
+			src.Set(x, y, c)
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, src); err != nil {
+		t.Fatal(err)
+	}
+	photo := turned(picture(t, 120, 80), 6)
+	for _, c := range []struct {
+		name   string
+		source []byte
+		recipe Recipe
+		want   string
+	}{
+		{"resize to jpeg", buf.Bytes(), Recipe{Steps: []Step{step(t, "resize", "80x")}, Format: "jpeg", Quality: 80}, "5e01c3417c1c018f"},
+		{"fill to png", buf.Bytes(), Recipe{Steps: []Step{step(t, "fill", "64x64 topright")}}, "2bb66b381f53bb40"},
+		{"fit to webp", buf.Bytes(), Recipe{Steps: []Step{step(t, "fit", "100x100")}, Format: "webp"}, "c802f674051ab457"},
+		{"crop to gif", buf.Bytes(), Recipe{Steps: []Step{step(t, "crop", "50x40")}, Format: "gif"}, "cba15e309f6b1c3e"},
+		{"turned photo", photo, Recipe{Steps: []Step{step(t, "resize", "x60")}, Format: "webp", Quality: 60}, "20404a3c8835980d"},
+	} {
+		out, _, err := produce(c.source, c.recipe)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256(out)
+		if got := hex.EncodeToString(sum[:8]); got != c.want {
+			t.Errorf("%s made %s, want %s", c.name, got, c.want)
+		}
 	}
 }
 
@@ -175,8 +266,8 @@ func TestAStepThatCannotBeMadeIsRefused(t *testing.T) {
 			t.Errorf("%s %q: error = %v, want one containing %q", c.op, c.spec, err, c.want)
 		}
 	}
-	if _, err := ParseFormat("webp"); err == nil || !strings.Contains(err.Error(), "cannot write webp yet") {
-		t.Errorf("webp: %v", err)
+	if _, err := ParseFormat("avif"); err == nil || !strings.Contains(err.Error(), "cannot write avif") {
+		t.Errorf("avif: %v", err)
 	}
 }
 

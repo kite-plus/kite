@@ -32,16 +32,15 @@ type Step struct {
 type Recipe struct {
 	Steps []Step
 
-	// Format is jpeg, png or gif; empty keeps the source's, and a WebP
-	// source, which cannot be written, becomes a JPEG, or a PNG when it is
-	// transparent.
+	// Format is jpeg, png, gif or webp; empty keeps the source's.
 	Format string
 
-	// Quality is a JPEG's, from 1 to 100; 0 is DefaultQuality.
+	// Quality is a JPEG's or a WebP's, from 1 to 100; 0 is DefaultQuality.
 	Quality int
 }
 
-// DefaultQuality is the quality a JPEG is written at when none is asked for.
+// DefaultQuality is the quality a JPEG or a WebP is written at when none is
+// asked for.
 const DefaultQuality = 75
 
 var anchors = []string{"center", "top", "bottom", "left", "right", "topleft", "topright", "bottomleft", "bottomright"}
@@ -103,12 +102,12 @@ func ParseFormat(format string) (string, error) {
 	switch f := strings.ToLower(strings.TrimPrefix(format, ".")); f {
 	case "jpeg", "jpg":
 		return "jpeg", nil
-	case "png", "gif":
+	case "png", "gif", "webp":
 		return f, nil
-	case "webp", "avif":
-		return "", fmt.Errorf("img.Format: Kite cannot write %s yet; write jpeg or png", f)
+	case "avif":
+		return "", fmt.Errorf("img.Format: Kite cannot write avif; write webp, jpeg or png")
 	default:
-		return "", fmt.Errorf("img.Format: %q is not a format (want jpeg, png or gif)", format)
+		return "", fmt.Errorf("img.Format: %q is not a format (want jpeg, png, gif or webp)", format)
 	}
 }
 

@@ -257,7 +257,7 @@ small cover or a picture a `srcset`:
 ```html
 {{ with .Resources.Get "river.jpg" }}
   {{ $small := img.Fit "800x800" . }}
-  {{ $card := . | img.Fill "600x400" | img.Quality 80 }}
+  {{ $card := . | img.Fill "600x400" | img.Format "webp" | img.Quality 80 }}
   <img src="{{ $small.RelPermalink }}" width="{{ $small.Width }}" height="{{ $small.Height }}">
 {{ end }}
 ```
@@ -265,10 +265,13 @@ small cover or a picture a `srcset`:
 `img.Resize "800x"` scales to a size, keeping the ratio where a side is left
 out; `img.Fit` scales down to fit inside one; `img.Fill "600x400 top"` crops
 to its ratio and scales to it, keeping the part an anchor names; `img.Crop`
-cuts without scaling; `img.Format` writes `jpeg`, `png` or `gif`, and
-`img.Quality` a JPEG's quality. A photo is turned upright as its EXIF says
-first, and what is made carries none of it, so where a photo was taken is not
-published. Kite reads JPEG, PNG, GIF and WebP and writes JPEG, PNG and GIF.
+cuts without scaling; `img.Format` writes `webp`, `jpeg`, `png` or `gif`,
+and `img.Quality` a WebP's or a JPEG's quality, 75 unless asked. A photo is
+turned upright as its EXIF says first, and what is made carries none of it,
+so where a photo was taken is not published. Kite reads and writes JPEG, PNG,
+GIF and WebP with code of its own, the same on every machine, so a site built
+on a laptop and on a CI runner publishes the same bytes. A WebP is lossy and
+keeps what is transparent; a picture written as a JPEG is put on white.
 A picture is made once, the first time a template asks where it is or how
 large, published beside its source as `river_<key>.jpg`, and kept in
 `.kite/cache/images/`, which a later build and `kite serve` use.
