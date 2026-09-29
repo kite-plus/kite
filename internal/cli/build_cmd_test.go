@@ -18,16 +18,41 @@ import (
 // runKite runs a command line the way the binary would, in a project.
 func runKite(t *testing.T, root string, args ...string) string {
 	t.Helper()
+	out, err := tryKite(t, root, args...)
+	if err != nil {
+		t.Fatalf("kite %s: %v\n%s", strings.Join(args, " "), err, out)
+	}
+	return out
+}
+
+// tryKite is runKite for a command line that may fail.
+func tryKite(t *testing.T, root string, args ...string) (string, error) {
+	t.Helper()
 	t.Chdir(root)
 	cmd := newRootCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
 	cmd.SetArgs(args)
-	if err := cmd.ExecuteContext(t.Context()); err != nil {
-		t.Fatalf("kite %s: %v\n%s", strings.Join(args, " "), err, out.String())
+	err := cmd.ExecuteContext(t.Context())
+	return out.String(), err
+}
+
+// setOutput writes build.output into a project kite init wrote.
+func setOutput(t *testing.T, root, output string) {
+	t.Helper()
+	file := filepath.Join(root, project.ConfigName)
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return out.String()
+	edited := strings.Replace(string(data), "output: public", "output: '"+output+"'", 1)
+	if edited == string(data) {
+		t.Fatalf("%s names no output:\n%s", project.ConfigName, data)
+	}
+	if err := os.WriteFile(file, []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func newSite(t *testing.T) string {
@@ -110,18 +135,7 @@ func TestAnAbsoluteOutputTakesTheSiteOutOfTheProject(t *testing.T) {
 			args := []string{"build", "--json"}
 			switch via {
 			case "kite.yaml":
-				file := filepath.Join(root, project.ConfigName)
-				data, err := os.ReadFile(file)
-				if err != nil {
-					t.Fatal(err)
-				}
-				edited := strings.Replace(string(data), "output: public", "output: '"+elsewhere+"'", 1)
-				if edited == string(data) {
-					t.Fatalf("%s names no output:\n%s", project.ConfigName, data)
-				}
-				if err := os.WriteFile(file, []byte(edited), 0o644); err != nil {
-					t.Fatal(err)
-				}
+				setOutput(t, root, elsewhere)
 			case "KITE_BUILD_OUTPUT":
 				t.Setenv("KITE_BUILD_OUTPUT", elsewhere)
 			case "--output":
@@ -141,6 +155,37 @@ func TestAnAbsoluteOutputTakesTheSiteOutOfTheProject(t *testing.T) {
 			}
 			if after := entries(t, root); !slices.Equal(after, before) {
 				t.Errorf("the build added to the project: %v, was %v", after, before)
+			}
+		})
+	}
+}
+
+// A build replaces its output whole, so one sent to the project itself is
+// refused, whichever of --output, kite.yaml and KITE_BUILD_OUTPUT sends it,
+// and the project is left as it was.
+func TestABuildIntoTheProjectIsRefused(t *testing.T) {
+	for _, via := range []string{"--output", "kite.yaml", "KITE_BUILD_OUTPUT"} {
+		t.Run(via, func(t *testing.T) {
+			t.Setenv("KITE_BUILD_OUTPUT", "")
+			root := newSite(t)
+
+			args := []string{"build"}
+			switch via {
+			case "--output":
+				args = append(args, "--output", ".")
+			case "kite.yaml":
+				setOutput(t, root, ".")
+			case "KITE_BUILD_OUTPUT":
+				t.Setenv("KITE_BUILD_OUTPUT", root)
+			}
+			before := entries(t, root)
+
+			out, err := tryKite(t, root, args...)
+			if err == nil || !strings.Contains(err.Error(), "would replace the project") {
+				t.Fatalf("kite build = %v, want a refusal\n%s", err, out)
+			}
+			if after := entries(t, root); !slices.Equal(after, before) {
+				t.Errorf("the project went from %v to %v", before, after)
 			}
 		})
 	}

@@ -341,6 +341,9 @@ func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []str
 	if outDir == "" {
 		outDir = s.Config.Build.OutputDir(s.Project.Root)
 	}
+	if err := s.checkOutDir(outDir); err != nil {
+		return build.Stats{}, nil, err
+	}
 
 	emitter, err := build.NewEmitter(outDir)
 	if err != nil {

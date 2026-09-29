@@ -444,9 +444,12 @@ depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,
 `kite build` writes the site to. A relative path is taken from the project
 root and has to stay inside it. An absolute one is used as it stands, as with
 `kite build --output`, which is how a site is built outside the project. A
-build replaces the directory whole, so it should hold nothing but the site.
-The deploy workflow `kite init` writes uploads `public`; if `build.output`
-changes, change the workflow's `path` with it.
+build replaces the directory whole, so it has to be one of its own, and Kite
+refuses one that is not, however it is given: a file, a directory that is or
+holds the project, its theme or one of its plugins, and one that is, holds or
+lies inside `content`, `static`, `layouts`, `themes`, `plugins`, `.kite` or
+`.git`. The deploy workflow `kite init` writes uploads `public`; if
+`build.output` changes, change the workflow's `path` with it.
 
 ## Moving from Hugo
 

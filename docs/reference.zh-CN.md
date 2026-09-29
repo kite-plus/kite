@@ -385,8 +385,11 @@ plugins:
 `build.output`（或者代替它的 `KITE_BUILD_OUTPUT`）是 `kite build` 写出站点的目录。
 相对路径从项目根目录算起，不能跑到项目外面；绝对路径按原样使用，和 `kite build --output`
 一样，要把站点构建到项目以外就写绝对路径。每次构建都会把这个目录整个换掉，
-里面不要放站点以外的东西。`kite init` 写出的部署工作流上传的是 `public`，
-改了 `build.output`，工作流里的 `path` 也要跟着改。
+所以它只能用来放站点。不管用哪种方式指定，下面这些 Kite 都会拒绝：文件；
+项目本身、所用的主题或插件，或者包含它们的目录；`content`、`static`、`layouts`、
+`themes`、`plugins`、`.kite`、`.git`，包含它们的目录，以及它们里面的目录。
+`kite init` 写出的部署工作流上传的是 `public`，改了 `build.output`，
+工作流里的 `path` 也要跟着改。
 
 ## 从 Hugo 迁移
 
