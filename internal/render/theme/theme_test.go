@@ -198,41 +198,40 @@ func TestNumbersAndListsOfAnyType(t *testing.T) {
 		"Nums":  [3]int{10, 9, 1},
 		"None":  []string{},
 	}
-	cases := map[string]string{
+	for _, tc := range []struct{ src, want string }{
 		// Integers stay integers, so they compare with integer literals.
-		`{{ $n := 0 }}{{ range .Pages }}{{ $n = math.Add $n 1 }}{{ end }}{{ if lt $n 8 }}{{ $n }}{{ end }}`: "3",
-		`{{ math.Add (len .Pages) 1 }}`:                            "4",
-		`{{ math.Sub 2 5 }} {{ math.Mul 3 4 }}`:                    "-3 12",
-		`{{ math.Div 7 2 }} {{ math.Div 7.0 2 }}`:                  "3 3.5",
-		`{{ math.Max 2 9 }} {{ math.Min 2.5 9 }}`:                  "9 2.5",
-		`{{ math.Ceil 3 }} {{ math.Ceil 2.1 }}`:                    "3 3",
-		`{{ math.Add 0.5 1 }}`:                                     "1.5",
-		`{{ $n := 0.0 }}{{ $n = math.Add $n 1 }}{{ $n }}`:          "1",
-		`{{ math.Mod 7 2 }} {{ math.Mod 7.0 2 }}`:                  "1 1",
-		`{{ math.Int "8" }} {{ math.Int 2.7 }} {{ math.Int nil }}`: "8 2 0",
-		`{{ math.Float "2.5" }} {{ math.Float 3 }}`:                "2.5 3",
+		{`{{ $n := 0 }}{{ range .Pages }}{{ $n = math.Add $n 1 }}{{ end }}{{ if lt $n 8 }}{{ $n }}{{ end }}`, "3"},
+		{`{{ math.Add (len .Pages) 1 }}`, "4"},
+		{`{{ math.Sub 2 5 }} {{ math.Mul 3 4 }}`, "-3 12"},
+		{`{{ math.Div 7 2 }} {{ math.Div 7.0 2 }}`, "3 3.5"},
+		{`{{ math.Max 2 9 }} {{ math.Min 2.5 9 }}`, "9 2.5"},
+		{`{{ math.Ceil 3 }} {{ math.Ceil 2.1 }}`, "3 3"},
+		{`{{ math.Add 0.5 1 }}`, "1.5"},
+		{`{{ $n := 0.0 }}{{ $n = math.Add $n 1 }}{{ $n }}`, "1"},
+		{`{{ math.Mod 7 2 }} {{ math.Mod 7.0 2 }}`, "1 1"},
+		{`{{ math.Int "8" }} {{ math.Int 2.7 }} {{ math.Int nil }}`, "8 2 0"},
+		{`{{ math.Float "2.5" }} {{ math.Float 3 }}`, "2.5 3"},
 		// Any slice or array, and what comes back has the same element type.
-		`{{ coll.Len .Pages }} {{ coll.Len .Words }} {{ coll.Len "你好" }} {{ coll.Len nil }}`: "3 3 2 0",
-		`{{ range coll.First 2 .Pages }}{{ .Title }}{{ end }}`:                               "ab",
-		`{{ range coll.Last 1 .Pages }}{{ .Title }}{{ end }}`:                                "c",
-		`{{ range coll.After 1 .Pages }}{{ .Title }}{{ end }}`:                               "bc",
-		`{{ range coll.First 2.0 .Pages }}{{ .Title }}{{ end }}`:                             "ab",
-		`{{ range coll.Reverse .Pages }}{{ .Title }}{{ end }}`:                               "cba",
-		`{{ coll.In .Words "a" }} {{ coll.In .Words "z" }} {{ coll.In .Nums "9" }}`:          "true false true",
-		`{{ coll.Uniq .Words }}`:                              "[b a]",
-		`{{ coll.Sort .Words }} {{ coll.Sort .Nums }}`:        "[a b b] [1 9 10]",
-		`{{ printf "%T" (coll.First 1 .Words) }}`:             "[]string",
-		`{{ str.Join ", " .Tags }} {{ str.Join "/" .Words }}`: "go, web b/a/b",
-		`{{ default "none" .None }}`:                          "none",
-	}
-	for src, want := range cases {
-		t.Run(src, func(t *testing.T) {
-			got, err := render(t, src, data)
+		{`{{ coll.Len .Pages }} {{ coll.Len .Words }} {{ coll.Len "你好" }} {{ coll.Len nil }}`, "3 3 2 0"},
+		{`{{ range coll.First 2 .Pages }}{{ .Title }}{{ end }}`, "ab"},
+		{`{{ range coll.Last 1 .Pages }}{{ .Title }}{{ end }}`, "c"},
+		{`{{ range coll.After 1 .Pages }}{{ .Title }}{{ end }}`, "bc"},
+		{`{{ range coll.First 2.0 .Pages }}{{ .Title }}{{ end }}`, "ab"},
+		{`{{ range coll.Reverse .Pages }}{{ .Title }}{{ end }}`, "cba"},
+		{`{{ coll.In .Words "a" }} {{ coll.In .Words "z" }} {{ coll.In .Nums "9" }}`, "true false true"},
+		{`{{ coll.Uniq .Words }}`, "[b a]"},
+		{`{{ coll.Sort .Words }} {{ coll.Sort .Nums }}`, "[a b b] [1 9 10]"},
+		{`{{ printf "%T" (coll.First 1 .Words) }}`, "[]string"},
+		{`{{ str.Join ", " .Tags }} {{ str.Join "/" .Words }}`, "go, web b/a/b"},
+		{`{{ default "none" .None }}`, "none"},
+	} {
+		t.Run(tc.src, func(t *testing.T) {
+			got, err := render(t, tc.src, data)
 			if err != nil {
 				t.Fatalf("Render: %v", err)
 			}
-			if got != want {
-				t.Errorf("got %q, want %q", got, want)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
 	}
