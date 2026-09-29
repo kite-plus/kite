@@ -249,7 +249,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           # There is no package.json at the repository root, so the
           # action has to be pointed at the one pinning pnpm.
