@@ -339,7 +339,7 @@ func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []str
 
 	outDir := opts.OutDir
 	if outDir == "" {
-		outDir = filepath.Join(s.Project.Root, s.Config.Build.Output)
+		outDir = s.Config.Build.OutputDir(s.Project.Root)
 	}
 
 	emitter, err := build.NewEmitter(outDir)

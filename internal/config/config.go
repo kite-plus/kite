@@ -173,6 +173,16 @@ type Build struct {
 	FeedAliases []string `yaml:"feedAliases,omitempty"`
 }
 
+// OutputDir is the directory a build writes the site to. An absolute output
+// is used as it stands, as kite build --output uses one; a relative one is
+// taken from the project root.
+func (b Build) OutputDir(root string) string {
+	if filepath.IsAbs(b.Output) {
+		return filepath.Clean(b.Output)
+	}
+	return filepath.Join(root, b.Output)
+}
+
 // Plugins chooses the plugins a site runs and holds their settings.
 type Plugins struct {
 	// Enabled lists the plugins that run, in the order they run, so that two
@@ -350,8 +360,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("config: site.timezone %q is not a time zone (want something like Asia/Shanghai or UTC)",
 			c.Site.Timezone)
 	}
-	if strings.Contains(c.Build.Output, "..") {
-		return fmt.Errorf("config: build.output must stay inside the project")
+	if !filepath.IsAbs(c.Build.Output) && !filepath.IsLocal(c.Build.Output) {
+		return fmt.Errorf("config: build.output %q leaves the project (want a path inside it, or an absolute one)",
+			c.Build.Output)
 	}
 	if err := validFeedAliases(c.Build.FeedAliases); err != nil {
 		return err

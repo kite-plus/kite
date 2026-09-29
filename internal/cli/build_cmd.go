@@ -53,7 +53,7 @@ func newBuildCmd() *cobra.Command {
 
 			outDir := out
 			if outDir == "" {
-				outDir = filepath.Join(s.Project.Root, s.Config.Build.Output)
+				outDir = s.Config.Build.OutputDir(s.Project.Root)
 			}
 
 			// One instant for both runs of --verify: a scheduled post falling

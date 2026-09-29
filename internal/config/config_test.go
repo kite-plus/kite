@@ -113,6 +113,58 @@ func TestAPluginIsNamedByAnIdOnce(t *testing.T) {
 	}
 }
 
+// An absolute output is used as it stands, from kite.yaml or KITE_BUILD_OUTPUT
+// alike; a relative one is taken from the project root.
+func TestAnAbsoluteOutputIsUsedAsItStands(t *testing.T) {
+	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
+	elsewhere := filepath.Join(t.TempDir(), "out")
+
+	for _, tc := range []struct {
+		name, yaml, env, want string
+	}{
+		{"the default", "", "", "public"},
+		{"a relative path", "build:\n  output: site/public\n", "", filepath.Join("site", "public")},
+		{"an absolute path", "build:\n  output: '" + elsewhere + "'\n", "", elsewhere},
+		{"an absolute path from the environment", "build:\n  output: site/public\n", elsewhere, elsewhere},
+		{"an absolute path through a parent", "", filepath.Join(elsewhere, "x") + string(filepath.Separator) + "..", elsewhere},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("KITE_BUILD_OUTPUT", tc.env)
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, config.Name), []byte(site+tc.yaml), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := config.Load(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := tc.want
+			if !filepath.IsAbs(want) {
+				want = filepath.Join(root, want)
+			}
+			if got := cfg.Build.OutputDir(root); got != want {
+				t.Errorf("output dir = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// A relative output is taken from the project root, and one that climbs out
+// of it is refused: building outside the project takes an absolute path.
+func TestARelativeOutputStaysInsideTheProject(t *testing.T) {
+	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
+	t.Setenv("KITE_BUILD_OUTPUT", "")
+	for _, out := range []string{"../out", "public/../../out"} {
+		if _, err := load(t, site+"build:\n  output: "+out+"\n"); err == nil || !strings.Contains(err.Error(), "build.output") {
+			t.Errorf("output: %s = %v, want a refusal naming build.output", out, err)
+		}
+	}
+	t.Setenv("KITE_BUILD_OUTPUT", "../out")
+	if _, err := load(t, site); err == nil || !strings.Contains(err.Error(), "build.output") {
+		t.Errorf("KITE_BUILD_OUTPUT=../out = %v, want a refusal naming build.output", err)
+	}
+}
+
 // A site moved from Hugo keeps its subscribers by writing the feed where they
 // subscribed too. Each such path is a feed's own file within the site.
 func TestFeedAliasesAreFilesOfTheirOwn(t *testing.T) {

@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/kite-plus/kite/internal/project"
 )
 
 // runKite runs a command line the way the binary would, in a project.
@@ -75,6 +77,72 @@ func TestBuildReportsWhenTheNextScheduledPostIsDue(t *testing.T) {
 
 	if out := runKite(t, root, "build"); !strings.Contains(out, "next scheduled post is due 2099-01-01T00:00:00Z") {
 		t.Errorf("the build does not say when to build again:\n%s", out)
+	}
+}
+
+// entries lists what a directory holds, leaving out the .kite a build keeps
+// its records in.
+func entries(t *testing.T, dir string) []string {
+	t.Helper()
+	list, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range list {
+		if e.Name() != ".kite" {
+			names = append(names, e.Name())
+		}
+	}
+	return names
+}
+
+// An absolute output is where the site goes, whichever of kite.yaml,
+// KITE_BUILD_OUTPUT and --output gives it. Joined to the project root, it
+// would land in a copy of its own path inside the project.
+func TestAnAbsoluteOutputTakesTheSiteOutOfTheProject(t *testing.T) {
+	for _, via := range []string{"kite.yaml", "KITE_BUILD_OUTPUT", "--output"} {
+		t.Run(via, func(t *testing.T) {
+			t.Setenv("KITE_BUILD_OUTPUT", "")
+			root := newSite(t)
+			elsewhere := filepath.Join(t.TempDir(), "site")
+
+			args := []string{"build", "--json"}
+			switch via {
+			case "kite.yaml":
+				file := filepath.Join(root, project.ConfigName)
+				data, err := os.ReadFile(file)
+				if err != nil {
+					t.Fatal(err)
+				}
+				edited := strings.Replace(string(data), "output: public", "output: '"+elsewhere+"'", 1)
+				if edited == string(data) {
+					t.Fatalf("%s names no output:\n%s", project.ConfigName, data)
+				}
+				if err := os.WriteFile(file, []byte(edited), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			case "KITE_BUILD_OUTPUT":
+				t.Setenv("KITE_BUILD_OUTPUT", elsewhere)
+			case "--output":
+				args = append(args, "--output", elsewhere)
+			}
+			before := entries(t, root)
+
+			var report buildReport
+			if err := json.Unmarshal([]byte(runKite(t, root, args...)), &report); err != nil {
+				t.Fatal(err)
+			}
+			if report.Output != elsewhere {
+				t.Errorf("output = %q, want %q", report.Output, elsewhere)
+			}
+			if _, err := os.Stat(filepath.Join(elsewhere, "index.html")); err != nil {
+				t.Errorf("the site is not where it was sent: %v", err)
+			}
+			if after := entries(t, root); !slices.Equal(after, before) {
+				t.Errorf("the build added to the project: %v, was %v", after, before)
+			}
+		})
 	}
 }
 
@@ -189,6 +257,28 @@ func TestTheDeployWorkflowBuildsForWherePagesPublishes(t *testing.T) {
 	}
 	if configured < 0 || built < 0 || configured > built {
 		t.Errorf("configure-pages is step %d and the build step %d; the address has to be known first", configured, built)
+	}
+}
+
+// The deploy workflow uploads one directory, and a project kite init wrote
+// builds into it without being told where.
+func TestTheDeployWorkflowUploadsWhereANewSiteBuilds(t *testing.T) {
+	deploy, _ := readWorkflows(t)
+	uploaded := ""
+	for _, s := range deploy.Jobs["build"].Steps {
+		if strings.HasPrefix(s.Uses, "actions/upload-pages-artifact@") {
+			uploaded = s.With["path"]
+		}
+	}
+	if uploaded == "" {
+		t.Fatal("the deploy workflow uploads nothing")
+	}
+
+	t.Setenv("KITE_BUILD_OUTPUT", "")
+	root := newSite(t)
+	runKite(t, root, "build")
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(uploaded), "index.html")); err != nil {
+		t.Errorf("a new site does not build where the workflow uploads, %s: %v", uploaded, err)
 	}
 }
 

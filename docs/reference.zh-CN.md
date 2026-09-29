@@ -371,6 +371,12 @@ plugins:
 `KITE_SITE_BASEURL`、`KITE_SITE_LANGUAGE`、`KITE_THEME`、`KITE_BUILD_OUTPUT`、
 `KITE_BUILD_URLSTYLE` 和 `KITE_BUILD_PAGESIZE`。
 
+`build.output`（或者代替它的 `KITE_BUILD_OUTPUT`）是 `kite build` 写出站点的目录。
+相对路径从项目根目录算起，不能跑到项目外面；绝对路径按原样使用，和 `kite build --output`
+一样，要把站点构建到项目以外就写绝对路径。每次构建都会把这个目录整个换掉，
+里面不要放站点以外的东西。`kite init` 写出的部署工作流上传的是 `public`，
+改了 `build.output`，工作流里的 `path` 也要跟着改。
+
 ## 从 Hugo 迁移
 
 Hugo 站点的内容原地就能打开。在站点目录里运行 `kite init .`，它只添加 `kite.yaml`，

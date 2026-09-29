@@ -425,6 +425,14 @@ depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,
 `KITE_SITE_LANGUAGE`, `KITE_THEME`, `KITE_BUILD_OUTPUT`,
 `KITE_BUILD_URLSTYLE` and `KITE_BUILD_PAGESIZE`.
 
+`build.output`, or `KITE_BUILD_OUTPUT` in its place, is the directory
+`kite build` writes the site to. A relative path is taken from the project
+root and has to stay inside it. An absolute one is used as it stands, as with
+`kite build --output`, which is how a site is built outside the project. A
+build replaces the directory whole, so it should hold nothing but the site.
+The deploy workflow `kite init` writes uploads `public`; if `build.output`
+changes, change the workflow's `path` with it.
+
 ## Moving from Hugo
 
 A Hugo site's content opens where it is. Run `kite init .` in the site's
