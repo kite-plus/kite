@@ -1406,3 +1406,56 @@ func TestAnExportWaitsForContentTheIndexRefusedToBeFixed(t *testing.T) {
 		t.Errorf("export after the fix: status = %d, want 200\nbody: %s", rec.Code, rec.Body.String())
 	}
 }
+
+// A kind of content declared in kite.yaml while the server runs is served,
+// listed and offered to the studio after the next reload, and one taken out
+// again is gone, without a restart.
+func TestAKindDeclaredWhileServingIsServed(t *testing.T) {
+	root := newProject(t, 1)
+	srv := newServer(t, root, serve.Options{Admin: true, Write: true})
+	handler := srv.Handler()
+	get := func(url string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		return rec
+	}
+
+	dir := filepath.Join(root, "content", "books")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	book := "---\nid: 01J8KQ2P3R4S5T6V7W8X9YZB00\ntitle: Walden\nstatus: published\n---\n\nA book.\n"
+	if err := os.WriteFile(filepath.Join(dir, "walden.md"), []byte(book), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if rec := get("/books/walden/"); rec.Code != http.StatusNotFound {
+		t.Fatalf("an undeclared kind's item was served: %d", rec.Code)
+	}
+
+	declared := config + "content:\n  types:\n    - {kind: book, dir: books, layout: single}\n"
+	if err := os.WriteFile(filepath.Join(root, "kite.yaml"), []byte(declared), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Reload(t.Context()); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	if rec := get("/books/walden/"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "A book.") {
+		t.Errorf("the declared kind's item: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := get("/books/"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Walden") {
+		t.Errorf("the declared kind's listing: %d", rec.Code)
+	}
+	if rec := get("/api/v1/content-types"); !strings.Contains(rec.Body.String(), `"kind":"book"`) {
+		t.Errorf("the studio is not offered the kind: %s", rec.Body.String())
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "kite.yaml"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Reload(t.Context()); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	if rec := get("/books/walden/"); rec.Code != http.StatusNotFound {
+		t.Errorf("a kind taken out of kite.yaml is still served: %d", rec.Code)
+	}
+}

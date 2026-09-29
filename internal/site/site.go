@@ -107,8 +107,15 @@ func (s *Site) Reconfigure() (*Site, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The index reads the kinds from the registry it shares, so it sees the
+	// ones declared now on its next reconcile.
+	before := s.Project.Types.Declared()
+	if err := s.Project.Types.Declare(cfg.Content.ContentTypes()...); err != nil {
+		return nil, fmt.Errorf("config: content.types: %w", err)
+	}
 	out, err := assemble(s.Project, cfg, s.Index)
 	if err != nil {
+		_ = s.Project.Types.Declare(before...)
 		return nil, err
 	}
 	out.Problems = s.Problems
@@ -145,6 +152,7 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index) (*Site, e
 		Sitemap:     cfg.Build.Sitemap,
 		Feed:        cfg.Build.Feed,
 		FeedLimit:   cfg.Build.FeedLimit,
+		FeedKinds:   p.Types.FeedKinds(),
 		FeedAliases: cfg.Build.FeedAliases,
 	})
 	plugins, pluginProblems := loadPlugins(p.Root, cfg, resolver, bus)

@@ -1,10 +1,12 @@
 package build
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"unicode"
 
 	"github.com/kite-plus/kite/internal/content"
@@ -59,7 +61,7 @@ func (b *Builder) loadAll(ctx context.Context) ([]content.Summary, error) {
 }
 
 func (b *Builder) planSingles(ctx context.Context, p *Plan, all []content.Summary) error {
-	prev, next := neighbors(all)
+	prev, next := b.neighbors(all)
 	ids := make([]content.ID, len(all))
 	for i, s := range all {
 		ids[i] = s.ID
@@ -123,27 +125,76 @@ func LayoutOf(item *content.Content) string {
 	return name
 }
 
-// neighbors finds, for every item, the one published before it and the one
-// after it among the items of the same kind and locale. The input is newest
-// first, so the older neighbor is the one that follows.
-func neighbors(all []content.Summary) (prev, next []*content.Summary) {
+// neighbors finds, for every item, the one before it and the one after it in
+// the order its kind is read in, among the items of the same kind and locale:
+// by date, where the one before is the older one, or by weight. The input is
+// newest first.
+func (b *Builder) neighbors(all []content.Summary) (prev, next []*content.Summary) {
 	type run struct {
 		kind   content.Kind
 		locale string
 	}
-	prev = make([]*content.Summary, len(all))
-	next = make([]*content.Summary, len(all))
-
-	newer := make(map[run]int)
+	runs := make(map[run][]int)
 	for i, s := range all {
 		key := run{kind: s.Kind, locale: s.Locale}
-		if j, ok := newer[key]; ok {
-			next[i] = &all[j]
-			prev[j] = &all[i]
+		runs[key] = append(runs[key], i)
+	}
+	prev = make([]*content.Summary, len(all))
+	next = make([]*content.Summary, len(all))
+	for key, read := range runs {
+		if b.readsByWeight(key.kind) {
+			slices.SortStableFunc(read, func(x, y int) int { return byWeight(all[x], all[y]) })
+		} else {
+			slices.Reverse(read) // oldest first
 		}
-		newer[key] = i
+		for j, i := range read {
+			if j > 0 {
+				prev[i] = &all[read[j-1]]
+			}
+			if j+1 < len(read) {
+				next[i] = &all[read[j+1]]
+			}
+		}
 	}
 	return prev, next
+}
+
+// readsByWeight reports whether a kind is listed and read by weight.
+func (b *Builder) readsByWeight(kind content.Kind) bool {
+	t := b.opts.Types.Get(kind)
+	return t != nil && t.Order == content.OrderWeight
+}
+
+// byWeight orders items by the weight their front matter gives, smallest
+// first, and then those that give none, or 0, as Hugo does; either by title
+// where they tie.
+func byWeight(a, b content.Summary) int {
+	x, weighed := weightOf(a)
+	y, weighs := weightOf(b)
+	switch {
+	case weighed != weighs && weighed:
+		return -1
+	case weighed != weighs:
+		return 1
+	case x != y:
+		return cmp.Compare(x, y)
+	}
+	return cmp.Or(strings.Compare(a.Title, b.Title), strings.Compare(string(a.ID), string(b.ID)))
+}
+
+func weightOf(s content.Summary) (float64, bool) {
+	var w float64
+	switch v := s.Meta["weight"].(type) {
+	case int:
+		w = float64(v)
+	case int64:
+		w = float64(v)
+	case uint64:
+		w = float64(v)
+	case float64:
+		w = v
+	}
+	return w, w != 0
 }
 
 func (b *Builder) planHome(p *Plan, all []content.Summary) {
@@ -157,6 +208,9 @@ func (b *Builder) planLists(p *Plan, all []content.Summary) {
 		items := filterKind(all, t.Kind)
 		if len(items) == 0 {
 			continue
+		}
+		if b.readsByWeight(t.Kind) {
+			slices.SortStableFunc(items, byWeight)
 		}
 		base := b.opts.Resolver.ForList(t.Kind, b.opts.Site.Language)
 		if base == home {

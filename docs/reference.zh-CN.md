@@ -476,6 +476,38 @@ plugins:
 `kite init` 写出的部署工作流上传的是 `public`，改了 `build.output`，
 工作流里的 `path` 也要跟着改。
 
+## 内容类型
+
+站点有文章和页面，还可以在 `kite.yaml` 里声明自己的种类，放两者都不是的内容，比如作品集里
+的项目、书单里的书：
+
+```yaml
+content:
+  types:
+    - kind: project
+      label: 项目
+      dir: projects          # 放在 content/projects/，列表页在 /projects/
+      route: /projects/:slug # 默认就是目录加 slug
+      layout: bundle         # 每条一个文件夹；single 是每条一个文件
+      order: weight          # 或 date，新的在前，这是默认
+      feed: false            # 写 true 就和文章一样进订阅
+      taxonomies: [stack]
+      fields:
+        - {key: repo, type: url, label: 仓库地址}
+        - {key: status, type: select, label: 状态,
+           options: [{value: active, label: 进行中}, {value: done, label: 已完成}]}
+```
+
+只有 `kind` 必须写，其余的默认值就是上面写的。声明之后，每一条都有自己的地址、在列表里的
+位置、种类要求时的订阅条目，以及后台里的表单：后台在文章和页面旁边列出这个种类，按主题设置
+的画法画出它的字段。模板用 `.Params.repo` 读字段。站点或主题有 `layouts/project/single.html`
+和 `layouts/project/list.html` 时用它们画条目和列表，没有就用 `single.html` 和 `list.html`。
+
+`order: weight` 按 front matter 里的 `weight` 从小到大排列和阅读，文档就这样读，`.Prev` 和
+`.Next` 也按这个顺序；没有 weight 或者是 0 的排在后面，按标题。种类的名字用小写字母、数字、
+`-` 和 `_`，条目放在 `content/` 下属于它自己的一个文件夹里，名字和文件夹都不能和别的种类或
+分类轴相同。`kite serve` 运行时声明或去掉的种类，不用重启就会生效。
+
 ## 从 Hugo 迁移
 
 Hugo 站点的内容原地就能打开。在站点目录里运行 `kite init .`，它只添加 `kite.yaml`，
@@ -491,6 +523,8 @@ kite doctor --fix-ids
 时，它是另一篇文章。两种不论放在 `content/posts/` 的哪一层，地址都是
 `/posts/<slug>/`；Hugo 的 `_index.md` 不读。拖到单文件文章里的图片存进站点自己的
 `static/uploads/`。
+
+文章以外的栏目，比如 `content/projects/`，给它声明一个内容类型就能读到，见[内容类型](#内容类型)。
 
 slug 里可以带路径：slug 是 `projects/tideline` 的页面发布在 `/projects/tideline/`，
 和 Hugo 里放在文件夹中的页面一样。地址和另一个页面相同的内容，比如叫 `posts` 的页面，

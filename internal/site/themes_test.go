@@ -210,3 +210,65 @@ func TestAListingPagesAsTheThemeAndThenTheSiteSay(t *testing.T) {
 		t.Errorf("a theme paging a kind of listing that does not exist loaded: %v", err)
 	}
 }
+
+// A site declares a kind of its own in kite.yaml: its items have addresses,
+// a listing in the order the kind is read in, neighbors in that order, the
+// templates a site gives the kind, a taxonomy of their own, and a place in
+// the feed when the kind asks for one.
+func TestASiteDeclaresAKindOfItsOwn(t *testing.T) {
+	root := t.TempDir()
+	project := func(slug string, weight int) string {
+		return fmt.Sprintf("---\nid: 01J8KQ2P3R4S5T6V7W8X9YZP%02d\ntitle: %s\nstatus: published\n"+
+			"published_at: 2026-01-%02dT00:00:00Z\nweight: %d\nstack: [Go]\nrepo: https://example.com/%s\n---\n\n%s.\n",
+			weight, slug, 10+weight, weight, slug, slug)
+	}
+	write(t, root, map[string]string{
+		"kite.yaml": `site: {title: T, baseURL: https://example.com}
+content:
+  types:
+    - kind: project
+      label: Project
+      dir: projects
+      order: weight
+      feed: true
+      taxonomies: [stack]
+      fields:
+        - {key: repo, type: url, label: Repository}
+`,
+		"content/projects/kite/index.md":    project("kite", 1),
+		"content/projects/vane/index.md":    project("vane", 3),
+		"content/projects/almanac/index.md": project("almanac", 2),
+		"layouts/project/single.html": `{{ define "main" }}<a class="repo" href="{{ .Page.Params.repo }}">{{ .Page.Title }}</a>` +
+			`{{ with .Page.Prev }}prev:{{ .Title }}{{ end }} {{ with .Page.Next }}next:{{ .Title }}{{ end }}{{ end }}`,
+		"layouts/project/list.html": `{{ define "main" }}{{ range .Pages }}{{ .Title }};{{ end }}{{ end }}`,
+	})
+	s, err := site.Open(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if got := s.Project.Types.Get("project"); got == nil || got.Route != "/projects/:slug" {
+		t.Fatalf("the declared kind is %+v", got)
+	}
+	out := filepath.Join(t.TempDir(), "public")
+	if _, _, err := s.Build(context.Background(), site.BuildOptions{OutDir: out}); err != nil {
+		t.Fatal(err)
+	}
+	read := func(file string) string {
+		data, err := os.ReadFile(filepath.Join(out, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	for file, want := range map[string]string{
+		"projects/index.html":         "kite;almanac;vane;",
+		"projects/almanac/index.html": `<a class="repo" href="https://example.com/almanac">almanac</a>prev:kite next:vane`,
+		"stack/go/index.html":         "almanac",
+		"rss.xml":                     "<title>vane</title>",
+	} {
+		if got := read(file); !strings.Contains(got, want) {
+			t.Errorf("%s does not hold %q", file, want)
+		}
+	}
+}

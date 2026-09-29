@@ -6,6 +6,7 @@
 package config
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -24,6 +25,9 @@ import (
 	_ "time/tzdata"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/schema"
 )
 
 // languageTag is the shape of a BCP 47 tag: a language, then optional
@@ -141,6 +145,65 @@ func cleanKeywords(words []string) []string {
 type Content struct {
 	Store string `yaml:"store,omitempty"`
 	Dir   string `yaml:"dir,omitempty"`
+
+	// Types are the kinds of content the site declares of its own, beside
+	// post and page.
+	Types []Type `yaml:"types,omitempty"`
+}
+
+// Type declares a kind of content of a site's own, as a portfolio's projects
+// or a reading list's books: items with addresses, a listing, templates of
+// their own and forms in the studio, drawn from the fields declared here.
+type Type struct {
+	Kind  string `yaml:"kind"`
+	Label string `yaml:"label,omitempty"`
+
+	// Dir is the folder under content/ the items are kept in, and the
+	// address of their listing; the kind by default.
+	Dir string `yaml:"dir,omitempty"`
+
+	// Route is an item's address, where :slug stands for its slug; the dir
+	// and the slug by default, as /projects/:slug.
+	Route string `yaml:"route,omitempty"`
+
+	// Layout is bundle, a folder per item holding its pictures, which is the
+	// default, or single, a file per item.
+	Layout string `yaml:"layout,omitempty"`
+
+	Taxonomies []string      `yaml:"taxonomies,omitempty"`
+	Fields     schema.Schema `yaml:"fields,omitempty"`
+
+	// Order is how the items are listed and read: date, newest first, which
+	// is the default, or weight, by the weight in each item's front matter.
+	Order string `yaml:"order,omitempty"`
+
+	// Feed puts the items in the site's feed, as posts are.
+	Feed bool `yaml:"feed,omitempty"`
+}
+
+// ContentTypes are the kinds the site declares, as the registry keeps them.
+func (c Content) ContentTypes() []*content.Type {
+	out := make([]*content.Type, 0, len(c.Types))
+	for _, t := range c.Types {
+		ct := &content.Type{
+			Kind:       content.Kind(t.Kind),
+			Label:      cmp.Or(t.Label, t.Kind),
+			Dir:        cmp.Or(t.Dir, t.Kind),
+			Route:      t.Route,
+			Layout:     content.Layout(cmp.Or(t.Layout, string(content.LayoutBundle))),
+			Taxonomies: t.Taxonomies,
+			Fields:     t.Fields,
+			Templates:  content.TemplateHints{Single: "single", List: "list"},
+			Sortable:   []string{"published_at", "updated_at", "title"},
+			Order:      content.Order(cmp.Or(t.Order, string(content.OrderDate))),
+			Feed:       t.Feed,
+		}
+		if ct.Route == "" {
+			ct.Route = "/" + ct.Dir + "/:slug"
+		}
+		out = append(out, ct)
+	}
+	return out
 }
 
 // Theme names the theme and carries its settings.

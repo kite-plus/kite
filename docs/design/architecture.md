@@ -326,7 +326,7 @@ type Content struct {
 
 > **把上线状态塞进 status 枚举，是本项目最容易犯、且代价最高的错误之一。**
 
-#### D5. ContentType Registry：V1 落地、内置两种、不开放注册 `[设计中]`
+#### D5. ContentType Registry：内置两种，站点在 kite.yaml 里声明其余的 `[已实现]`
 
 ```go
 type ContentType struct {
@@ -342,7 +342,7 @@ type ContentType struct {
 
 **为什么现在就要 Registry**：路由规则、模板查找、Admin 表单生成这三件事都必须从类型元数据读取。V1 若硬编码成 `if kind == "post"`，开放自定义类型时就是一次彻底重写。
 
-**态度：先留接口，不要现在实现开放注册。**
+**态度：先留接口，不要现在实现开放注册。** 后来站点可以在 `kite.yaml` 的 `content.types` 里声明自己的种类了（2026-09-29，kite-plus/kite#8）：写法见 [reference.md 的 Content types](../reference.md#content-types)，另外两个字段 `Order`（按日期或按 `weight`）和 `Feed`（进不进订阅）。注册表在打开项目时读入声明，`kite serve` 重新读配置时原地替换，索引下一次对账就按新的种类扫描。插件注册类型仍不开放。
 
 #### D6. Meta / Theme Settings / Plugin Settings 三处共用一套 Schema → 表单渲染器
 

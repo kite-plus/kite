@@ -555,6 +555,44 @@ lies inside `content`, `static`, `layouts`, `themes`, `plugins`, `.kite` or
 `.git`. The deploy workflow `kite init` writes uploads `public`; if
 `build.output` changes, change the workflow's `path` with it.
 
+## Content types
+
+A site has posts and pages, and can declare kinds of its own in `kite.yaml`,
+for what is neither, such as a portfolio's projects or a reading list's books:
+
+```yaml
+content:
+  types:
+    - kind: project
+      label: Project
+      dir: projects          # content/projects/, and the listing at /projects/
+      route: /projects/:slug # the default: the dir and the slug
+      layout: bundle         # a folder per item, or single, a file per item
+      order: weight          # or date, newest first, which is the default
+      feed: false            # true puts the items in the feed, as posts are
+      taxonomies: [stack]
+      fields:
+        - {key: repo, type: url, label: Repository}
+        - {key: status, type: select, label: Status,
+           options: [{value: active, label: Active}, {value: done, label: Done}]}
+```
+
+Only `kind` is needed; the rest has the defaults shown. Each item then has an
+address, a place in its listing, a feed entry when the kind asks for one, and
+a form in the studio, which lists the kind beside posts and pages and draws
+its fields the way the theme's settings are drawn. A template reads a field
+as `.Params.repo`. Items are drawn with `layouts/project/single.html` and
+listed with `layouts/project/list.html` when the site or the theme has them,
+and with `single.html` and `list.html` otherwise.
+
+`order: weight` lists and reads the items by the `weight` in their front
+matter, smallest first, as documentation is read, and `.Prev` and `.Next`
+follow that order; items with no weight, or 0, come after, by title. A kind
+is named by lowercase letters, digits, `-` and `_`, keeps its items in one
+folder of its own under `content/`, and cannot share its name or folder with
+another kind or a taxonomy. `kite serve` picks up a kind declared or taken
+out while it runs.
+
 ## Moving from Hugo
 
 A Hugo site's content opens where it is. Run `kite init .` in the site's
@@ -573,6 +611,9 @@ links it; a folder with an `index.md` of its own is another post. Either is
 published at `/posts/<slug>/` wherever in `content/posts/` it sits, and
 Hugo's `_index.md` is left out. A picture dropped on a post kept as a single
 file goes among the site's own files, in `static/uploads/`.
+
+A section other than posts, such as `content/projects/`, is read once a kind
+of content is declared for it; see [Content types](#content-types).
 
 A slug may hold a path: a page whose slug is `projects/tideline` is published
 at `/projects/tideline/`, as pages kept in folders were in Hugo. An item whose

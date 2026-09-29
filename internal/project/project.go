@@ -26,13 +26,22 @@ type Project struct {
 	Types *content.Registry
 }
 
-// Open finds the project root by walking up from dir and returns it.
+// Open finds the project root by walking up from dir and returns it, with
+// the kinds of content its kite.yaml declares beside the built-in ones.
 func Open(dir string) (*Project, error) {
 	root, err := FindRoot(dir)
 	if err != nil {
 		return nil, err
 	}
-	return &Project{Root: root, Types: content.DefaultRegistry()}, nil
+	cfg, err := config.Load(root)
+	if err != nil {
+		return nil, err
+	}
+	types := content.DefaultRegistry()
+	if err := types.Declare(cfg.Content.ContentTypes()...); err != nil {
+		return nil, fmt.Errorf("config: content.types: %w", err)
+	}
+	return &Project{Root: root, Types: types}, nil
 }
 
 // FindRoot walks up from dir looking for the project marker file.
