@@ -4,7 +4,7 @@ title: The fifth post
 slug: fifth
 status: published
 published_at: 2026-04-18T09:00:00Z
-tags: [Notes]
+tags: [notes]
 categories: [Essays]
 ---
 

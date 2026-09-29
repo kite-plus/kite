@@ -1,6 +1,7 @@
 package file
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
@@ -343,15 +344,22 @@ func TestChangingATermTouchesOnlyItsLine(t *testing.T) {
 		"cover: cover.png # the photo\ntags: [Blog, Kite, Notes]\n---\n\nBody.\n"
 
 	for _, tc := range []struct {
-		name, term, to, want string
+		name, tags, term, to, want string
 	}{
-		{"rename keeps the order", "Blog", "Journal", "tags: [Journal, Kite, Notes]"},
-		{"merge keeps one copy", "Blog", "Kite", "tags: [Kite, Notes]"},
-		{"remove", "Kite", "", "tags: [Blog, Notes]"},
+		{"rename keeps the order", "", "Blog", "Journal", "tags: [Journal, Kite, Notes]"},
+		{"merge keeps one copy", "", "Blog", "Kite", "tags: [Kite, Notes]"},
+		{"remove", "", "Kite", "", "tags: [Blog, Notes]"},
+		// Terms with one slug are one term, however the file writes them.
+		{"rename every spelling", "tags: [blog, Kite, BLOG]", "Blog", "Journal", "tags: [Journal, Kite]"},
+		{"write one spelling", "tags: [blog, Kite, BLOG]", "Blog", "Blog", "tags: [Blog, Kite]"},
+		{"merge into another spelling", "tags: [Blog, kite, Notes]", "Blog", "Kite", "tags: [Kite, Notes]"},
+		{"remove every spelling", "tags: [blog, Kite, BLOG]", "Blog", "", "tags: [Kite]"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root, types, w := newTestProject(t)
-			writeFile(t, root, "content/posts/a/index.md", doc)
+			line := cmp.Or(tc.tags, "tags: [Blog, Kite, Notes]")
+			before := strings.Replace(doc, "tags: [Blog, Kite, Notes]", line, 1)
+			writeFile(t, root, "content/posts/a/index.md", before)
 			scan, err := NewScanner(root, types).Scan()
 			if err != nil {
 				t.Fatal(err)
@@ -368,7 +376,7 @@ func TestChangingATermTouchesOnlyItsLine(t *testing.T) {
 				t.Errorf("Written = %v", res.Written)
 			}
 			got := readFile(t, root, "content/posts/a/index.md")
-			if want := strings.Replace(doc, "tags: [Blog, Kite, Notes]", tc.want, 1); got != want {
+			if want := strings.Replace(before, line, tc.want, 1); got != want {
 				t.Errorf("file = %q\nwant %q", got, want)
 			}
 		})

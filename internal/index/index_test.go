@@ -2,6 +2,7 @@ package index_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -224,6 +225,48 @@ func TestFileWithoutIDIsReportedNotIndexed(t *testing.T) {
 	}
 	if stats.Indexed != 0 {
 		t.Errorf("a file without an id must not be indexed: %+v", stats)
+	}
+}
+
+// A database from before terms kept their slugs has no slug column. The
+// schema runs against it before its version is read, and must not fail on
+// the column it lacks: the database is discarded and indexed again.
+func TestADatabaseOfAnOlderShapeIsRebuilt(t *testing.T) {
+	root, types := newProject(t)
+	write(t, root, "content/posts/a/index.md", post(idA, "Alpha", "alpha", "tags: [Go]"))
+
+	dbPath := filepath.Join(root, filepath.FromSlash(index.Path))
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = old.Exec(`
+		CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+		INSERT INTO meta (key, value) VALUES ('schema_version', '4');
+		CREATE TABLE terms (
+			content_id TEXT NOT NULL, taxonomy TEXT NOT NULL, term TEXT NOT NULL, position INTEGER NOT NULL,
+			PRIMARY KEY (content_id, taxonomy, term));
+		CREATE INDEX terms_lookup ON terms (taxonomy, term);`)
+	if cerr := old.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ix := openIndex(t, root, types)
+	if _, err := ix.Reconcile(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	page, err := reader.New(ix.DB()).Query(t.Context(), content.Query{TermsAny: map[string][]string{"tags": {"go"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 {
+		t.Errorf("found %d items tagged go, want Alpha", len(page.Items))
 	}
 }
 

@@ -210,6 +210,14 @@ as well. A template links to Kite's own pages with `url.For "home"`,
 `url.For "term" "tags" "Go"`, and to any other path of the site with
 `url.Rel "rss.xml"`; both carry the path.
 
+Terms written differently that share an address are one term: Go, go and GO
+are all `/tags/go/`, and Web Dev and web-dev are both `/tags/web-dev/`. The
+term's page lists the posts carrying it in any of these ways, and is called
+the way most of them write it, or, when as many write it each way, the first
+in character order, Go before go. A taxonomy page's `.Terms` count such a term
+once, and a post's own `.Terms` show it as that post writes it. A term of
+nothing but dashes, slashes or spaces has no page.
+
 A post's cover is the `cover` in its front matter, which a template reads as
 written in `.Params.cover`, and `.Images` lists the pictures its text shows,
 in order and as written; a listed page carries both. A theme resolves either

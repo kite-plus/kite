@@ -730,7 +730,15 @@ func (b *Builder) termsOfMap(taxonomies map[string][]string) map[string][]render
 	}
 	out := make(map[string][]render.Term, len(taxonomies))
 	for _, name := range slices.Sorted(maps.Keys(taxonomies)) {
+		// A term written two ways is one term, shown once as it is first
+		// written; one with an empty slug has no page to link to.
+		shown := make(map[string]bool)
 		for _, term := range taxonomies[name] {
+			slug := content.TermSlug(term)
+			if slug == "" || shown[slug] {
+				continue
+			}
+			shown[slug] = true
 			out[name] = append(out[name],
 				render.NewTerm(name, term, 0, b.opts.Resolver, b.opts.Site.Language, nil))
 		}

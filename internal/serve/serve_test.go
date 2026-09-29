@@ -163,6 +163,16 @@ func TestServedFilesAreByteIdenticalToBuiltOnes(t *testing.T) {
 	} {
 		t.Run(at.name, func(t *testing.T) {
 			root := newProjectAt(t, 7, at.baseURL)
+			// Terms written other ways share the pages of Go, Notes and Tech,
+			// which a server has to find and draw as a build does.
+			variant := filepath.Join(root, "content", "posts", "variant")
+			if err := os.MkdirAll(variant, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(variant, "index.md"),
+				[]byte(post(70, "tags: [go, NOTES]\ncategories: [tech]\n")), 0o644); err != nil {
+				t.Fatal(err)
+			}
 			// A build writes the feed after the static files, over this one,
 			// and a server has to answer with the same file.
 			static := filepath.Join(root, "static")

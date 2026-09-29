@@ -163,6 +163,8 @@ type Taxonomy struct {
 // TermDetail is one term with every item that carries it: what renaming or
 // removing the term would change.
 type TermDetail struct {
+	// Term is the term's name as the term list gives it: the way most of the
+	// items outside the trash write it.
 	Term string `json:"term"`
 	// Count is how many items outside the trash carry the term, as the term
 	// list counts it.
@@ -182,7 +184,8 @@ type TermItem struct {
 
 // TermRename is the request that renames a term.
 type TermRename struct {
-	// Name is the term's new name. Naming a term that exists merges the two.
+	// Name is the term's new name. Naming a term that exists merges the two,
+	// and naming the term itself writes it that way on every item.
 	Name string `json:"name"`
 }
 

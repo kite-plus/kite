@@ -4,7 +4,7 @@ title: The sixth post
 slug: sixth
 status: published
 published_at: 2026-04-10T09:00:00Z
-categories: [Essays]
+categories: [essays]
 ---
 
 And another.

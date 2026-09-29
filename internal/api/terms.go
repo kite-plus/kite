@@ -18,6 +18,11 @@ import (
 // client first reads the term, which lists those items and carries an ETag
 // fingerprinting them; the change sends that ETag back, and is refused if
 // any of the items changed, or an item gained or lost the term, since.
+//
+// Terms with one slug are one term, as they share one page on the site:
+// reading, renaming or removing Go reaches the items that write go as well,
+// and a rename writes the new name on all of them. Renaming a term to its own
+// name is how the ways it is written become one.
 
 // handleTerm reports one term and every item that carries it.
 func (s *Server) handleTerm(w http.ResponseWriter, r *http.Request) {
@@ -58,8 +63,9 @@ func (s *Server) handleRenameTerm(w http.ResponseWriter, r *http.Request) {
 		failField(w, http.StatusBadRequest, CodeInvalidRequest, "name",
 			"a term name cannot hold line breaks or other control characters")
 		return
-	case name == term:
-		failField(w, http.StatusBadRequest, CodeInvalidRequest, "name", "the term already has this name")
+	case content.TermSlug(name) == "":
+		failField(w, http.StatusBadRequest, CodeInvalidRequest, "name",
+			"a term name needs more than spaces, slashes and dashes")
 		return
 	}
 
@@ -114,10 +120,11 @@ func (s *Server) writeTerm(w http.ResponseWriter, r *http.Request, view View, ta
 		return
 	}
 
+	name := termName(items, trashed, taxonomy, term)
 	out := TermDetail{
-		Term:  term,
+		Term:  name,
 		Count: len(items) - len(trashed),
-		URL:   view.Resolver.ForTerm(taxonomy, term, view.Site.Language),
+		URL:   view.Resolver.ForTerm(taxonomy, name, view.Site.Language),
 		Items: make([]TermItem, 0, len(items)),
 	}
 	for _, item := range items {
@@ -130,9 +137,34 @@ func (s *Server) writeTerm(w http.ResponseWriter, r *http.Request, view View, ta
 	writeJSON(w, http.StatusOK, out)
 }
 
+// termName is what the term list calls a term: the way most of the items
+// outside the trash write it, or all of them when every one is trashed.
+func termName(items []content.Summary, trashed map[content.ID]bool, taxonomy, term string) string {
+	slug := content.TermSlug(term)
+	count := func(withTrashed bool) map[string]int {
+		spellings := make(map[string]int)
+		for _, item := range items {
+			if trashed[item.ID] && !withTrashed {
+				continue
+			}
+			for _, t := range item.Taxonomies[taxonomy] {
+				if content.TermSlug(t) == slug {
+					spellings[t]++
+				}
+			}
+		}
+		return spellings
+	}
+	if spellings := count(false); len(spellings) > 0 {
+		return content.TermName(spellings)
+	}
+	return content.TermName(count(true))
+}
+
 // changeTerm renames the term to to, or removes it when to is empty, on every
 // item that carries it, in one change set, provided they are still the items
-// the client was shown.
+// the client was shown. An item that already writes the term as to alone is
+// left as it is, and a rename that would change no item is refused.
 func (s *Server) changeTerm(w http.ResponseWriter, r *http.Request, view View,
 	taxonomy, term, to string, revision content.Revision, message string,
 ) bool {
@@ -154,9 +186,16 @@ func (s *Server) changeTerm(w http.ResponseWriter, r *http.Request, view View,
 
 	cs := content.ChangeSet{Message: message}
 	for _, item := range items {
+		if to != "" && writesOnly(item.Taxonomies[taxonomy], term, to) {
+			continue
+		}
 		cs.Add(content.ChangeTerm{
 			ID: item.ID, IfRevision: item.Revision, Taxonomy: taxonomy, Term: term, To: to,
 		})
+	}
+	if len(cs.Ops) == 0 {
+		failField(w, http.StatusBadRequest, CodeInvalidRequest, "name", "the term already has this name")
+		return false
 	}
 
 	if _, err := s.apply(r, view, cs); err != nil {
@@ -170,6 +209,21 @@ func (s *Server) changeTerm(w http.ResponseWriter, r *http.Request, view View,
 		}
 		s.failWrite(w, view, r, err)
 		return false
+	}
+	return true
+}
+
+// writesOnly reports whether a list writes a term as name and in no other
+// way, which renaming the term to name would leave as it is.
+func writesOnly(terms []string, term, name string) bool {
+	slug := content.TermSlug(term)
+	if content.TermSlug(name) != slug {
+		return false
+	}
+	for _, t := range terms {
+		if content.TermSlug(t) == slug && t != name {
+			return false
+		}
 	}
 	return true
 }

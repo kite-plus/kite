@@ -63,12 +63,21 @@ CREATE INDEX IF NOT EXISTS contents_updated        ON contents (updated_at DESC,
 -- terms is a materialized projection of the string lists carried on each item,
 -- never a source of truth. Renaming a term means rewriting the items that use
 -- it, in file mode and database mode alike.
+--
+-- term is written as the item writes it, and slug as the term's address does
+-- (content.TermSlug). Terms are found and counted by slug, so Go and go are
+-- one term, as they share one page.
 CREATE TABLE IF NOT EXISTS terms (
     content_id TEXT    NOT NULL REFERENCES contents (id) ON DELETE CASCADE,
     taxonomy   TEXT    NOT NULL,
     term       TEXT    NOT NULL,
+    slug       TEXT    NOT NULL,
     position   INTEGER NOT NULL,
     PRIMARY KEY (content_id, taxonomy, term)
 );
 
-CREATE INDEX IF NOT EXISTS terms_lookup ON terms (taxonomy, term);
+-- This file runs against a database an older build left before its version is
+-- read, and IF NOT EXISTS passes over a name it knows without looking at the
+-- columns. An index on a new column therefore keeps an old index's name, or
+-- opening the old database fails on a column it lacks instead of rebuilding it.
+CREATE INDEX IF NOT EXISTS terms_lookup ON terms (taxonomy, slug);

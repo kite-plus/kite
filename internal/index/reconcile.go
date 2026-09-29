@@ -254,7 +254,7 @@ func prepare(ctx context.Context, tx *sql.Tx) (*statements, error) {
 				body, body_format, excerpt, word_count, cjk_count, images_json, meta_json, aliases_json,
 				created_at, updated_at, published_at, deleted_at
 			) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`},
-		{&s.term, `INSERT OR REPLACE INTO terms (content_id, taxonomy, term, position) VALUES (?,?,?,?)`},
+		{&s.term, `INSERT OR REPLACE INTO terms (content_id, taxonomy, term, slug, position) VALUES (?,?,?,?,?)`},
 		{&s.file, `
 			INSERT INTO files (path, size, mtime_ns, content_sha256, indexed_at_ns)
 			VALUES (?,?,?,?,?)
@@ -315,7 +315,7 @@ func upsert(ctx context.Context, s *statements, e *file.Entry, nowNS int64) erro
 
 	for _, taxonomy := range slices.Sorted(maps.Keys(item.Taxonomies)) {
 		for i, term := range item.Taxonomies[taxonomy] {
-			if _, err := s.term.ExecContext(ctx, string(item.ID), taxonomy, term, i); err != nil {
+			if _, err := s.term.ExecContext(ctx, string(item.ID), taxonomy, term, content.TermSlug(term), i); err != nil {
 				return fmt.Errorf("index: insert term %s/%s: %w", taxonomy, term, err)
 			}
 		}

@@ -1,7 +1,6 @@
 package build
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -173,18 +172,38 @@ func (b *Builder) planLists(p *Plan, all []content.Summary) {
 // terms, which is exactly what a query per term would return. Grouping them
 // here rather than asking again term by term took a server's replan after an
 // edit on a site with many tags from most of half a second to a fraction.
+//
+// Terms are grouped by slug, as their addresses are: Go and go are both
+// /tags/go/, so they are one term, whose page lists the items of both and is
+// called what most of them write. A term with an empty slug would be the
+// taxonomy's own listing, and has no page.
 func (b *Builder) planTaxonomies(p *Plan, all []content.Summary) {
+	type term struct {
+		items     []content.Summary
+		spellings map[string]int
+	}
 	for _, taxonomy := range b.opts.Types.TaxonomyNames() {
-		byTerm := make(map[string][]content.Summary)
+		bySlug := make(map[string]*term)
 		for _, s := range all {
-			for _, term := range s.Taxonomies[taxonomy] {
-				if listed := byTerm[term]; len(listed) > 0 && listed[len(listed)-1].ID == s.ID {
-					continue // named twice by the same item
+			written := s.Taxonomies[taxonomy]
+			for i, name := range written {
+				slug := content.TermSlug(name)
+				if slug == "" || slices.Contains(written[:i], name) {
+					continue // no page of its own, or named twice by the same item
 				}
-				byTerm[term] = append(byTerm[term], s)
+				t := bySlug[slug]
+				if t == nil {
+					t = &term{spellings: make(map[string]int)}
+					bySlug[slug] = t
+				}
+				t.spellings[name]++
+				if n := len(t.items); n > 0 && t.items[n-1].ID == s.ID {
+					continue // the same term written another way by the same item
+				}
+				t.items = append(t.items, s)
 			}
 		}
-		if len(byTerm) == 0 {
+		if len(bySlug) == 0 {
 			continue
 		}
 
@@ -197,15 +216,13 @@ func (b *Builder) planTaxonomies(p *Plan, all []content.Summary) {
 			Title: displayName(taxonomy),
 		})
 
-		// Most used first, then by name, the order the index counts them in.
-		terms := slices.SortedFunc(maps.Keys(byTerm), func(x, y string) int {
-			return cmp.Or(cmp.Compare(len(byTerm[y]), len(byTerm[x])), cmp.Compare(x, y))
-		})
-		for _, term := range terms {
-			base := b.opts.Resolver.ForTerm(taxonomy, term, b.opts.Site.Language)
-			// A term keeps the spelling its author used; only Kite's own
-			// names are presented.
-			b.paginate(p, render.KindTerm, base, taxonomy, term, term, byTerm[term])
+		for _, slug := range slices.Sorted(maps.Keys(bySlug)) {
+			t := bySlug[slug]
+			// A term keeps a spelling its authors used; only Kite's own names
+			// are presented.
+			name := content.TermName(t.spellings)
+			base := b.opts.Resolver.ForTerm(taxonomy, name, b.opts.Site.Language)
+			b.paginate(p, render.KindTerm, base, taxonomy, name, name, t.items)
 		}
 	}
 }

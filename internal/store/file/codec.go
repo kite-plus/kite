@@ -227,7 +227,9 @@ func (c *Codec) Encode(t *content.Type, item *content.Content, existing []byte) 
 
 // ChangeTerm renames one term in a file's list for a taxonomy, or takes it
 // out when to is empty, keeping the list's order and a single copy of to.
-// No other key changes but updated_at, which moves to now where the file
+// A term is matched by its slug, so every way the file writes it changes,
+// and a term it merges into is written as to as well, however the file wrote
+// it. No other key changes but updated_at, which moves to now where the file
 // keeps one; a list left empty takes its key out of the file.
 func (c *Codec) ChangeTerm(existing []byte, taxonomy, term, to string, now time.Time) ([]byte, error) {
 	doc, err := frontmatter.Parse(existing)
@@ -241,13 +243,17 @@ func (c *Codec) ChangeTerm(existing []byte, taxonomy, term, to string, now time.
 			terms = []string{s}
 		}
 	}
+	from, into := content.TermSlug(term), content.TermSlug(to)
+	carried := slices.ContainsFunc(terms, func(t string) bool { return content.TermSlug(t) == from })
 	next := make([]string, 0, len(terms))
 	for _, t := range terms {
-		if t == term {
-			if to == "" {
+		if carried {
+			switch slug := content.TermSlug(t); {
+			case slug == from && to == "":
 				continue
+			case slug == from, to != "" && slug == into:
+				t = to
 			}
-			t = to
 		}
 		if !slices.Contains(next, t) {
 			next = append(next, t)

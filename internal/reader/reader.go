@@ -7,6 +7,7 @@
 package reader
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -206,6 +207,11 @@ func (r *Reader) Count(ctx context.Context, q content.Query) (int, error) {
 }
 
 // CountTerms aggregates term usage across the items a query selects.
+//
+// Terms are counted by slug, so an item carrying Go and one carrying go make
+// one term used twice, named as [content.TermName] names it, and an item that
+// writes a term both ways counts once. A term with an empty slug has no page
+// and is left out.
 func (r *Reader) CountTerms(ctx context.Context, taxonomy string, q content.Query) ([]content.TermCount, error) {
 	if err := q.Normalize(); err != nil {
 		return nil, err
@@ -217,25 +223,53 @@ func (r *Reader) CountTerms(ctx context.Context, taxonomy string, q content.Quer
 		return nil, err
 	}
 
-	sqlText := `SELECT t.term, count(*) FROM terms t
-		JOIN contents c ON c.id = t.content_id
-		WHERE t.taxonomy = ? AND c.id IN (SELECT id FROM contents` + where + `)
-		GROUP BY t.term ORDER BY count(*) DESC, t.term ASC`
+	// One row per way a term is written: how many items write it so, and how
+	// many carry the term at all.
+	sqlText := `WITH used AS (
+			SELECT slug, term, content_id FROM terms
+			WHERE taxonomy = ? AND slug <> '' AND content_id IN (SELECT id FROM contents` + where + `)
+		)
+		SELECT spelled.slug, spelled.term, spelled.items, carried.items
+		FROM (SELECT slug, term, count(*) AS items FROM used GROUP BY slug, term) AS spelled
+		JOIN (SELECT slug, count(DISTINCT content_id) AS items FROM used GROUP BY slug) AS carried
+			ON carried.slug = spelled.slug`
 	rows, err := r.db.QueryContext(ctx, sqlText, append([]any{taxonomy}, args...)...)
 	if err != nil {
 		return nil, fmt.Errorf("reader: count terms: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []content.TermCount
+	type tally struct {
+		spellings map[string]int
+		items     int
+	}
+	bySlug := make(map[string]*tally)
 	for rows.Next() {
-		tc := content.TermCount{Taxonomy: taxonomy}
-		if err := rows.Scan(&tc.Term, &tc.Count); err != nil {
+		var slug, term string
+		var spelled, carried int
+		if err := rows.Scan(&slug, &term, &spelled, &carried); err != nil {
 			return nil, err
 		}
-		out = append(out, tc)
+		t := bySlug[slug]
+		if t == nil {
+			t = &tally{spellings: make(map[string]int), items: carried}
+			bySlug[slug] = t
+		}
+		t.spellings[term] = spelled
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]content.TermCount, 0, len(bySlug))
+	for _, t := range bySlug {
+		out = append(out, content.TermCount{Taxonomy: taxonomy, Term: content.TermName(t.spellings), Count: t.items})
+	}
+	// Most used first, then by name, so that a tag cloud keeps its order.
+	slices.SortFunc(out, func(a, b content.TermCount) int {
+		return cmp.Or(cmp.Compare(b.Count, a.Count), strings.Compare(a.Term, b.Term))
+	})
+	return out, nil
 }
 
 type scanner interface{ Scan(dest ...any) error }
@@ -369,16 +403,21 @@ func buildWhere(q content.Query) (string, []any, error) {
 		add(`(title LIKE ? OR excerpt LIKE ? OR body LIKE ?)`, like, like, like)
 	}
 
+	// A term is found by its slug, however the item writes it.
 	for taxonomy, terms := range q.TermsAny {
 		if len(terms) == 0 {
 			continue
 		}
-		add(`id IN (SELECT content_id FROM terms WHERE taxonomy = ? AND term IN (`+
-			placeholders(len(terms))+`))`, append([]any{taxonomy}, toAny(terms)...)...)
+		values := []any{taxonomy}
+		for _, term := range terms {
+			values = append(values, content.TermSlug(term))
+		}
+		add(`id IN (SELECT content_id FROM terms WHERE taxonomy = ? AND slug IN (`+
+			placeholders(len(terms))+`))`, values...)
 	}
 	for taxonomy, terms := range q.TermsAll {
 		for _, term := range terms {
-			add(`id IN (SELECT content_id FROM terms WHERE taxonomy = ? AND term = ?)`, taxonomy, term)
+			add(`id IN (SELECT content_id FROM terms WHERE taxonomy = ? AND slug = ?)`, taxonomy, content.TermSlug(term))
 		}
 	}
 

@@ -66,7 +66,8 @@ type Query struct {
 	PublicAt *time.Time
 
 	// TermsAny matches items carrying at least one of the listed terms in the
-	// given taxonomy; TermsAll requires every listed term.
+	// given taxonomy; TermsAll requires every listed term. A term matches
+	// however an item writes it, by its [TermSlug].
 	TermsAny map[string][]string
 	TermsAll map[string][]string
 
@@ -170,7 +171,9 @@ type Capabilities struct {
 	Aggregate bool
 }
 
-// TermCount is one row of a taxonomy aggregation.
+// TermCount is one row of a taxonomy aggregation. Term is the term's name,
+// the way most of the items write it (see [TermName]), and Count how many
+// items carry it in any of its spellings.
 type TermCount struct {
 	Taxonomy string
 	Term     string

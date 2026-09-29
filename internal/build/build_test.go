@@ -476,6 +476,8 @@ categories: [Tech]
 
 Body.
 `)
+	f.add(t, "content/posts/lower/index.md", post("01J8KQ2P3R4S5T6V7W8X9YZ902", "lower", "2026-02-02",
+		"tags: [go, notes]\ncategories: [tech]\n"))
 	plan, err := f.builder(t, nil, nil).Plan(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -513,6 +515,150 @@ Body.
 	}
 	if checked < 3 {
 		t.Fatalf("only %d term pages were planned", checked)
+	}
+
+	// A taxonomy's listing names and counts the terms its term pages list.
+	for _, taxonomy := range []string{"tags", "categories"} {
+		counts, err := f.reader.CountTerms(t.Context(), taxonomy, content.Query{PublicAt: &fixtureNow})
+		if err != nil {
+			t.Fatal(err)
+		}
+		listed := make(map[string]int)
+		for _, c := range counts {
+			listed[c.Term] = c.Count
+		}
+		pages := make(map[string]int)
+		for _, target := range plan.Targets {
+			if target.Kind == render.KindTerm && target.Type == taxonomy && target.Page == 1 {
+				pages[target.Term] = target.TotalItems
+			}
+		}
+		if !maps.Equal(listed, pages) {
+			t.Errorf("%s: the listing counts %v, the term pages list %v", taxonomy, listed, pages)
+		}
+	}
+}
+
+// post is the source of a published post, with more front matter in extra.
+func post(id, slug, published, extra string) string {
+	return fmt.Sprintf("---\nid: %s\ntitle: %s\nslug: %s\nstatus: published\npublished_at: %sT00:00:00Z\n%s---\n\nBody.\n",
+		id, slug, slug, published, extra)
+}
+
+// Terms written differently that share an address are one term. Planned
+// apart, Go and go were two pages written to one file, and the build kept
+// whichever was written last: the other's posts were missing from the page,
+// and which ones changed from one build to the next.
+func TestTermsWrittenTwoWaysAreOnePage(t *testing.T) {
+	f := newFixture(t, 2)
+	f.add(t, "content/posts/lower/index.md", post("01J8KQ2P3R4S5T6V7W8X9YZ901", "lower", "2026-02-01", "tags: [go]\n"))
+	f.add(t, "content/posts/both/index.md", post("01J8KQ2P3R4S5T6V7W8X9YZ902", "both", "2026-02-02", "tags: [GO, Go]\n"))
+	roomy := func(o *build.Options) { o.PageSize = 10 }
+
+	plan, err := f.builder(t, nil, roomy).Plan(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	written := make(map[string]int)
+	for _, target := range plan.Targets {
+		if written[target.Path]++; written[target.Path] == 2 {
+			t.Errorf("two targets are written to %s", target.Path)
+		}
+	}
+
+	for i := range 3 {
+		dir := filepath.Join(f.root, fmt.Sprintf("run%d", i))
+		f.run(t, dir, roomy)
+
+		term := readFile(t, dir, "tags/go/index.html")
+		for _, post := range []string{"post-00", "post-01", "lower", "both"} {
+			if !strings.Contains(term, `href="/posts/`+post+`/"`) {
+				t.Errorf("run %d: tags/go does not list %s", i, post)
+			}
+		}
+		if got := documentTitle(t, term); got != "Go · Test" {
+			t.Errorf("run %d: tags/go is titled %q, want the way most posts write it", i, got)
+		}
+		listing := readFile(t, dir, "tags/index.html")
+		if n := strings.Count(listing, `href="/tags/go/"`); n != 1 {
+			t.Errorf("run %d: the tags listing links to tags/go %d times, want once", i, n)
+		}
+		if !strings.Contains(listing, `<a href="/tags/go/">Go</a><span class="count">4</span>`) {
+			t.Errorf("run %d: the tags listing does not count Go on 4 posts:\n%s", i, excerptOf(listing, "tags/go"))
+		}
+	}
+
+	// A post writing the term two ways names it once, as it first wrote it.
+	single := readFile(t, filepath.Join(f.root, "run0"), "posts/both/index.html")
+	if !strings.Contains(single, `<a href="/tags/go/">GO</a>`) || strings.Contains(single, `>Go</a>`) {
+		t.Errorf("posts/both should show its term once, as GO:\n%s", excerptOf(single, "filed-in"))
+	}
+}
+
+func TestATermIsCalledWhatMostOfItsPostsWrite(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		tags []string // one post each
+		want string
+		link string
+	}{
+		{"the most used", []string{"go", "Go", "go"}, "go", "/tags/go/"},
+		{"used alike, the first in byte order", []string{"go", "Go"}, "Go", "/tags/go/"},
+		{"spaced", []string{"web-dev", "Web Dev", "web  dev"}, "Web Dev", "/tags/web-dev/"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t, 0)
+			for i, tag := range tc.tags {
+				id := fmt.Sprintf("01J8KQ2P3R4S5T6V7W8X9YZ9%02d", i)
+				f.add(t, fmt.Sprintf("content/posts/p%d/index.md", i),
+					post(id, fmt.Sprintf("p%d", i), fmt.Sprintf("2026-02-%02d", i+1), "tags: ["+tag+"]\n"))
+			}
+			plan, err := f.builder(t, nil, nil).Plan(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var terms []string
+			for _, target := range plan.Targets {
+				if target.Kind != render.KindTerm {
+					continue
+				}
+				terms = append(terms, target.Term)
+				if target.Title != tc.want || target.URL != tc.link || target.TotalItems != len(tc.tags) {
+					t.Errorf("term page %q at %s lists %d, want %q at %s listing %d",
+						target.Title, target.URL, target.TotalItems, tc.want, tc.link, len(tc.tags))
+				}
+			}
+			if len(terms) != 1 {
+				t.Errorf("term pages %v, want one", terms)
+			}
+
+			counts, err := f.reader.CountTerms(t.Context(), "tags", content.Query{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(counts) != 1 || counts[0].Term != tc.want || counts[0].Count != len(tc.tags) {
+				t.Errorf("the index counts %+v, want %s on %d", counts, tc.want, len(tc.tags))
+			}
+		})
+	}
+}
+
+// A term of nothing but dashes, slashes or spaces has nothing to write in
+// its address, which would then be the taxonomy's own listing.
+func TestATermWithAnEmptySlugHasNoPage(t *testing.T) {
+	f := newFixture(t, 1)
+	f.add(t, "content/posts/dash/index.md", post("01J8KQ2P3R4S5T6V7W8X9YZ901", "dash", "2026-02-01", `tags: ["-", Go]`+"\n"))
+	_, files := f.run(t, f.out, nil)
+
+	if !slices.Contains(files, "tags/index.html") || !slices.Contains(files, "tags/go/index.html") {
+		t.Fatalf("the tags pages are missing\ngot: %v", files)
+	}
+	if listing := readFile(t, f.out, "tags/index.html"); !strings.Contains(listing, `class="terms"`) ||
+		strings.Contains(listing, ">-</a>") {
+		t.Errorf("tags/index.html should be the listing, without the dash:\n%s", excerptOf(listing, `class="terms"`))
+	}
+	if single := readFile(t, f.out, "posts/dash/index.html"); strings.Contains(single, ">-</a>") {
+		t.Errorf("posts/dash links its dash to the listing:\n%s", excerptOf(single, "filed-in"))
 	}
 }
 

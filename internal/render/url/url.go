@@ -144,15 +144,16 @@ func (r *Resolver) ForList(kind content.Kind, locale string) string {
 // ForTaxonomy returns the URL listing every term of a taxonomy.
 func (r *Resolver) ForTaxonomy(taxonomy, locale string) string {
 	return r.finish(locale, expand(r.opts.TaxonomyRoute, map[string]string{
-		"taxonomy": slugSegment(taxonomy),
+		"taxonomy": content.TermSlug(taxonomy),
 	}))
 }
 
-// ForTerm returns the URL of one term's listing.
+// ForTerm returns the URL of one term's listing, which every way of writing
+// the term with the same [content.TermSlug] shares.
 func (r *Resolver) ForTerm(taxonomy, term, locale string) string {
 	return r.finish(locale, expand(r.opts.TermRoute, map[string]string{
-		"taxonomy": slugSegment(taxonomy),
-		"term":     slugSegment(term),
+		"taxonomy": content.TermSlug(taxonomy),
+		"term":     content.TermSlug(term),
 	}))
 }
 
@@ -327,33 +328,6 @@ func pathSegments(v string) string {
 		parts = append(parts, part)
 	}
 	return strings.Join(parts, "/")
-}
-
-// slugSegment normalizes a taxonomy or term name for use in a path. Terms are
-// free text, so "Web Dev" has to become a single usable segment.
-func slugSegment(s string) string {
-	var b strings.Builder
-	lastDash := true
-	for _, r := range strings.TrimSpace(s) {
-		switch r {
-		case '/', ' ', '\t':
-			if !lastDash {
-				b.WriteByte('-')
-				lastDash = true
-			}
-		default:
-			b.WriteRune(toLower(r))
-			lastDash = false
-		}
-	}
-	return strings.Trim(b.String(), "-")
-}
-
-func toLower(r rune) rune {
-	if r >= 'A' && r <= 'Z' {
-		return r + ('a' - 'A')
-	}
-	return r
 }
 
 // pathEscape escapes only what a path segment must escape.

@@ -242,6 +242,47 @@ func TestCountTerms(t *testing.T) {
 	}
 }
 
+// Terms with one slug share a page, so they are one term: counted once per
+// item, called the way most items write them, and found however a query
+// writes them. A term with an empty slug has no page and is not counted.
+func TestTermsAreCountedAndFoundBySlug(t *testing.T) {
+	r := fixture(t, 5, func(i int) string {
+		return []string{
+			"tags: [go]\n",
+			"tags: [Go, GO]\n",
+			"tags: [Go]\n",
+			"tags: [Web Dev]\n",
+			"tags: [web-dev, \"/\"]\n",
+		}[i]
+	})
+
+	counts, err := r.CountTerms(t.Context(), "tags", content.Query{})
+	if err != nil {
+		t.Fatalf("CountTerms: %v", err)
+	}
+	want := []content.TermCount{{Taxonomy: "tags", Term: "Go", Count: 3}, {Taxonomy: "tags", Term: "Web Dev", Count: 2}}
+	if !slices.Equal(counts, want) {
+		t.Errorf("counts = %v, want %v", counts, want)
+	}
+
+	for _, spelling := range []string{"go", "GO", " Go "} {
+		page, err := r.Query(t.Context(), content.Query{TermsAny: map[string][]string{"tags": {spelling}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page.Items) != 3 {
+			t.Errorf("TermsAny %q got %v, want the 3 posts carrying Go", spelling, titles(page))
+		}
+	}
+	both, err := r.Query(t.Context(), content.Query{TermsAll: map[string][]string{"tags": {"web dev", "WEB-DEV"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(both.Items) != 2 {
+		t.Errorf("TermsAll got %v, want the 2 posts carrying Web Dev", titles(both))
+	}
+}
+
 func TestGetBySlug(t *testing.T) {
 	r := fixture(t, 3, noExtra)
 	item, err := r.GetBySlug(t.Context(), "post", "post-01")
