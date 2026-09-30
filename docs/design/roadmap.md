@@ -1,6 +1,6 @@
 # Kite 路线图与实现现状
 
-> 状态：持续更新 · 最近核对：2026-09-29
+> 状态：持续更新 · 最近核对：2026-10-01
 > 里程碑的原始定义见 [architecture.md §28 Roadmap](architecture.md#28-roadmap)，验收标准见 [§29](architecture.md#29-每阶段验收标准)。
 > 本文记录的是**对照代码和测试逐项核实后**的进度，不是对计划的复述；有疑问的项都实际运行确认过。
 
@@ -13,8 +13,10 @@
   - front matter 保真：只改标题时，文件的 diff 只有标题这一行；
   - build 和 serve 的输出逐字节一致，预览和最终页面也逐字节一致；
   - 发布只提交本次涉及的文件，不动用户暂存区里的其他改动。
-- **§4 的收尾项只剩第 11 项**：周边仓库建了一半（`website` 和 `lab` 已建，`starters` 和 `setup-kite` 等 v1.0 之后）。第 14 项（部署在带子路径的地址上时站内链接失效）已修复。M4 的端到端验收已在 `kite-plus/website` 上通过（§3）。
-- **M5–M8 都还没开始**，其中 M5 有一部分已经提前做了。后台只显示已经实现的功能；原设计稿里画出的其余功能各自归到哪个阶段见 §6。
+- **§4 的收尾项只剩第 11 项的一部分**：`website`、`lab`、两个主题仓库和四个官方插件仓库都已建好，`starters` 和 `setup-kite` 还没有。第 14 项（部署在带子路径的地址上时站内链接失效）已修复。M4 的端到端验收已在 `kite-plus/website` 上通过（§3）。
+- 首个版本按用户的决定发成 **v0.1.0**（2026-09-27），之后连续发到 v0.1.3（2026-10-01）。
+- **M5 主题契约已完成**：`kite/v1` 于 2026-10-01 冻结，只增不改；菜单写进了契约，主题有了完整的命令行。**M8 插件的第一版提前随 v0.1.0 发布**（页面注入和构建期 WASM 钩子）。M6、M7 还没开始。后台只显示已经实现的功能；原设计稿里画出的其余功能各自归到哪个阶段见 §6。
+- 下一步待规划的是**应用中心**：在后台在线浏览、安装和更新主题与插件，见 [kite-plus/kite#16](https://github.com/kite-plus/kite/issues/16) 和 §5。
 
 ## 2. 各里程碑完成情况
 
@@ -25,10 +27,10 @@
 | **M2** 只读后台 | 完成 | REST API，并从代码生成 OpenAPI；前端请求一律用生成的客户端；React 后台嵌入二进制；列表的筛选、排序、游标分页和搜索；索引一致性的三层机制：文件监听、stat 全树扫描、Git HEAD 哨兵（切分支时只重新索引变化的路径） |
 | **M3** 可写后台 | 完成 | `PUT` + `If-Match` 走 `Apply(ChangeSet)`；在旧版本上保存时返回 409，并给出三方对比；由 schema 驱动的表单，内容字段、主题设置、站点设置共用；可视化编辑器（Tiptap）加 Markdown 源码模式（CodeMirror）；服务端渲染的预览；拖图进 page bundle；站点设置和主题设置页（改 `kite.yaml` 时保留注释和顺序）；`kite doctor --fix-ids` |
 | **M4** Git 发布 | 完成 | 发布前检查：不是仓库、子模块、游离 HEAD、有进行中的 merge/rebase/cherry-pick、缺 git-lfs、文件超出托管平台限制；`git commit --only` 只提交指定路径；`GIT_TERMINAL_PROMPT=0` 加空的 `GIT_ASKPASS`，缺凭据时立刻报错；`.kite/publish.lock` 加 `index.lock` 退避重试；从不强推；DeliveryState 和发布面板；`kite publish` 命令行；`kite init` 生成 GitHub Pages 部署 workflow 和发布定时文章的 `scheduled.yml`；远端有新提交且没有改到同样的文件时一键接到后面推送；hook 拒绝后可跳过 hooks 发布；「已部署」对接 GitHub Pages 的部署状态 |
-| **M5** 主题契约 | 部分提前完成 | `apiVersion` 硬校验和 `requires` 检查；命名空间化的函数；由 `theme.yaml` 生成的主题设置页；`kite theme verify`；后台的主题列表、zip 安装、切换和整站实时预览，以及主题自带的语言包：后台用 `theme` 下的词说明主题，模板用 `T` 说其余的词，站点的语言包盖过主题的。其余见 §5 |
+| **M5** 主题契约 | 完成 | 第二、三套主题按契约写成，各在自己的仓库：文档站主题风标（`theme-vane`）和个人站主题年鉴（`theme-almanac`），写的时候发现的缺口都已补上（列表页的 `Params` 和字数、图片处理、`T` 和语言包、按列表分页、短代码、render hook、声明内容类型）；站点菜单写进契约（`kite.yaml` 的 `menus`、`theme.yaml` 声明、`.Site.Menus`、后台「设置 → 菜单」）；`kite theme list/add/remove/use/new/verify`；契约 `kite/v1` 于 2026-10-01 冻结：模板能调用的每一项连同签名记录在 `internal/render/theme/testdata/kite-v1.txt`，`TestTheContractOnlyGrows` 保证只增不改，[theme-system.md](theme-system.md) §6、§7 按实现逐项写明，§12 定下多语言 URL 策略（路径前缀、默认语言不加），§14 的开放问题都有了结论。风标 1.0 已在本地备好，发布等确认 |
 | **M6** | 未开始 | 构建时已经按 OutputTarget 记录依赖和缓存键，只是跳过判断还没启用 |
 | **M7** | 未开始 | 读模型已按双 Store 设计；单账号认证和 Docker 已提前完成 |
-| **M8** | 未开始 | HookBus 已被内置功能使用 |
+| **M8** | 第一版提前完成 | 随 v0.1.0 发布：`plugin.yaml` 声明的页面注入（`client`）和挂在 HookBus 上的构建期 WASM 钩子（`build`，Extism），后台「系统 → 插件」和 `kite plugin` 命令，四个官方插件（评论、统计、搜索、公式与图表）。见 [plugin-system.md §0.1](plugin-system.md#01-第一版实施方案2026-09-26-定)。`runtime`、`admin` 能力、权限、插件的 lock 表和 SDK 还没做 |
 
 **规划外已完成的：**
 - 单账号登录，带防暴力尝试；
@@ -78,7 +80,7 @@
 | 8 | 主题的 `requires` 只读取、不检查 | **已解决。** 每次加载主题（打开站点、构建、serve）都检查 `requires`：支持 `>=`、`>`、`<=`、`<`、`=`，空格隔开表示同时满足，`||` 表示任一满足，按 semver 比较，预发布版本排在正式版之前。不满足就拒绝加载，并说明主题要求的范围和正在运行的 Kite 版本。从源码构建的版本（`dev` 或提交哈希）不参与比较；`git describe` 生成的「tag 之后又有提交」按那个 tag 比较。测试：`internal/render/theme/requires_test.go` | P2 |
 | 9 | 文章列表不显示「置顶」 | **已解决。** 列表摘要带上 `pinned`，在 SQL 里从存储的 meta 取出（`json_type(meta_json, '$.pinned') = 'true'`），列表仍然不需要逐行解析 meta；只有真正的 `true` 才算置顶，和条目本身的判断一致。文章列表在标题后按设计稿画出琥珀色的「置顶」标记，深色模式有对应的配色。测试：`TestSummariesSayWhichItemsArePinned` | P2 |
 | 10 | 发布的备用路径没有实现 | **已解决。** 按 [architecture.md §16.3](architecture.md#16-git-workflow最高危模块) 的逃生舱实现：在临时 index 里从 HEAD 出发 `git add` 这次发布的路径（clean filter 和 LFS 照常生效），`commit-tree` 生成提交，`update-ref` 以旧值做 CAS 移动分支，最后只更新真实 index 里这几个路径，失败时把分支移回原处。用在 hook 拒绝发布之后：拒绝会报成 `hook_refused` 并带上 hook 的输出，后台提供「跳过 hooks 发布」，命令行是 `kite publish --no-verify`。测试：`internal/publish/git/escape_test.go`、`TestAPublishAHookRefusedCanGoAheadWithoutTheHooks` | P2 |
-| 11 | 周边仓库和文档站没有建 | **部分完成。** 2026-09-23 建了 `website`（公开）：官网和文档，用 `kite init` 生成的站点加两个覆盖主题的模板搭成，推送到 `main` 即部署到 GitHub Pages；文档页来自本仓库的 README 和 `docs/reference.md`，两边要一起改。域名 www.kite.plus 还没指过来，在那之前站点在 `kite-plus.github.io/website/`，而它的 `baseURL` 写的是 www.kite.plus，所以站内链接不可用；第 14 项修复后，也可以先把 `baseURL` 改成这个子路径地址。`lab`（私有）存放设计稿存档：后台和默认主题的原始设计稿，以及各自对应的提交。`starters` 等 M5 有第二套主题，`setup-kite` 等有了第一个 release | P2 |
+| 11 | 周边仓库和文档站没有建 | **大部分完成。** `website`（公开）是官网和文档，用风标主题搭成，由 Vercel 在 www.kite.plus 上构建发布（GitHub Pages 已于 2026-09-27 撤下），文档页来自本仓库的 `README.zh-CN.md` 和 `docs/reference.zh-CN.md`，两边要一起改；`lab`（私有）存放设计稿存档；主题各自一个仓库（`theme-vane`、`theme-almanac`），官方插件各自一个仓库（`plugin-analytics`、`plugin-comments`、`plugin-math`、`plugin-search`）。还没有的：`starters`（M5 已经完成，可以做了）和 `setup-kite`（已有 release，可以做了），建仓库要用户确认 | P2 |
 | 12 | Hugo 里日期在未来的文章会立即公开 | **已解决。** 日期在未来的 `published` 和 `scheduled` 一样，等到发布时间才公开，和 Hugo、Jekyll 的默认做法一致；没有日期的 `published` 仍然立即公开。Kite 把没有 `status` 的文件读成 `published`、把 Hugo 的 `date` 读成发布时间，所以从 Hugo 迁过来的站点，排在未来的文章会按时上线：serve 到点后的第一个请求重新规划页面，静态站点由构建报告的 `next_due` 和 `scheduled.yml` 在到点后一小时内补上。规则在 `Content.IsPublic` 和 SQL 过滤里各有一份，`TestPublicAtAgreesWithIsPublic` 保证两者一致。测试：`TestAPublishedPostDatedLaterWaitsForItsDate`、`TestAScheduledPostIsServedOnceItsTimeComes/published` | P2 |
 | 13 | serve 没有 RSS 和 sitemap | **已解决。** 核对第 12 项时发现：`kite serve` 对 `/rss.xml` 和 `/sitemap.xml` 都返回 404，而每个页面都链接着 RSS。两者由 build 结束时的 completion hook 生成，serve 从来不调用这些 hook；build 和 serve 的比对只看 `.html`，所以一直没被发现。现在 serve 在第一次有请求用到时，用和 build 相同的代码算出每页交给 hook 的信息（不画模板，2000 篇的站点约 120ms，完整构建约 1 秒），跑同一组 hook，结果留在内存里，直到下一次重新规划：文件改动和定时文章到点都会让它重算。同名时 hook 的产物优先于静态文件，和 build 后写覆盖先写一致。测试：`TestServedFilesAreByteIdenticalToBuiltOnes`（改为比较 build 写出的每个文件）、`TestTheFeedFollowsTheSite`、`TestExtrasAreWhatABuildWrites`；`kite theme verify` 也改为比较全部文件 | P2 |
 | 14 | 部署在带子路径的地址上时站内链接失效 | **已解决。** 搭 `website` 时发现：站内链接都从域名根开始，`baseURL` 里的路径被忽略，GitHub Pages 的项目站点（没有自定义域名时在 `user.github.io/repo/` 下）部署出来导航、文章链接、RSS 和图片全部 404。现在 `url.Resolver` 生成的每个链接（文章、首页、列表、分类、term、分页）都以 `baseURL` 的路径开头，`.Permalink`、sitemap 和 RSS 里的绝对地址随之正确；输出文件的位置不变，由托管平台把这段路径映射到发布目录。`kite serve` 在同一路径下预览：访问 `/` 跳到首页，路径以外的地址按 404 处理，漏掉路径的链接在本地就会失效，而不是部署后才发现。主题新增 `url.For`（首页、列表、分类、term）和 `url.Rel`、`url.Abs`（站内任意路径，如 `rss.xml`），默认主题里写死的 `/`、`/posts/`、`/rss.xml` 和拼出来的分类链接都改用它们，导航里作者填的路径也经过 `url.Rel`；顺带修了列表页的 `.Page.RelPermalink`（原来是 `//posts/`）。`kite theme verify` 的夹具站点改为发布在 `/blog/` 下，并报告从域名根开始写的链接。正文里作者自己写的根路径链接（如 `[x](/posts/y/)`）仍原样发布，和 Hugo 一样。测试：`TestABasePathPrefixesEveryLink`、`TestOutputPathIsTheInverseOfTheURL`、`TestASiteUnderAPathLinksWithinIt`、`TestServedFilesAreByteIdenticalToBuiltOnes/path`、`TestASiteUnderAPathIsServedUnderIt`、`TestAThemeThatLinksToTheRootOfTheHostIsCaught` | P1 |
@@ -90,9 +92,10 @@
 | 阶段 | 版本 | 范围 | 已有基础 |
 |---|---|---|---|
 | **1. v1.0 收尾** | v1.0 | §4 的 P0 和 P1 项；另外可以顺手做两个低成本占位：「存储空间」（统计内容目录大小）、版本号旁的「最新」（查询 GitHub Releases）；最后打 `v1.0.0` 标签 | — |
-| **2. M5 主题契约** | v1.1 | 写第二套风格完全不同的主题，并用 `kite theme verify`（已有）检查它：文档站主题风标（原名司南），在它自己的仓库 `kite-plus/theme-vane` 里写（已建，规划在那边的 `docs/design/README.md`），主程序只内置默认主题；`kite theme list/add/new`；菜单（`.Site.Menus`）写入契约；冻结之前要把 [theme-system.md](theme-system.md) §12 i18n 的三件事（尤其是多语言 URL 策略）和 §14 的开放问题定下来；发布 `kite/v1` 和主题开发文档 | 查找顺序、带方法的 RenderContext、命名空间函数、`apiVersion` 和 `requires` 校验、由 settings schema 生成的配置页都已经有了 |
+| **2. M5 主题契约** | 已完成（2026-10-01） | 见 §2。剩下的只有风标 1.0 的发布和 `starters` 仓库，都要用户确认 | — |
 | **3. M6 可重现构建** | v1.2 | `kite.lock`、`kitew`、Cloudflare Pages 部署模板；启用增量构建里的跳过判断 | 依赖记录和缓存键已经有了 |
-| **4. 媒体库**（新增） | v1.5 | 在现有索引上汇总所有 page bundle 里的文件：媒体列表、跨文章复用、找出没人引用的文件、上传入口 | 单篇的附件上传和删除 API 已经有了 |
+| **4. 媒体库**（新增） | v1.5 | 在现有索引上汇总所有 page bundle 里的文件：媒体列表、跨文章复用、找出没人引用的文件、上传入口 | 单篇的附件上传、替换、删除和引用检查已经有了（后台的「附件」，admin-backlog B01） |
+| **应用中心**（新增，待规划） | — | 后台在线浏览、安装、更新和移除主题与插件，命令行按名字安装；索引、信任、来源记录、镜像等问题见 [kite-plus/kite#16](https://github.com/kite-plus/kite/issues/16)。原计划的主题市场和插件注册表在 V4（[architecture.md §32](architecture.md#32-现在不要设计的东西)），用户要求提前规划 | `kite theme add` / `kite plugin add` 和后台的 zip 安装共用同一条安装路径（`PutTheme` / `PutPlugin`），检查和发布都已经有了 |
 | **5. M7 动态模式** | v2.0 | SQLite 作为真相源，写入同一套读模型；`kite migrate` 在文件和数据库之间互转；文章加密和私密文章（只在服务端部署提供）；数据库备份和 `kite export`；Kite 自己存储的评论 | 读模型、单账号认证、Docker 都已经有了 |
 | **6. M8 插件** | v3.0 | 基于 wazero 的 WebAssembly 插件、Host ABI、能力和权限声明、`kite plugin`、插件 SDK | HookBus 已经被内置功能使用 |
 
@@ -104,12 +107,12 @@
 
 | 占位功能 | 做法 | 阶段 |
 |---|---|---|
-| 菜单 | 在 `kite.yaml` 里定义菜单，并写进主题契约 | M5 |
+| 菜单 | 在 `kite.yaml` 里定义菜单，并写进主题契约 | 已完成（后台「设置 → 菜单」） |
 | 附件、上传附件 | 全站媒体库 | v1.5 |
 | 评论、待审核评论、最近评论 | 默认主题内置 Kite Plus 评论，静态和动态模式都能用（§7 第 2 项）；后台的待审核、最近评论和审核操作调用评论服务的站点 API；Giscus、Waline 留给插件的适配器 | 主题：随评论服务 C2；后台：评论服务 C4 |
 | 用户 | 不做多用户：博客只有一个站长，后台只有一个账号（2026-09-26 定），在「设置 → 账户」里管理 | 不做 |
 | 可见性、备份、上次备份 | 文章加密、私密文章和数据库备份都要服务端部署，纯静态部署不提供 | M7 |
-| 插件、插件可更新 | WebAssembly 插件 | M8 |
+| 插件、插件可更新 | 插件第一版已完成（后台「系统 → 插件」）；更新提示随应用中心 | 插件：已完成；更新：应用中心（#16） |
 | 存储空间 | 统计内容目录和上传文件的大小 | 阶段 1 可做 |
 | 版本号旁的「最新」 | 查询 GitHub Releases | 阶段 1 可做 |
 | 总访问量、访问量列、RSS 订阅数 | 纯静态站点自己无法统计。要么接第三方统计服务（如 Umami、Plausible），要么等动态模式按请求统计；RSS 订阅数基本拿不到 | 待定 |
@@ -120,7 +123,7 @@
 1. **静态站点的定时发布怎么触发**：已定。每小时检查一次，下一篇的时间由构建算出，只在有文章到点时才构建和部署（§4 第 2 项）。私有仓库每小时的检查仍按 1 分钟计费，大约每月 720 分钟。
 2. **评论**：已定。默认主题内置 Kite Plus 评论：主题设置里填站点 ID 就启用，为空时不输出任何评论相关的标签和脚本；讨论页用文章的 ULID 标识，改链接不丢评论。它和其他博客用同一套嵌入代码，没有私有通道。评论服务上线（C2）后接入，设计见 [comments sites.md §5.1](https://github.com/kite-plus/comments/blob/main/docs/design/sites.md#51-kite-默认主题)。M7 里「Kite 自己存储的评论」是否还需要，排 M7 时再定。
 3. **访问统计**：接哪一家第三方服务，还是先不做？
-4. **v1.0 标签的时机**：M4 的端到端验收已经通过（§3），原先建议打标签前先修的第 14 项（没有自定义域名的 GitHub Pages 项目站点链接全坏）也已修复，没有技术上的阻碍了。
+4. **v1.0 标签的时机**：用户决定先发 0.1.x（2026-09-27 起 v0.1.0 至 v0.1.3），1.0 的时机另定。技术上没有阻碍：M4 的端到端验收已经通过（§3），第 14 项也已修复，主题契约已冻结。
 
 ## 8. 维护本文
 

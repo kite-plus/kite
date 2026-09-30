@@ -1266,7 +1266,7 @@ Hugo 在 v0.146 不得不重写整个模板系统并打断主题生态 `[EV]`。
 | 多用户、角色、RBAC | 只有一个账号 | 不做（2026-09-26 定） |
 | GraphQL | REST + OpenAPI | 有真实需求再说 |
 | 实时协作 / CRDT | 乐观锁 + 409 三方冲突 | V4+ |
-| Marketplace / Kite Cloud | Admin 走公开 API，为复用留路 | V4 |
+| Marketplace / Kite Cloud | Admin 走公开 API，为复用留路 | V4；其中在线安装主题和插件的应用中心提前规划，见 [kite-plus/kite#16](https://github.com/kite-plus/kite/issues/16) |
 | 增量构建算法、磁盘持久化依赖图、增量重建的并行调度 | 只记录依赖；全量构建按目标并行渲染（每个输出只取决于计划和冻结的时钟，与渲染顺序无关） | M6+ |
 | PostgreSQL / MySQL | 接口按多方言设计，只实现 SQLite | V3 |
 | FTS5 全文检索 | 2k 篇以下用 `LIKE`/`instr`（索引是派生的，schema 随时能改） | 需要时 |
