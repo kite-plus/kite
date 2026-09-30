@@ -1,4 +1,5 @@
 import { Separator } from '@/components/ui/separator'
+import { ReadOnlyNote } from '@/components/read-only-note'
 import { cn } from '@/lib/utils'
 import { PublishBar } from './publish-bar'
 
@@ -8,11 +9,14 @@ type ContentSectionProps = {
   children: React.JSX.Element
   // Kite: the theme gallery needs the whole column, not a form's width.
   wide?: boolean
+  // Kite: writes says the section changes the site, which a server that
+  // takes no changes says it will not do.
+  writes?: boolean
 }
 
 // Kite: a section heads the page, with what is waiting to be published under
 // its title, since the app sidebar is the menu of the sections.
-export function ContentSection({ title, desc, children, wide }: ContentSectionProps) {
+export function ContentSection({ title, desc, children, wide, writes }: ContentSectionProps) {
   return (
     // Positioned, so the scroll area's fade ends at the column's foot, above
     // the studio's footer rather than over it.
@@ -22,6 +26,7 @@ export function ContentSection({ title, desc, children, wide }: ContentSectionPr
         <p className='text-muted-foreground'>{desc}</p>
       </div>
       <Separator className='my-4 flex-none lg:my-6' />
+      {writes && <ReadOnlyNote className='mb-4 flex-none' />}
       <PublishBar />
       <div className='faded-bottom h-full w-full overflow-y-auto scroll-smooth pe-4 pb-12'>
         <div className={cn('-mx-1 px-1.5', !wide && 'lg:max-w-2xl')}>{children}</div>

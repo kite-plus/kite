@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
+import { useWritable } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { usePlugin, useSavePlugins, useSwitchPlugin } from "@/hooks/usePlugins";
 import { useSettingsDraft } from "@/hooks/useSettingsDraft";
@@ -18,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ReadOnlyNote } from "@/components/read-only-note";
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
@@ -39,6 +41,7 @@ export function PluginSettings({ id }: { id: string }) {
   const values = form.values;
   const save = useSavePlugins();
   const flip = useSwitchPlugin();
+  const writable = useWritable();
   const guard = useUnsavedGuard(form.dirty);
 
   const fields = useMemo(() => valueFields(detail?.schema), [detail?.schema]);
@@ -98,7 +101,7 @@ export function PluginSettings({ id }: { id: string }) {
                 {t(detail.enabled ? "plugins.on" : "plugins.off")}
                 <Switch
                   checked={detail.enabled}
-                  disabled={flip.isPending || (!detail.enabled && Boolean(detail.problem))}
+                  disabled={!writable || flip.isPending || (!detail.enabled && Boolean(detail.problem))}
                   onCheckedChange={(enabled) =>
                     flip.mutate(
                       { id, enabled },
@@ -111,6 +114,7 @@ export function PluginSettings({ id }: { id: string }) {
                 />
               </label>
             </PageTitle>
+            <ReadOnlyNote className="max-w-2xl" />
             <PublishBar className="mb-0 lg:mb-0" />
 
             <div className="grid max-w-2xl gap-6">
@@ -143,7 +147,7 @@ export function PluginSettings({ id }: { id: string }) {
                   <p className="text-sm text-muted-foreground">{t("plugins.noSettingsNote")}</p>
                 </div>
               ) : (
-                <>
+                <fieldset disabled={!writable} className="grid gap-6">
                   <SchemaForm
                     fields={detail.schema ?? []}
                     values={values}
@@ -155,16 +159,18 @@ export function PluginSettings({ id }: { id: string }) {
                     }}
                     idPrefix="plugin-"
                   />
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Button onClick={submit} disabled={!form.dirty || problems > 0 || save.isPending}>
-                      {save.isPending && <Spinner />}
-                      {t("settings.save")}
-                    </Button>
-                    {problems > 0 && (
-                      <span className="text-sm text-destructive">{t("customize.problems", { count: problems })}</span>
-                    )}
-                  </div>
-                </>
+                  {writable && (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button onClick={submit} disabled={!form.dirty || problems > 0 || save.isPending}>
+                        {save.isPending && <Spinner />}
+                        {t("settings.save")}
+                      </Button>
+                      {problems > 0 && (
+                        <span className="text-sm text-destructive">{t("customize.problems", { count: problems })}</span>
+                      )}
+                    </div>
+                  )}
+                </fieldset>
               )}
             </div>
           </>

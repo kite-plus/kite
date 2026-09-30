@@ -2,6 +2,7 @@ import { Check, GitMerge, Minus, TriangleAlert, Upload, X, XCircle } from "lucid
 import { cn } from "@/lib/utils";
 
 import { useI18n, useProblem, type Key, type Values } from "@/i18n";
+import { useWritable } from "@/hooks/useContents";
 import type { DeliveryState, RemoteChange, usePublish } from "@/hooks/usePublish";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -138,6 +139,7 @@ export function DeliveryStages({
   publish?: Publish;
 }) {
   const { t } = useI18n();
+  const writable = useWritable();
   const list = steps(delivery, t);
   const current = currentStep(list);
 
@@ -148,7 +150,7 @@ export function DeliveryStages({
           <StepMark standing={step.standing} current={i === current} className="size-4" />
           <span className={cn(i > current && current >= 0 && "text-muted-foreground")}>{step.label}</span>
           {step.note && <span className="ml-auto truncate text-xs text-muted-foreground">{step.note}</span>}
-          {step.key === "pushed" && publish && delivery?.ahead ? (
+          {step.key === "pushed" && publish && writable && delivery?.ahead ? (
             <button
               type="button"
               className={cn("shrink-0 text-xs text-brand hover:underline disabled:opacity-50", !step.note && "ml-auto")}

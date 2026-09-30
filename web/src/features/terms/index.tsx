@@ -13,7 +13,7 @@ import { ArrowUpDown, ExternalLink, List, Merge, MoreHorizontal, Pencil, Trash2 
 
 import type { components } from "@/api/client";
 import { useI18n } from "@/i18n";
-import { useContentTypes, useTaxonomies, useTerms } from "@/hooks/useContents";
+import { useContentTypes, useTaxonomies, useTerms, useWritable } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { followRowLink } from "@/lib/row-link";
@@ -39,6 +39,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
 import { QueryError } from "@/components/query-error";
+import { ReadOnlyNote } from "@/components/read-only-note";
 import { TermBadge } from "@/components/TermBadge";
 import { DEFAULT_PAGE_SIZE } from "@/features/contents/search";
 import { TermDialog, type TermAction, type TermMode } from "./term-dialog";
@@ -142,6 +143,7 @@ export function Terms() {
             </Button>
           )}
         </PageTitle>
+        <ReadOnlyNote />
 
         {terms.error && !terms.data ? (
           <QueryError error={terms.error} onRetry={() => void terms.refetch()} />
@@ -259,6 +261,7 @@ function TermCard({
 }) {
   const { t } = useI18n();
   const kindLabel = useKindLabel();
+  const writable = useWritable();
   const items = { terms: [`${taxonomy}:${term.term}`] };
 
   return (
@@ -294,16 +297,16 @@ function TermCard({
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => onAction("rename")}>
+            <DropdownMenuItem disabled={!writable} onSelect={() => onAction("rename")}>
               <Pencil />
               {t("terms.rename")}
             </DropdownMenuItem>
-            <DropdownMenuItem disabled={!canMerge} onSelect={() => onAction("merge")}>
+            <DropdownMenuItem disabled={!writable || !canMerge} onSelect={() => onAction("merge")}>
               <Merge />
               {t("terms.merge")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={() => onAction("remove")}>
+            <DropdownMenuItem variant="destructive" disabled={!writable} onSelect={() => onAction("remove")}>
               <Trash2 />
               {t("terms.remove")}
             </DropdownMenuItem>

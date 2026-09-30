@@ -105,6 +105,14 @@ export function useSite() {
   return useQuery(siteQuery);
 }
 
+/**
+ * useWritable says whether the server stores changes. It is taken as yes
+ * until the site says otherwise; the server refuses a change either way.
+ */
+export function useWritable(): boolean {
+  return useSite().data?.writable !== false;
+}
+
 /** contentTypesQuery is shared with the route that turns away a kind the project lacks. */
 export const contentTypesQuery = {
   queryKey: ["content-types"],

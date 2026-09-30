@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { api, unwrap } from '@/api/client'
 import { useI18n } from '@/i18n'
-import { useContentTypes, useSite } from '@/hooks/useContents'
+import { useContentTypes, useSite, useWritable } from '@/hooks/useContents'
 import { useKindLabel } from '@/hooks/useKindLabel'
 import { siteHome } from '@/lib/links'
 import { setTheme } from '@/lib/theme'
@@ -52,6 +52,7 @@ export function CommandMenu() {
   const types = useContentTypes()
   const kindLabel = useKindLabel()
   const site = useSite()
+  const writable = useWritable()
 
   const [query, setQuery] = useState('')
   const deferred = useDeferredValue(query.trim())
@@ -92,7 +93,8 @@ export function CommandMenu() {
           ]
     )
   )
-  const kinds = types.data?.items.map((type) => type.kind) ?? []
+  // A server that takes no changes has nothing to write a new item to.
+  const kinds = writable ? (types.data?.items.map((type) => type.kind) ?? []) : []
   const actions: Entry[] = [
     ...kinds.map((kind) => {
       const label = t('list.newKind', { kind: kindLabel.one(kind) })

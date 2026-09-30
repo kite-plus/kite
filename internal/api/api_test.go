@@ -505,6 +505,19 @@ func TestSiteReportsWhatTheIndexRefused(t *testing.T) {
 	}
 }
 
+// The studio shows a read-only server's site without offering the changes it
+// would refuse, so the site says which kind of server it is.
+func TestSiteSaysWhetherItTakesChanges(t *testing.T) {
+	readOnly, _ := newServer(t, newProject(t, 1))
+	if info := get[api.SiteInfo](t, readOnly, api.Prefix+"/site", http.StatusOK); info.Writable {
+		t.Error("a read-only server says it takes changes")
+	}
+	writable, _ := newWritableServer(t, newProject(t, 1))
+	if info := get[api.SiteInfo](t, writable, api.Prefix+"/site", http.StatusOK); !info.Writable {
+		t.Error("a writable server says it does not take changes")
+	}
+}
+
 // The admin is a view of the files, not a second source of truth: an edit
 // made in an editor has to show up without the admin being told.
 func TestListReflectsAnEditMadeOutsideTheAdmin(t *testing.T) {

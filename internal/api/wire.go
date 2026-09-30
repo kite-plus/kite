@@ -148,6 +148,10 @@ type SiteInfo struct {
 	Theme   string `json:"theme,omitempty"`
 	Version string `json:"version,omitempty"`
 
+	// Writable says the server stores what the studio sends. One started
+	// without --write shows the site and refuses every change.
+	Writable bool `json:"writable"`
+
 	// Problems lists content the index refused to load, such as a file with
 	// no id. The admin shows them rather than leaving a file silently absent.
 	Problems []string `json:"problems,omitempty"`

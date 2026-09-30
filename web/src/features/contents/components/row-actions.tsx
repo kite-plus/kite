@@ -15,11 +15,13 @@ import {
 interface Props {
   item: Summary;
   trashed: boolean;
+  /** writable is whether the server takes changes; one that does not can still be read. */
+  writable: boolean;
   onDelete: (item: Summary) => void;
   onRestore: (item: Summary) => void;
 }
 
-export function RowActions({ item, trashed, onDelete, onRestore }: Props) {
+export function RowActions({ item, trashed, writable, onDelete, onRestore }: Props) {
   const { t } = useI18n();
 
   return (
@@ -32,7 +34,7 @@ export function RowActions({ item, trashed, onDelete, onRestore }: Props) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
         {trashed ? (
-          <DropdownMenuItem onClick={() => onRestore(item)}>
+          <DropdownMenuItem disabled={!writable} onClick={() => onRestore(item)}>
             <RotateCcw />
             {t("list.restore")}
           </DropdownMenuItem>
@@ -51,7 +53,7 @@ export function RowActions({ item, trashed, onDelete, onRestore }: Props) {
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={() => onDelete(item)}>
+            <DropdownMenuItem variant="destructive" disabled={!writable} onClick={() => onDelete(item)}>
               <Trash2 />
               {t("editor.delete")}
             </DropdownMenuItem>

@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ExternalLink, Plus } from "lucide-react";
 
 import { useI18n, type Key } from "@/i18n";
-import { useContentTypes, useSite, useTaxonomies } from "@/hooks/useContents";
+import { useContentTypes, useSite, useTaxonomies, useWritable } from "@/hooks/useContents";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSession } from "@/hooks/useSession";
@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
+import { ReadOnlyNote } from "@/components/read-only-note";
 import { RefreshButton } from "@/components/refresh-button";
 import { DeliveryCard, LatestPosts, TopTerms } from "./components/cards";
 import { Overview } from "./components/overview";
@@ -20,6 +21,7 @@ import { StatCards } from "./components/stat-cards";
 export function Dashboard() {
   const { t } = useI18n();
   const site = useSite();
+  const writable = useWritable();
   const session = useSession();
   const types = useContentTypes();
   const taxonomies = useTaxonomies();
@@ -65,13 +67,16 @@ export function Dashboard() {
               {t("nav.viewSite")}
             </a>
           </Button>
-          <Button asChild>
-            <Link to="/content/$kind/$id" params={{ kind: primary, id: "new" }}>
-              <Plus />
-              {t("dashboard.write", { kind: kindLabel.one(primary) })}
-            </Link>
-          </Button>
+          {writable && (
+            <Button asChild>
+              <Link to="/content/$kind/$id" params={{ kind: primary, id: "new" }}>
+                <Plus />
+                {t("dashboard.write", { kind: kindLabel.one(primary) })}
+              </Link>
+            </Button>
+          )}
         </PageTitle>
+        <ReadOnlyNote />
 
         <StatCards kind={primary} />
 

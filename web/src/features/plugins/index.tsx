@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
+import { useWritable } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   installPlugin,
@@ -42,6 +43,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
 import { QueryError } from "@/components/query-error";
+import { ReadOnlyNote } from "@/components/read-only-note";
 import { PublishBar } from "@/features/settings/components/publish-bar";
 
 /**
@@ -55,17 +57,21 @@ export function Plugins() {
   const plugins = usePlugins();
   const upload = useUpload();
   const [removing, setRemoving] = useState<PluginInfo | null>(null);
+  const writable = useWritable();
 
   return (
     <>
       <AppHeader />
       <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
         <PageTitle title={t("nav.plugins")} description={t("plugins.note")}>
-          <Button variant="outline" disabled={upload.busy} onClick={upload.choose}>
-            {upload.busy ? <Spinner /> : <Upload />}
-            {t("plugins.upload")}
-          </Button>
+          {writable && (
+            <Button variant="outline" disabled={upload.busy} onClick={upload.choose}>
+              {upload.busy ? <Spinner /> : <Upload />}
+              {t("plugins.upload")}
+            </Button>
+          )}
         </PageTitle>
+        <ReadOnlyNote />
         <PublishBar className="mb-0 lg:mb-0" />
 
         {plugins.error && !plugins.data ? (
@@ -80,7 +86,7 @@ export function Plugins() {
             {plugins.data.map((plugin) => (
               <PluginCard key={plugin.id} plugin={plugin} onRemove={() => setRemoving(plugin)} />
             ))}
-            <UploadTile upload={upload} empty={plugins.data.length === 0} />
+            {writable && <UploadTile upload={upload} empty={plugins.data.length === 0} />}
           </div>
         )}
 
@@ -116,6 +122,7 @@ function PluginCard({ plugin, onRemove }: { plugin: PluginInfo; onRemove: () => 
   const { t } = useI18n();
   const problem = useProblem();
   const flip = useSwitchPlugin();
+  const writable = useWritable();
 
   const toggle = (enabled: boolean) =>
     flip.mutate(
@@ -174,7 +181,7 @@ function PluginCard({ plugin, onRemove }: { plugin: PluginInfo; onRemove: () => 
         </div>
         <Switch
           checked={plugin.enabled}
-          disabled={flip.isPending || (!plugin.enabled && Boolean(plugin.problem))}
+          disabled={!writable || flip.isPending || (!plugin.enabled && Boolean(plugin.problem))}
           onCheckedChange={toggle}
           aria-label={t(plugin.enabled ? "plugins.turnOff" : "plugins.turnOn", { plugin: plugin.name })}
         />
@@ -194,6 +201,7 @@ function PluginCard({ plugin, onRemove }: { plugin: PluginInfo; onRemove: () => 
             </a>
           </Button>
         )}
+        {writable && (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="ms-auto size-8" aria-label={t("themes.more")}>
@@ -207,6 +215,7 @@ function PluginCard({ plugin, onRemove }: { plugin: PluginInfo; onRemove: () => 
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        )}
       </div>
     </article>
   );

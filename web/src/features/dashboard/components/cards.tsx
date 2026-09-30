@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { useI18n, useProblem } from "@/i18n";
-import { useLatest, useTerms } from "@/hooks/useContents";
+import { useLatest, useTerms, useWritable } from "@/hooks/useContents";
 import { useKindLabel, useTaxonomyLabel } from "@/hooks/useKindLabel";
 import { canPublish, useDelivery, usePublish, type DeliveryState } from "@/hooks/usePublish";
 import { isoDate } from "@/lib/dates";
@@ -150,6 +150,7 @@ function DeliveryOverview({ delivery: d }: { delivery: DeliveryState }) {
   const { t } = useI18n();
   const publish = usePublish([]);
   const [publishing, setPublishing] = useState(false);
+  const writable = useWritable();
   const dirty = d.dirty ?? [];
 
   return (
@@ -169,12 +170,12 @@ function DeliveryOverview({ delivery: d }: { delivery: DeliveryState }) {
           )}
         </div>
       )}
-      {dirty.length > 0 ? (
+      {dirty.length > 0 && writable ? (
         <Button size="sm" className="justify-self-start" onClick={() => setPublishing(true)}>
           <Upload />
           {t("publish.publishAll", { count: dirty.length })}
         </Button>
-      ) : d.ahead ? (
+      ) : d.ahead && writable ? (
         <Button
           size="sm"
           className="justify-self-start"

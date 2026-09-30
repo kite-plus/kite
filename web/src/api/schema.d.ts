@@ -972,6 +972,7 @@ export interface components {
             theme?: string;
             title: string;
             version?: string;
+            writable: boolean;
         };
         SiteSettings: {
             author?: string;

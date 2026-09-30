@@ -109,6 +109,8 @@ export const zhCN: Record<keyof typeof en, string> = {
   "session.signOutNote": "退出后需要重新登录才能使用后台。",
   "session.role": "站长",
   "session.local": "本地模式",
+  "session.readOnly": "只读",
+  "session.readOnlyNote": "服务器没有以 --write 启动，这里可以浏览和预览，但不能保存修改。",
   "session.checking": "正在检查登录状态",
   "session.retry": "重试",
   "error.notFound": "页面不存在",

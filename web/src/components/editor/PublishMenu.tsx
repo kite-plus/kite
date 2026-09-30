@@ -28,6 +28,7 @@ export function PublishMenu({
   delivery,
   publish,
   onDelete,
+  disabled,
 }: {
   draft: Draft;
   onEdit: (patch: Partial<Draft>) => void;
@@ -35,6 +36,8 @@ export function PublishMenu({
   publish: ReturnType<typeof usePublish>;
   /** onDelete is absent until the item is saved. */
   onDelete?: () => void;
+  /** disabled shows the status without offering to change it. */
+  disabled?: boolean;
 }) {
   const { t, date } = useI18n();
   const [open, setOpen] = useState(false);
@@ -47,7 +50,7 @@ export function PublishMenu({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="relative h-8 gap-1.5 px-2.5">
+        <Button variant="outline" size="sm" className="relative h-8 gap-1.5 px-2.5" disabled={disabled}>
           <span className="sr-only">{t("editor.publishing")}</span>
           {/* On a phone the status shows by its icon and color alone. */}
           <Icon className={cn("size-3.5", tone)} />

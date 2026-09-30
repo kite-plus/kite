@@ -36,6 +36,8 @@ interface Props {
   /** onExitTop is up from the first line, which leaves the body for what is above it. */
   onExitTop?: () => void;
   onReady?: (editor: Editor | null) => void;
+  /** editable is false on a server that takes no changes, where the body is only read. */
+  editable?: boolean;
 }
 
 /** alt is a file's name without its extension, which is the best guess there is. */
@@ -62,6 +64,7 @@ export function RichEditor({
   onUploadError,
   onExitTop,
   onReady,
+  editable = true,
 }: Props) {
   // Read through a ref so the extensions, built once, always see the latest.
   const current = { placeholder, base, home, slash, labels, upload, onUploadError, onChange, onExitTop, onReady };
@@ -160,6 +163,10 @@ export function RichEditor({
       latest.current.onChange(emitted.current);
     },
   });
+
+  useEffect(() => {
+    editor.setEditable(editable, false);
+  }, [editor, editable]);
 
   useEffect(() => {
     instance.current = editor;

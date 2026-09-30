@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem, type Key } from "@/i18n";
-import { useContentTypes, useSite } from "@/hooks/useContents";
+import { useContentTypes, useSite, useWritable } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useFoldedSidebar } from "@/hooks/useFoldedSidebar";
 import { useItem } from "@/hooks/useItem";
@@ -21,6 +21,7 @@ import { stored } from "@/lib/uploads";
 import { cn } from "@/lib/utils";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ReadOnlyNote } from "@/components/read-only-note";
 import { AppHeader } from "@/components/layout/app-header";
 import { Header } from "@/components/layout/header";
 import { Main } from "@/components/layout/main";
@@ -70,6 +71,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   // Images named from the site's root are shown under its path, so the body
   // waits for the site as it does for the item.
   const site = useSite();
+  const writable = useWritable();
   const home = siteHome(site.data);
   // A new item moves to its own address once its first save gives it an id,
   // whichever save that was: the button, a shortcut, an upload or its own.
@@ -462,6 +464,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             delivery={delivery.data}
             publish={publish}
             onDelete={id ? () => setRemoving(true) : undefined}
+            disabled={!writable}
           />
           <Button
             variant="outline"
@@ -473,7 +476,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             {t("editor.preview")}
           </Button>
 
-          {canPublish(delivery.data) ? (
+          {!writable ? null : canPublish(delivery.data) ? (
             <>
               <Button
                 variant="outline"
@@ -501,6 +504,12 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           )}
         </div>
       </Header>
+
+      {!writable && (
+        <div className="border-b px-4 py-2">
+          <ReadOnlyNote />
+        </div>
+      )}
 
       {(item.error || uploadError) && (
         <div className="border-b px-4 py-2">
@@ -546,6 +555,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             onPickImage={pick}
             base={item.base?.url}
             home={home}
+            readOnly={!writable}
           />
 
           {mode === "source" && lost.length > 0 && (
@@ -568,7 +578,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
           <div ref={scroller} className="min-h-0 flex-1 overflow-auto">
             <div className="kite-editor-page">
               {/* The head reads as the item's page opens: cover, title, summary. */}
-              <div className="group/head">
+              <fieldset disabled={!writable} className="group/head">
                 {cover && (
                   <CoverField
                     value={meta[cover.key] === false ? false : text(cover.key)}
@@ -615,7 +625,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                   />
                 )}
                 <Properties draft={draft} type={type} fields={others} uploads={uploads} onEdit={item.edit} />
-              </div>
+              </fieldset>
               {mode === "visual" ? (
                 <RichEditor
                   value={draft.body}
@@ -633,14 +643,16 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                   onUploadError={setUploadError}
                   onExitTop={aboveText}
                   onReady={setRich}
+                  editable={writable}
                 />
               ) : (
                 <SourceEditor
                   value={draft.body}
                   onChange={(body) => item.edit({ body })}
                   placeholder={t("editor.bodyPlaceholder")}
-                  onDropFiles={attach}
+                  onDropFiles={writable ? attach : undefined}
                   onExitTop={aboveText}
+                  readOnly={!writable}
                   onReady={(handle) => {
                     source.current = handle;
                   }}

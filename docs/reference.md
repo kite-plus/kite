@@ -101,9 +101,10 @@ kite openapi > openapi.json
 ```
 
 `--admin` serves it and `--write` allows it to change the project; without
-`--write` the same API is read-only. The studio's typed client is generated
-from that description and checked in CI, so the types it compiles against
-cannot describe an API the server does not serve.
+`--write` the same API is read-only, and the studio says so beside the site's
+name and offers only what can be read and previewed. The studio's typed
+client is generated from that description and checked in CI, so the types it
+compiles against cannot describe an API the server does not serve.
 
 ## Themes
 

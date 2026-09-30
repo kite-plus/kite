@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Annotation, EditorState } from "@codemirror/state";
+import { Annotation, Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderText } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
@@ -24,7 +24,12 @@ interface Props {
   /** onExitTop is up from the first line, which leaves the text for what is above it. */
   onExitTop?: () => void;
   onReady?: (handle: SourceHandle | null) => void;
+  /** readOnly shows the text without taking edits, on a server that takes no changes. */
+  readOnly?: boolean;
 }
+
+/** locked is what keeps an editor from being typed in, or lets it be. */
+const locked = (on: boolean) => [EditorState.readOnly.of(on), EditorView.editable.of(!on)];
 
 // Marks a document swapped in by this component, which is not an author's edit.
 const loaded = Annotation.define<boolean>();
@@ -66,9 +71,10 @@ const theme = EditorView.theme({
  * It formats nothing on the author's behalf: this is where footnotes, raw
  * html and anything else the visual editor cannot hold are edited by hand.
  */
-export function SourceEditor({ value, onChange, placeholder, onDropFiles, onExitTop, onReady }: Props) {
+export function SourceEditor({ value, onChange, placeholder, onDropFiles, onExitTop, onReady, readOnly = false }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView>(null);
+  const editing = useRef(new Compartment());
 
   // Read through refs so a new callback does not rebuild the editor.
   const emit = useRef(onChange);
@@ -108,6 +114,7 @@ export function SourceEditor({ value, onChange, placeholder, onDropFiles, onExit
           syntaxHighlighting(highlight),
           placeholderText(placeholder ?? ""),
           EditorView.lineWrapping,
+          editing.current.of(locked(readOnly)),
           EditorView.updateListener.of((update) => {
             if (!update.docChanged) return;
             if (update.transactions.some((tr) => tr.annotation(loaded))) return;
@@ -137,6 +144,10 @@ export function SourceEditor({ value, onChange, placeholder, onDropFiles, onExit
     // Built once; later values arrive through the sync below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    view.current?.dispatch({ effects: editing.current.reconfigure(locked(readOnly)) });
+  }, [readOnly]);
 
   // Replaced only when it differs, so typing never moves the cursor. A
   // difference of surrounding blank lines is the store's own tidying of what

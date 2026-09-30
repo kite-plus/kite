@@ -1,5 +1,6 @@
 import type { Settings } from "@/api/client";
 import { useI18n, type Key } from "@/i18n";
+import { useWritable } from "@/hooks/useContents";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,19 +50,20 @@ type Values = ReturnType<typeof read>;
 export function SiteSettings() {
   const { t } = useI18n();
   const form = useSettingsForm(read, (key) => paths[key]);
+  const writable = useWritable();
   const values = form.values as Partial<Values>;
   const set = (key: keyof Values, value: unknown) => form.change({ ...values, [key]: value });
   const text = (key: keyof Values) => (value: string) => set(key, value === "" ? null : value);
   const count = (key: keyof Values) => (value: string) => set(key, value === "" ? null : Number(value));
 
   return (
-    <ContentSection title={t("settings.site")} desc={t("settings.siteNote")}>
+    <ContentSection title={t("settings.site")} desc={t("settings.siteNote")} writes>
       <div>
         <FormProblem form={form} />
         {!form.loaded ? (
           <Skeleton className="h-72 w-full" />
         ) : (
-          <div className="grid gap-10">
+          <fieldset disabled={!writable} className="grid gap-10">
             <Group title={t("settings.groupBasics")}>
               <Row id="title" label="settings.siteTitle">
                 <Input id="title" value={values.title ?? ""} onChange={(event) => set("title", event.target.value)} />
@@ -168,7 +170,7 @@ export function SiteSettings() {
             <div>
               <SaveButton form={form} />
             </div>
-          </div>
+          </fieldset>
         )}
         <LeaveGuard form={form} />
       </div>

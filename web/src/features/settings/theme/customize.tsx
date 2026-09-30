@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { ApiError, type Field } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
-import { useContentTypes, useLatest, useSite } from "@/hooks/useContents";
+import { useContentTypes, useLatest, useSite, useWritable } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useFoldedSidebar } from "@/hooks/useFoldedSidebar";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -30,6 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ReadOnlyNote } from "@/components/read-only-note";
 import { Header } from "@/components/layout/header";
 import { SchemaForm, type Uploads } from "@/components/SchemaForm";
 import { usePreviewWidth, WidthToggle } from "@/components/editor/Preview";
@@ -49,6 +50,7 @@ export function ThemeCustomizer({ name, section }: { name: string; section?: str
   const navigate = useNavigate();
   const theme = useTheme(name);
   const detail = theme.data;
+  const writable = useWritable();
   useDocumentTitle(t("customize.title", { theme: detail?.title ?? name }));
 
   const form = useSettingsDraft(detail?.values, detail?.revision);
@@ -205,6 +207,7 @@ export function ThemeCustomizer({ name, section }: { name: string; section?: str
 
   const alerts = (
     <>
+      <ReadOnlyNote />
       {said && (
         <Alert variant="destructive">
           <XCircle />
@@ -251,7 +254,7 @@ export function ThemeCustomizer({ name, section }: { name: string; section?: str
         <h2 className="text-lg font-semibold">{current.label || current.key}</h2>
         {current.help && <p className="mt-1 text-sm text-muted-foreground">{current.help}</p>}
       </div>
-      <div data-section-form>
+      <fieldset data-section-form disabled={!writable}>
         <SchemaForm
           key={current.key}
           fields={current.fields ?? []}
@@ -260,7 +263,7 @@ export function ThemeCustomizer({ name, section }: { name: string; section?: str
           uploads={uploads}
           onReset={reset}
         />
-      </div>
+      </fieldset>
     </div>
   );
 
@@ -364,7 +367,7 @@ export function ThemeCustomizer({ name, section }: { name: string; section?: str
             <TooltipContent>{open ? t("customize.hidePreview") : t("customize.showPreview")}</TooltipContent>
           </Tooltip>
         )}
-        {!detail.problem && values && fields.length > 0 && (
+        {writable && !detail.problem && values && fields.length > 0 && (
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={t("themes.more")}>
@@ -379,14 +382,16 @@ export function ThemeCustomizer({ name, section }: { name: string; section?: str
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        <Button
-          size="sm"
-          disabled={!values || problems > 0 || save.isPending || !!detail.problem || (!form.dirty && !trying)}
-          onClick={submit}
-        >
-          {save.isPending && <Spinner />}
-          {trying ? t("customize.use") : t("customize.save")}
-        </Button>
+        {writable && (
+          <Button
+            size="sm"
+            disabled={!values || problems > 0 || save.isPending || !!detail.problem || (!form.dirty && !trying)}
+            onClick={submit}
+          >
+            {save.isPending && <Spinner />}
+            {trying ? t("customize.use") : t("customize.save")}
+          </Button>
+        )}
       </Header>
 
       {wide ? (

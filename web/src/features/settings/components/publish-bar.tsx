@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CloudUpload, Upload } from "lucide-react";
 
 import { useI18n } from "@/i18n";
+import { useWritable } from "@/hooks/useContents";
 import { canPublish, useDelivery } from "@/hooks/usePublish";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,8 +19,9 @@ export function PublishBar({ className }: { className?: string }) {
   const { t } = useI18n();
   const delivery = useDelivery();
   const [open, setOpen] = useState(false);
+  const writable = useWritable();
   const paths = settingsPaths(delivery.data?.dirty ?? []);
-  if (!canPublish(delivery.data) || paths.length === 0) return null;
+  if (!writable || !canPublish(delivery.data) || paths.length === 0) return null;
 
   return (
     <>

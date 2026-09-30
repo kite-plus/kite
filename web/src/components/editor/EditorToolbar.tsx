@@ -54,6 +54,8 @@ interface Props {
   onMode: (mode: Mode) => void;
   /** onPickImage asks for a file to put in the markdown, in source mode. */
   onPickImage: () => void;
+  /** readOnly leaves only the switch between the two views, for a body that is only read. */
+  readOnly?: boolean;
   /** base is the item's own address, which links in the body are relative to. */
   base?: string;
   /** home is the path the site is previewed at, which links from its root are under. */
@@ -112,7 +114,7 @@ const extra = (label: Key) => extras.find((each) => each.label === label)!;
  * the markdown switch at the far end. Where the bar is too narrow, as beside
  * the preview, the extra tools move into a More menu rather than off its edge.
  */
-export function EditorToolbar({ editor, mode, onMode, onPickImage, base, home }: Props) {
+export function EditorToolbar({ editor, mode, onMode, onPickImage, base, home, readOnly }: Props) {
   const { t } = useI18n();
   const isMobile = useIsBreakpoint();
   const bar = useRef<HTMLDivElement>(null);
@@ -158,7 +160,17 @@ export function EditorToolbar({ editor, mode, onMode, onPickImage, base, home }:
   );
 
   let content;
-  if (!editor) {
+  if (readOnly) {
+    content = (
+      <>
+        <ToolbarGroup>
+          <span className="kite-toolbar-note">{t("session.readOnly")}</span>
+        </ToolbarGroup>
+        <Spacer />
+        {end()}
+      </>
+    );
+  } else if (!editor) {
     content = (
       <>
         <ToolbarGroup>

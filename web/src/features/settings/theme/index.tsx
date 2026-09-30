@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 import { ApiError, type ThemeInfo } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
-import { useSite } from "@/hooks/useContents";
+import { useSite, useWritable } from "@/hooks/useContents";
 import { useSettings } from "@/hooks/useSettings";
 import {
   installTheme,
@@ -52,12 +52,13 @@ export function Themes() {
   const [using, setUsing] = useState<ThemeInfo | null>(null);
   const [removing, setRemoving] = useState<ThemeInfo | null>(null);
   const upload = useUpload();
+  const writable = useWritable();
 
   const active = themes.data?.find((theme) => theme.active);
   const others = themes.data?.filter((theme) => !theme.active) ?? [];
 
   return (
-    <ContentSection title={t("themes.title")} desc={t("themes.description")} wide>
+    <ContentSection title={t("themes.title")} desc={t("themes.description")} wide writes>
       <div className="grid gap-8">
         {themes.error && !themes.data ? (
           <QueryError error={themes.error} onRetry={() => void themes.refetch()} />
@@ -76,21 +77,24 @@ export function Themes() {
                   {t("themes.others")}
                   <span className="ms-1.5 font-normal text-muted-foreground tabular-nums">{others.length}</span>
                 </h4>
-                <Button variant="outline" size="sm" disabled={upload.busy} onClick={upload.choose}>
-                  {upload.busy ? <Spinner /> : <Upload />}
-                  {t("themes.upload")}
-                </Button>
+                {writable && (
+                  <Button variant="outline" size="sm" disabled={upload.busy} onClick={upload.choose}>
+                    {upload.busy ? <Spinner /> : <Upload />}
+                    {t("themes.upload")}
+                  </Button>
+                )}
               </div>
               <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(15rem,1fr))]">
                 {others.map((theme) => (
                   <ThemeCard
                     key={theme.name}
                     theme={theme}
+                    writable={writable}
                     onUse={() => setUsing(theme)}
                     onRemove={() => setRemoving(theme)}
                   />
                 ))}
-                <UploadTile upload={upload} empty={others.length === 0} />
+                {writable && <UploadTile upload={upload} empty={others.length === 0} />}
               </div>
             </section>
           </>
@@ -239,7 +243,18 @@ function ProblemNote({ problem }: { problem: string }) {
   );
 }
 
-function ThemeCard({ theme, onUse, onRemove }: { theme: ThemeInfo; onUse: () => void; onRemove: () => void }) {
+function ThemeCard({
+  theme,
+  writable,
+  onUse,
+  onRemove,
+}: {
+  theme: ThemeInfo;
+  /** writable is whether the server takes changes; one that does not only shows its themes. */
+  writable: boolean;
+  onUse: () => void;
+  onRemove: () => void;
+}) {
   const { t } = useI18n();
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border bg-card">
@@ -276,12 +291,12 @@ function ThemeCard({ theme, onUse, onRemove }: { theme: ThemeInfo; onUse: () => 
                 {t("themes.preview")}
               </Link>
             </Button>
-            <Button size="sm" onClick={onUse}>
+            <Button size="sm" disabled={!writable} onClick={onUse}>
               {t("themes.use")}
             </Button>
           </>
         )}
-        {!theme.builtin && (
+        {!theme.builtin && writable && (
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="ms-auto size-8" aria-label={t("themes.more")}>

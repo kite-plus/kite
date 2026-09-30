@@ -12,6 +12,7 @@ import {
   useContentTypes,
   useStatusCounts,
   useTermsOf,
+  useWritable,
 } from "@/hooks/useContents";
 import {
   useDeleteItems,
@@ -31,6 +32,7 @@ import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { QueryError } from "@/components/query-error";
+import { ReadOnlyNote } from "@/components/read-only-note";
 import { statuses } from "@/components/StatusLabel";
 import { useContentsColumns } from "./components/contents-columns";
 import { ContentsTable } from "./components/contents-table";
@@ -169,10 +171,12 @@ export function ContentList() {
       latestBatch.current("restore", [{ id: item.id, revision: item.revision, title: item.title }]),
     [],
   );
+  const writable = useWritable();
   const columns = useContentsColumns({
     sortable,
     taxonomies,
     trashed,
+    writable,
     chosenTerms,
     onTerm,
     onDelete,
@@ -234,16 +238,19 @@ export function ContentList() {
                   ) : null}
                 </Link>
               </Button>
-              <Button asChild>
-                <Link to="/content/$kind/$id" params={{ kind, id: "new" }}>
-                  <Plus />
-                  {t("list.newKind", { kind: kindLabel.one(kind) })}
-                </Link>
-              </Button>
+              {writable && (
+                <Button asChild>
+                  <Link to="/content/$kind/$id" params={{ kind, id: "new" }}>
+                    <Plus />
+                    {t("list.newKind", { kind: kindLabel.one(kind) })}
+                  </Link>
+                </Button>
+              )}
             </>
           )}
         </PageTitle>
 
+        <ReadOnlyNote />
         <IndexProblems />
 
         {batchResult && (
@@ -310,19 +317,21 @@ export function ContentList() {
                     </p>
                     <p className="text-sm text-muted-foreground">{t("list.emptyNote")}</p>
                   </div>
-                  <Button asChild size="sm">
-                    <Link to="/content/$kind/$id" params={{ kind, id: "new" }}>
-                      <Plus />
-                      {t("list.newKind", { kind: kindLabel.one(kind) })}
-                    </Link>
-                  </Button>
+                  {writable && (
+                    <Button asChild size="sm">
+                      <Link to="/content/$kind/$id" params={{ kind, id: "new" }}>
+                        <Plus />
+                        {t("list.newKind", { kind: kindLabel.one(kind) })}
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <span className="text-muted-foreground">{t("list.empty")}</span>
               )
             }
             bulkActions={(selected) =>
-              trashed ? (
+              !writable ? null : trashed ? (
                 <Button
                   variant="outline"
                   size="sm"
