@@ -354,9 +354,23 @@ type Settings struct {
 	Build BuildSettings `json:"build"`
 	Theme ThemeSettings `json:"theme"`
 
+	// Menus are the site's menus by name. Which of them the theme draws, and
+	// how deep, is in Theme.Menus.
+	Menus map[string][]MenuEntry `json:"menus"`
+
 	// Writable lists the paths this API accepts, so a client can tell what it
 	// may offer rather than discovering it by being refused.
 	Writable []string `json:"writable"`
+}
+
+// MenuEntry is one link of a site's menu, as kite.yaml holds it.
+type MenuEntry struct {
+	Name string `json:"name"`
+	// URL is a path within the site, such as /about/, or a full address. It
+	// is empty for an entry that only heads its children.
+	URL      string         `json:"url,omitempty"`
+	Params   map[string]any `json:"params,omitempty"`
+	Children []MenuEntry    `json:"children,omitempty"`
 }
 
 // SiteSettings is the site's own description.
@@ -392,6 +406,18 @@ type ThemeSettings struct {
 	Name   string         `json:"name"`
 	Schema schema.Schema  `json:"schema,omitempty"`
 	Values map[string]any `json:"values,omitempty"`
+	// Menus are the menus the theme draws, which the site fills in.
+	Menus []ThemeMenu `json:"menus,omitempty"`
+}
+
+// ThemeMenu is a menu a theme draws.
+type ThemeMenu struct {
+	Name        string `json:"name"`
+	Label       string `json:"label,omitempty"`
+	Description string `json:"description,omitempty"`
+	// Depth is how many levels of links the theme draws, 1 for a row of
+	// links.
+	Depth int `json:"depth"`
 }
 
 // ThemeInfo describes an installed theme.

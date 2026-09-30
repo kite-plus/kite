@@ -17,6 +17,8 @@ title: Paper
 description: A quiet theme.
 layouts:
   - {name: links, label: Links, description: Cards of links.}
+menus:
+  - {name: main, label: Header, description: Links across the top.}
 settings:
   - key: look
     type: section
@@ -50,6 +52,8 @@ const zhPack = `theme:
         github: {label: GitHub 主页}
   layouts:
     links: {label: 友链}
+  menus:
+    main: {label: 页头}
 read_more: 阅读全文
 `
 
@@ -93,6 +97,9 @@ func TestAThemeIsDescribedInThePacksLanguage(t *testing.T) {
 	}
 	if m.Layouts[0].Label != "友链" || m.Layouts[0].Description != "Cards of links." {
 		t.Errorf("layout = %+v", m.Layouts[0])
+	}
+	if m.Menus[0].Label != "页头" || m.Menus[0].Description != "Links across the top." {
+		t.Errorf("menu = %+v", m.Menus[0])
 	}
 }
 
@@ -195,6 +202,10 @@ func TestTheBuiltInThemeSpeaksTheAdminsLanguages(t *testing.T) {
 	for i, l := range english.Layouts {
 		same("layout "+l.Name, l.Label, chinese.Layouts[i].Label)
 		same("layout "+l.Name+" description", l.Description, chinese.Layouts[i].Description)
+	}
+	for i, menu := range english.Menus {
+		same("menu "+menu.Name, menu.Label, chinese.Menus[i].Label)
+		same("menu "+menu.Name+" description", menu.Description, chinese.Menus[i].Description)
 	}
 	if _, ok := th.ScreenshotPath(); !ok {
 		t.Error("the built-in theme has no screenshot")

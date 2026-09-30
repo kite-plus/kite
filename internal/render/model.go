@@ -34,6 +34,9 @@ type SiteInfo struct {
 	Taxonomies    []string
 	Version       string
 
+	// Menus hold each menu's links with their addresses resolved.
+	Menus map[string][]MenuEntry
+
 	Author     string
 	Keywords   []string
 	NoIndex    bool
@@ -51,6 +54,15 @@ type SiteInfo struct {
 	Build bool
 }
 
+// MenuEntry is one link of a site's menu, its URL resolved as url.Rel would
+// resolve it.
+type MenuEntry struct {
+	Name     string
+	URL      string
+	Params   map[string]any
+	Children []MenuEntry
+}
+
 type siteModel struct{ info SiteInfo }
 
 // NewSite returns the Site view of a site description.
@@ -63,13 +75,21 @@ func (s siteModel) Language() string              { return s.info.Language }
 func (s siteModel) Params() map[string]any        { return maps.Clone(s.info.Params) }
 func (s siteModel) ThemeSettings() map[string]any { return maps.Clone(s.info.ThemeSettings) }
 func (s siteModel) Taxonomies() []string          { return slices.Clone(s.info.Taxonomies) }
-func (s siteModel) Author() string                { return s.info.Author }
-func (s siteModel) Keywords() []string            { return slices.Clone(s.info.Keywords) }
-func (s siteModel) NoIndex() bool                 { return s.info.NoIndex }
-func (s siteModel) BuildTime() time.Time          { return in(s.info.BuildTime, s.info.Location) }
-func (s siteModel) Version() string               { return s.info.Version }
-func (s siteModel) IsBuild() bool                 { return s.info.Build }
-func (s siteModel) IsServe() bool                 { return !s.info.Build }
+
+func (s siteModel) Menus() map[string][]MenuItem {
+	out := make(map[string][]MenuItem, len(s.info.Menus))
+	for name, entries := range s.info.Menus {
+		out[name] = menuItems(entries)
+	}
+	return out
+}
+func (s siteModel) Author() string       { return s.info.Author }
+func (s siteModel) Keywords() []string   { return slices.Clone(s.info.Keywords) }
+func (s siteModel) NoIndex() bool        { return s.info.NoIndex }
+func (s siteModel) BuildTime() time.Time { return in(s.info.BuildTime, s.info.Location) }
+func (s siteModel) Version() string      { return s.info.Version }
+func (s siteModel) IsBuild() bool        { return s.info.Build }
+func (s siteModel) IsServe() bool        { return !s.info.Build }
 
 // The site's own code is written by whoever runs it, so it is trusted as the
 // theme's templates are.
@@ -82,6 +102,24 @@ func in(t time.Time, loc *time.Location) time.Time {
 		return t
 	}
 	return t.In(loc)
+}
+
+type menuModel struct{ e MenuEntry }
+
+func (m menuModel) Name() string           { return m.e.Name }
+func (m menuModel) URL() string            { return m.e.URL }
+func (m menuModel) Params() map[string]any { return maps.Clone(m.e.Params) }
+func (m menuModel) Children() []MenuItem   { return menuItems(m.e.Children) }
+
+func menuItems(entries []MenuEntry) []MenuItem {
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make([]MenuItem, len(entries))
+	for i, e := range entries {
+		out[i] = menuModel{e}
+	}
+	return out
 }
 
 type headingModel struct{ h markdown.Heading }

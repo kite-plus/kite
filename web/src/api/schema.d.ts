@@ -815,6 +815,14 @@ export interface components {
             bundle: boolean;
             items: components["schemas"]["Media"][];
         };
+        MenuEntry: {
+            children?: components["schemas"]["MenuEntry"][];
+            name: string;
+            params?: {
+                [key: string]: unknown;
+            };
+            url?: string;
+        };
         Option: {
             label: string;
             value: string;
@@ -949,6 +957,9 @@ export interface components {
         };
         Settings: {
             build: components["schemas"]["BuildSettings"];
+            menus: {
+                [key: string]: components["schemas"]["MenuEntry"][];
+            };
             site: components["schemas"]["SiteSettings"];
             theme: components["schemas"]["ThemeSettings"];
             writable: string[];
@@ -1131,7 +1142,14 @@ export interface components {
             next_cursor?: string;
             total?: number;
         };
+        ThemeMenu: {
+            depth: number;
+            description?: string;
+            label?: string;
+            name: string;
+        };
         ThemeSettings: {
+            menus?: components["schemas"]["ThemeMenu"][];
             name: string;
             schema?: components["schemas"]["Field"][];
             values?: {

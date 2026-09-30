@@ -228,6 +228,40 @@ offers that kind of item and previews the page with it. It is then drawn with `l
 theme cannot declare a layout it has no template for, and a page naming a
 layout the active theme lacks keeps its type's own template.
 
+A site's menus live in `kite.yaml`, apart from any theme, so another theme
+finds them where they were. An address within the site is written from the
+site's root and published under its base path:
+
+```yaml
+menus:
+  main:
+    - name: Archive
+      url: /posts/
+    - name: About
+      url: /about/
+    - name: Elsewhere        # a link that only heads others
+      children:
+        - {name: Code, url: "https://github.com/someone"}
+```
+
+A theme names the menus it draws in `theme.yaml`, and how many levels of each,
+and the studio's Menus page offers those to fill in, with pages and posts
+picked by their titles:
+
+```yaml
+menus:
+  - name: main
+    label: Header
+    description: The links across the top of every page.
+    depth: 1                 # 2 for links that open a submenu
+```
+
+A template draws one with `{{ range .Site.Menus.main }}`: each link has
+`.Name`, `.URL`, already under the base path, `.Children` and `.Params`,
+whatever else the site gives it, such as an icon. A menu the site has not
+written is empty. The built-in theme draws `main` in its header, and its own
+links until the site writes one.
+
 A theme can be checked against the contract it is written to:
 
 ```bash
@@ -575,6 +609,10 @@ plugins:
   enabled: []          # the plugins that run, in the order they run in
   settings:            # whatever each plugin declares in plugin.yaml
     search: {full_text: true}
+
+menus:                 # the links themes draw, by menu; see Themes
+  main:
+    - {name: About, url: /about/}
 ```
 
 `timezone` decides which day a date falls on. Left empty, a date is shown in

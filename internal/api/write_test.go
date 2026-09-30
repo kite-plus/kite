@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -481,6 +482,7 @@ func newWritableServer(t *testing.T, root string, with ...func(*api.Options)) (h
 			Theme:         current.Config.Theme.Name,
 			ActiveTheme:   current.Theme,
 			ThemeSettings: current.Config.Theme.Settings,
+			Menus:         current.Config.Menus,
 			Themes:        func() []api.InstalledTheme { return installedThemes(root) },
 			Plugins:       current.Config.Plugins,
 			InstalledPlugins: func() []api.InstalledPlugin {
@@ -1183,5 +1185,95 @@ Body.
 	}
 	if changed := changedLines(src, string(after)); len(changed) != 1 || !strings.Contains(changed[0], "Still dated") {
 		t.Errorf("a title change changed %d lines, want the title only:\n%s", len(changed), strings.Join(changed, "\n"))
+	}
+}
+
+// A menu goes into kite.yaml link by link, each with its fields in the order
+// they are read, comes back as it was set, and leaves the file when it is
+// set to nothing. The theme says which menus it draws.
+func TestTheSitesMenusAreWrittenAndReadBack(t *testing.T) {
+	root := newProject(t, 1)
+	config := filepath.Join(root, "kite.yaml")
+	h, _ := newWritableServer(t, root)
+
+	got := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil)
+	tag := got.Header().Get("ETag")
+	settings := decode[api.Settings](t, got)
+	if menus := settings.Theme.Menus; len(menus) != 1 || menus[0].Name != "main" || menus[0].Depth != 1 {
+		t.Errorf("the built-in theme's menus = %+v", menus)
+	}
+	if !slices.Contains(settings.Writable, "menus.*") {
+		t.Errorf("writable does not offer menus: %v", settings.Writable)
+	}
+
+	main := []any{
+		map[string]any{"name": " About ", "url": "/about/"},
+		map[string]any{"name": "Elsewhere", "children": []any{
+			map[string]any{"name": "Code", "url": "https://github.com/example", "params": map[string]any{"icon": "github"}},
+		}},
+	}
+	rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
+		map[string]any{"menus.main": main}, map[string]string{"If-Match": tag})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body.String())
+	}
+	want := []api.MenuEntry{
+		{Name: "About", URL: "/about/"},
+		{Name: "Elsewhere", Children: []api.MenuEntry{
+			{Name: "Code", URL: "https://github.com/example", Params: map[string]any{"icon": "github"}},
+		}},
+	}
+	if got := decode[api.Settings](t, rec).Menus["main"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("menus.main = %+v, want %+v", got, want)
+	}
+	data, err := os.ReadFile(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{"menus:", "- name: About", "url: /about/", "icon: github"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("kite.yaml lacks %q:\n%s", want, text)
+		}
+	}
+	if strings.Index(text, "name: Elsewhere") > strings.Index(text, "children:") {
+		t.Errorf("a link's children come before its name:\n%s", text)
+	}
+
+	tag = rec.Header().Get("ETag")
+	for _, bad := range []struct {
+		name, path string
+		value      any
+	}{
+		{"a link with no name", "menus.main", []any{map[string]any{"url": "/a/"}}},
+		{"a link that leads nowhere", "menus.main", []any{map[string]any{"name": "A"}}},
+		{"a field nobody reads", "menus.main", []any{map[string]any{"name": "A", "href": "/a/"}}},
+		{"a menu a template cannot reach", "menus.footer-links", []any{map[string]any{"name": "A", "url": "/a/"}}},
+		{"a menu that is not a list", "menus.main", "About"},
+	} {
+		rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
+			map[string]any{bad.path: bad.value}, map[string]string{"If-Match": tag})
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400\n%s", bad.name, rec.Code, rec.Body.String())
+			continue
+		}
+		if field := decode[api.ErrorBody](t, rec).Error.Field; field != bad.path {
+			t.Errorf("%s: field = %q, want %q", bad.name, field, bad.path)
+		}
+	}
+
+	cleared := send(t, h, http.MethodPut, api.Prefix+"/settings",
+		map[string]any{"menus.main": nil}, map[string]string{"If-Match": tag})
+	if cleared.Code != http.StatusOK {
+		t.Fatalf("clearing: status = %d\n%s", cleared.Code, cleared.Body.String())
+	}
+	if menus := decode[api.Settings](t, cleared).Menus; len(menus) != 0 {
+		t.Errorf("menus after clearing = %+v", menus)
+	}
+	if data, err = os.ReadFile(config); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "menus") {
+		t.Errorf("kite.yaml still holds a menu:\n%s", data)
 	}
 }

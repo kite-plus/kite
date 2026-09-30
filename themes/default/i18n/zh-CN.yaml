@@ -26,7 +26,7 @@ theme:
       label: 导航
     nav:
       label: 额外链接
-      help: 排在首页和归档之后，显示在页头。站内地址以斜杠开头。
+      help: 站点的页头菜单还没有链接时，排在首页和归档之后，显示在页头。站内地址以斜杠开头。
       fields:
         label:
           label: 名称
@@ -55,6 +55,11 @@ theme:
     copyright:
       label: 版权信息
       help: 留空时，署名为站点本身，年份为最后一次构建的年份。
+
+  menus:
+    main:
+      label: 页头
+      description: 每一页顶部的链接。站点给这个菜单加上链接之前，页头显示首页、归档和「导航」里的额外链接。
 
   layouts:
     links:

@@ -22,6 +22,7 @@ import { Route as AuthenticatedPluginsIdRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
+import { Route as AuthenticatedSettingsMenusRouteImport } from './routes/_authenticated/settings/menus'
 import { Route as AuthenticatedSettingsThemeRouteImport } from './routes/_authenticated/settings/theme'
 import { Route as AuthenticatedTaxonomiesIndexRouteImport } from './routes/_authenticated/taxonomies/index'
 import { Route as AuthenticatedTaxonomiesTaxonomyRouteImport } from './routes/_authenticated/taxonomies/$taxonomy'
@@ -99,6 +100,12 @@ const AuthenticatedSettingsAppearanceRoute =
     path: '/appearance',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedSettingsMenusRoute =
+  AuthenticatedSettingsMenusRouteImport.update({
+    id: '/menus',
+    path: '/menus',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
 const AuthenticatedSettingsThemeRoute =
   AuthenticatedSettingsThemeRouteImport.update({
     id: '/theme',
@@ -147,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/plugins/$id': typeof AuthenticatedPluginsIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/settings/menus': typeof AuthenticatedSettingsMenusRoute
   '/settings/theme': typeof AuthenticatedSettingsThemeRoute
   '/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
   '/plugins/': typeof AuthenticatedPluginsIndexRoute
@@ -165,6 +173,7 @@ export interface FileRoutesByTo {
   '/plugins/$id': typeof AuthenticatedPluginsIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/settings/menus': typeof AuthenticatedSettingsMenusRoute
   '/settings/theme': typeof AuthenticatedSettingsThemeRoute
   '/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
   '/plugins': typeof AuthenticatedPluginsIndexRoute
@@ -187,6 +196,7 @@ export interface FileRoutesById {
   '/_authenticated/plugins/$id': typeof AuthenticatedPluginsIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/_authenticated/settings/menus': typeof AuthenticatedSettingsMenusRoute
   '/_authenticated/settings/theme': typeof AuthenticatedSettingsThemeRoute
   '/_authenticated/taxonomies/$taxonomy': typeof AuthenticatedTaxonomiesTaxonomyRoute
   '/_authenticated/plugins/': typeof AuthenticatedPluginsIndexRoute
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/plugins/$id'
     | '/settings/account'
     | '/settings/appearance'
+    | '/settings/menus'
     | '/settings/theme'
     | '/taxonomies/$taxonomy'
     | '/plugins/'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/plugins/$id'
     | '/settings/account'
     | '/settings/appearance'
+    | '/settings/menus'
     | '/settings/theme'
     | '/taxonomies/$taxonomy'
     | '/plugins'
@@ -248,6 +260,7 @@ export interface FileRouteTypes {
     | '/_authenticated/plugins/$id'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
+    | '/_authenticated/settings/menus'
     | '/_authenticated/settings/theme'
     | '/_authenticated/taxonomies/$taxonomy'
     | '/_authenticated/plugins/'
@@ -357,6 +370,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAppearanceRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/settings/menus': {
+      id: '/_authenticated/settings/menus'
+      path: '/menus'
+      fullPath: '/settings/menus'
+      preLoaderRoute: typeof AuthenticatedSettingsMenusRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
     '/_authenticated/settings/theme': {
       id: '/_authenticated/settings/theme'
       path: '/theme'
@@ -405,6 +425,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
   AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
+  AuthenticatedSettingsMenusRoute: typeof AuthenticatedSettingsMenusRoute
   AuthenticatedSettingsThemeRoute: typeof AuthenticatedSettingsThemeRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
 }
@@ -413,6 +434,7 @@ const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteCh
   {
     AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
     AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
+    AuthenticatedSettingsMenusRoute: AuthenticatedSettingsMenusRoute,
     AuthenticatedSettingsThemeRoute: AuthenticatedSettingsThemeRoute,
     AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
   }

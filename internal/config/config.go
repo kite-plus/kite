@@ -294,6 +294,70 @@ var pluginID = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 // ValidPluginID reports whether an id can name a plugin.
 func ValidPluginID(id string) bool { return pluginID.MatchString(id) }
 
+// MenuEntry is one link of a menu, as a site lists it under menus in
+// kite.yaml. Which menus are drawn, and where, is up to the theme.
+type MenuEntry struct {
+	Name string `yaml:"name"`
+	// URL is a path within the site, such as /about/, published under the
+	// site's base path, or a full address. An entry that only heads its
+	// children may leave it out.
+	URL string `yaml:"url,omitempty"`
+	// Params carries what a theme reads beyond a name and a link, such as an
+	// icon.
+	Params   map[string]any `yaml:"params,omitempty"`
+	Children []MenuEntry    `yaml:"children,omitempty"`
+}
+
+// Bounds on a site's menus, well past any real one, so that a pasted mistake
+// cannot make kite.yaml the size of a book.
+const (
+	MaxMenuEntries = 200
+	MaxMenuDepth   = 3
+)
+
+// menuName is the shape of a menu's name. A template reaches a menu as a
+// field, .Site.Menus.main, which a name with a dash could not be.
+var menuName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// ValidMenuName reports whether a name can name a menu.
+func ValidMenuName(name string) bool { return menuName.MatchString(name) }
+
+// ValidMenus checks a site's menus.
+func ValidMenus(menus map[string][]MenuEntry) error {
+	for _, name := range slices.Sorted(maps.Keys(menus)) {
+		if !ValidMenuName(name) {
+			return fmt.Errorf("%q is not a menu name (want lowercase letters, digits and _, starting with a letter)", name)
+		}
+		count := 0
+		if err := validMenu(name, menus[name], 1, &count); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validMenu(where string, entries []MenuEntry, depth int, count *int) error {
+	if depth > MaxMenuDepth {
+		return fmt.Errorf("%s: a menu goes at most %d levels deep", where, MaxMenuDepth)
+	}
+	for i, e := range entries {
+		if *count++; *count > MaxMenuEntries {
+			return fmt.Errorf("%s: a menu holds at most %d links", where, MaxMenuEntries)
+		}
+		if strings.TrimSpace(e.Name) == "" {
+			return fmt.Errorf("%s > link %d: give the link a name", where, i+1)
+		}
+		at := where + " > " + e.Name
+		if strings.TrimSpace(e.URL) == "" && len(e.Children) == 0 {
+			return fmt.Errorf("%s: give the link a url, or links under it", at)
+		}
+		if err := validMenu(at, e.Children, depth+1, count); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Publish configures how content reaches its destination.
 type Publish struct {
 	Publisher string `yaml:"publisher,omitempty"`
@@ -310,6 +374,10 @@ type Config struct {
 	Build    Build    `yaml:"build,omitempty"`
 	Publish  Publish  `yaml:"publish,omitempty"`
 	Plugins  Plugins  `yaml:"plugins,omitempty"`
+
+	// Menus are the site's menus by name, such as main. They belong to the
+	// site rather than to a theme, so a change of theme keeps them.
+	Menus map[string][]MenuEntry `yaml:"menus,omitempty"`
 }
 
 // validFeedAliases checks that each feed alias is a file of its own within
@@ -468,6 +536,9 @@ func (c *Config) Validate() error {
 	}
 	if err := ValidPagination(c.Build.Pagination); err != nil {
 		return fmt.Errorf("config: build.pagination: %w", err)
+	}
+	if err := ValidMenus(c.Menus); err != nil {
+		return fmt.Errorf("config: menus: %w", err)
 	}
 	seen := make(map[string]bool, len(c.Plugins.Enabled))
 	for _, id := range c.Plugins.Enabled {

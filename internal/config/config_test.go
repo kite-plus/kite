@@ -205,3 +205,44 @@ func TestPaginationSizesEachKindOfListing(t *testing.T) {
 		}
 	}
 }
+
+// A menu is read with its links in order and the links under them, and one
+// a theme could not draw, or a template could not reach, is refused on load.
+func TestMenusAreCheckedWhenTheyAreRead(t *testing.T) {
+	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
+	cfg, err := load(t, site+`menus:
+  main:
+    - name: About
+      url: /about/
+    - name: Elsewhere
+      params: {icon: globe}
+      children:
+        - {name: Code, url: "https://github.com/example"}
+  footer_links:
+    - {name: Feed, url: rss.xml}
+`)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	main := cfg.Menus["main"]
+	if len(main) != 2 || main[0].Name != "About" || main[0].URL != "/about/" ||
+		main[1].Params["icon"] != "globe" || len(main[1].Children) != 1 || main[1].Children[0].Name != "Code" {
+		t.Errorf("main = %+v", main)
+	}
+	if len(cfg.Menus["footer_links"]) != 1 {
+		t.Errorf("footer_links = %+v", cfg.Menus["footer_links"])
+	}
+
+	for _, tc := range []struct{ name, menus, says string }{
+		{"a name a template cannot reach", "  footer-links:\n    - {name: A, url: /a/}\n", "not a menu name"},
+		{"a link with no name", "  main:\n    - {url: /a/}\n", "main > link 1: give the link a name"},
+		{"a link that leads nowhere", "  main:\n    - {name: A}\n", "main > A: give the link a url"},
+		{"a menu four levels deep", "  main:\n    - name: A\n      children:\n        - name: B\n          children:\n            - name: C\n              children:\n                - {name: D, url: /d/}\n", "at most 3 levels"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := load(t, site+"menus:\n"+tc.menus); err == nil || !strings.Contains(err.Error(), tc.says) {
+				t.Errorf("Load = %v, want a refusal saying %q", err, tc.says)
+			}
+		})
+	}
+}

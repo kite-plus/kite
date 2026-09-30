@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -57,6 +59,9 @@ const (
 	pluginPrefix   = "plugins.settings."
 )
 
+// menusPrefix covers the site's menus, one path each, as menus.main.
+const menusPrefix = "menus."
+
 // checkSetting reports why a value cannot be stored, or "" when it can.
 //
 // The admin offers a list rather than a text box for most of these, but the
@@ -112,6 +117,68 @@ func checkSetting(path string, value any) string {
 		}
 	}
 	return ""
+}
+
+// checkMenu reports why a value cannot be the menu of a name, and otherwise
+// returns it as kite.yaml will hold it: nil for no links at all, which takes
+// the menu out.
+func checkMenu(name string, value any) ([]config.MenuEntry, string) {
+	if !config.ValidMenuName(name) {
+		return nil, "a menu's name is lowercase letters, digits and _, starting with a letter"
+	}
+	if value == nil {
+		return nil, ""
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, "want a list of links"
+	}
+	var sent []MenuEntry
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&sent); err != nil {
+		return nil, "want a list of links, each with a name, a url and perhaps links under it"
+	}
+	entries := storedMenu(sent)
+	if err := config.ValidMenus(map[string][]config.MenuEntry{name: entries}); err != nil {
+		return nil, err.Error()
+	}
+	return entries, ""
+}
+
+func storedMenu(sent []MenuEntry) []config.MenuEntry {
+	if len(sent) == 0 {
+		return nil
+	}
+	out := make([]config.MenuEntry, len(sent))
+	for i, e := range sent {
+		out[i] = config.MenuEntry{
+			Name:     strings.TrimSpace(e.Name),
+			URL:      strings.TrimSpace(e.URL),
+			Params:   e.Params,
+			Children: storedMenu(e.Children),
+		}
+	}
+	return out
+}
+
+func wireMenus(menus map[string][]config.MenuEntry) map[string][]MenuEntry {
+	out := make(map[string][]MenuEntry, len(menus))
+	for name, entries := range menus {
+		out[name] = wireMenu(entries)
+	}
+	return out
+}
+
+func wireMenu(entries []config.MenuEntry) []MenuEntry {
+	out := make([]MenuEntry, len(entries))
+	for i, e := range entries {
+		out[i] = MenuEntry{Name: e.Name, URL: e.URL, Params: e.Params}
+		if len(e.Children) > 0 {
+			out[i].Children = wireMenu(e.Children)
+		}
+	}
+	return out
 }
 
 // checkKeywords reports why a value cannot be the site's keywords, which are
@@ -176,14 +243,21 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			Pagination: view.Build.PageSizes(nil),
 		},
 		Theme:    ThemeSettings{Name: view.Theme},
-		Writable: append(slices.Clone(settable), settablePrefix+"*"),
+		Menus:    wireMenus(view.Menus),
+		Writable: append(slices.Clone(settable), settablePrefix+"*", menusPrefix+"*"),
 	}
 	if th := view.ActiveTheme; th != nil {
 		settings.Build.Pagination = view.Build.PageSizes(th.Manifest.Pagination)
 		// The schema comes from the theme's own manifest, so a theme author
 		// gets a settings form without writing any admin code.
-		settings.Theme.Schema = described(th, r).Settings
+		m := described(th, r)
+		settings.Theme.Schema = m.Settings
 		settings.Theme.Values = th.Manifest.Settings.Resolve(view.ThemeSettings)
+		for _, menu := range m.Menus {
+			settings.Theme.Menus = append(settings.Theme.Menus, ThemeMenu{
+				Name: menu.Name, Label: menu.Label, Description: menu.Description, Depth: menu.Levels(),
+			})
+		}
 	}
 	writeJSON(w, http.StatusOK, settings)
 }
@@ -257,6 +331,22 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	for _, path := range slices.Sorted(maps.Keys(values)) {
 		rest, themed := strings.CutPrefix(path, settablePrefix)
 		ofPlugin, plugged := strings.CutPrefix(path, pluginPrefix)
+		menu, isMenu := strings.CutPrefix(path, menusPrefix)
+		if isMenu {
+			entries, problem := checkMenu(menu, values[path])
+			if problem != "" {
+				failField(w, http.StatusBadRequest, CodeInvalidRequest, path, problem)
+				return
+			}
+			// Written as a typed list, so each link keeps its fields in the
+			// order kite.yaml is read in: name, url, params, children.
+			if entries == nil {
+				values[path] = nil
+			} else {
+				values[path] = entries
+			}
+			continue
+		}
 		if !slices.Contains(settable, path) && !themed && !plugged {
 			failField(w, http.StatusBadRequest, CodeInvalidRequest, path,
 				"this setting cannot be changed through the API")

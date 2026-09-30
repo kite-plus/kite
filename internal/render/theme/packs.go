@@ -14,8 +14,8 @@ func (t *Theme) Pack(lang string) map[string]string { return t.Packs.Pick(lang) 
 
 // Localized returns the manifest in a language, from the theme's pack for it:
 // the title and description, the label, help, placeholder and option labels
-// of each setting, and the label and description of each layout. A string the
-// pack does not have stays as the manifest wrote it.
+// of each setting, and the label and description of each layout and menu. A
+// string the pack does not have stays as the manifest wrote it.
 func (t *Theme) Localized(lang string) Manifest {
 	m := t.Manifest
 	words := t.Pack(lang)
@@ -33,6 +33,13 @@ func (t *Theme) Localized(lang string) Manifest {
 		l.Label = say(key+"label", l.Label)
 		l.Description = say(key+"description", l.Description)
 		m.Layouts[i] = l
+	}
+	m.Menus = make([]Menu, len(t.Manifest.Menus))
+	for i, menu := range t.Manifest.Menus {
+		key := "theme.menus." + menu.Name + "."
+		menu.Label = say(key+"label", menu.Label)
+		menu.Description = say(key+"description", menu.Description)
+		m.Menus[i] = menu
 	}
 	return m
 }

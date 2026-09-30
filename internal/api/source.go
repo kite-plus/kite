@@ -33,6 +33,8 @@ type View struct {
 	// It is kept raw because each theme reads it through its own schema, and
 	// the admin may be looking at a theme other than the one in use.
 	ThemeSettings map[string]any
+	// Menus are the site's menus as kite.yaml holds them.
+	Menus map[string][]config.MenuEntry
 	// Themes lists every theme the project could switch to. It is nil where
 	// themes cannot be switched.
 	Themes func() []InstalledTheme

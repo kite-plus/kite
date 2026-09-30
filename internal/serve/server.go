@@ -314,6 +314,7 @@ func (s *Server) view() api.View {
 
 		ActiveTheme:   current.Theme,
 		ThemeSettings: current.Config.Theme.Settings,
+		Menus:         current.Config.Menus,
 		Themes:        s.themes,
 		Previews:      s.previews,
 

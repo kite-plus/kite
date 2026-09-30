@@ -5,6 +5,19 @@
     <a class="brand" href="{{ url.For "home" }}"><span class="mark" aria-hidden="true"></span>{{ .Site.Title }}</a>
     {{ with .Site.Description }}<span class="tagline">{{ . }}</span>{{ end }}
     <nav>
+      {{- /* The header draws one level: an entry that only heads others
+             stands aside for them. */ -}}
+      {{- with .Site.Menus.main }}
+      {{- range . }}
+      {{- if .URL }}
+      <a href="{{ .URL }}"{{ if eq .URL $here }} aria-current="page"{{ end }}>{{ .Name }}</a>
+      {{- else }}
+      {{- range .Children }}{{ if .URL }}
+      <a href="{{ .URL }}"{{ if eq .URL $here }} aria-current="page"{{ end }}>{{ .Name }}</a>
+      {{- end }}{{ end }}
+      {{- end }}
+      {{- end }}
+      {{- else }}
       <a href="{{ url.For "home" }}"{{ if eq $kind "home" }} aria-current="page"{{ end }}>{{ T "home" }}</a>
       <a href="{{ url.For "list" "post" }}"{{ if and (eq $kind "list") (eq $type "post") }} aria-current="page"{{ end }}>{{ T "archive" }}</a>
       {{- /* A path in an extra link is within the site, under its base path. */ -}}
@@ -12,6 +25,7 @@
       {{- if and .label .url }}
       {{- $url := url.Rel .url }}
       <a href="{{ $url }}"{{ if eq $url $here }} aria-current="page"{{ end }}>{{ .label }}</a>
+      {{- end }}
       {{- end }}
       {{- end }}
       {{ $toggle := T "toggle" -}}

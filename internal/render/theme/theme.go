@@ -115,7 +115,24 @@ type Manifest struct {
 	// kind it leaves out pages by the site's build.pageSize, and a site's
 	// build.pagination stands in for it.
 	Pagination map[string]int `yaml:"pagination,omitempty"`
+
+	// Menus are the menus the theme draws, by the names a site gives them
+	// under menus in kite.yaml, so that the studio offers those to fill in.
+	Menus []Menu `yaml:"menus,omitempty"`
 }
+
+// Menu is a menu a theme draws.
+type Menu struct {
+	Name        string `yaml:"name"`
+	Label       string `yaml:"label,omitempty"`
+	Description string `yaml:"description,omitempty"`
+	// Depth is how many levels of links the theme draws: 1, the default, for
+	// a row of links, 2 for links that open a submenu of their own.
+	Depth int `yaml:"depth,omitempty"`
+}
+
+// Levels is how many levels of links the theme draws in the menu.
+func (m Menu) Levels() int { return max(m.Depth, 1) }
 
 // Validate checks a manifest.
 //
@@ -149,6 +166,19 @@ func (m *Manifest) Validate() error {
 			return fmt.Errorf("theme %s: layout %q is declared twice", m.Name, l.Name)
 		}
 		seen[l.Name] = true
+	}
+	menus := make(map[string]bool, len(m.Menus))
+	for _, menu := range m.Menus {
+		switch {
+		case !config.ValidMenuName(menu.Name):
+			return fmt.Errorf("theme %s: menu name %q must be lowercase letters, digits and _, starting with a letter",
+				m.Name, menu.Name)
+		case menus[menu.Name]:
+			return fmt.Errorf("theme %s: menu %q is declared twice", m.Name, menu.Name)
+		case menu.Depth < 0 || menu.Depth > config.MaxMenuDepth:
+			return fmt.Errorf("theme %s: menu %s: depth is 1 to %d", m.Name, menu.Name, config.MaxMenuDepth)
+		}
+		menus[menu.Name] = true
 	}
 	return nil
 }

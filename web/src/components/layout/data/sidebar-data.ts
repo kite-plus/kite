@@ -2,6 +2,7 @@ import {
   FileText,
   Folder,
   LayoutDashboard,
+  ListTree,
   MonitorCog,
   Newspaper,
   Palette,
@@ -78,6 +79,7 @@ export function useSidebarData(): SidebarData {
           // The account's page is under this address too, but is not the site's.
           { title: t('nav.site'), url: '/settings', icon: SlidersHorizontal, exact: true },
           { title: t('nav.theme'), url: '/settings/theme', icon: Palette },
+          { title: t('nav.menus'), url: '/settings/menus', icon: ListTree },
           { title: t('settings.interface'), url: '/settings/appearance', icon: MonitorCog },
         ],
       },

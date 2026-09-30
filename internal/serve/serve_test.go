@@ -1521,3 +1521,69 @@ func TestAKindDeclaredWhileServingIsServed(t *testing.T) {
 		t.Errorf("a kind taken out of kite.yaml is still served: %d", rec.Code)
 	}
 }
+
+// A site's menu takes the place of the header's own links, its paths under
+// the base path, and a build draws it as the server does.
+func TestTheSitesMenuReachesItsPages(t *testing.T) {
+	root := newProjectAt(t, 2, "https://example.github.io/blog/")
+	menus := `menus:
+  main:
+    - name: About
+      url: /about/
+    - name: Elsewhere
+      children:
+        - {name: Code, url: "https://github.com/example"}
+`
+	f, err := os.OpenFile(filepath.Join(root, "kite.yaml"), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(menus); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	handler := newServer(t, root, serve.Options{}).Handler()
+	nav := func(path string) string {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET %s: status %d", path, rec.Code)
+		}
+		body := rec.Body.String()
+		start, end := strings.Index(body, "<nav>"), strings.Index(body, "</nav>")
+		if start < 0 || end < start {
+			t.Fatalf("GET %s: no nav in\n%s", path, body)
+		}
+		return body[start:end]
+	}
+
+	home := nav("/blog/")
+	for _, want := range []string{`<a href="/blog/about/">About</a>`, `<a href="https://github.com/example">Code</a>`} {
+		if !strings.Contains(home, want) {
+			t.Errorf("the header lacks %s:\n%s", want, home)
+		}
+	}
+	if strings.Contains(home, "/blog/posts/") {
+		t.Errorf("the header still links the archive of its own:\n%s", home)
+	}
+	if about := nav("/blog/about/"); !strings.Contains(about, `<a href="/blog/about/" aria-current="page">About</a>`) {
+		t.Errorf("the about page's header does not mark it current:\n%s", about)
+	}
+
+	built := openSite(t, root)
+	outDir := filepath.Join(root, "public")
+	if _, _, err := built.Build(t.Context(), site.BuildOptions{OutDir: outDir, Now: frozen}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	page, err := os.ReadFile(filepath.Join(outDir, "about", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(page), `<a href="/blog/about/" aria-current="page">About</a>`) {
+		t.Error("the built about page does not carry the menu")
+	}
+}

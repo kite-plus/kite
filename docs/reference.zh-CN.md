@@ -190,6 +190,36 @@ layouts:
 `layouts/page/links.html` 渲染，没有的话用 `layouts/links.html`。主题不能声明
 没有模板文件的布局；页面选了当前主题没有的模板时，退回它所属类型的默认模板。
 
+站点的菜单写在 `kite.yaml` 里，不属于哪一个主题，换了主题还在。站内地址从站点根写起，
+发布时放在站点的路径下：
+
+```yaml
+menus:
+  main:
+    - name: 归档
+      url: /posts/
+    - name: 关于
+      url: /about/
+    - name: 别处            # 只用来归拢下级链接的一项
+      children:
+        - {name: 代码, url: "https://github.com/someone"}
+```
+
+主题在 `theme.yaml` 里声明它画哪些菜单、每个画几层，后台的“菜单”页据此列出要填的菜单，
+页面和文章可以按标题搜索添加：
+
+```yaml
+menus:
+  - name: main
+    label: Header
+    description: 每一页顶部的链接。
+    depth: 1                 # 2 表示链接可以展开下级菜单
+```
+
+模板用 `{{ range .Site.Menus.main }}` 画它：每个链接有 `.Name`、已经带上站点路径的
+`.URL`、`.Children`，以及 `.Params`，即站点给它的其他东西，比如图标。站点没写的菜单是空的。
+内置主题在页头画 `main`，站点写这个菜单之前，显示它自己的链接。
+
 主题可以对照它所依据的契约检查：
 
 ```bash
@@ -494,6 +524,10 @@ plugins:
   enabled: []          # 启用的插件，按运行顺序排列
   settings:            # 各插件在 plugin.yaml 里声明的设置
     search: {full_text: true}
+
+menus:                 # 主题画的链接，按菜单分；见“主题”一节
+  main:
+    - {name: 关于, url: /about/}
 ```
 
 `timezone` 决定日期落在哪一天。不设置时，日期按写入时的时区显示，后台写入的是 UTC，

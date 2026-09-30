@@ -333,6 +333,7 @@ func (s *Site) newBuilder(opts BuildOptions, emitter *build.Emitter) (*build.Bui
 			Language:      s.Config.Site.Language,
 			Params:        s.Config.Site.Params,
 			ThemeSettings: s.ThemeSettings(),
+			Menus:         menus(s.Config.Menus, s.Resolver),
 			Version:       buildinfo.Version,
 			Build:         emitter != nil,
 			Author:        s.Config.Site.Author,
@@ -356,6 +357,39 @@ func (s *Site) newBuilder(opts BuildOptions, emitter *build.Emitter) (*build.Bui
 		IncludeDrafts: opts.Drafts,
 		Now:           opts.Now,
 	})
+}
+
+// menus resolves the links of a site's menus as url.Rel resolves a path in a
+// template, so that a theme draws them as they are.
+func menus(written map[string][]config.MenuEntry, resolver *kurl.Resolver) map[string][]render.MenuEntry {
+	if len(written) == 0 {
+		return nil
+	}
+	out := make(map[string][]render.MenuEntry, len(written))
+	for name, entries := range written {
+		out[name] = menuEntries(entries, resolver)
+	}
+	return out
+}
+
+func menuEntries(entries []config.MenuEntry, resolver *kurl.Resolver) []render.MenuEntry {
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make([]render.MenuEntry, len(entries))
+	for i, e := range entries {
+		link := strings.TrimSpace(e.URL)
+		if link != "" {
+			link = resolver.Rel(link)
+		}
+		out[i] = render.MenuEntry{
+			Name:     strings.TrimSpace(e.Name),
+			URL:      link,
+			Params:   e.Params,
+			Children: menuEntries(e.Children, resolver),
+		}
+	}
+	return out
 }
 
 // Build renders the whole site to disk.

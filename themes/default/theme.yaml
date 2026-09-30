@@ -1,6 +1,6 @@
 name: default
 title: Kite Default
-version: 0.6.1
+version: 0.7.0
 apiVersion: kite/v1
 requires: ">=0.1.0 <2.0.0"
 description: The theme Kite ships with. Quiet serif typography for personal writing, dependency free, light and dark.
@@ -15,6 +15,11 @@ screenshot: screenshot.webp
 capabilities: [static, dynamic]
 contentTypes: [post, page]
 taxonomies: [tags, categories]
+
+menus:
+  - name: main
+    label: Header
+    description: The links across the top of every page. Until the site gives this menu links, the header links the home page, the archive and the extra links under Navigation.
 
 layouts:
   - name: links
@@ -54,7 +59,7 @@ settings:
       - key: nav
         type: repeat
         label: Extra links
-        help: They follow the home page and the archive in the header. An address within the site starts with a slash.
+        help: They follow the home page and the archive in the header, while the site's header menu has no links. An address within the site starts with a slash.
         fields:
           - {key: label, type: string, label: Label, placeholder: About}
           - {key: url, type: url, label: Address, placeholder: /about/}

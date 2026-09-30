@@ -6,3 +6,14 @@ site:
 build:
   pageSize: 3
   feedAliases: [index.xml]
+menus:
+  main:
+    - name: Archive
+      url: /posts/
+    - name: About
+      url: about/
+    - name: Elsewhere
+      children:
+        - {name: Source, url: "https://example.org/source"}
+  footer:
+    - {name: Feed, url: /rss.xml}

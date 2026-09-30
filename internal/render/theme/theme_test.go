@@ -435,3 +435,28 @@ func TestLayoutsAreNamesWithTemplatesBehindThem(t *testing.T) {
 		})
 	}
 }
+
+// A theme names the menus it draws by the names a site gives them, which a
+// template reaches as fields, and says how deep it draws each.
+func TestMenusAreDeclaredByNamesATemplateCanReach(t *testing.T) {
+	load := func(menus string) error {
+		t.Helper()
+		_, err := theme.Load(fstest.MapFS{
+			"theme.yaml":          file("name: x\nversion: 1.0.0\napiVersion: kite/v1\nmenus:\n" + menus),
+			"layouts/single.html": file("x"),
+		})
+		return err
+	}
+	if err := load("  - {name: main, label: Header}\n  - {name: footer_links, depth: 2}\n"); err != nil {
+		t.Errorf("two menus = %v", err)
+	}
+	for _, tc := range []struct{ menus, refused string }{
+		{"  - {name: footer-links}\n", "footer-links"},
+		{"  - {name: main}\n  - {name: main}\n", "declared twice"},
+		{"  - {name: main, depth: 4}\n", "depth is 1 to 3"},
+	} {
+		if err := load(tc.menus); err == nil || !strings.Contains(err.Error(), tc.refused) {
+			t.Errorf("%q = %v, want a refusal naming %q", tc.menus, err, tc.refused)
+		}
+	}
+}

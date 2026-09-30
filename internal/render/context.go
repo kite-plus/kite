@@ -52,6 +52,11 @@ type Site interface {
 	ThemeSettings() map[string]any
 	Taxonomies() []string
 
+	// Menus are the site's menus by name, each link in the order the site
+	// lists it, as {{ range .Site.Menus.main }}. A menu the site has not
+	// written is empty.
+	Menus() map[string][]MenuItem
+
 	// Author, Keywords and NoIndex describe the site to search engines; a
 	// theme writes them into the head of a page.
 	Author() string
@@ -123,6 +128,19 @@ type Page interface {
 	// rather than rendered. Neighbors carry what a listed page carries.
 	Prev() Page
 	Next() Page
+}
+
+// MenuItem is one link of a site's menu.
+type MenuItem interface {
+	Name() string
+	// URL is where the link leads: a path within the site, already under its
+	// base path, or a full address as the site wrote it. It is empty for an
+	// entry that only heads its children.
+	URL() string
+	// Params is what the site gives a link beyond its name and address, such
+	// as an icon, for the theme to read.
+	Params() map[string]any
+	Children() []MenuItem
 }
 
 // Heading is one table-of-contents entry.
