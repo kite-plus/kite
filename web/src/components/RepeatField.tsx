@@ -271,9 +271,10 @@ function TreeList({
                       onChange={(next) => onChange(replaced(entries, g, next))}
                       className="max-w-72"
                     />
-                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                      {open ? "" : summary(items)}
-                    </span>
+                    {/* Only a folded entry sums up its list; an open one gives the room to its fields. */}
+                    {!open && (
+                      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{summary(items)}</span>
+                    )}
                     <EntryMenu
                       first={g === 0}
                       last={g === entries.length - 1}
