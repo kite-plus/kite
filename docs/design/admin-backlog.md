@@ -32,7 +32,7 @@
 
 | ID | 优先级 | 要做的事与验收条件 | 依据 / 依赖 |
 |---|---|---|---|
-| B01 | P1 | **管理文章附件。** 在编辑器列出当前 bundle 文件，支持复制链接、替换、删除，并提示正文或封面仍在引用的文件。全站附件库按路线图放到 v1.5；先让作者能处理自己上传的文件。 | 已有上传和删除 API：`internal/api/media.go`；缺列表 API 与页面：`web/src/components/editor/EditorAside.tsx` |
+| B01 | P1 | **已完成。** 文章头部的“附件”列出 bundle 里的文件（与构建发布的是同一批：子文件夹里的也在，源文件、隐藏文件和别的文章的 bundle 不在），每个文件标出正文、封面或其他字段是否在用（按当前草稿，含未保存的改动；短代码的参数也算），可以复制链接、原地替换（名字不变，链接照样有效，照片同样去掉定位）、删除（还在用的会提醒），也可以直接上传。单文件的文章没有自己的文件夹，不显示。 | `GET/PUT/DELETE /contents/{id}/media`：`internal/api/media.go`，`internal/site/bundle.go`，`internal/store/file/writer.go` 的 `bundleFile`；`web/src/components/editor/Attachments.tsx` |
 | B02 | P2 | **已完成。** 状态、搜索词、排序、分类/标签和每页条数都写在地址里，刷新或复制地址后复现同一列表；游标不进地址，刷新后回到第一页。 | `web/src/features/contents/search.ts`、`web/src/features/contents/index.tsx` |
 | B03 | P2 | **已完成。** 词条仍从内容派生。分类、标签页的卡片菜单可以重命名、合并（改成已有的名称即合并，同时带两者的内容只留一个）和删除（从内容上去掉，内容本身保留）。确认框先列出受影响的内容（含回收站里的），`GET /taxonomies/{taxonomy}/terms/{term}` 的 ETag 指纹覆盖这些内容及其版本；改名（PUT）或删除（DELETE）时带回 If-Match，期间有内容变化就整体拒绝（409）。写入是一个 ChangeSet，每篇一个只改该分类法那一行的 `ChangeTerm`；文件存储在写之前核对整组版本，冲突时一个文件都不动。 | `internal/api/terms.go`、`internal/store/file/writer.go`、`web/src/features/terms/` |
 | B04 | P2 | **已完成。** 主题自带语言包 `i18n/<lang>.yaml`，`theme:` 下放后台用的文字（标题、说明、字段、选项、布局）；后台按界面语言请求（`Accept-Language`），没有译文的地方显示 `theme.yaml` 里的原文。默认主题带中文包，测试保证它和 `theme.yaml` 对得上。 | `internal/render/theme/packs.go`、`themes/default/i18n/zh-CN.yaml`、`web/src/api/client.ts` |

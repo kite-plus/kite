@@ -83,6 +83,7 @@ export type ThemeInfo = components["schemas"]["ThemeInfo"];
 export type ThemeDetail = components["schemas"]["ThemeDetail"];
 export type ThemeExists = components["schemas"]["ThemeExists"];
 export type Media = components["schemas"]["Media"];
+export type MediaList = components["schemas"]["MediaList"];
 export type ErrorBody = components["schemas"]["ErrorBody"];
 
 /** ApiError carries the server's machine-readable code, not just a message. */

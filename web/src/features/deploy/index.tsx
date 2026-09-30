@@ -9,6 +9,7 @@ import { useSite } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { saveFile, useExportSite } from "@/hooks/useExport";
 import { canPublish, useDelivery, usePublish } from "@/hooks/usePublish";
+import { sizeOf } from "@/lib/bytes";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -199,9 +200,3 @@ function isLocal(address: string): boolean {
   );
 }
 
-/** sizeOf writes a byte count the way a download list does. */
-function sizeOf(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}

@@ -26,6 +26,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { Header } from "@/components/layout/header";
 import { Main } from "@/components/layout/main";
 import { CoverField, fieldsOf, Properties, SummaryField } from "@/components/editor/ArticleHead";
+import { Attachments } from "@/components/editor/Attachments";
 import { ConflictDialog } from "@/components/editor/ConflictDialog";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import {
@@ -626,7 +627,14 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
                     onExitUp={focusTitle}
                   />
                 )}
-                <Properties draft={draft} type={type} fields={others} uploads={uploads} onEdit={item.edit} />
+                <Properties
+                  draft={draft}
+                  type={type}
+                  fields={others}
+                  uploads={uploads}
+                  onEdit={item.edit}
+                  files={id ? <Attachments id={id} kind={kind} draft={draft} upload={(file) => upload(file)} /> : null}
+                />
               </fieldset>
               {mode === "visual" ? (
                 <RichEditor

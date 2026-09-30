@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent, type Ref } from "react";
+import { useRef, useState, type DragEvent, type Ref, type ReactNode } from "react";
 import {
   Check,
   ChevronDown,
@@ -242,9 +242,9 @@ export function SummaryField({
 
 // A property reads as a small outlined button; one not set yet is dashed,
 // and a switch that is on takes the accent.
-const chip =
+export const chip =
   "h-7 max-w-full min-w-0 gap-1.5 px-2.5 text-[13px] font-normal shadow-none has-[>svg]:px-2.5 [&>svg]:text-muted-foreground";
-const unset = "border-dashed text-muted-foreground";
+export const unset = "border-dashed text-muted-foreground";
 const on =
   "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 [&>svg]:text-primary";
 
@@ -259,6 +259,7 @@ export function Properties({
   fields,
   uploads,
   onEdit,
+  files,
 }: {
   draft: Draft;
   type?: ContentType;
@@ -266,6 +267,8 @@ export function Properties({
   fields: Field[];
   uploads: Uploads;
   onEdit: (patch: Partial<Draft>) => void;
+  /** files is the chip of the files the item keeps beside it, once it has a folder to keep them in. */
+  files?: ReactNode;
 }) {
   // Categories lead, as they do in the listing.
   const taxonomies = [...(type?.taxonomies ?? [])].sort(
@@ -316,6 +319,7 @@ export function Properties({
             />
           ),
         )}
+      {files}
     </div>
   );
 }
