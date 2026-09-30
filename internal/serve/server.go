@@ -411,6 +411,14 @@ func (s *Server) preview(ctx context.Context, item *content.Content) ([]byte, er
 	builder, current := s.builder, s.site
 	s.mu.RUnlock()
 
+	// A draft is shown as it will be published, and the studio dates one that
+	// has no date when it is published. A build draws a draft as it stands.
+	if item.Status == content.StatusDraft && item.PublishedAt == nil {
+		dated, now := *item, s.now().UTC()
+		dated.PublishedAt = &now
+		item = &dated
+	}
+
 	target := build.Target{
 		Kind:   render.KindSingle,
 		Type:   string(item.Kind),

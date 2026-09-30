@@ -824,6 +824,68 @@ func TestPreviewOfSavedContentIsByteIdenticalToTheBuiltPage(t *testing.T) {
 	}
 }
 
+// A draft reaches the site by being published, and the studio dates one that
+// has no date when it is published, so its preview is dated now. It used to
+// show the day the draft was created, or the year 1 when it gave neither date.
+// Only the preview says so: the site a server draws with drafts, as a build
+// does, shows a draft as it stands.
+func TestADraftIsPreviewedDatedAsPublishingItNowWouldDateIt(t *testing.T) {
+	root := newProject(t, 1)
+	const id = "01J8KQ2P3R4S5T6V7W8X9YZ950"
+	dir := filepath.Join(root, "content", "posts", "unpublished")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	draft := "---\nid: " + id + "\ntitle: Unpublished\nslug: unpublished\nstatus: draft\n" +
+		"created_at: 2026-05-01T08:00:00Z\n---\n\nNot yet.\n"
+	if err := os.WriteFile(filepath.Join(dir, "index.md"), []byte(draft), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler := newServer(t, root, serve.Options{Admin: true, Write: true, Drafts: true}).Handler()
+
+	const (
+		now     = `<time datetime="2026-06-01">June 1, 2026</time>`
+		created = `<time datetime="2026-05-01">May 1, 2026</time>`
+	)
+	for _, tc := range []struct {
+		name, id string
+		draft    map[string]any
+		want     string // empty for no date at all
+	}{
+		{"a new draft", "", map[string]any{"status": "draft"}, now},
+		{"a saved draft", id, map[string]any{"status": "draft"}, now},
+		{"a draft given a date", id, map[string]any{"status": "draft", "published_at": "2026-03-04T09:00:00Z"},
+			`<time datetime="2026-03-04">March 4, 2026</time>`},
+		{"a saved post published without a date", id, map[string]any{"status": "published"}, created},
+		{"a new post published without a date", "", map[string]any{"status": "published"}, ""},
+	} {
+		tc.draft["kind"], tc.draft["title"], tc.draft["body"] = "post", "Unpublished", "Not yet.\n"
+		rec := call(t, handler, http.MethodPost, "/api/v1/preview?id="+tc.id, tc.draft)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: preview returned %d\n%s", tc.name, rec.Code, rec.Body.String())
+		}
+		page := rec.Body.String()
+		switch {
+		case tc.want == "" && strings.Contains(page, "<time"):
+			t.Errorf("%s is dated: %s", tc.name, excerpt(page, `class="meta"`))
+		case tc.want != "" && !strings.Contains(page, tc.want):
+			t.Errorf("%s is not dated %s: %s", tc.name, tc.want, excerpt(page, `class="meta"`))
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/posts/unpublished/", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), created) {
+		t.Errorf("the served draft is not dated as it stands, %s: %d %s", created, rec.Code, excerpt(rec.Body.String(), `class="meta"`))
+	}
+}
+
+// excerpt is the part of a page from marker on, or its start without one.
+func excerpt(page, marker string) string {
+	i := max(strings.Index(page, marker), 0)
+	return page[i:min(i+200, len(page))]
+}
+
 // The editor shows the count the server gives, which is the one a draft's page
 // will show: the heading and list are read, the code and the picture are not.
 func TestADraftIsCountedAsItsPageWillBe(t *testing.T) {
