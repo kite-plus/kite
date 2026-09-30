@@ -1,6 +1,6 @@
 # Kite 主题系统设计
 
-> 状态：设计中，契约计划于 **M5** 冻结 · 最近更新：2026-09-21
+> 状态：契约 **`kite/v1` 已于 2026-10-01 冻结**，只增不改（§11.2） · 最近更新：2026-10-01
 > 上级文档：[architecture.md](architecture.md) · 姊妹文档：[plugin-system.md](plugin-system.md)
 > `[EV]` 标记的结论有既有项目的实证支撑，来源见 [证据来源](#证据来源)。
 
@@ -73,29 +73,28 @@
 
 ```
 themes/paper/
-├── theme.yaml              # 元数据 + 兼容范围 + settings schema
+├── theme.yaml              # 元数据 + 兼容范围 + 设置、布局、菜单的声明
 ├── layouts/                # 模板；与站点 layouts/ 同名同结构
 │   ├── baseof.html         # 基础骨架
-│   ├── home.html
+│   ├── home.html           # 没有时用 list.html
 │   ├── single.html
 │   ├── list.html
-│   ├── taxonomy.html       # 某个分类轴的所有 term 列表（如「所有标签」）
-│   ├── term.html           # 某个 term 下的内容列表（如「标签 go」）
+│   ├── taxonomy.html       # 某个分类轴的所有 term 列表（如「所有标签」）；没有时用 list.html
+│   ├── term.html           # 某个 term 下的内容列表（如「标签 go」）；没有时用 list.html
 │   ├── 404.html
-│   ├── single.rss.xml      # 非 html 输出格式
 │   ├── post/               # 按 ContentType 覆盖
 │   │   └── single.html
-│   └── _partials/          # 下划线前缀 = 不可路由
-│       ├── header.html
-│       └── post-card.html
-├── assets/                 # 参与 asset pipeline（fingerprint / minify）
-│   ├── css/main.css
-│   └── js/app.js
-├── static/                 # 原样拷贝，不处理
-├── i18n/
+│   ├── _partials/          # 下划线前缀 = 不可路由
+│   │   ├── header.html
+│   │   └── post-card.html
+│   ├── _shortcodes/        # 正文里按名字调用的短代码（§6.8）
+│   └── _markup/            # 正文节点的 render hook，如 render-image.html
+├── assets/                 # 原样发布到站点的 /assets/（§10）
+├── static/                 # 原样发布到站点根
+├── i18n/                   # 语言包：后台用的 theme 键，页面上的词（§12）
 │   ├── en.yaml
 │   └── zh-CN.yaml
-└── screenshot.png          # 1280×800，Admin 主题列表用
+└── screenshot.png          # 1280×800，后台主题列表用；也可以是 .jpg 或 .webp
 ```
 
 ### 关键决策：站点与主题使用**相同的目录名** `[已冻结]`
@@ -125,7 +124,9 @@ themes/paper/
 | **layout** | front matter 的 `layout` 字段（可选，如 `wide`） |
 | **output format** | `html`（默认，无后缀）/ `rss.xml` / `json` / … |
 
-加一个**语言后缀**。
+加一个**语言后缀**。查找已经支持它；v1 的站点只有一种语言，页面还没有语言后缀可查（§12）。
+
+输出格式这一维目前只有 `html`：RSS 和 sitemap 由 Kite 的钩子生成，不经过主题模板。
 
 **明确拒绝 section 路径递归查找。** Hugo 的查找顺序有六个互相作用的维度、优先级不可调整，官方文档自己承认那是一次 "complete overhaul" `[EV]`。递归 section 查找正是让规则无法向用户解释的那一部分——Kite 不要。
 
@@ -192,7 +193,7 @@ theme:layouts/post/wide.html
 kite doctor --explain-lookup /posts/hello-world/
 ```
 
-必须输出完整的候选链、每一条的命中/未命中、以及最终选中的文件。**"为什么我的模板没生效"是主题开发最高频的问题，把它变成一条命令就能自答，收益远大于成本。**
+必须输出完整的候选链、每一条的命中/未命中、以及最终选中的文件。（这条命令还没有实现；它是工具，不属于契约，随时可以加。模板找不到时的报错已经列出完整的候选链。）**"为什么我的模板没生效"是主题开发最高频的问题，把它变成一条命令就能自答，收益远大于成本。**
 
 ---
 
@@ -223,19 +224,22 @@ type Page struct {
 
 ### 6.2 顶层对象
 
-模板拿到的 `.` 永远是一个 `RenderContext`：
+模板拿到的 `.` 永远是一个 `Context`：
 
 ```go
-type RenderContext interface {
+type Context interface {
     Site() Site
-    Page() Page              // 当前页面；list 类页面也有（代表列表页自身）
-    Pages() PageList         // list/taxonomy/term 页面的条目；single 页为空
+    Page() Page              // 当前页面；列表类页面也有（代表列表页自身）
+    Pages() []Page           // 列表、分类法、term 页本页的条目；single 页为空
     Paginator() Paginator    // 需要分页时非 nil
-    Request() Request        // 静态构建时为 nil —— 见 §9.1
+    Terms() []Term           // 分类法页列出的 term
+    Request() Request        // 静态构建时为 nil —— 见 §9.2
 }
 ```
 
 > 为方便书写，模板里 `.Title` 是 `.Page.Title` 的简写（在 single 上下文中）。这个简写规则本身也是契约的一部分。
+
+**`kite/v1` 冻结的就是这里和 §6.3–§6.9 列出的方法，一个不多、一个不少。** 每一项连同签名记录在 `internal/render/theme/testdata/kite-v1.txt`，`TestTheContractOnlyGrows` 在任何一项被删掉、改名或换了签名时失败（§11.2）。设计阶段设想过、v1 没有的方法，列在各小节末尾的「以后可以加」里：加进来是只增，不破坏已有主题。
 
 ### 6.3 `Site`
 
@@ -245,20 +249,19 @@ type Site interface {
     Description() string
     BaseURL() string
     Language() string                       // "zh-CN"
-    Languages() []LanguageInfo              // i18n 预留
-    Params() ParamMap                       // kite.yaml 的 site.params
-    ThemeSettings() ParamMap                // theme.yaml settings 的当前值
-    Menus() map[string][]MenuItem
-    Pages() PageList                        // 全站内容（惰性）
-    Taxonomies() []string                   // ["tag", "category"]
-    Taxonomy(name string) Taxonomy
+    Params() map[string]any                 // kite.yaml 的 site.params
+    ThemeSettings() map[string]any          // theme.yaml settings 的当前值，按字段类型读好
+    Taxonomies() []string                   // ["tags", "categories"]
+    Menus() map[string][]MenuItem           // kite.yaml 的 menus，见 §6.9
     Author() string                         // site.author
     Keywords() []string                     // site.keywords，给搜索引擎
     NoIndex() bool                          // site.noindex，要求搜索引擎不收录
     HeadHTML() template.HTML                // site.headHTML，原样写到 </head> 前
     FooterHTML() template.HTML              // site.footerHTML，原样写到 </body> 前
     BuildTime() time.Time                   // 冻结的构建时间戳
-    Kite() BuildInfo                        // Version / IsBuild / IsServe
+    Version() string                        // 正在运行的 Kite 的版本
+    IsBuild() bool                          // 静态构建
+    IsServe() bool                          // kite serve / kite run
 }
 ```
 
@@ -270,28 +273,27 @@ type Site interface {
 
 **站点的关键词、作者、`noindex` 和自定义代码由主题写进页面。** 它们跟着站点保存，换主题不丢；主题负责把它们放到 `<head>` 和 `</body>` 前。自动注入更多 SEO 标签（如 Open Graph）留给插件（[plugin-system.md](plugin-system.md)）。
 
+以后可以加：`Languages()`（多语言站点的语言，见 §12）、`Pages()`（全站内容，见 §14 第 4 条）、`Taxonomy(name)`（一个分类法的全部 term）。
+
 ### 6.4 `Page`
 
 ```go
 type Page interface {
     ID() string                  // ULID，跨重命名稳定
-    Kind() string                // home/single/list/taxonomy/term/404
+    Kind() Kind                  // home/single/list/taxonomy/term/404
     Type() string                // ContentType
-    Layout() string
-
     Title() string
     Slug() string
     Description() string
+
     Permalink() string           // 绝对 URL
-    RelPermalink() string        // 站内相对 URL
-    Aliases() []string
+    RelPermalink() string        // 站内 URL，带着站点的路径
+    Aliases() []string           // 条目以前的地址，Kite 在那里放一个跳转页
 
     Content() template.HTML      // 渲染后的正文（惰性）
-    Summary() template.HTML
-    Truncated() bool
-    TableOfContents() template.HTML
-    Plain() string
-    WordCount() int
+    Excerpt() string             // 摘要：作者写的，或正文开头的一段
+    TableOfContents() []Heading  // 正文的标题，每个有 Level、ID、Text
+    WordCount() int              // 中日韩文字每字算一个词
     ReadingTime() time.Duration
     Images() []string            // 正文里的图片，按出现顺序，保持原文写法
 
@@ -300,63 +302,58 @@ type Page interface {
     Lastmod() time.Time
     Draft() bool
 
-    Params() ParamMap            // front matter 的 meta 字段
-    Terms(taxonomy string) TermList
-    Resources() ResourceList     // page bundle 内的媒体
+    Params() map[string]any      // front matter 的 meta 字段，保持 YAML/TOML 里的类型
+    Terms(taxonomy string) []Term
+    Resources() ResourceList     // page bundle 里的文件，见 §6.7
 
-    Parent() Page
-    Ancestors() PageList
-    Children() PageList
-    Next() Page
-    Prev() Page
-    Translations() PageList
+    Prev() Page                  // 同一种条目里更早的一篇，没有是 nil
+    Next() Page                  // 更新的一篇
 }
 ```
 
-### 6.5 `Paginator` `[已冻结]`
+列表里的页（`.Pages` 的每一项）和前后篇也是 `Page`，带着列表需要的一切：标题、地址、日期、摘要、字数、`Params`、`Terms`、`Images`、`Resources`；只有 `Content`、`TableOfContents` 这些要渲染正文的方法是空的。
+
+以后可以加：`Layout()`、`Summary()` / `Truncated()` / `Plain()`（v1 用 `Excerpt`）、`Parent()` / `Ancestors()` / `Children()`（分节的站点）、`Translations()` 和 `Language()`（多语言，见 §12）。
+
+### 6.5 `Paginator`
 
 ```go
 type Paginator interface {
-    Pages() PageList
     PageNumber() int
     TotalPages() int
     TotalItems() int
     PageSize() int
-    First() Paginator
-    Last() Paginator
-    Prev() Paginator
-    Next() Paginator
     HasPrev() bool
     HasNext() bool
+    PrevURL() string
+    NextURL() string
+    FirstURL() string
+    LastURL() string
     URL(n int) string     // 第 n 页的 URL；URL 模式是配置，这个方法是契约
 }
 ```
 
-**URL 的生成规则（`/page/2/` 还是 `?page=2`）是站点配置**，但模板可见的 API 固定。这样 Build 模式展开成静态页、Serve 模式走查询参数，主题**完全不需要知道**。
+本页的条目是 `.Pages`，不在 `Paginator` 上。**URL 的生成规则（`/page/2/` 还是 `?page=2`）是站点配置**，但模板可见的 API 固定。这样 Build 模式展开成静态页、Serve 模式走查询参数，主题**完全不需要知道**。
 
 **每种列表怎么分页由主题声明**（`theme.yaml` 的 `pagination`，见 [§8.1](#81-完整-schema)），站点的 `build.pagination` 按种类盖过它，都没写的按 `build.pageSize`。数目是 0 的列表只有一页，放全部条目，`PageSize` 等于条目数；每一页仍是一个独立的构建目标。
 
-### 6.6 `Taxonomy` / `Term`
+### 6.6 `Term`
 
 ```go
-type Taxonomy interface {
-    Name() string                 // "tag"
-    Hierarchical() bool
-    Terms() TermList
-    Get(slug string) Term
-}
-
 type Term interface {
-    Name() string
+    Taxonomy() string             // "tags"
+    Name() string                 // 写法不同但地址相同的词条是同一个，名字取写得最多的写法
     Slug() string
     Count() int
     Permalink() string
+    RelPermalink() string
     Page() Page                   // 可能为 nil —— 见下方决策
-    Pages() PageList
-    Parent() Term
-    Children() TermList
 }
 ```
+
+分类法页（`taxonomy.html`）的 term 在 `.Terms` 里；一篇文章的 term 用 `.Page.Terms "tags"`，按这篇文章的写法给出。
+
+以后可以加：`Taxonomy` 对象（`Hierarchical`、`Terms`、`Get`）、`Term.Pages()`、`Term.Parent()` / `Children()`（有层级的分类）。
 
 ### 决策：**Term 是「可以带自己内容文件的页面」** `[已冻结]`
 
@@ -364,26 +361,33 @@ type Term interface {
 
 > **这件事必须在契约冻结前决定。** 将来补"标签可以有描述和封面"会改变每一个 taxonomy / term 模板的数据形状，属于破坏性变更。
 
-### 6.7 `Resource`（Asset Pipeline 的产物）`[已冻结]`
+### 6.7 `Resource`
 
 ```go
 type Resource interface {
-    Name() string
+    Name() string                 // bundle 里的路径，如 images/01.jpg
     RelPermalink() string
     Permalink() string
-    Content() string
-    MediaType() string
-    Data() ParamMap       // 图片的 Width/Height/EXIF 等
+    MediaType() string            // image/jpeg
+    Content() (string, error)
+    Data() (map[string]any, error)  // 图片的 Width、Height
 }
+
+type ResourceList []Resource
+func (ResourceList) Get(name string) Resource        // 没有是 nil
+func (ResourceList) Match(pattern string) ResourceList
+func (ResourceList) ByType(kind string) ResourceList // image / video / audio / text / application
 ```
+
+图片另有 `Width()`、`Height()`（按 EXIF 方向转正后的尺寸，返回 `(int, error)`）。`img.*` 做出的图是 `Image`，方法和上面相同，每一个都返回 `(值, error)`：图只在模板第一次问它的地址或尺寸时才真正去做，做图的错误从这里报出来。
 
 **冻结 `Resource` 接口，不冻结 transform 列表。** 这样以后加 AVIF、加 CSS bundling、换 minifier 都不是破坏性变更。
 
-已实现的是 page bundle 里的文件（`.Resources`）和从图片做出的图（`img.*`）：
-
-- `.Resources` 按名字排序列出 bundle 发布的每个文件（`.md` 和隐藏文件除外，另一篇内容的 bundle 目录除外），`Name` 是 bundle 里的路径，如 `images/01.jpg`。`.Resources.Get "cover.jpg"` 按名字取一个，没有是 nil；`.Resources.Match "*.jpg"` 按通配符取，不分大小写，`*` 不跨 `/`，`**` 跨；`.Resources.ByType "image"` 按媒体类型的大类取。单页、列表里的页、前后篇和短代码的 `.Page` 都有。图片另有 `Width`、`Height`（按 EXIF 方向转正后的尺寸）。
-- `img.Resize "800x"`（缺一边就按比例）、`img.Fit "1200x1200"`（只缩小，放进这个框）、`img.Fill "600x400 top"`（先按比例裁、再缩放到正好这个尺寸，锚点可选）、`img.Crop "600x400"`（只裁不缩）、`img.Format "webp"`（webp / jpeg / png / gif）、`img.Quality 80`（WebP 和 JPEG 的质量，默认 75）。它们接一张图、返回一张待做的图，可以串起来；模板第一次问它的地址或尺寸时才真正去做，所以中间步骤不会多做。JPEG、PNG、GIF 和 WebP 都能读写，全是纯 Go：WebP 用 `github.com/deepteams/webp`（不查找系统里的 libwebp；不用 `golang.org/x/image/webp`，它把 WebP 的黑和白读成 16 和 235 的灰），缩放用 `x/image/draw` 的 Catmull-Rom。固定输入做出的字节由测试核对 hash，CI 在 amd64 和 arm64 上都跑，所以不同机器做出同样的图。WebP 是有损的，保留透明；写成 JPEG 时透明部分铺白。没指定格式就保持源文件的格式。手机照片先按 EXIF 方向转正；做出的图不带源文件的 EXIF，拍摄地点之类不会随图发布。`img.Filter` 还没有实现。
+- `.Resources` 按名字排序列出 bundle 发布的每个文件（`.md` 和隐藏文件除外，另一篇内容的 bundle 目录除外），`Name` 是 bundle 里的路径，如 `images/01.jpg`。`.Resources.Get "cover.jpg"` 按名字取一个，没有是 nil；`.Resources.Match "*.jpg"` 按通配符取，不分大小写，`*` 不跨 `/`，`**` 跨；`.Resources.ByType "image"` 按媒体类型的大类取。单页、列表里的页、前后篇和短代码的 `.Page` 都有。
+- `img.Resize "800x"`（缺一边就按比例）、`img.Fit "1200x1200"`（只缩小，放进这个框）、`img.Fill "600x400 top"`（先按比例裁、再缩放到正好这个尺寸，锚点可选）、`img.Crop "600x400"`（只裁不缩）、`img.Format "webp"`（webp / jpeg / png / gif）、`img.Quality 80`（WebP 和 JPEG 的质量，默认 75）。它们接一张图、返回一张待做的图，可以串起来；模板第一次问它的地址或尺寸时才真正去做，所以中间步骤不会多做。JPEG、PNG、GIF 和 WebP 都能读写，全是纯 Go：WebP 用 `github.com/deepteams/webp`（不查找系统里的 libwebp；不用 `golang.org/x/image/webp`，它把 WebP 的黑和白读成 16 和 235 的灰），缩放用 `x/image/draw` 的 Catmull-Rom。固定输入做出的字节由测试核对 hash，CI 在 amd64 和 arm64 上都跑，所以不同机器做出同样的图。WebP 是有损的，保留透明；写成 JPEG 时透明部分铺白。没指定格式就保持源文件的格式。手机照片先按 EXIF 方向转正；做出的图不带源文件的 EXIF，拍摄地点之类不会随图发布。
 - 做出的图发布在源文件旁边，名字是源文件名加上 16 位 key：`river_<key>.jpg`。key 是源文件内容、整条做法和做图代码版本的 hash，符合 §10.1 的要求。做出的图缓存在 `.kite/cache/images/`，下一次构建和 serve 直接用；serve 按文件名里的 key 找到它，所以 build 和 serve 给出的是同一份字节，`kite theme verify` 的夹具也有一张。
+
+以后可以加：`img.Filter`、AVIF 输出。
 
 ### 6.8 `Shortcode`
 
@@ -414,7 +418,24 @@ type Shortcode interface {
 
 参数没有 schema、不做校验，见 [§11.3](#113-明确不做的东西)。
 
-**render hook**：正文里的图片由 `layouts/_markup/render-image.html` 画（站点的优先于主题的），没有这个模板时按 Markdown 原样输出。模板拿到的 `.` 是 `BodyImage`：`Destination`（正文里写的地址，写 bundle 里的文件时就是 `.Resources.Get` 要的名字）、`Src`（没有模板时页面引用它的地址，从站点根写的带上站点路径）、`Text`（替代文字）、`Title`、`Page`、`Site`。配合 [§6.7](#67-resourceasset-pipeline-的产物已冻结) 的 `img.*`，正文里的照片可以缩小后再发布。链接、标题、代码块的 hook 还没有。`kite theme verify` 的夹具站点自带两个短代码，所以正文里的短代码也在 build 与 serve 的逐字节比较之内。
+**render hook**：正文里的图片由 `layouts/_markup/render-image.html` 画（站点的优先于主题的），没有这个模板时按 Markdown 原样输出。模板拿到的 `.` 是 `BodyImage`：`Destination`（正文里写的地址，写 bundle 里的文件时就是 `.Resources.Get` 要的名字）、`Src`（没有模板时页面引用它的地址，从站点根写的带上站点路径）、`Text`（替代文字）、`Title`、`Page`、`Site`。配合 [§6.7](#67-resource) 的 `img.*`，正文里的照片可以缩小后再发布。链接、标题、代码块的 hook 还没有。`kite theme verify` 的夹具站点自带两个短代码，所以正文里的短代码也在 build 与 serve 的逐字节比较之内。
+
+### 6.9 `MenuItem`（菜单）
+
+```go
+type MenuItem interface {
+    Name() string
+    URL() string              // 站内地址已经带上站点的路径；完整网址原样
+    Params() map[string]any   // 站点给这个链接的其他东西，比如图标
+    Children() []MenuItem
+}
+```
+
+菜单属于站点，不属于主题：写在 `kite.yaml` 的 `menus` 下，按名字分（`main`、`footer`……），换主题不丢。主题在 `theme.yaml` 的 `menus` 里声明它画哪些菜单、每个画几层（§8.1），后台的“菜单”页据此列出要填的菜单。模板用 `{{ range .Site.Menus.main }}` 画；站点没写的菜单是空的，主题可以用 `{{ with .Site.Menus.main }}…{{ else }}…{{ end }}` 退回自己的链接，默认主题就是这样。菜单的名字只能是小写字母、数字和 `_`，所以总能写成 `.Site.Menus.<名字>`。
+
+`URL` 由 Kite 按 `url.Rel` 的规则算好：站内地址从站点根写起（`/about/`），发布在站点的路径下，主题不用再处理；只用来归拢下级链接的一项没有 `URL`。判断当前页用 `eq .URL $.Page.RelPermalink`，两边都带着站点的路径。
+
+以后可以加：按页面引用的菜单项（`page:`，页面改地址时菜单跟着变）、`Page.IsMenuCurrent` 一类的判断。
 
 ---
 
@@ -426,7 +447,9 @@ type Shortcode interface {
 
 > **为什么**：Hugo 有约 200 个扁平的全局函数名，这是**永久的兼容性负债**——它永远不能再新增一个叫 `title` 或 `where` 的函数，也不能把 `title` 的语义改掉。命名空间让这个问题从一开始就不存在。`[EV]`
 
-### 7.2 完整清单（v1 基线）
+### 7.2 `kite/v1` 的函数
+
+下面是 v1 的全部函数，每一个的签名都记录在契约清单里（§11.2）。
 
 **顶层例外**（模板机制必需，无法命名空间化）：
 
@@ -436,32 +459,29 @@ safeHTML  safeURL  safeCSS  safeJS  safeHTMLAttr
 T                              # i18n 的简写，高频到必须顶层
 ```
 
+`default` 的参数顺序和 Hugo 一样，默认值在前：`default "#7d5c3c" .Site.ThemeSettings.accent`。`partialCached` 在 v1 就是 `partial`，接受并忽略 Hugo 写在数据之后的变体参数（§14 第 2 条）。
+
 **`str.*`** —— 字符串
 
 ```
 str.Title  str.Upper  str.Lower  str.Trim  str.TrimPrefix  str.TrimSuffix
-str.Replace  str.Split  str.Join  str.Truncate  str.Slugify
-str.HasPrefix  str.HasSuffix  str.Contains  str.Repeat  str.Pad
-str.Markdownify  str.Plainify  str.CountWords
+str.Replace  str.Split  str.Join  str.Truncate  str.Repeat
+str.HasPrefix  str.HasSuffix  str.Contains  str.CountWords
 ```
 
 **`collections.*`** —— 集合（别名 `coll.*`）
 
 ```
-collections.Where  collections.Sort  collections.First  collections.Last
-collections.After  collections.Shuffle  collections.Uniq  collections.Reverse
-collections.Union  collections.Intersect  collections.Symdiff
-collections.GroupBy  collections.GroupByDate  collections.Len  collections.In
-collections.Apply  collections.Seq
+coll.First  coll.Last  coll.After  coll.Reverse  coll.Uniq  coll.Sort  coll.Len  coll.In
 ```
 
 **`time.*`** —— 时间
 
 ```
-time.Format  time.Parse  time.Since  time.Unix  time.Duration  time.AsTime
+time.Format  time.Parse  time.AsTime  time.Unix  time.Year  time.Minutes  time.IsZero
 ```
 
-front matter 里的值到模板里仍是原来的类型，在单页和列表里一样：日期（无论写在哪一层，YAML 和 TOML 都一样）是 `time.Time`，整数是 `int`，小数是 `float64`。`time.AsTime` 把时间原样返回，把用 front matter 常见写法写成文字的日期（`2026-03-04`、`2026-03-04 09:30`、RFC 3339）读成时间，其余的值报错。
+front matter 里的值到模板里仍是原来的类型，在单页和列表里一样：日期（无论写在哪一层，YAML 和 TOML 都一样）是 `time.Time`，整数是 `int`，小数是 `float64`。`time.AsTime` 把时间原样返回，把用 front matter 常见写法写成文字的日期（`2026-03-04`、`2026-03-04 09:30`、RFC 3339）读成时间，其余的值报错。`time.Minutes` 把 `.ReadingTime` 这样的时长取整成分钟，`time.IsZero` 判断一个日期是不是没写（§6.3）。
 
 > **`time.Now` 不存在。** 模板获取当前时间的唯一途径是 `.Site.BuildTime`。
 > 这不是疏漏，是[构建纯度](architecture.md#142-现在必须做对的四件事回填--重写)的强制执行点——`time.Now()` 是一个隐藏输入，会永久毒化增量构建的可缓存性。
@@ -470,54 +490,61 @@ front matter 里的值到模板里仍是原来的类型，在单页和列表里�
 
 ```
 url.For        # ← 主题生成站内链接的唯一正确方式
-url.Abs  url.Rel  url.JoinPath  url.Query  url.Anchorize  url.Parse
+url.Rel  url.Abs  url.Join  url.Query  url.Escape  url.Anchorize
 ```
 
 > **主题里禁止手工拼接站内链接。** Static 模式（目录索引 / `.html` 后缀）与 Dynamic 模式（路由）的 URL 形态不同，只有 `url.For` / `.Permalink` 能保证两边一致。这是 [§9 跨 Runtime 一致性](#9-跨-runtime-一致性)的第一道防线。
 
-已实现的三个的语义：
+语义：
 
 - `url.For "home"`、`url.For "list" KIND`、`url.For "taxonomy" NAME`、`url.For "term" NAME TERM`：Kite 规划出的页面的链接，按站点配置的路由、URL 风格和 `baseURL` 的路径生成。名字或参数个数不对时模板报错。
 - `url.Rel PATH`：站点里任意路径的链接，如 `"rss.xml"`，或作者在主题设置里填的 `/about/`，前面加上 `baseURL` 的路径。开头有没有 `/` 都一样，这一点和 Hugo 的 `relURL` 不同：交给 Kite 的路径一律是站内路径。完整网址、`//` 开头的地址、只有 `#` 或 `?` 的引用原样返回。
 - `url.Abs PATH`：`url.Rel` 的结果再用 `baseURL` 补成绝对地址。
+- `url.Join`、`url.Query`、`url.Escape`：拼路径的各段、给查询参数的值转义、给路径的一段转义。
 - `url.Anchorize TEXT`：按标题锚点的规则把文字变成 id。标题的 id 从标题的文字生成，规则和 GitHub 相同：转小写，保留任何文字的字母、数字以及 `-`、`_`，空格变成 `-`，其余标点去掉，所以「近况」的 id 就是 `近况`；重复的依次加 `-1`、`-2`，什么都不剩的叫 `heading`，作者用 `{#id}` 写的 id 原样保留。`.TableOfContents` 里的 `.ID` 就是它。中文 id 写进 `href` 时会被 `html/template` 百分号编码，浏览器跳转时会解码；主题脚本拿链接找标题时要先 `decodeURIComponent`。
 
-> 站点部署在子路径下时（GitHub Pages 的项目站点 `user.github.io/repo/`），`.RelPermalink`、分页、term 链接和上面三个函数给出的链接都以这段路径开头，输出文件的位置不变。`kite theme verify` 的夹具站点就发布在子路径下，并报告从域名根开始写的链接。
+> 站点部署在子路径下时（GitHub Pages 的项目站点 `user.github.io/repo/`），`.RelPermalink`、分页、term 链接、菜单和上面这些函数给出的链接都以这段路径开头，输出文件的位置不变。`kite theme verify` 的夹具站点就发布在子路径下，并报告从域名根开始写的链接。
 
 **`img.*`** —— 图片处理
 
 ```
-img.Resize  img.Fit  img.Fill  img.Crop  img.Format  img.Quality  img.Filter
+img.Resize  img.Fit  img.Fill  img.Crop  img.Format  img.Quality
 ```
 
-除 `img.Filter` 外都已实现，语义见 [§6.7](#67-resourceasset-pipeline-的产物已冻结)。
-
-**`asset.*`** —— 资源管线
-
-```
-asset.Get  asset.CSS  asset.JS  asset.Fingerprint  asset.Minify  asset.Bundle  asset.Inline
-```
+语义见 [§6.7](#67-resource)。
 
 **`i18n.*`**
 
 ```
-i18n.T  i18n.Has  i18n.Words  i18n.Lang  i18n.Translate
+i18n.T  i18n.Has  i18n.Words
 ```
 
-`T`、`i18n.T`、`i18n.Has` 和 `i18n.Words` 已实现，语义见 [§12](#12-i18n)。
+语义见 [§12](#12-i18n)。
 
-**`math.*`** / **`debug.*`**
+**`math.*`**
 
 ```
 math.Add  math.Sub  math.Mul  math.Div  math.Mod  math.Ceil  math.Floor  math.Round  math.Max  math.Min
 math.Int  math.Float
-debug.Dump  debug.Timer
 ```
 
-已实现的 `math.*` 和 `collections.*` 对参数类型的约定：
+`math.*` 和 `collections.*` 对参数类型的约定：
 
 - `math.*` 接受任意整数和浮点数。参数都是整数时结果是 `int`，所以 `range` 里用 `math.Add` 数出来的数能直接和 `8` 比较；有一个是浮点数，结果就是 `float64`。`math.Div 7 2` 是 3，和 Go、Hugo 一样舍去余数，`math.Div 7.0 2` 是 3.5。`math.Mod` 和集合函数的个数参数也接受没有小数部分的浮点数。`math.Int`、`math.Float` 把数字或写成文字的数字（`"8"`）转成整数（舍去小数）或浮点数，没有设置的值转成 0。
 - `collections.*` 接受任意切片和数组，如 `.Pages`（`[]Page`）、`str.Split` 的结果（`[]string`），返回的列表和传入的元素类型相同；`str.Join` 同样接受任意列表。`collections.Len` 还能数 map 和字符串（按字符），没有设置的值是 0，其余的值报错，而不是返回 0。`collections.Sort` 按大小排数字、按先后排时间，其余按字符串。
+
+**以后可以加的函数**（设计阶段列过、v1 没有；加进来是只增，已有主题不受影响）：
+
+```
+str.Slugify  str.Pad  str.Markdownify  str.Plainify
+coll.Where  coll.Shuffle  coll.Union  coll.Intersect  coll.Symdiff  coll.GroupBy  coll.GroupByDate  coll.Apply  coll.Seq
+time.Since  time.Duration
+url.Parse
+img.Filter
+asset.Get  asset.CSS  asset.JS  asset.Fingerprint  asset.Minify  asset.Bundle  asset.Inline   # 见 §10
+i18n.Lang  i18n.Translate                                                                      # 见 §12
+debug.Dump  debug.Timer
+```
 
 ### 7.3 新增函数的规则
 
@@ -552,17 +579,7 @@ screenshot: screenshot.png
 # ── 能力声明 ──
 capabilities: [static, dynamic]     # 支持的 Runtime；缺省两者都支持
 contentTypes: [post, page]          # 该主题能渲染的内容类型
-taxonomies: [tag, category]         # 该主题会渲染的分类轴
-outputFormats: [html, rss]
-
-# ── 模板清单（可选，用于 kite doctor 校验完整性）──
-templates:
-  - home
-  - single
-  - list
-  - taxonomy
-  - term
-  - 404
+taxonomies: [tags, categories]      # 该主题会渲染的分类轴
 
 # ── 分页：按列表的种类（home / list / term），每页几条，0 是全部在一页 ──
 # 没写的种类按站点的 build.pageSize；站点的 build.pagination 盖过这里。
@@ -578,6 +595,14 @@ layouts:
     label: Links
     description: A list of links drawn as cards.
     types: [page]                   # 缺省即对所有内容类型提供
+
+# ── 菜单：主题画哪些站点菜单，每个画几层（§6.9）──
+# 名字只能是小写字母、数字和 _；depth 缺省是 1，最多 3。
+menus:
+  - name: main
+    label: Header
+    description: The links across the top of every page.
+    depth: 1
 
 # ── 设置 schema → Admin 自动生成配置页 ──
 settings:
@@ -614,13 +639,15 @@ settings:
       - { key: github,   type: url, label: GitHub }
       - { key: twitter,  type: url, label: X / Twitter }
 
-  - key: nav
+  - key: links
     type: repeat
-    label: 导航菜单
+    label: 友情链接
     fields:
       - { key: text, type: string, label: 文字 }
       - { key: url,  type: url,    label: 链接 }
 ```
+
+v1 读的就是上面这些键；其余的键被忽略，所以以后加一个键不会让旧的 Kite 拒绝新主题。主题的文字（`title`、`description`、设置、布局和菜单的说明）可以由 `i18n/<lang>.yaml` 的 `theme` 键翻译，见 §12。
 
 ### 8.2 Settings 字段类型（v1 基线） `[已冻结]`
 
@@ -628,16 +655,17 @@ settings:
 |---|---|---|
 | `string` | 单行输入 | string |
 | `text` | 多行输入 | string |
-| `number` | 数字输入（`min`/`max`/`step`） | float64 |
+| `number` | 数字输入（`min`/`max`/`step`） | int 或 float64，保持写法 |
 | `boolean` | 开关 | bool |
 | `color` | 取色器 | string |
 | `select` | 下拉（`options`） | string |
-| `multiselect` | 多选 | []string |
-| `image` | 媒体选择器 | Resource |
+| `multiselect` | 多选 | []any，每项是 string |
+| `image` | 上传图片或填地址 | string，图片的地址；站内地址用 `url.Rel` |
 | `url` | URL 输入（带校验） | string |
+| `date` | 日期和时间 | string |
 | `code` | 代码编辑器（`language`） | string |
-| `group` | 嵌套分组（`fields`） | ParamMap |
-| `repeat` | 可增删的重复项（`fields`） | []ParamMap |
+| `group` | 嵌套分组（`fields`） | map[string]any |
+| `repeat` | 可增删的重复项（`fields`） | []any，每项是 map[string]any |
 | `section` | 表单里的分组标题（`fields`），自己不存值 | —（其中的字段存在同一层） |
 
 通用可选属性：`label` / `help` / `default` / `required` / `placeholder` / `showIf`（条件显示）。`color` 字段的 `options` 是推荐色，不限制取值。
@@ -693,25 +721,26 @@ Halo 的 `requires` 是已验证有效的模式 `[EV]`。
 
 ### 9.3 URL 只能由 `url.For` / `.Permalink` 生成
 
-见 [§7.2](#72-完整清单v1-基线)。
+见 [§7.2](#72-kitev1-的函数)。
 
 ### 9.4 `kite theme verify` —— **契约的真身**
 
 ```bash
 kite theme verify ./themes/paper
-kite theme verify ./themes/paper --strict   # 废弃告警升级为失败
 ```
 
 行为：
 
-1. 拿一个内置的 **fixture 站点**（覆盖 single / list / taxonomy / term / 分页 / 404 / RSS / 多语言 / 有图与无图 / 有 term 页与无 term 页）
+1. 拿一个内置的 **fixture 站点**（`internal/themecheck/fixture`，发布在 `/blog/` 路径下）：single / list / taxonomy / term / 分页 / 404 / RSS / sitemap、带图片的 page bundle 和 `img.*` 做出的图、正文里的短代码、有 term 页与无 term 页、没有日期的文章、主菜单（含下级链接和站外链接）与另一个菜单，以及不该出现的草稿和定时文章；主题声明的每个布局各有一页用它
 2. 在 **build 模式**下渲染全站
 3. 在 **serve 模式**下逐 URL 请求 build 写出的每个文件
-4. **逐字节 diff**
+4. **逐字节 diff**，并报告从域名根开始写、漏掉站点路径的链接
 
 > **那个测试才是契约本身，文档不是。** 文档会过时、会被误读；一个跑在 CI 里的黄金文件测试不会。
 >
 > `kite theme verify` **从 M0 就存在**（即使那时只有一套内置主题），不能等到 M5 才补。
+
+`kite theme verify` 管的是「同一套主题在两种 Runtime 下画得一样」；「契约本身不被改坏」由契约清单管（§11.2）。多语言站点到来时夹具要加上第二种语言；有了废弃告警后再加 `--strict`，把告警升级为失败。
 
 ---
 
@@ -740,20 +769,22 @@ resource_hash = SHA256( source_bytes ‖ transform_chain_spec ‖ transform_para
 
 | 函数 | 作用 | v1 |
 |---|---|---|
-| `asset.Get` | 从 `assets/` 取资源 | ✅ |
-| `asset.Fingerprint` | 内容 hash 进文件名 | ✅ |
-| `asset.Minify` | CSS/JS/HTML 压缩 | ✅ |
-| `asset.Inline` | 内联进 HTML | ✅ |
-| `asset.Bundle` | 多文件合并 | M5 |
 | `img.Resize` / `Fit` / `Fill` / `Crop` | 图片缩放、裁切 | ✅ |
-| `img.Format` | WebP / JPEG / PNG / GIF；AVIF 暂不做 | ✅ |
+| `img.Format` / `Quality` | WebP / JPEG / PNG / GIF 和质量；AVIF 暂不做 | ✅ |
+| `asset.Get` | 从 `assets/` 取资源 | 以后 |
+| `asset.Fingerprint` | 内容 hash 进文件名 | 以后 |
+| `asset.Minify` | CSS/JS/HTML 压缩 | 以后 |
+| `asset.Inline` | 内联进 HTML | 以后 |
+| `asset.Bundle` | 多文件合并 | 以后 |
 | SCSS / PostCSS | —— | **不做**，见 [§11.3](#113-明确不做的东西) |
 
-**v1 的主题用纯 CSS。** 需要构建步骤的主题可以自己在发布前编译好，产物放进 `assets/`。
+**v1 没有 `asset.*`。** 主题的 `assets/` 原样发布到站点的 `/assets/`，`static/` 原样发布到站点根，模板用 `url.Rel "assets/main.css"` 链接它们。目前唯一的 transform 是 `img.*`，它做出的图的名字已经按上面的规则由源文件、整条做法和做图代码的版本算出（§6.7）；`asset.*` 以后加入时同样遵守 10.1，并且是只增。
+
+**v1 的主题用纯 CSS。** 需要构建步骤的主题可以自己在发布前编译好，产物放进 `assets/` 或 `static/`。
 
 ### 10.3 带 fingerprint 的产物可以 `immutable`
 
-`Cache-Control: public, max-age=31536000, immutable` —— 这是 fingerprint 的全部意义。
+`Cache-Control: public, max-age=31536000, immutable` —— 这是 fingerprint 的全部意义。`img.*` 做出的图已经是这样的名字；`asset.Fingerprint` 到来之后，样式表和脚本也一样。
 
 ---
 
@@ -773,9 +804,11 @@ resource_hash = SHA256( source_bytes ‖ transform_chain_spec ‖ transform_para
 |---|---|---|
 | **M0** | 引擎可用，契约**内部** | 实现查找顺序、RenderContext、funcmap、`kite theme verify`。文档标注"内部 API，可能变更" |
 | **M1~M4** | 随实现演进 | 遇到不顺手就改，不承担任何兼容义务 |
-| **M5** | **写第二套主题** | 用第一套主题的契约去写一套风格完全不同的主题。**每一处别扭都是契约缺陷的证据**。第二套是文档站主题风标（原名司南），在它自己的仓库 `theme-vane` 里写 |
-| **M5 末** | **冻结，发布 `kite/v1`** | 打版本、写文档、风标发布 1.0 |
+| **M5** | **写第二套主题**（已完成） | 用第一套主题的契约去写一套风格完全不同的主题。**每一处别扭都是契约缺陷的证据**。实际写了两套，各在自己的仓库：文档站主题风标（`kite-plus/theme-vane`，原名司南）和个人站主题年鉴（`kite-plus/theme-almanac`）。写的时候发现的缺口都在冻结前补上了：列表页的 `Params` 和字数、图片处理、`T` 和语言包、按列表分页、短代码、render hook、声明内容类型、菜单 |
+| **M5 末** | **冻结 `kite/v1`**（2026-10-01） | 契约的每一项连同签名记录在 `internal/render/theme/testdata/kite-v1.txt`，`TestTheContractOnlyGrows` 保证它只增不改；§6、§7 按实现逐项写明，设计阶段设想过、v1 没有的标为「以后可以加」；主题作者文档在 [reference.md 的 Themes](../reference.md#themes)；风标随后发布 1.0 |
 | M5 之后 | 只增不改 | 新增方法/函数可以；改名/改语义要走 `kite/v2` |
+
+新增一项时，同时在契约清单里加一行、在 §6 或 §7 写明它，并让用到它的主题把 `requires` 提到带这一项的 Kite 版本；契约测试在清单和实现不一致时失败，所以不会有人不经意地加上或删掉一项。
 
 > **为什么必须等第二套主题：** Hugo 在 v0.146 做了一次**彻底的模板系统重写**——`_default/` 去掉、`layouts/partials` → `layouts/_partials`、`index.html` → `home.html`、`list-baseof.html` → `baseof.list.html`。即便做了新旧映射，仍然打断了包括 Docsy 在内的大量主题 `[EV]`。
 >
@@ -797,15 +830,13 @@ resource_hash = SHA256( source_bytes ‖ transform_chain_spec ‖ transform_para
 
 ## 12. i18n
 
-v1 只发一种语言，**但以下三件事必须在冻结前定死**：
+v1 只发一种语言，**冻结前定死的三件事都已定下**：
 
-1. **Catalog 格式**：go-i18n 风格的 YAML，放 `i18n/<lang>.yaml`
-2. **函数与上下文**：`T "key" count` / `i18n.T` / `.Site.Language` / `.Page.Translations` / `.Site.Languages`
-3. **多语言 URL 策略**：路径前缀（`/zh/posts/...`）还是子域（`zh.example.com`）
+1. **Catalog 格式**（已实现）：go-i18n 风格的 YAML，放 `i18n/<lang>.yaml`，主题和站点各有一份，站点的盖过主题的。
+2. **函数与上下文**：v1 有 `T "key" count`、`i18n.T`、`i18n.Has`、`i18n.Words` 和 `.Site.Language`。多语言站点到来时再加 `.Site.Languages`、`.Page.Language`、`.Page.Translations`，以及查找顺序里的语言后缀（`single.zh.html`，查找本身已经支持，§5.2）。这些名字现在就保留，加进来是只增。
+3. **多语言 URL 策略**（2026-10-01 定）：**路径前缀，默认语言不加前缀。** 默认语言的页面就是现在的地址（`/posts/hello/`），其他语言在自己的前缀下（`/en/posts/hello/`）。所以现在的单语言站点以后加上第二种语言，已有页面的地址一个都不变。以后可以加配置改成子域（`en.example.com`），也是只增。
 
-> **第 3 条最容易被忽略，代价也最大**：它影响**每一个页面的 `.Permalink`**。等有了多语言站点再决定，等于要求所有已存在的站点改 URL。
->
-> **建议默认：路径前缀 + 默认语言不加前缀**，可配置切换为子域。
+> **第 3 条最容易被忽略，代价也最大**：它影响**每一个页面的 `.Permalink`**。等有了多语言站点再决定，等于要求所有已存在的站点改 URL。选「默认语言不加前缀」，正是为了让现在发布的地址以后不用改。
 
 ```yaml
 # i18n/zh-CN.yaml
@@ -815,7 +846,7 @@ posts_count:
   other: "{{.Count}} 篇文章"
 ```
 
-**主题在后台里的文字已经用上这套目录**：`theme` 键下放 `theme.yaml` 里给后台看的文字——`title`、`description`、`settings.<key>.label` / `help` / `placeholder` / `options.<value>`、`group` 和 `repeat` 的 `settings.<key>.fields.<子键>...`、`layouts.<name>.label` / `description`；`section` 里的字段与 section 同层，直接用自己的键。API 按请求的 `Accept-Language` 选最接近的语言包（完全匹配 → 基础语言 → 同一语言的其他地区），语言包里没有的回退到 `theme.yaml` 原文。
+**主题在后台里的文字已经用上这套目录**：`theme` 键下放 `theme.yaml` 里给后台看的文字——`title`、`description`、`settings.<key>.label` / `help` / `placeholder` / `options.<value>`、`group` 和 `repeat` 的 `settings.<key>.fields.<子键>...`、`layouts.<name>.label` / `description`、`menus.<name>.label` / `description`；`section` 里的字段与 section 同层，直接用自己的键。API 按请求的 `Accept-Language` 选最接近的语言包（完全匹配 → 基础语言 → 同一语言的其他地区），语言包里没有的回退到 `theme.yaml` 原文。
 
 **`theme` 以外的键是页面上的词，模板用 `T` 读**（已实现，一个站点一种语言）：
 
@@ -840,23 +871,26 @@ posts_count:
 | fingerprint 在 transform 之前 → 静默的缓存失效 | Hugo #11268 `[EV]` | hash 覆盖整条 DAG |
 | 模板能拿到请求态数据 → 主题只在 Dynamic 下能用 | —— | `.Request` 显式 nil + `{{ with }}` 唯一访问方式 |
 | 模板能读时间 → 破坏构建纯度与增量构建 | —— | funcmap 里没有 `time.Now` |
-| 契约靠文档维护 → 实现漂移无人发现 | —— | `kite theme verify` 黄金文件测试 |
+| 契约靠文档维护 → 实现漂移无人发现 | —— | `kite theme verify` 黄金文件测试；契约清单 `testdata/kite-v1.txt` 和 `TestTheContractOnlyGrows` |
 | 主题继承 → 覆盖语义爆炸 | 多个 CMS | 不做 |
 | Term 不能带内容 → 后来补描述/封面是破坏性变更 | —— | Term 从一开始就可以有 `_index.md` |
 
 ---
 
-## 14. 开放问题 `[待定]`
+## 14. 冻结前的问题及结论
 
-这些**不在 M0 决定**，但要在 M5 冻结前有结论：
+这些没有在 M0 决定，M5 冻结前（2026-10-01）都有了结论：
 
-1. **Shortcode 的语法与能力边界** —— 已定：用 Hugo 的 `{{< >}}` 语法，`{{% %}}` 同样读取，从 Hugo 迁来的内容不用改写（[§6.8](#68-shortcode)）。分工：短代码是作者在正文里显式调用的模板，由站点或主题提供；插件的节点匹配器处理 Markdown 自己的节点，比如语言是 mermaid 的代码块。
-2. **`partialCached` 的缓存键** —— 由用户显式传入，还是从依赖记录自动推导？后者更安全但实现复杂。
-3. **主题能否声明自己需要的 Hook / 插件** —— 例如一个主题依赖 `mermaid` 插件。倾向于：可以声明为**建议**，不能声明为**硬依赖**。
-4. **`.Site.Pages` 在 Serve 模式下的语义** —— 全量加载不可接受，但主题会天真地这么写。倾向于：返回惰性 PageList，并对无 limit 的遍历发出告警。
-5. **暗色模式** —— 完全交给主题 CSS，还是提供一个标准的 settings key 与 `data-theme` 约定？倾向于后者（约定优于各自发明）。
-
----
+1. **Shortcode 的语法与能力边界** —— 用 Hugo 的 `{{< >}}` 语法，`{{% %}}` 同样读取，从 Hugo 迁来的内容不用改写（[§6.8](#68-shortcode)）。分工：短代码是作者在正文里显式调用的模板，由站点或主题提供；插件的节点匹配器处理 Markdown 自己的节点，比如语言是 mermaid 的代码块。
+2. **`partialCached` 的缓存键** —— v1 的 `partialCached` 就是 `partial`：接受并忽略 Hugo 写在数据之后的变体参数，不缓存。构建已经按目标并行渲染，serve 每个请求只画一页，缓存还没有实测的需要；真要缓存时，键从依赖记录推导，模板的写法不变。
+3. **主题能否声明自己需要的 Hook / 插件** —— v1 不能。以后加的话只能是**建议**（后台在切换主题时提示），不能是硬依赖：主题在没有任何插件时也要能用。
+4. **`.Site.Pages` 在 Serve 模式下的语义** —— v1 没有 `.Site.Pages`。列表、分类法和 term 页通过本页的 `.Pages`、`.Paginator`、`.Terms` 拿到条目，serve 只需规划这一页；首页也是列表。以后加 `.Site.Pages` 时，它是惰性的 PageList，对不带上限的遍历发出告警。
+5. **暗色模式** —— 用约定，不加 API：
+   - `<html>` 上的 `data-theme="dark"` 或 `"light"` 表示页面选定了深浅；没有这个属性时跟随系统的 `prefers-color-scheme`。
+   - 读者的选择存在 `localStorage` 的 `kite-theme` 里（`light` 或 `dark`，没有就是跟随系统），由首屏绘制之前的脚本读出来写到 `data-theme` 上，避免闪一下浅色。
+   - 想给站点设默认深浅的主题，用一个叫 `color_scheme` 的 `select` 设置，取值 `auto`、`light`、`dark`。
+   - 插件按同样的顺序判断深浅：先看 `data-theme`，再看系统。官方的评论、公式和图表插件就是这样，并且在 `data-theme` 变化时重画。
+   - 默认主题、风标和 `kite theme new` 生成的样式表都照此实现。
 
 ## 证据来源
 

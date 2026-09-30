@@ -1,0 +1,191 @@
+# The theme contract kite/v1, frozen on 2026-10-01: every method and
+# function a template can call, with its signature. Lines are only ever
+# added; see docs/design/theme-system.md 11.2.
+
+Context.Page func() render.Page
+Context.Pages func() []render.Page
+Context.Paginator func() render.Paginator
+Context.Request func() render.Request
+Context.Site func() render.Site
+Context.Terms func() []render.Term
+Site.Author func() string
+Site.BaseURL func() string
+Site.BuildTime func() time.Time
+Site.Description func() string
+Site.FooterHTML func() template.HTML
+Site.HeadHTML func() template.HTML
+Site.IsBuild func() bool
+Site.IsServe func() bool
+Site.Keywords func() []string
+Site.Language func() string
+Site.Menus func() map[string][]render.MenuItem
+Site.NoIndex func() bool
+Site.Params func() map[string]interface {}
+Site.Taxonomies func() []string
+Site.ThemeSettings func() map[string]interface {}
+Site.Title func() string
+Site.Version func() string
+Page.Aliases func() []string
+Page.Content func() template.HTML
+Page.Date func() time.Time
+Page.Description func() string
+Page.Draft func() bool
+Page.Excerpt func() string
+Page.ID func() string
+Page.Images func() []string
+Page.Kind func() render.Kind
+Page.Lastmod func() time.Time
+Page.Next func() render.Page
+Page.Params func() map[string]interface {}
+Page.Permalink func() string
+Page.Prev func() render.Page
+Page.PublishDate func() time.Time
+Page.ReadingTime func() time.Duration
+Page.RelPermalink func() string
+Page.Resources func() render.ResourceList
+Page.Slug func() string
+Page.TableOfContents func() []render.Heading
+Page.Terms func(string) []render.Term
+Page.Title func() string
+Page.Type func() string
+Page.WordCount func() int
+Heading.ID func() string
+Heading.Level func() int
+Heading.Text func() string
+Term.Count func() int
+Term.Name func() string
+Term.Page func() render.Page
+Term.Permalink func() string
+Term.RelPermalink func() string
+Term.Slug func() string
+Term.Taxonomy func() string
+MenuItem.Children func() []render.MenuItem
+MenuItem.Name func() string
+MenuItem.Params func() map[string]interface {}
+MenuItem.URL func() string
+Paginator.FirstURL func() string
+Paginator.HasNext func() bool
+Paginator.HasPrev func() bool
+Paginator.LastURL func() string
+Paginator.NextURL func() string
+Paginator.PageNumber func() int
+Paginator.PageSize func() int
+Paginator.PrevURL func() string
+Paginator.TotalItems func() int
+Paginator.TotalPages func() int
+Paginator.URL func(int) string
+Request.Header func(string) string
+Request.Path func() string
+Request.Query func(string) string
+Resource.Content func() (string, error)
+Resource.Data func() (map[string]interface {}, error)
+Resource.MediaType func() string
+Resource.Name func() string
+Resource.Permalink func() string
+Resource.RelPermalink func() string
+ResourceList.ByType func(string) render.ResourceList
+ResourceList.Get func(string) render.Resource
+ResourceList.Match func(string) render.ResourceList
+Shortcode.Get func(interface {}) interface {}
+Shortcode.Inner func() (template.HTML, error)
+Shortcode.IsNamedParams func() bool
+Shortcode.Name func() string
+Shortcode.Ordinal func() int
+Shortcode.Page func() render.Page
+Shortcode.Params func() interface {}
+Shortcode.Parent func() render.Shortcode
+Shortcode.RawInner func() string
+Shortcode.Site func() render.Site
+BodyImage.Destination func() string
+BodyImage.Page func() render.Page
+BodyImage.Site func() render.Site
+BodyImage.Src func() string
+BodyImage.Text func() string
+BodyImage.Title func() string
+Resource(picture).Width func() (int, error)
+Resource(picture).Height func() (int, error)
+Image.Content func() (string, error)
+Image.Data func() (map[string]interface {}, error)
+Image.Height func() (int, error)
+Image.MediaType func() (string, error)
+Image.Name func() (string, error)
+Image.Permalink func() (string, error)
+Image.RelPermalink func() (string, error)
+Image.Width func() (int, error)
+T func(string, ...interface {}) (string, error)
+coll.After func(interface {}, interface {}) (interface {}, error)
+coll.First func(interface {}, interface {}) (interface {}, error)
+coll.In func(interface {}, interface {}) (bool, error)
+coll.Last func(interface {}, interface {}) (interface {}, error)
+coll.Len func(interface {}) (int, error)
+coll.Reverse func(interface {}) (interface {}, error)
+coll.Sort func(interface {}) (interface {}, error)
+coll.Uniq func(interface {}) (interface {}, error)
+collections.After func(interface {}, interface {}) (interface {}, error)
+collections.First func(interface {}, interface {}) (interface {}, error)
+collections.In func(interface {}, interface {}) (bool, error)
+collections.Last func(interface {}, interface {}) (interface {}, error)
+collections.Len func(interface {}) (int, error)
+collections.Reverse func(interface {}) (interface {}, error)
+collections.Sort func(interface {}) (interface {}, error)
+collections.Uniq func(interface {}) (interface {}, error)
+default func(interface {}, interface {}) interface {}
+dict func(...interface {}) (map[string]interface {}, error)
+i18n.Has func(string) bool
+i18n.T func(string, ...interface {}) (string, error)
+i18n.Words func(...string) map[string]string
+img.Crop func(string, interface {}) (*render.Image, error)
+img.Fill func(string, interface {}) (*render.Image, error)
+img.Fit func(string, interface {}) (*render.Image, error)
+img.Format func(string, interface {}) (*render.Image, error)
+img.Quality func(interface {}, interface {}) (*render.Image, error)
+img.Resize func(string, interface {}) (*render.Image, error)
+math.Add func(interface {}, interface {}) (interface {}, error)
+math.Ceil func(interface {}) (interface {}, error)
+math.Div func(interface {}, interface {}) (interface {}, error)
+math.Float func(interface {}) (float64, error)
+math.Floor func(interface {}) (interface {}, error)
+math.Int func(interface {}) (int, error)
+math.Max func(interface {}, interface {}) (interface {}, error)
+math.Min func(interface {}, interface {}) (interface {}, error)
+math.Mod func(interface {}, interface {}) (int, error)
+math.Mul func(interface {}, interface {}) (interface {}, error)
+math.Round func(interface {}) (interface {}, error)
+math.Sub func(interface {}, interface {}) (interface {}, error)
+partial func(string, interface {}) (template.HTML, error)
+partialCached func(string, interface {}, ...interface {}) (template.HTML, error)
+safeCSS func(string) template.CSS
+safeHTML func(string) template.HTML
+safeHTMLAttr func(string) template.HTMLAttr
+safeJS func(string) template.JS
+safeURL func(string) template.URL
+slice func(...interface {}) []interface {}
+str.Contains func(string, string) bool
+str.CountWords func(string) int
+str.HasPrefix func(string, string) bool
+str.HasSuffix func(string, string) bool
+str.Join func(string, interface {}) (string, error)
+str.Lower func(string) string
+str.Repeat func(int, string) string
+str.Replace func(string, string, string) string
+str.Split func(string, string) []string
+str.Title func(string) string
+str.Trim func(string) string
+str.TrimPrefix func(string, string) string
+str.TrimSuffix func(string, string) string
+str.Truncate func(int, string) string
+str.Upper func(string) string
+time.AsTime func(interface {}) (time.Time, error)
+time.Format func(string, time.Time) string
+time.IsZero func(time.Time) bool
+time.Minutes func(time.Duration) int
+time.Parse func(string, string) (time.Time, error)
+time.Unix func(time.Time) int64
+time.Year func(time.Time) int
+url.Abs func(string) string
+url.Anchorize func(string) string
+url.Escape func(string) string
+url.For func(string, ...string) (string, error)
+url.Join func(...string) string
+url.Query func(string) string
+url.Rel func(string) string

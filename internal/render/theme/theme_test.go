@@ -460,3 +460,20 @@ func TestMenusAreDeclaredByNamesATemplateCanReach(t *testing.T) {
 		}
 	}
 }
+
+// A Hugo template caches a partial by variant keys after its data. Kite draws
+// the partial as partial does, keys and all, rather than refusing the call.
+func TestPartialCachedTakesHugosVariantKeys(t *testing.T) {
+	th := fstest.MapFS{
+		"single.html":         file(`{{ partialCached "note.html" . "variant" 2 }}|{{ partialCached "note.html" . }}`),
+		"_partials/note.html": file(`<b>{{ .Title }}</b>`),
+	}
+	e := theme.NewEngine(theme.Options{Sources: []theme.Source{{Name: "theme", FS: th}}})
+	out, err := e.Render(theme.Target{Kind: "single"}, map[string]any{"Title": "Hello"})
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if got := string(out); got != "<b>Hello</b>|<b>Hello</b>" {
+		t.Errorf("got %q", got)
+	}
+}

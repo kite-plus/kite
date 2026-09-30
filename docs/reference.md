@@ -287,6 +287,12 @@ previewed; one that fails is shown the first line that differs in each file.
 With no directory it checks the project's own theme, or the built-in one
 outside a project.
 
+The contract a theme is written to, `apiVersion: kite/v1`, is frozen: what a
+template can call, every method and function with its signature, is listed in
+[theme-system.md](design/theme-system.md) sections 6 and 7 and is only ever
+added to, never renamed, removed or changed. A theme that uses something added
+later names the Kite it needs with `requires`.
+
 The small site is published under a path, as a GitHub Pages project site is,
 so a link written from the root of the host, such as `/rss.xml`, is reported
 as well. A template links to Kite's own pages with `url.For "home"`,

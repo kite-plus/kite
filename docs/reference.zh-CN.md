@@ -240,6 +240,10 @@ kite theme verify ./themes/paper
 RSS 和 sitemap，逐字节比较。通过检查的主题，发布出去的就是 `kite run` 预览时看到的；
 没通过的，会指出每个文件第一处不同的行。不给目录时，检查当前项目在用的主题，在项目之外则检查内置主题。
 
+主题所依据的契约 `apiVersion: kite/v1` 已经冻结：模板能调用的东西，每个方法和函数
+连同签名，列在 [theme-system.md](design/theme-system.md) 第 6、7 节，以后只增，不改名、
+不删除、不改签名。用到后来新增的东西的主题，用 `requires` 写明它需要的 Kite 版本。
+
 这个小站点发布在一个路径下，就像 GitHub Pages 的项目站点那样，所以从域名根开始写的链接，
 比如 `/rss.xml`，也会被报告出来。模板链接到 Kite 自己的页面用 `url.For "home"`、
 `url.For "list" "post"`、`url.For "taxonomy" "tags"` 或 `url.For "term" "tags" "Go"`，

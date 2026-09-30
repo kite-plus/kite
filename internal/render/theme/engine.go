@@ -192,7 +192,7 @@ func (e *Engine) special(dir, name string) (*template.Template, error) {
 	root := template.New("kite").Funcs(e.funcs)
 	root = root.Funcs(template.FuncMap{
 		"partial":       partialFunc(root),
-		"partialCached": partialFunc(root),
+		"partialCached": partialCachedFunc(root),
 	})
 	if err := e.parsePartials(root); err != nil {
 		return nil, err
@@ -242,7 +242,7 @@ func (e *Engine) build(t Target, page Candidate) (*template.Template, error) {
 	// Partials are bound late so that a partial can call another partial.
 	root = root.Funcs(template.FuncMap{
 		"partial":       partialFunc(root),
-		"partialCached": partialFunc(root),
+		"partialCached": partialCachedFunc(root),
 	})
 
 	if err := e.parsePartials(root); err != nil {
@@ -321,6 +321,16 @@ func (e *Engine) read(name string) ([]byte, error) {
 		}
 	}
 	return nil, fmt.Errorf("theme: template %s not found", name)
+}
+
+// partialCachedFunc is partialCached, which takes Hugo's variant keys after
+// the data and draws the partial as partial does. Nothing is cached: a build
+// draws its pages in parallel and a server one page a request, and a key
+// derived from the dependency record can come later without a change to
+// what a template writes.
+func partialCachedFunc(root *template.Template) func(string, any, ...any) (template.HTML, error) {
+	partial := partialFunc(root)
+	return func(name string, data any, _ ...any) (template.HTML, error) { return partial(name, data) }
 }
 
 // partialFunc renders a named partial into the surrounding document.
