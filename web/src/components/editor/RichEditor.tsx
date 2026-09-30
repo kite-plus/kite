@@ -6,6 +6,7 @@ import { extensions, type Env } from "@/components/editor/extensions";
 import { ImageBubble } from "@/components/editor/ImageBubble";
 import { LinkBubble } from "@/components/editor/LinkBubble";
 import { slashKey, type SlashItem } from "@/components/editor/SlashMenu";
+import { keeper } from "@/components/editor/stable";
 import type { UploadFunction } from "@/components/tiptap-node/image-upload-node";
 import { resolveLink } from "@/lib/links";
 
@@ -46,7 +47,8 @@ const altOf = (file: File) => file.name.replace(/\.[^.]+$/, "");
  * Markdown goes in and markdown comes out: the document model is
  * ProseMirror's, but what is stored is what a build reads. Nothing is
  * serialized until the author changes something, so opening a file and
- * closing it again leaves its bytes alone.
+ * closing it again leaves its bytes alone, and then only the blocks that
+ * changed are written anew.
  */
 export function RichEditor({
   value,
@@ -69,6 +71,19 @@ export function RichEditor({
   const instance = useRef<Editor | null>(null);
   // The last markdown handed out, which is what a value prop is compared against.
   const emitted = useRef(value);
+  // keep writes the blocks an edit left alone as the body has them.
+  const keep = useRef<(fresh: string) => string>((fresh) => fresh);
+  const follow = (editor: Editor, markdown: string) => {
+    const md = editor.markdown;
+    keep.current = md
+      ? keeper(
+          (text) => md.instance.lexer(text),
+          (text) => md.serialize(md.parse(text)),
+          markdown,
+          editor.getMarkdown(),
+        )
+      : (fresh) => fresh;
+  };
 
   const env = useMemo<Env>(
     () => ({
@@ -141,13 +156,14 @@ export function RichEditor({
       // appends an empty paragraph to a body that does not end in one on the
       // first click, and that alone must not mark the item changed.
       if (!transaction.docChanged) return;
-      emitted.current = editor.getMarkdown();
+      emitted.current = keep.current(editor.getMarkdown());
       latest.current.onChange(emitted.current);
     },
   });
 
   useEffect(() => {
     instance.current = editor;
+    follow(editor, emitted.current);
     latest.current.onReady?.(editor);
     return () => {
       instance.current = null;
@@ -166,6 +182,7 @@ export function RichEditor({
     }
     emitted.current = value;
     editor.commands.setContent(value, { contentType: "markdown", emitUpdate: false });
+    follow(editor, value);
   }, [editor, value]);
 
   const resolveUrl = useCallback((url: string) => resolveLink(url, base, home), [base, home]);
