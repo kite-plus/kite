@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChainedCommands, Editor } from "@tiptap/react";
-import { ChevronLeft, History, Info, Minus, Table, Type, X, XCircle } from "lucide-react";
+import { ChevronLeft, Eye, History, Info, Minus, Table, Type, X, XCircle } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -466,14 +466,16 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
             onDelete={id ? () => setRemoving(true) : undefined}
             disabled={!writable}
           />
+          {/* On a phone the preview takes the editor's place, and shows by its icon alone. */}
           <Button
             variant="outline"
             size="sm"
             aria-pressed={preview}
             onClick={() => setPreview(!preview)}
-            className="hidden sm:inline-flex aria-pressed:bg-muted"
+            className="aria-pressed:bg-muted max-sm:px-2"
           >
-            {t("editor.preview")}
+            <Eye className="sm:hidden" />
+            <span className="max-sm:sr-only">{t("editor.preview")}</span>
           </Button>
 
           {!writable ? null : canPublish(delivery.data) ? (
