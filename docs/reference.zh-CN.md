@@ -220,6 +220,16 @@ menus:
 `.URL`、`.Children`，以及 `.Params`，即站点给它的其他东西，比如图标。站点没写的菜单是空的。
 内置主题在页头画 `main`，站点写这个菜单之前，显示它自己的链接。
 
+主题也可以在命令行里管理。命令检查主题的方式和后台一样，写下的改动也一样，之后照常发布：
+
+```bash
+kite theme list                  # 站点能用的主题，* 标出正在用的
+kite theme add vane-0.2.0.zip    # 发布附带的压缩包，或一个目录；--replace 替换同名的
+kite theme use vane              # 写 theme.name
+kite theme remove paper          # 正在用的不能删
+kite theme new paper             # 生成一个起步的主题目录
+```
+
 主题可以对照它所依据的契约检查：
 
 ```bash

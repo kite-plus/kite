@@ -262,6 +262,18 @@ whatever else the site gives it, such as an icon. A menu the site has not
 written is empty. The built-in theme draws `main` in its header, and its own
 links until the site writes one.
 
+Themes can be handled from the command line too. The commands check a theme
+the way the studio does and write the same changes, which are then published
+like any other:
+
+```bash
+kite theme list                  # what the site can use; * marks the one in use
+kite theme add vane-0.2.0.zip    # a release's archive, or a folder; --replace over one
+kite theme use vane              # sets theme.name
+kite theme remove paper          # not the one in use
+kite theme new paper             # a folder to start a theme from
+```
+
 A theme can be checked against the contract it is written to:
 
 ```bash

@@ -21,16 +21,6 @@ import (
 	"github.com/kite-plus/kite/internal/render/theme"
 )
 
-// Bounds on an uploaded theme: the archive as sent, the files once unpacked,
-// and how many of them there are. A theme is templates, a stylesheet or two
-// and perhaps some fonts and pictures; these leave room for all of that and
-// none for an archive built to fill the disk.
-const (
-	maxThemeArchive = 64 << 20
-	maxThemeSize    = 128 << 20
-	maxThemeFiles   = 5000
-)
-
 // handleThemes lists the themes the project could use.
 func (s *Server) handleThemes(w http.ResponseWriter, r *http.Request) {
 	view := s.src()
@@ -125,18 +115,18 @@ func (s *Server) handleInstallTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = file.Close() }()
-	sent, err := io.ReadAll(io.LimitReader(file, maxThemeArchive+1))
+	sent, err := io.ReadAll(io.LimitReader(file, theme.MaxArchive+1))
 	if err != nil {
 		s.failErr(w, err)
 		return
 	}
-	if len(sent) > maxThemeArchive {
+	if len(sent) > theme.MaxArchive {
 		fail(w, http.StatusRequestEntityTooLarge, CodeInvalidRequest,
-			fmt.Sprintf("a theme archive may be at most %d MB", maxThemeArchive>>20))
+			fmt.Sprintf("a theme archive may be at most %d MB", theme.MaxArchive>>20))
 		return
 	}
 
-	files, problem := archive.Unpack(sent, "theme", theme.ManifestName, maxThemeSize, maxThemeFiles)
+	files, problem := archive.Unpack(sent, "theme", theme.ManifestName, theme.MaxSize, theme.MaxFiles)
 	if problem != "" {
 		failField(w, http.StatusBadRequest, CodeInvalidRequest, "file", problem)
 		return

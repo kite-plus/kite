@@ -16,6 +16,7 @@ import (
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/project"
+	"github.com/kite-plus/kite/internal/render/theme"
 )
 
 func newPluginCmd() *cobra.Command {
@@ -111,7 +112,7 @@ func newPluginAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			files, err := readPackage(args[0])
+			files, err := readPackage(args[0], pluginPackage)
 			if err != nil {
 				return err
 			}
@@ -147,8 +148,24 @@ func newPluginAddCmd() *cobra.Command {
 	return cmd
 }
 
-// readPackage reads a plugin's files from a zip archive or a directory.
-func readPackage(path string) (map[string][]byte, error) {
+// packageKind is what a package of one kind may hold when it is installed
+// from a zip archive or a directory.
+type packageKind struct {
+	name       string
+	manifest   string
+	maxArchive int
+	maxSize    int64
+	maxFiles   int
+}
+
+var (
+	pluginPackage = packageKind{"plugin", plugin.ManifestName, plugin.MaxArchive, plugin.MaxSize, plugin.MaxFiles}
+	themePackage  = packageKind{"theme", theme.ManifestName, theme.MaxArchive, theme.MaxSize, theme.MaxFiles}
+)
+
+// readPackage reads a plugin's or a theme's files from a zip archive or a
+// directory.
+func readPackage(path string, kind packageKind) (map[string][]byte, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -158,10 +175,10 @@ func readPackage(path string) (map[string][]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if len(data) > plugin.MaxArchive {
-			return nil, fmt.Errorf("a plugin archive may be at most %d MB", plugin.MaxArchive>>20)
+		if len(data) > kind.maxArchive {
+			return nil, fmt.Errorf("a %s archive may be at most %d MB", kind.name, kind.maxArchive>>20)
 		}
-		files, problem := archive.Unpack(data, "plugin", plugin.ManifestName, plugin.MaxSize, plugin.MaxFiles)
+		files, problem := archive.Unpack(data, kind.name, kind.manifest, kind.maxSize, kind.maxFiles)
 		if problem != "" {
 			return nil, errors.New(problem)
 		}
@@ -176,7 +193,7 @@ func readPackage(path string) (map[string][]byte, error) {
 		}
 		name := d.Name()
 		if d.IsDir() {
-			// What version control and editors keep beside the plugin is not
+			// What version control and editors keep beside a package is not
 			// part of it.
 			if p != path && strings.HasPrefix(name, ".") {
 				return filepath.SkipDir
@@ -194,8 +211,8 @@ func readPackage(path string) (map[string][]byte, error) {
 		if err != nil {
 			return err
 		}
-		if total += int64(len(data)); total > plugin.MaxSize || len(files) == plugin.MaxFiles {
-			return fmt.Errorf("a plugin may take at most %d MB in %d files", plugin.MaxSize>>20, plugin.MaxFiles)
+		if total += int64(len(data)); total > kind.maxSize || len(files) == kind.maxFiles {
+			return fmt.Errorf("a %s may take at most %d MB in %d files", kind.name, kind.maxSize>>20, kind.maxFiles)
 		}
 		files[filepath.ToSlash(rel)] = data
 		return nil

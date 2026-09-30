@@ -45,6 +45,16 @@ const MarkupDir = "_markup"
 // ManifestName is the theme descriptor.
 const ManifestName = "theme.yaml"
 
+// Bounds on a theme installed from an archive or a directory: the archive as
+// sent, the files once unpacked, and how many of them there are. A theme is
+// templates, a stylesheet or two and perhaps some fonts and pictures; these
+// leave room for all of that and none for an archive built to fill the disk.
+const (
+	MaxArchive = 64 << 20
+	MaxSize    = 128 << 20
+	MaxFiles   = 5000
+)
+
 // Author describes a theme's author.
 type Author struct {
 	Name string `yaml:"name"`
