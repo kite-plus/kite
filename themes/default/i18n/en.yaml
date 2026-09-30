@@ -20,6 +20,7 @@ total:
   one: "{{ .Count }} post"
   other: "{{ .Count }} posts"
 year: "{{ .Year }}"
+undated: Undated
 date:
   short: Jan 2
   long: January 2, 2006

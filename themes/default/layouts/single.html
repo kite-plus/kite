@@ -6,11 +6,17 @@
   <article>
     <header>
       <h1>{{ .Title }}</h1>
+      {{- $dated := not (time.IsZero .PublishDate) }}
+      {{- $filed := partial "terms.html" (dict "page" . "site" $site) }}
+      {{- if or $dated $filed $settings.show_word_count }}
       <p class="meta">
+        {{- if $dated }}
         <time datetime="{{ time.Format "2006-01-02" .PublishDate }}">{{ time.Format (T "date.long") .PublishDate }}</time>
-        {{- with partial "terms.html" (dict "page" . "site" $site) }} · <span class="filed-in">{{ . }}</span>{{ end }}
-        {{- if $settings.show_word_count }} · {{ T "words" .WordCount }} · {{ T "minutes" (time.Minutes .ReadingTime) }}{{ end }}
+        {{- end }}
+        {{- with $filed }}{{ if $dated }} · {{ end }}<span class="filed-in">{{ . }}</span>{{ end }}
+        {{- if $settings.show_word_count }}{{ if or $dated $filed }} · {{ end }}{{ T "words" .WordCount }} · {{ T "minutes" (time.Minutes .ReadingTime) }}{{ end }}
       </p>
+      {{- end }}
     </header>
     {{- if $settings.show_toc }}{{ partial "toc.html" (dict "page" . "site" $site) }}{{ end }}
     <div class="content">{{ .Content }}</div>

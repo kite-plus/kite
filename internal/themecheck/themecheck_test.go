@@ -22,13 +22,14 @@ func TestTheBuiltInThemeDrawsTheSamePagesBuiltAndServed(t *testing.T) {
 	for _, d := range report.Outside {
 		t.Errorf("%s %s, outside the site", d.URL, d.Detail)
 	}
-	// Every kind of page: seven posts and a page, three pages of the home
-	// listing and of the posts, the pages listing, both taxonomies, their
-	// five terms and the 404. Then the feed and its alias, the sitemap and
-	// the two images a page bundle carries, one in a folder, a page for the
-	// links layout the theme offers, the page at a post's old address, and
-	// the picture a shortcode has made from the bundle's.
-	if want := 8 + 3 + 3 + 1 + 2 + 5 + 1 + 5 + 1 + 1 + 1; report.Compared != want {
+	// Every kind of page: eight posts, one of them with no date, and a page,
+	// three pages of the home listing and of the posts, the pages listing,
+	// both taxonomies, their five terms and the 404. Then the feed and its
+	// alias, the sitemap and the two images a page bundle carries, one in a
+	// folder, a page for the links layout the theme offers, the page at a
+	// post's old address, and the picture a shortcode has made from the
+	// bundle's.
+	if want := 9 + 3 + 3 + 1 + 2 + 5 + 1 + 5 + 1 + 1 + 1; report.Compared != want {
 		t.Errorf("%d files compared, want %d; the fixture no longer covers what it did", report.Compared, want)
 	}
 	if !report.OK() {

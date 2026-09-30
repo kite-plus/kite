@@ -1081,6 +1081,93 @@ func TestPageWithoutATitleLeavesNoDanglingSeparator(t *testing.T) {
 	}
 }
 
+// A file written by hand may give neither a publish date nor a creation date,
+// and its dates are then the zero time. The theme printed that as the first
+// of January of the year 1, and its archive filed the post under the year 1.
+func TestAPostThatGivesNoDateShowsNone(t *testing.T) {
+	f := newFixture(t, 2) // post-01, dated 2026-01-02, is the newest
+	th, err := theme.Load(themes.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.engine = theme.NewEngine(theme.Options{
+		Sources: []theme.Source{{Name: "default", FS: th.Layouts}},
+		Links:   f.resolve,
+		Words:   theme.NewWords("en", th.Packs),
+	})
+	for _, p := range []struct{ id, slug, terms string }{
+		{"01J8KQ2P3R4S5T6V7W8X9YZ903", "undated", "tags: [Go]\n"},
+		{"01J8KQ2P3R4S5T6V7W8X9YZ904", "bare", ""},
+	} {
+		f.add(t, "content/posts/"+p.slug+"/index.md", fmt.Sprintf(
+			"---\nid: %s\ntitle: %s\nslug: %s\nstatus: published\n%s---\n\nWritten without a date.\n",
+			p.id, p.slug, p.slug, p.terms))
+	}
+	f.run(t, f.out, func(o *build.Options) {
+		o.PageSize = 10
+		o.Site.ThemeSettings = map[string]any{"show_word_count": true}
+	})
+
+	// The line under the title starts with whatever there is to show.
+	for file, want := range map[string]string{
+		"posts/post-01/index.html": `<time datetime="2026-01-02">January 2, 2026</time> · <span class="filed-in">`,
+		"posts/undated/index.html": `<span class="filed-in"><a href="/tags/go/">Go</a></span> · 4 words · 1 min read`,
+		"posts/bare/index.html":    `4 words · 1 min read`,
+	} {
+		page := readFile(t, f.out, file)
+		if got := metaOf(page); !strings.HasPrefix(got, want) {
+			t.Errorf("%s: meta = %q, want it to start %q", file, got, want)
+		}
+		if file != "posts/post-01/index.html" && strings.Contains(page, "<time") {
+			t.Errorf("%s shows a date: %s", file, excerptOf(page, "<time"))
+		}
+	}
+
+	home := readFile(t, f.out, "index.html")
+	for _, post := range strings.Split(home, `<article class="post">`)[1:] {
+		post, _, _ = strings.Cut(post, "</article>")
+		undated := strings.Contains(post, `href="/posts/undated/"`) || strings.Contains(post, `href="/posts/bare/"`)
+		if strings.Contains(post, "<time") == undated {
+			t.Errorf("home page: a post shows a date if and only if it gives one, but got:\n%s", post)
+		}
+	}
+
+	archive := readFile(t, f.out, "posts/index.html")
+	if strings.Contains(archive, "<h2>1</h2>") {
+		t.Errorf("the archive has a year 1: %s", excerptOf(archive, "<h2>1</h2>"))
+	}
+	dated, undated, ok := strings.Cut(archive, "<h2>Undated</h2>")
+	if !ok || !strings.Contains(dated, "<h2>2026</h2>") {
+		t.Fatalf("the archive does not list the undated posts apart from 2026: %s", excerptOf(archive, "<h2>"))
+	}
+	for _, slug := range []string{"undated", "bare"} {
+		if link := `href="/posts/` + slug + `/"`; strings.Contains(dated, link) || !strings.Contains(undated, link) {
+			t.Errorf("the archive does not list %s under Undated", slug)
+		}
+	}
+	if strings.Contains(undated, "<time") {
+		t.Errorf("the archive dates a post that gives no date: %s", excerptOf(undated, "<time"))
+	}
+
+	// With nothing to show, the line is left out rather than drawn empty.
+	quiet := filepath.Join(f.root, "quiet")
+	f.run(t, quiet, nil)
+	if page := readFile(t, quiet, "posts/bare/index.html"); strings.Contains(page, `class="meta"`) {
+		t.Errorf("an empty meta line was drawn: %s", excerptOf(page, `class="meta"`))
+	}
+}
+
+// metaOf is what the line under a post's title says.
+func metaOf(page string) string {
+	const open = `<p class="meta">`
+	_, rest, ok := strings.Cut(page, open)
+	if !ok {
+		return ""
+	}
+	meta, _, _ := strings.Cut(rest, "</p>")
+	return strings.TrimSpace(meta)
+}
+
 func documentTitle(t *testing.T, page string) string {
 	t.Helper()
 	const open, close = "<title>", "</title>"

@@ -266,6 +266,8 @@ type Site interface {
 
 **日期按站点的时区给出。** `site.timezone` 设置后，`BuildTime` 和页面的 `Date`、`PublishDate`、`Lastmod` 都换算到这个时区，模板直接格式化即可；不设置时，日期保持写入时的时区。时区属于站点而不是主题：同一篇文章落在哪一天，不应随换主题而变。
 
+**日期可能是零值。** `PublishDate` 在没有发布时间时退回创建时间；手写的文章可能两者都没写，这时 `Date`、`PublishDate`、`Lastmod` 都是零值。主题先用 `time.IsZero` 判断：零值不显示，也不按它的年份（公元 1 年）归档。
+
 **站点的关键词、作者、`noindex` 和自定义代码由主题写进页面。** 它们跟着站点保存，换主题不丢；主题负责把它们放到 `<head>` 和 `</body>` 前。自动注入更多 SEO 标签（如 Open Graph）留给插件（[plugin-system.md](plugin-system.md)）。
 
 ### 6.4 `Page`

@@ -19,15 +19,21 @@
     </span>
   </header>
   <div class="archive">
-    {{- $year := 0 }}
+    {{- /* A post that gives no date is listed under a heading of its own, not
+           under the year 1. Its year is 0 here, so -1 means no heading yet. */ -}}
+    {{- $year := -1 }}
     {{- range $pages }}
-      {{- $y := time.Year .PublishDate }}
+      {{- $dated := not (time.IsZero .PublishDate) }}
+      {{- $y := 0 }}
+      {{- if $dated }}{{ $y = time.Year .PublishDate }}{{ end }}
       {{- if ne $y $year }}
-    <h2>{{ T "year" (dict "Year" $y) }}</h2>
+    <h2>{{ if $dated }}{{ T "year" (dict "Year" $y) }}{{ else }}{{ T "undated" }}{{ end }}</h2>
         {{- $year = $y }}
       {{- end }}
     <div class="entry">
+      {{- if $dated }}
       <time datetime="{{ time.Format "2006-01-02" .PublishDate }}">{{ time.Format (T "date.short") .PublishDate }}</time>
+      {{- end }}
       <a class="title" href="{{ .RelPermalink }}">{{ .Title }}</a>
       {{- with partial "terms.html" (dict "page" . "site" $site) }}
       <span class="filed-in">{{ . }}</span>

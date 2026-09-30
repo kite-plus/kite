@@ -4,12 +4,14 @@
 <div class="posts">
   {{- range .Pages }}
   <article class="post">
+    {{- if not (time.IsZero .PublishDate) }}
     <time datetime="{{ time.Format "2006-01-02" .PublishDate }}">
       {{- time.Format (T "date.short") .PublishDate }}
       {{- /* A date with no year reads as this year, so an older one says so. */ -}}
       {{- $year := time.Year .PublishDate }}
       {{- if ne $year $thisYear }}<span class="year">{{ $year }}</span>{{ end -}}
     </time>
+    {{- end }}
     <div>
       <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
       {{- if $summary }}{{ with .Excerpt }}

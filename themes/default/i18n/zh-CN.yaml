@@ -79,6 +79,7 @@ words: "{{ .Count }} 字"
 minutes: "约 {{ .Count }} 分钟"
 total: "共 {{ .Count }} 篇"
 year: "{{ .Year }} 年"
+undated: 未注明日期
 date:
   short: 1 月 2 日
   long: 2006 年 1 月 2 日

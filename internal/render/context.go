@@ -102,6 +102,9 @@ type Page interface {
 	// too.
 	Images() []string
 
+	// PublishDate falls back to Date, when the item was created. A file
+	// written by hand may give neither, and then the dates are the zero
+	// time, which a theme tests with time.IsZero rather than shows.
 	Date() time.Time
 	PublishDate() time.Time
 	Lastmod() time.Time
