@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { api, ApiError, type Draft, type Item, type Media } from "@/api/client";
+import { api, ApiError, heard, type Draft, type Item, type Media } from "@/api/client";
 import { dropUnsaved, readUnsaved, sameDraft, unsavedKey, writeUnsaved } from "@/lib/unsaved";
 
 /** failureOf describes a request that threw instead of being answered. */
@@ -475,6 +475,7 @@ export function useItem(
           if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
         };
         request.onload = () => {
+          heard(request.status);
           const body = request.response as (Media & { error?: { code?: string; message?: string } }) | null;
           if (request.status >= 200 && request.status < 300 && body?.link) {
             resolve(body);

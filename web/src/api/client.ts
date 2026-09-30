@@ -35,6 +35,15 @@ export function onRefused(listener: () => void): () => void {
 }
 
 /**
+ * heard passes on the status a request made without this client came back
+ * with, such as an upload sent with XMLHttpRequest for its progress, so that
+ * a session that ended is noticed there too.
+ */
+export function heard(status: number) {
+  if (status === 401) for (const listener of refused) listener();
+}
+
+/**
  * The language the admin is shown in. A theme describes itself in it, from
  * its own language pack, and the browser's Accept-Language would name the
  * browser's language rather than the one chosen here.
@@ -51,9 +60,7 @@ api.use({
     return request;
   },
   onResponse({ response }) {
-    if (response.status === 401) {
-      for (const listener of refused) listener();
-    }
+    heard(response.status);
     return response;
   },
   // fetch rejects with a TypeError, worded differently by every browser, when

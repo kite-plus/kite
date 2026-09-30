@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, type components } from "@/api/client";
+import { api, heard, type components } from "@/api/client";
 
 export type DeliveryState = components["schemas"]["DeliveryState"];
 export type Plan = components["schemas"]["Plan"];
@@ -52,6 +52,7 @@ async function post(path: string, body: unknown): Promise<Result> {
     if (err instanceof TypeError) throw { error: { code: "unreachable", message: err.message } };
     throw err;
   }
+  heard(response.status);
   const answer = await response.json();
   if (!response.ok) throw answer;
   return answer;

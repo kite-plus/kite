@@ -4,7 +4,7 @@ import { ExternalLink, Monitor, Smartphone, X, XCircle } from "lucide-react";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Draft } from "@/api/client";
+import { heard, type Draft } from "@/api/client";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
@@ -105,6 +105,7 @@ export function Preview({ draft, id, base, live, onClose, onFrame }: Props) {
             signal: controller.signal,
           },
         );
+        heard(response.status);
         if (!response.ok) {
           const body = await response.json().catch(() => null);
           setFailed(

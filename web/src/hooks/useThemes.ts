@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, ApiError, unwrap, type Media, type ThemeExists, type ThemeInfo } from "@/api/client";
+import { api, ApiError, heard, unwrap, type Media, type ThemeExists, type ThemeInfo } from "@/api/client";
 
 export function useThemes() {
   return useQuery({
@@ -61,6 +61,7 @@ export function installTheme(
       if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
     };
     request.onload = () => {
+      heard(request.status);
       const body = request.response as
         | (ThemeInfo & Partial<ThemeExists> & { error?: { code?: string; message?: string } })
         | null;
@@ -111,6 +112,7 @@ export async function uploadSiteMedia(file: File): Promise<Media> {
   const form = new FormData();
   form.append("file", file);
   const response = await fetch("/api/v1/media", { method: "POST", body: form, credentials: "same-origin" });
+  heard(response.status);
   const body = (await response.json().catch(() => null)) as
     | (Media & { error?: { code?: string; message?: string } })
     | null;

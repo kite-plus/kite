@@ -34,9 +34,11 @@ export function useSession() {
 
   useEffect(
     () =>
+      // A server that refuses somebody wants them signed in, even one that
+      // was open when the page was loaded.
       onRefused(() => {
         client.setQueryData<Session>(key, (current) =>
-          current && { ...current, authenticated: false, user: undefined },
+          current && { ...current, required: true, authenticated: false, user: undefined },
         );
       }),
     [client],
