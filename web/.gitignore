@@ -2,6 +2,10 @@ node_modules/
 openapi.json
 *.tsbuildinfo
 
+# What the browser tests leave behind: the last report, and traces of failures.
+/playwright-report/
+/test-results/
+
 # The route generator's scratch space while it writes src/routeTree.gen.ts.
 .tanstack/
 

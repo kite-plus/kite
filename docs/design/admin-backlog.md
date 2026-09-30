@@ -36,7 +36,7 @@
 | B02 | P2 | **已完成。** 状态、搜索词、排序、分类/标签和每页条数都写在地址里，刷新或复制地址后复现同一列表；游标不进地址，刷新后回到第一页。 | `web/src/features/contents/search.ts`、`web/src/features/contents/index.tsx` |
 | B03 | P2 | **已完成。** 词条仍从内容派生。分类、标签页的卡片菜单可以重命名、合并（改成已有的名称即合并，同时带两者的内容只留一个）和删除（从内容上去掉，内容本身保留）。确认框先列出受影响的内容（含回收站里的），`GET /taxonomies/{taxonomy}/terms/{term}` 的 ETag 指纹覆盖这些内容及其版本；改名（PUT）或删除（DELETE）时带回 If-Match，期间有内容变化就整体拒绝（409）。写入是一个 ChangeSet，每篇一个只改该分类法那一行的 `ChangeTerm`；文件存储在写之前核对整组版本，冲突时一个文件都不动。 | `internal/api/terms.go`、`internal/store/file/writer.go`、`web/src/features/terms/` |
 | B04 | P2 | **已完成。** 主题自带语言包 `i18n/<lang>.yaml`，`theme:` 下放后台用的文字（标题、说明、字段、选项、布局）；后台按界面语言请求（`Accept-Language`），没有译文的地方显示 `theme.yaml` 里的原文。默认主题带中文包，测试保证它和 `theme.yaml` 对得上。 | `internal/render/theme/packs.go`、`themes/default/i18n/zh-CN.yaml`、`web/src/api/client.ts` |
-| B05 | P2 | **为核心后台流程建立浏览器回归测试。** 覆盖新建/保存、保存中继续输入、冲突、筛选与翻页、上传、删除部分成功、设置并发、发布拒绝与 401。测试站点使用临时目录和本地 Git 仓库，不操作真实 `website`。 | `web/package.json` 只有 `lint`/`build`；CI 的 web job 只做类型检查、构建和 schema 对比 |
+| B05 | P2 | **已完成。** Playwright 在 Chromium 里对着嵌入了后台的真实二进制跑：新建并保存、保存途中继续输入（已有文章和新文章各一）、三方冲突与合并、筛选排序和每页条数写在地址里、附件上传、批量删除部分成功与回收站、设置并发、发布被 Git hook 拒绝后跳过 hooks、会话失效后回到登录页再带着未保存的内容回来。每个测试用临时目录里 `kite init` 出的一次性站点和本地的裸仓库远端，互不干扰，可以并行。本地 `make e2e`，CI 的“Admin in a browser” job 每次推送都跑。 | `web/e2e/`、`web/playwright.config.ts`、`Makefile` 的 `e2e`、`.github/workflows/ci.yml` |
 | B06 | P2 | **已完成。** 设置 → 账户：个人资料（显示名称、邮箱、头像，存在 `.kite/secrets`，不发布）；本地敞开的后台可以直接设置密码，立即生效；确认当前密码后修改用户名和密码，其他会话失效、当前浏览器续签；轮换会话密钥让其他设备退出；只有 localhost 能移除密码；来自环境变量的账号只读。当前密码错误返回 403（不是 401），与登录共用限流。 | `internal/auth/keeper.go`、`internal/auth/profile.go`、`internal/api/account.go`，测试见 `keeper_test.go`、`account_test.go`；`web/src/features/settings/account/` |
 
 ## 4. 占位入口与后续阶段

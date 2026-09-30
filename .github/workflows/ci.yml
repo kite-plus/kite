@@ -315,3 +315,52 @@ jobs:
           # A build that embedded nothing answers 501 here, which is exactly
           # what this job exists to catch before a release ships it.
           curl -sf http://127.0.0.1:1717/admin/ | grep -q '<div id="root">'
+
+  e2e:
+    name: Admin in a browser
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v6
+        with:
+          # There is no package.json at the repository root, so the
+          # action has to be pointed at the one pinning pnpm.
+          package_json_file: web/package.json
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: web/.nvmrc
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm --dir web install --frozen-lockfile
+
+      # The admin is tested as it ships: embedded in the binary that serves it.
+      - name: Build the admin and kite
+        run: |
+          set -eu
+          pnpm --dir web build
+          go build -o /tmp/kite ./cmd/kite
+
+      - name: Install Chromium
+        run: pnpm --dir web exec playwright install --with-deps chromium
+
+      - name: Run the browser tests
+        env:
+          KITE_BIN: /tmp/kite
+        run: pnpm --dir web e2e
+
+      - name: Upload the report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7

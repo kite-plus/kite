@@ -798,6 +798,7 @@ make web        # 后台界面，会被嵌入二进制
 make web-gen    # 用这次构建自己的描述重新生成 API 客户端
 make docker     # 容器镜像，上面两样东西它会自己编译
 make perf       # 用 2000 篇的站点对照设计里的时延目标计时
+make e2e        # 在 Chromium 里对着新构建的二进制测试后台
 ```
 
 `make web` 需要 Node 和 pnpm，两者版本都被精确钉死 —— 见 `web/.nvmrc` 和
@@ -842,5 +843,5 @@ GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot 
 make check
 ```
 
-如果动过后台，`make web-check` 做类型检查，`make web` 构建 CI 会拿来比对的产物。
+如果动过后台，`make web-check` 做类型检查，`make web` 构建 CI 会拿来比对的产物。`make e2e` 跑后台的浏览器测试，每个测试用临时目录里的一次性站点；第一次运行会下载 Chromium。
 

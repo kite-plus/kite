@@ -948,6 +948,7 @@ make web        # the admin, which is embedded into the binary
 make web-gen    # regenerate the API client from this build's own description
 make docker     # the container image, which compiles both of those itself
 make perf       # time a 2000-post site against the design's latency targets
+make e2e        # drive the admin in Chromium against a binary built with it
 ```
 
 `make web` needs Node and pnpm, both pinned exactly — the versions live in
@@ -999,5 +1000,6 @@ make check
 ```
 
 If you touched the admin, `make web-check` type checks it and `make web` builds
-the bundle CI compares against.
+the bundle CI compares against. `make e2e` runs its browser tests, each on a
+throwaway site in a temporary directory; the first run downloads Chromium.
 
