@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kite-plus/kite/internal/api"
+	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/site"
 )
@@ -91,6 +92,7 @@ func newServer(t *testing.T, root string, with ...func(*api.Options)) (http.Hand
 			Store:    s.Config.Content.Store,
 			Runtime:  "test",
 			Problems: s.Problems,
+			Bundle:   func(owner *content.Content) ([]api.BundleFile, bool, error) { return bundleOf(s, owner) },
 		}
 	}}
 	for _, apply := range with {
@@ -103,6 +105,16 @@ func newServer(t *testing.T, root string, with ...func(*api.Options)) (http.Hand
 	mux := http.NewServeMux()
 	srv.Mount(mux)
 	return mux, s
+}
+
+// bundleOf lists an item's files the way a running server does.
+func bundleOf(s *site.Site, owner *content.Content) ([]api.BundleFile, bool, error) {
+	files, kept, err := s.Bundle(owner)
+	out := make([]api.BundleFile, len(files))
+	for i, f := range files {
+		out[i] = api.BundleFile(f)
+	}
+	return out, kept, err
 }
 
 // get issues a request and decodes the body into v, asserting the status.

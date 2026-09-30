@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/kite-plus/kite/internal/api"
+	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/site"
 	"github.com/kite-plus/kite/internal/store/file"
@@ -489,6 +490,9 @@ func newWritableServer(t *testing.T, root string, with ...func(*api.Options)) (h
 			Problems:       current.Problems,
 			Writer:         current.Project.Writer(),
 			Publisher:      current.Publisher(),
+			Bundle: func(owner *content.Content) ([]api.BundleFile, bool, error) {
+				return bundleOf(current, owner)
+			},
 			Refresh: func(ctx context.Context) error {
 				next, err := current.Reconfigure()
 				if err != nil {

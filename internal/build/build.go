@@ -406,7 +406,7 @@ func MediaFiles(plan *Plan, media fs.FS) (map[string]string, error) {
 			continue
 		}
 		dir := string(t.Item.Locator)
-		names, err := bundleFiles(media, dir)
+		names, err := BundleFiles(media, dir)
 		if err != nil {
 			return nil, err
 		}
@@ -429,11 +429,11 @@ func MediaFiles(plan *Plan, media fs.FS) (map[string]string, error) {
 	return out, nil
 }
 
-// bundleFiles lists what an item's bundle publishes beside its page, by path
+// BundleFiles lists what an item's bundle publishes beside its page, by path
 // within the bundle and in name order: every file but its sources and hidden
 // ones, in folders that are not another item's bundle. A single-file item
 // has no folder of its own and publishes nothing, which is not a problem.
-func bundleFiles(media fs.FS, dir string) ([]string, error) {
+func BundleFiles(media fs.FS, dir string) ([]string, error) {
 	if info, err := fs.Stat(media, dir); err != nil || !info.IsDir() {
 		return nil, nil
 	}
@@ -465,7 +465,7 @@ func (b *Builder) resources(loc content.Locator, out string) func() render.Resou
 		if b.opts.Media == nil {
 			return nil
 		}
-		names, err := bundleFiles(b.opts.Media, string(loc))
+		names, err := BundleFiles(b.opts.Media, string(loc))
 		if err != nil || len(names) == 0 {
 			return nil // MediaFiles reports what cannot be read
 		}

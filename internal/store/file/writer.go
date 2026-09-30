@@ -432,12 +432,20 @@ func (w *Writer) putMedia(op content.PutMedia, located map[content.ID]*Entry, re
 			dir = bundle
 		}
 	}
-	name := filepath.Base(filepath.FromSlash(op.Name))
-	if name == "." || name == string(filepath.Separator) {
-		return fmt.Errorf("file store: invalid media name %q", op.Name)
-	}
-	target := path.Join(dir, name)
-	if !op.Replace {
+	var target string
+	if op.Replace {
+		// A file replaced keeps its place, in whatever folder of the bundle
+		// it is kept, so every link to it still reaches it.
+		file, err := w.bundleFile(dir, op.Name)
+		if err != nil {
+			return err
+		}
+		target = file
+	} else {
+		name := filepath.Base(filepath.FromSlash(op.Name))
+		if name == "." || name == string(filepath.Separator) {
+			return fmt.Errorf("file store: invalid media name %q", op.Name)
+		}
 		free, err := w.freeMediaName(dir, name)
 		if err != nil {
 			return err
@@ -681,12 +689,39 @@ func (w *Writer) deleteMedia(op content.DeleteMedia, located map[content.ID]*Ent
 	if dir == "" {
 		return nil
 	}
-	target := path.Join(dir, filepath.Base(filepath.FromSlash(op.Name)))
+	target, err := w.bundleFile(dir, op.Name)
+	if err != nil {
+		return err
+	}
 	if err := w.remove(target); err != nil {
 		return err
 	}
 	appendUnique(&res.Removed, target)
 	return nil
+}
+
+// bundleFile is where a file named by its path within the bundle dir lies: a
+// slash-separated path that stays inside the bundle, passes through no
+// hidden folder and no folder another item keeps its bundle in, and names no
+// source.
+func (w *Writer) bundleFile(dir, name string) (string, error) {
+	clean := path.Clean(strings.ReplaceAll(name, `\`, "/"))
+	if !fs.ValidPath(clean) || clean == "." || IsMarkdown(clean) {
+		return "", fmt.Errorf("%w: media name %q", content.ErrInvalid, name)
+	}
+	parts := strings.Split(clean, "/")
+	for i, part := range parts {
+		if strings.HasPrefix(part, ".") {
+			return "", fmt.Errorf("%w: media name %q", content.ErrInvalid, name)
+		}
+		if i < len(parts)-1 {
+			folder := path.Join(dir, path.Join(parts[:i+1]...))
+			if _, err := os.Stat(abs(w.root, path.Join(folder, "index.md"))); err == nil {
+				return "", fmt.Errorf("%w: %s is another item's bundle", content.ErrInvalid, folder)
+			}
+		}
+	}
+	return path.Join(dir, clean), nil
 }
 
 // untitledKey names an item whose title yields no slug at all, such as an

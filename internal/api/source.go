@@ -48,6 +48,11 @@ type View struct {
 	// managed.
 	InstalledPlugins func() []InstalledPlugin
 
+	// Bundle lists the files an item keeps beside it, and says whether it
+	// keeps any at all: one kept as a single file has no folder of its own.
+	// It is nil where files cannot be listed.
+	Bundle func(owner *content.Content) ([]BundleFile, bool, error)
+
 	// Writer is nil when this deployment may not be written to, which is the
 	// difference between a preview an author is typing into and a read-only
 	// server someone pointed at a repository.
@@ -81,6 +86,15 @@ type View struct {
 
 	// Problems is the content the index refused, as of this view.
 	Problems []string
+}
+
+// BundleFile is a file an item keeps in its bundle.
+type BundleFile struct {
+	// Name is its path within the bundle, which is how the markdown links it.
+	Name string
+	// Path is where it lives in the repository.
+	Path string
+	Size int64
 }
 
 // InstalledTheme is a theme a project could switch to.

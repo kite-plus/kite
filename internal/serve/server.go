@@ -328,7 +328,21 @@ func (s *Server) view() api.View {
 	v.Preview = s.preview
 	v.WordCount = s.wordCount
 	v.Export = s.export
+	v.Bundle = s.bundle
 	return v
+}
+
+// bundle lists the files an item keeps in its bundle.
+func (s *Server) bundle(owner *content.Content) ([]api.BundleFile, bool, error) {
+	s.mu.RLock()
+	current := s.site
+	s.mu.RUnlock()
+	files, kept, err := current.Bundle(owner)
+	out := make([]api.BundleFile, len(files))
+	for i, f := range files {
+		out[i] = api.BundleFile(f)
+	}
+	return out, kept, err
 }
 
 // installedPlugins lists the plugins in plugins/, each loaded afresh so that

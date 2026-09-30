@@ -460,7 +460,12 @@ func openAPI() *document {
 				RequestBody: body(ref(Draft{})),
 				Responses:   ok(ref(WordCount{}), "The count.", "400", "501"),
 			}},
-			"/contents/{id}/media": {Post: &operation{
+			"/contents/{id}/media": {Get: &operation{
+				OperationID: "listMedia",
+				Summary:     "List the files an item keeps beside it, which are published with its page.",
+				Parameters:  []parameter{pathParam("id")},
+				Responses:   ok(ref(MediaList{}), "The item's files, by their path within its bundle.", "404"),
+			}, Post: &operation{
 				OperationID: "uploadMedia",
 				Summary:     "Store a file beside a page and report the link that reaches it.",
 				Parameters:  []parameter{pathParam("id")},
@@ -479,12 +484,29 @@ func openAPI() *document {
 						"upload never replaces a file of the same name.",
 					"400", "404", "405", "413", "415"),
 			}},
-			"/contents/{id}/media/{name}": {Delete: &operation{
+			"/contents/{id}/media/{name}": {Put: &operation{
+				OperationID: "replaceMedia",
+				Summary: "Put a new version of a file of a page's bundle in its place, under its name, " +
+					"named by its path within the bundle.",
+				Parameters: []parameter{pathParam("id"), pathParam("name")},
+				RequestBody: &requestBody{
+					Required: true,
+					Content: map[string]mediaType{"multipart/form-data": {Schema: &jsonSchema{
+						Type: "object",
+						Properties: map[string]*jsonSchema{
+							"file": {Type: "string", Format: "binary"},
+						},
+						Required: []string{"file"},
+					}}},
+				},
+				Responses: ok(ref(Media{}), "The file as it now is.", "400", "404", "405", "413", "415"),
+			}, Delete: &operation{
 				OperationID: "deleteMedia",
-				Summary:     "Remove a file from a page's bundle.",
+				Summary:     "Remove a file from a page's bundle, named by its path within it.",
 				Parameters:  []parameter{pathParam("id"), pathParam("name")},
 				Responses: map[string]response{
 					"204": {Description: "Removed."},
+					"400": {Description: "Failed.", Content: jsonOf(errorRef)},
 					"404": {Description: "Failed.", Content: jsonOf(errorRef)},
 					"405": {Description: "Failed.", Content: jsonOf(errorRef)},
 				},

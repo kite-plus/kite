@@ -340,6 +340,14 @@ type Media struct {
 	LocationRemoved bool `json:"location_removed,omitempty"`
 }
 
+// MediaList is the files an item keeps beside it.
+type MediaList struct {
+	// Bundle says whether the item keeps files of its own. One kept as a
+	// single file has none: what is dropped on it goes among the site's own.
+	Bundle bool    `json:"bundle"`
+	Items  []Media `json:"items"`
+}
+
 // Settings is what a project exposes to a configuration form.
 type Settings struct {
 	Site  SiteSettings  `json:"site"`
