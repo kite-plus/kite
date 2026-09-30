@@ -606,7 +606,11 @@ build replaces the directory whole, so it has to be one of its own, and Kite
 refuses one that is not, however it is given: a file, a directory that is or
 holds the project, its theme or one of its plugins, and one that is, holds or
 lies inside `content`, `static`, `layouts`, `themes`, `plugins`, `.kite` or
-`.git`. The deploy workflow `kite init` writes uploads `public`; if
+`.git`. A directory that already holds files is replaced only when a build of
+the project wrote it, which Kite records in `.kite/outputs`, or when it holds
+this site's `sitemap.xml` or `rss.xml`, as one built by an older Kite does;
+anything else, such as a home folder named by mistake, is refused and left as
+it is. The deploy workflow `kite init` writes uploads `public`; if
 `build.output` changes, change the workflow's `path` with it.
 
 ## Content types

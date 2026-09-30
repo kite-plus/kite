@@ -17,6 +17,10 @@ import (
 // Files are written to a staging directory and only swapped into place when
 // the whole build has succeeded. A failed build therefore leaves the previous
 // site intact rather than a half-replaced mixture of old and new pages.
+//
+// The staging directory and the previous output sit beside the output under
+// names only Kite gives, since whatever is at them is deleted: public.tmp
+// could be anyone's.
 type Emitter struct {
 	outDir   string
 	stageDir string
@@ -31,7 +35,7 @@ func NewEmitter(outDir string) (*Emitter, error) {
 	if err != nil {
 		return nil, err
 	}
-	stage := abs + ".tmp"
+	stage := abs + ".kite-stage"
 	if err := os.RemoveAll(stage); err != nil {
 		return nil, fmt.Errorf("build: clear staging directory: %w", err)
 	}
@@ -111,7 +115,7 @@ func (e *Emitter) Files() []string {
 
 // Commit swaps the staged output into place.
 func (e *Emitter) Commit() error {
-	previous := e.outDir + ".prev"
+	previous := e.outDir + ".kite-previous"
 	if err := os.RemoveAll(previous); err != nil {
 		return err
 	}

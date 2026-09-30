@@ -518,8 +518,10 @@ plugins:
 所以它只能用来放站点。不管用哪种方式指定，下面这些 Kite 都会拒绝：文件；
 项目本身、所用的主题或插件，或者包含它们的目录；`content`、`static`、`layouts`、
 `themes`、`plugins`、`.kite`、`.git`，包含它们的目录，以及它们里面的目录。
-`kite init` 写出的部署工作流上传的是 `public`，改了 `build.output`，
-工作流里的 `path` 也要跟着改。
+已经有文件的目录，只有是这个项目的构建写出的（Kite 记在 `.kite/outputs` 里），或者里面有
+本站的 `sitemap.xml` 或 `rss.xml`（旧版 Kite 构建出的目录就是这样），才会被换掉；其他的，比如误填的
+个人文件夹，会被拒绝并原样保留。`kite init` 写出的部署工作流上传的是 `public`，改了
+`build.output`，工作流里的 `path` 也要跟着改。
 
 ## 内容类型
 

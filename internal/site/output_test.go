@@ -173,3 +173,105 @@ func TestAnOutputMayNotReplaceALinkedThemeOrPlugin(t *testing.T) {
 		})
 	}
 }
+
+// A build replaces its output whole, so a directory it did not write, such as
+// a home folder named by mistake, is refused and keeps every file in it. One
+// that holds nothing, or only what a desktop leaves in a folder, is built in.
+func TestAnOutputKiteDidNotWriteIsLeftAlone(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"kite.yaml":                    "site:\n  title: T\n  baseURL: https://example.com\n",
+		"content/posts/hello/index.md": post,
+	})
+	s := open(t, root)
+
+	documents := filepath.Join(t.TempDir(), "Documents")
+	write(t, documents, map[string]string{"taxes.pdf": "numbers", "letters/mum.txt": "hi"})
+	_, _, err := s.Build(t.Context(), site.BuildOptions{OutDir: documents})
+	if err == nil || !strings.Contains(err.Error(), "holds files Kite did not write") {
+		t.Fatalf("build over a folder of documents = %v, want a refusal", err)
+	}
+	if got := tree(t, documents); !slices.Equal(got, []string{".", "letters", "letters/mum.txt", "taxes.pdf"}) {
+		t.Errorf("the refused build changed the folder: %q", got)
+	}
+
+	shown := filepath.Join(t.TempDir(), "site")
+	write(t, shown, map[string]string{".DS_Store": "x", "Thumbs.db": "x"})
+	if _, _, err := s.Build(t.Context(), site.BuildOptions{OutDir: shown}); err != nil {
+		t.Errorf("a folder holding only what a desktop leaves was refused: %v", err)
+	}
+}
+
+// The output a build wrote is replaced by the next build, and so is one an
+// older Kite wrote before builds were recorded, known by its sitemap or its
+// feed of this site. Another site's output is not this site's to replace.
+func TestAnOutputKiteWroteIsReplaced(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"kite.yaml":                    "site:\n  title: T\n  baseURL: https://example.com/blog/\n",
+		"content/posts/hello/index.md": post,
+	})
+	s := open(t, root)
+
+	out := filepath.Join(t.TempDir(), "public")
+	for range 2 {
+		if _, _, err := s.Build(t.Context(), site.BuildOptions{OutDir: out}); err != nil {
+			t.Fatalf("building again over the build's own output: %v", err)
+		}
+	}
+
+	older := filepath.Join(t.TempDir(), "public")
+	write(t, older, map[string]string{
+		"sitemap.xml": "<?xml version=\"1.0\"?>\n<urlset>\n  <url>\n    <loc>https://example.com/blog/posts/hello/</loc>\n  </url>\n</urlset>\n",
+		"old.html":    "gone after the build",
+	})
+	if _, _, err := s.Build(t.Context(), site.BuildOptions{OutDir: older}); err != nil {
+		t.Fatalf("an output an older Kite wrote was refused: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(older, "old.html")); !os.IsNotExist(err) {
+		t.Errorf("the older output was not replaced: %v", err)
+	}
+
+	fed := filepath.Join(t.TempDir(), "public")
+	write(t, fed, map[string]string{
+		"rss.xml": "<rss version=\"2.0\"><channel><link>https://example.com/blog/</link></channel></rss>",
+	})
+	if _, _, err := s.Build(t.Context(), site.BuildOptions{OutDir: fed}); err != nil {
+		t.Errorf("an older output known by its feed was refused: %v", err)
+	}
+
+	other := filepath.Join(t.TempDir(), "public")
+	write(t, other, map[string]string{
+		"sitemap.xml": "<urlset><url><loc>https://another.example/</loc></url></urlset>",
+	})
+	if _, _, err := s.Build(t.Context(), site.BuildOptions{OutDir: other}); err == nil {
+		t.Error("another site's output was replaced")
+	}
+}
+
+// A build stages beside its output under names only Kite gives, so a
+// directory beside it of the kind anyone might keep, public.tmp or
+// public.prev, is not deleted.
+func TestWhatLiesBesideTheOutputIsLeftAlone(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"kite.yaml":                    "site:\n  title: T\n  baseURL: https://example.com\n",
+		"content/posts/hello/index.md": post,
+		"public.tmp/notes.txt":         "mine",
+		"public.prev/notes.txt":        "mine too",
+	})
+	s := open(t, root)
+	if _, _, err := s.Build(t.Context(), site.BuildOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"public.tmp/notes.txt", "public.prev/notes.txt"} {
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(name))); err != nil {
+			t.Errorf("%s is gone: %v", name, err)
+		}
+	}
+	for _, name := range []string{"public.kite-stage", "public.kite-previous"} {
+		if _, err := os.Stat(filepath.Join(root, name)); !os.IsNotExist(err) {
+			t.Errorf("%s was left behind: %v", name, err)
+		}
+	}
+}

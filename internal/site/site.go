@@ -423,6 +423,9 @@ func (s *Site) Build(ctx context.Context, opts BuildOptions) (build.Stats, []str
 		_ = emitter.Discard()
 		return stats, nil, err
 	}
+	// A build that cannot remember its output still succeeded; the next one
+	// knows the output by its sitemap instead.
+	_ = s.recordOutput(outDir)
 	return stats, emitter.Files(), nil
 }
 
