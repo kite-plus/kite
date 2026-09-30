@@ -289,6 +289,45 @@ func TestSavingAgainstAReplacedVersionIsRefusedWithWhatIsStored(t *testing.T) {
 	}
 }
 
+// The store compares the file itself, and the index reads a change only once
+// a watcher gets to it, or never where none runs. A conflict found before then
+// still shows the file as it stands, so that a merge or an overwrite never
+// replaces a change the client was not shown.
+func TestAConflictShowsTheFileTheIndexHasNotReadYet(t *testing.T) {
+	root := newProject(t, 2)
+	h, _ := newWritableServer(t, root)
+
+	list := get[api.List[api.Summary]](t, h, api.Prefix+"/contents?kind=post&limit=1", http.StatusOK)
+	item, stale := load(t, h, list.Items[0].ID)
+
+	// Another editor changes the file. Nothing here watches the disk, so the
+	// index still holds the version the client loaded.
+	file := filepath.Join(root, filepath.FromSlash(item.Locator), "index.md")
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, file, strings.Replace(string(data), "Body of post", "Changed on disk. Body of post", 1))
+
+	mine := draftOf(item)
+	mine.Title = "Retitled here"
+	rec := send(t, h, http.MethodPut, api.Prefix+"/contents/"+item.ID, mine, map[string]string{"If-Match": stale})
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409\n%s", rec.Code, rec.Body.String())
+	}
+	body := decode[api.ConflictBody](t, rec)
+	if body.Conflict.Theirs == nil || !strings.Contains(body.Conflict.Theirs.Body, "Changed on disk.") {
+		t.Fatalf("theirs is not the file on disk: %+v", body.Conflict.Theirs)
+	}
+	if body.Conflict.Theirs.Revision == stale || body.Conflict.ActualRevision != body.Conflict.Theirs.Revision {
+		t.Errorf("revisions: expected %s, actual %s, theirs %s",
+			body.Conflict.ExpectedRevision, body.Conflict.ActualRevision, body.Conflict.Theirs.Revision)
+	}
+	if got := rec.Header().Get("ETag"); got != `"`+body.Conflict.Theirs.Revision+`"` {
+		t.Errorf("ETag = %s, want theirs' revision", got)
+	}
+}
+
 // Forgetting the header must not mean "overwrite whatever is there".
 func TestASaveWithoutAPreconditionIsRefused(t *testing.T) {
 	h, _ := newWritableServer(t, newProject(t, 2))
@@ -928,6 +967,21 @@ func TestSettingsRequireCurrentConfigurationRevision(t *testing.T) {
 	}
 	if stale.Header().Get("ETag") == oldTag {
 		t.Error("conflict returned the stale ETag")
+	}
+
+	// Reloading reads the file that refused the edit, though no watcher runs
+	// here to have read it, and an edit made on it goes through.
+	reloaded := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil)
+	if got := decode[api.Settings](t, reloaded).Site.Title; got != "External edit" {
+		t.Errorf("reloaded title = %q, want the external edit", got)
+	}
+	fresh := reloaded.Header().Get("ETag")
+	if fresh != stale.Header().Get("ETag") {
+		t.Errorf("reloaded ETag = %s, want the conflict's %s", fresh, stale.Header().Get("ETag"))
+	}
+	if again := send(t, h, http.MethodPut, api.Prefix+"/settings",
+		map[string]any{"site.title": "Browser edit"}, map[string]string{"If-Match": fresh}); again.Code != http.StatusOK {
+		t.Errorf("an edit on the reloaded settings: status = %d\n%s", again.Code, again.Body.String())
 	}
 }
 

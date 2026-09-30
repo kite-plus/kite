@@ -107,29 +107,20 @@ test.describe("with the index behind the disk", () => {
   // API, as it does for a moment after every change with one.
   test.use({ watch: false });
 
-  test.fixme(
-    "a conflict compares against the file on disk",
-    {
-      annotation: {
-        type: "bug",
-        description: "a 409 carries the index's stale copy as the stored version, so Merge both overwrites the change on disk",
-      },
-    },
-    async ({ page, site }) => {
-      const post = site.posts["three-paragraphs"];
-      await page.goto(`/admin/content/post/${post.id}`);
-      await appendTo(page, "Charlie paragraph.", " Changed in the studio.");
-      await site.write(post.file, (await site.read(post.file)).replace("Alpha paragraph.", "Alpha paragraph, changed on disk."));
-      await page.getByRole("button", { name: "Save", exact: true }).click();
+  test("a conflict compares against the file on disk", async ({ page, site }) => {
+    const post = site.posts["three-paragraphs"];
+    await page.goto(`/admin/content/post/${post.id}`);
+    await appendTo(page, "Charlie paragraph.", " Changed in the studio.");
+    await site.write(post.file, (await site.read(post.file)).replace("Alpha paragraph.", "Alpha paragraph, changed on disk."));
+    await page.getByRole("button", { name: "Save", exact: true }).click();
 
-      const conflict = page.getByRole("dialog", { name: "This changed while you were editing" });
-      await expect(conflict.getByText("Different paragraphs")).toBeVisible();
-      await conflict.getByRole("button", { name: "Merge both" }).click();
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-      await expect(page.getByText(savedAt)).toBeVisible();
-      expect(await site.read(post.file)).toContain("Alpha paragraph, changed on disk.");
-    },
-  );
+    const conflict = page.getByRole("dialog", { name: "This changed while you were editing" });
+    await expect(conflict.getByText("Different paragraphs")).toBeVisible();
+    await conflict.getByRole("button", { name: "Merge both" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText(savedAt)).toBeVisible();
+    expect(await site.read(post.file)).toContain("Alpha paragraph, changed on disk.");
+  });
 });
 
 // The smallest PNG there is: one grey pixel.

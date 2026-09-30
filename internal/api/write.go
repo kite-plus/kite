@@ -275,12 +275,34 @@ func (s *Server) failConflict(w http.ResponseWriter, view View, r *http.Request,
 			ActualRevision:   string(e.Actual),
 		},
 	}
+	view = s.reread(r, view)
 	if current, err := view.Reader.Get(r.Context(), e.ID); err == nil {
 		theirs := itemOf(current, view.Resolver)
 		body.Conflict.Theirs = &theirs
+		// The file may have changed again since the store looked; the item
+		// sent is the one to merge with, so its revision is the one to match.
+		body.Conflict.ActualRevision = theirs.Revision
 	}
-	w.Header().Set("ETag", etag(e.Actual))
+	w.Header().Set("ETag", etag(content.Revision(body.Conflict.ActualRevision)))
 	writeJSON(w, http.StatusConflict, body)
+}
+
+// reread brings the read model up to what is on disk after a write was
+// refused over a change there, and returns the view as it then stands. The
+// store compared the file itself, while the index reads a change only once
+// the watcher gets to it, or never where no watcher runs. Answering from the
+// index before then would show the client its own base as the stored
+// version, and a merge or an overwrite would then replace a change nobody
+// was shown.
+func (s *Server) reread(r *http.Request, view View) View {
+	if view.Refresh == nil {
+		return view
+	}
+	if err := view.Refresh(r.Context()); err != nil {
+		s.log.Error("refresh after a refused write failed", "err", err)
+		return view
+	}
+	return s.src()
 }
 
 // etag formats a revision as a strong entity tag.

@@ -376,6 +376,9 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		Message: "settings",
 	}); err != nil {
 		if conflict, ok := errors.AsType[*content.ConflictError](err); ok && string(conflict.ID) == "kite.yaml" {
+			// So that reloading the settings reads the file that refused
+			// them, where no watcher has read it yet.
+			s.reread(r, view)
 			w.Header().Set("ETag", etag(conflict.Actual))
 			fail(w, http.StatusConflict, CodeConflict, "settings changed since they were loaded")
 			return
