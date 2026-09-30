@@ -712,9 +712,15 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
       {item.conflict && resolving && (
         <ConflictDialog
           conflict={item.conflict}
+          base={item.base}
           ours={draft}
+          type={type}
           onTakeTheirs={item.takeTheirs}
           onKeepOurs={item.keepOurs}
+          onMerge={(merged) => {
+            item.mergeWith(merged);
+            setResolving(false);
+          }}
           onCancel={() => setResolving(false)}
         />
       )}

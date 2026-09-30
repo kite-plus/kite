@@ -392,6 +392,25 @@ export function useItem(
     enter("ready");
   }, [conflict, show, mark, forget, enter]);
 
+  /**
+   * mergeWith continues from what is stored with both sides' changes in the
+   * draft, unsaved, for the author to look over before it is saved.
+   */
+  const mergeWith = useCallback(
+    (merged: Draft) => {
+      if (!conflict?.theirs) return;
+      base.current = conflict.theirs;
+      revision.current = `"${conflict.actual_revision}"`;
+      editVersion.current += 1;
+      show(merged);
+      setConflict(null);
+      mark(true);
+      keep();
+      enter("ready");
+    },
+    [conflict, show, mark, keep, enter],
+  );
+
   /** keepOurs saves this edit over the stored one, deliberately. */
   const keepOurs = useCallback(async () => {
     if (!conflict) return null;
@@ -509,6 +528,7 @@ export function useItem(
     attach,
     takeTheirs,
     keepOurs,
+    mergeWith,
     discard,
     forgetUnsaved,
     /**
@@ -523,7 +543,8 @@ export function useItem(
   };
 }
 
-function draftOf(item: Item): Draft {
+/** draftOf is an item as the editor holds it. */
+export function draftOf(item: Item): Draft {
   return {
     kind: item.kind,
     title: item.title,
