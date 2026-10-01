@@ -41,6 +41,7 @@ func newRootCmd() *cobra.Command {
 		newRunCmd(),
 		newThemeCmd(),
 		newPluginCmd(),
+		newAppsCmd(),
 	)
 	return root
 }

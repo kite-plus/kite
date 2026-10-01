@@ -106,58 +106,91 @@ func inUse(cfg *config.Config, one site.Installed) bool {
 func newThemeAddCmd() *cobra.Command {
 	var replace bool
 	cmd := &cobra.Command{
-		Use:   "add <archive.zip|dir>",
-		Short: "Install a theme from a zip archive or a directory",
+		Use:   "add <name[@version]|archive.zip|dir>",
+		Short: "Install a theme by name from the index, or from a zip archive or a directory",
 		Long: "Installs a theme into themes/<name>, checked the way a site checks a\n" +
-			"theme it loads. A theme's release carries a zip archive that holds only\n" +
-			"the theme. The site keeps its theme until 'kite theme use' switches it.",
+			"theme it loads. A name that is not a file or a directory is looked up\n" +
+			"in the index, which 'kite apps search' looks through: the newest version\n" +
+			"that works with this Kite is installed, or the one after @, and\n" +
+			"kite.lock records where it came from. A theme's release carries a zip\n" +
+			"archive that holds only the theme. The site keeps its theme until\n" +
+			"'kite theme use' switches it.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p, _, err := openWithConfig()
+			p, cfg, err := openWithConfig()
 			if err != nil {
 				return err
 			}
-			files, err := readPackage(args[0], themePackage)
-			if err != nil {
-				return err
-			}
-			added, err := theme.Load(archive.FS(files))
-			if err != nil {
-				return err
-			}
-			if !added.Manifest.SupportsStatic() {
-				return errors.New("the theme says it cannot be built into a static site")
+			var added *theme.Theme
+			var files map[string][]byte
+			var origin *content.Origin
+			if id, want, ok := byName(args[0]); ok {
+				got, err := fetchByName(cmd, p.Root, cfg, "theme", id, want)
+				if err != nil {
+					return err
+				}
+				added, files, origin = got.theme, got.files, got.origin
+			} else {
+				if files, err = readPackage(args[0], themePackage); err != nil {
+					return err
+				}
+				if added, err = checkTheme(files); err != nil {
+					return err
+				}
 			}
 			name := added.Manifest.Name
-			switch {
-			case name == site.BuiltinTheme:
-				return fmt.Errorf("the name %s belongs to the theme built into Kite; the theme needs a name of its own", name)
-			case !content.ValidThemeName(name):
-				return fmt.Errorf("the theme is named %q, and a name has to be usable as a directory: letters, digits, dots, - and _", name)
-			}
 			exists := slices.ContainsFunc(site.Themes(p.Root), func(one site.Installed) bool {
 				return one.Name == name && !one.Builtin
 			})
 			if exists && !replace {
-				return fmt.Errorf("theme %s is installed already; add --replace to replace it", name)
+				return fmt.Errorf("theme %s is installed already; add --replace to replace it, "+
+					"or run 'kite apps update %s' to update it from the index", name, name)
 			}
 			verb := "install"
 			if exists {
 				verb = "replace"
 			}
 			if _, err := p.Writer().Apply(cmd.Context(), content.ChangeSet{
-				Ops:     []content.Op{content.PutTheme{Name: name, Files: files, Replace: exists}},
+				Ops:     []content.Op{content.PutTheme{Name: name, Files: files, Replace: exists, Origin: origin}},
 				Message: strings.TrimSpace(fmt.Sprintf("theme: %s %s %s", verb, name, added.Manifest.Version)),
 			}); err != nil {
 				return err
 			}
-			printf(cmd, "installed %s %s in %s\n", name, added.Manifest.Version, filepath.Join(site.ThemesDir, name))
+			printf(cmd, "installed %s %s%s in %s\n", name, added.Manifest.Version, fromIndex(origin),
+				filepath.Join(site.ThemesDir, name))
 			printf(cmd, "run 'kite theme use %s' to build the site with it\n", name)
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&replace, "replace", false, "replace an installed theme of the same name")
 	return cmd
+}
+
+// checkTheme checks a theme's files the way a site checks a theme it loads,
+// and that it can be installed under the name it gives itself.
+func checkTheme(files map[string][]byte) (*theme.Theme, error) {
+	added, err := theme.Load(archive.FS(files))
+	if err != nil {
+		return nil, err
+	}
+	if !added.Manifest.SupportsStatic() {
+		return nil, errors.New("the theme says it cannot be built into a static site")
+	}
+	name := added.Manifest.Name
+	switch {
+	case name == site.BuiltinTheme:
+		return nil, fmt.Errorf("the name %s belongs to the theme built into Kite; the theme needs a name of its own", name)
+	case !content.ValidThemeName(name):
+		return nil, fmt.Errorf("the theme is named %q, and a name has to be usable as a directory: letters, digits, dots, - and _", name)
+	}
+	return added, nil
+}
+
+func fromIndex(origin *content.Origin) string {
+	if origin == nil {
+		return ""
+	}
+	return " from the index"
 }
 
 func newThemeRemoveCmd() *cobra.Command {

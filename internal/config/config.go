@@ -266,6 +266,13 @@ func (b Build) OutputDir(root string) string {
 	return filepath.Join(root, b.Output)
 }
 
+// Apps says where the index of themes and plugins is read from.
+type Apps struct {
+	// Index is the address of an index to install from in place of Kite's
+	// own, such as a copy on a network without the internet.
+	Index string `yaml:"index,omitempty"`
+}
+
 // Plugins chooses the plugins a site runs and holds their settings.
 type Plugins struct {
 	// Enabled lists the plugins that run, in the order they run, so that two
@@ -374,6 +381,7 @@ type Config struct {
 	Build    Build    `yaml:"build,omitempty"`
 	Publish  Publish  `yaml:"publish,omitempty"`
 	Plugins  Plugins  `yaml:"plugins,omitempty"`
+	Apps     Apps     `yaml:"apps,omitempty"`
 
 	// Menus are the site's menus by name, such as main. They belong to the
 	// site rather than to a theme, so a change of theme keeps them.
@@ -463,6 +471,7 @@ func applyEnv(cfg *Config) {
 			cfg.Build.PageSize = n
 		}
 	})
+	set("KITE_APPS_URL", func(v string) { cfg.Apps.Index = v })
 }
 
 func (c *Config) normalize() {
@@ -515,6 +524,9 @@ func (c *Config) Validate() error {
 	case "directory", "extension":
 	default:
 		return fmt.Errorf("config: unknown build.urlStyle %q (want directory or extension)", c.Build.URLStyle)
+	}
+	if i := c.Apps.Index; i != "" && !strings.HasPrefix(i, "https://") && !strings.HasPrefix(i, "http://") {
+		return fmt.Errorf("config: apps.index %q is not an http or https address", i)
 	}
 	if c.Content.Store != "" && c.Content.Store != "file" {
 		return fmt.Errorf("config: content.store %q is not implemented yet (only file)", c.Content.Store)

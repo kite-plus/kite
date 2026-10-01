@@ -43,6 +43,23 @@ func Requires(kind, name, requires, kite string) error {
 	return nil
 }
 
+// CompareVersions orders two versions as a range does, a pre-release before
+// the release it leads to. One that cannot be read sorts before one that
+// can.
+func CompareVersions(a, b string) int {
+	va, errA := parseVersion(a)
+	vb, errB := parseVersion(b)
+	switch {
+	case errA != nil && errB != nil:
+		return 0
+	case errA != nil:
+		return -1
+	case errB != nil:
+		return 1
+	}
+	return va.compare(vb)
+}
+
 // described matches what git describe adds to a tag for a build made after
 // it: the commits since, the commit, and whether the tree was dirty. Such a
 // build carries at least the tagged release, so the tag is what is compared,

@@ -105,25 +105,35 @@ func newPluginListCmd() *cobra.Command {
 func newPluginAddCmd() *cobra.Command {
 	var replace bool
 	cmd := &cobra.Command{
-		Use:   "add <archive.zip|dir>",
-		Short: "Install a plugin from a zip archive or a directory, turned off",
-		Args:  cobra.ExactArgs(1),
+		Use:   "add <name[@version]|archive.zip|dir>",
+		Short: "Install a plugin by name from the index, or from a zip archive or a directory, turned off",
+		Long: "Installs a plugin into plugins/<id>, turned off, and says what it does\n" +
+			"to a site. A name that is not a file or a directory is looked up in the\n" +
+			"index, which 'kite apps search' looks through: the newest version that\n" +
+			"works with this Kite is installed, or the one after @, and kite.lock\n" +
+			"records where it came from and what it was installed to do.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p, _, err := openWithConfig()
+			p, cfg, err := openWithConfig()
 			if err != nil {
 				return err
 			}
-			files, err := readPackage(args[0], pluginPackage)
-			if err != nil {
-				return err
-			}
-			manifest, err := plugin.ReadManifest(archive.FS(files))
-			if err != nil {
-				return err
-			}
-			added, err := plugin.Load(archive.FS(files), manifest.ID)
-			if err != nil {
-				return err
+			var added *plugin.Plugin
+			var files map[string][]byte
+			var origin *content.Origin
+			if id, want, ok := byName(args[0]); ok {
+				got, err := fetchByName(cmd, p.Root, cfg, "plugin", id, want)
+				if err != nil {
+					return err
+				}
+				added, files, origin = got.plugin, got.files, got.origin
+			} else {
+				if files, err = readPackage(args[0], pluginPackage); err != nil {
+					return err
+				}
+				if added, err = checkPlugin(files); err != nil {
+					return err
+				}
 			}
 			id := added.Manifest.ID
 			installed, err := plugin.Installed(p.Root)
@@ -132,21 +142,34 @@ func newPluginAddCmd() *cobra.Command {
 			}
 			exists := slices.Contains(installed, id)
 			if exists && !replace {
-				return fmt.Errorf("plugin %s is installed already; add --replace to replace it", id)
+				return fmt.Errorf("plugin %s is installed already; add --replace to replace it, "+
+					"or run 'kite apps update %s' to update it from the index", id, id)
 			}
 			if _, err := p.Writer().Apply(cmd.Context(), content.ChangeSet{
-				Ops:     []content.Op{content.PutPlugin{ID: id, Files: files, Replace: exists}},
+				Ops:     []content.Op{content.PutPlugin{ID: id, Files: files, Replace: exists, Origin: origin}},
 				Message: fmt.Sprintf("plugin: add %s %s", id, added.Manifest.Version),
 			}); err != nil {
 				return err
 			}
-			printf(cmd, "installed %s %s in %s\n", id, added.Manifest.Version, filepath.Join(plugin.Dir, id))
+			printf(cmd, "installed %s %s%s in %s\n", id, added.Manifest.Version, fromIndex(origin),
+				filepath.Join(plugin.Dir, id))
+			printf(cmd, "  %s\n", describeGrant(grantOf(added)))
 			printf(cmd, "it is off: run 'kite plugin enable %s' to turn it on\n", id)
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&replace, "replace", false, "replace an installed plugin of the same id")
 	return cmd
+}
+
+// checkPlugin checks a plugin's files the way a site checks a plugin it
+// loads.
+func checkPlugin(files map[string][]byte) (*plugin.Plugin, error) {
+	manifest, err := plugin.ReadManifest(archive.FS(files))
+	if err != nil {
+		return nil, err
+	}
+	return plugin.Load(archive.FS(files), manifest.ID)
 }
 
 // packageKind is what a package of one kind may hold when it is installed
