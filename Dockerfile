@@ -13,8 +13,10 @@ ARG NODE_VERSION=22.19.0
 ARG ALPINE_VERSION=3.22
 
 # The admin is embedded in the binary, so it has to exist before the binary is
-# built. Its own stage keeps Node out of the image that ships.
-FROM node:${NODE_VERSION}-alpine AS admin
+# built. Its own stage keeps Node out of the image that ships. It is the same
+# bytes for every platform, so it is built once, on the machine running the
+# build: under emulation, for another platform, pnpm install can hang.
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS admin
 WORKDIR /src/web
 
 # The manifest and the lockfile alone first: dependencies change far less
@@ -25,7 +27,10 @@ RUN corepack enable && pnpm install --frozen-lockfile
 COPY web/ ./
 RUN pnpm build
 
-FROM golang:${GO_VERSION}-alpine AS build
+# Go cross-compiles, so the binary is built on that machine too, for the
+# platform the image is for.
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
+ARG TARGETOS TARGETARCH TARGETVARIANT
 WORKDIR /src
 
 COPY go.mod go.sum ./
@@ -43,7 +48,8 @@ ARG DATE=unknown
 # No cgo, for the same reason the released binaries have none: one
 # self-contained executable, and a dependency that quietly needs a C
 # toolchain fails here rather than at run time.
-RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
+    go build -trimpath -buildvcs=false \
     -ldflags "-s -w \
       -X github.com/kite-plus/kite/internal/buildinfo.Version=${VERSION} \
       -X github.com/kite-plus/kite/internal/buildinfo.Commit=${COMMIT} \
