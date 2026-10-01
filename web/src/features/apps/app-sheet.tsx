@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { ExternalLink, Puzzle, TriangleAlert } from "lucide-react";
+import { ExternalLink, TriangleAlert } from "lucide-react";
 
 import { useI18n } from "@/i18n";
 import { useApp, type AppInfo } from "@/hooks/useApps";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AppAction, AppScreenshot, Does, StatusBadges } from "./parts";
+import { AppAction, AppIcon, AppScreenshot, Does, StatusBadges } from "./parts";
 
 /**
  * AppSheet is everything the index says about one package: who makes it,
@@ -43,9 +43,7 @@ function Details({ app, onInstall, onUpdate }: { app: AppInfo; onInstall: () => 
         {app.kind === "theme" ? (
           <AppScreenshot app={app} className="aspect-[16/10] rounded-lg border" />
         ) : (
-          <div className="flex size-12 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-            <Puzzle className="size-6" />
-          </div>
+          <AppIcon app={app} className="size-12" />
         )}
         <div className="grid gap-1.5">
           <SheetTitle className="flex flex-wrap items-baseline gap-2 text-lg">

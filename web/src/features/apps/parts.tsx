@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpCircle, CheckCircle2, Code, Cpu, Download, Globe, Palette, ShieldCheck } from "lucide-react";
+import { ArrowUpCircle, CheckCircle2, Code, Cpu, Download, Globe, Palette, Puzzle, ShieldCheck } from "lucide-react";
 
 import { useI18n } from "@/i18n";
 import { useWritable } from "@/hooks/useContents";
@@ -26,6 +26,20 @@ export function AppScreenshot({ app, className }: { app: AppInfo; className?: st
         <div className="flex size-full items-center justify-center text-muted-foreground">
           <Palette className="size-6" />
         </div>
+      )}
+    </div>
+  );
+}
+
+/** AppIcon is a plugin's own icon, or a puzzle piece for one without. */
+export function AppIcon({ app, className }: { app: AppInfo; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className={cn("flex shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground", className)}>
+      {app.icon && !failed ? (
+        <img src={app.icon} alt="" className="size-3/4 object-contain" onError={() => setFailed(true)} />
+      ) : (
+        <Puzzle className="size-1/2" />
       )}
     </div>
   );

@@ -23,7 +23,7 @@ import { ReadOnlyNote } from "@/components/read-only-note";
 import { PublishBar } from "@/features/settings/components/publish-bar";
 import { AppSheet } from "./app-sheet";
 import { InstallDialog, UpdateDialog } from "./dialogs";
-import { AppAction, AppScreenshot, StatusBadges } from "./parts";
+import { AppAction, AppIcon, AppScreenshot, StatusBadges } from "./parts";
 import type { AppsSearch } from "./search";
 
 const route = getRouteApi("/_authenticated/apps/");
@@ -231,11 +231,7 @@ function AppCard({
         </button>
       )}
       <div className="flex flex-1 items-start gap-3 p-4">
-        {!theme && (
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-            <Puzzle className="size-5" />
-          </div>
-        )}
+        {!theme && <AppIcon app={app} className="size-10" />}
         <div className="grid min-w-0 flex-1 gap-1.5">
           <div className="flex items-baseline gap-2">
             <h3 className="truncate font-medium">
