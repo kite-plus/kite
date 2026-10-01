@@ -3,10 +3,9 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
-	"github.com/kite-plus/kite/internal/buildinfo"
+	"github.com/kite-plus/kite/internal/kitew"
 )
 
 // deployWorkflow is the GitHub Actions workflow `kite init` writes.
@@ -16,9 +15,10 @@ import (
 // can read, edit and delete is the honest shape for that: changing host means
 // editing this file, not migrating a CMS.
 //
-// The version is pinned to the one that wrote the file. A workflow that
-// floats to the newest release would rebuild the same commit differently
-// later, which is the thing reproducible builds exist to prevent.
+// It builds with kitew, which runs the release kite.lock pins: the one that
+// wrote the project, until the author moves the pin. A workflow that floated
+// to the newest release would rebuild the same commit differently later,
+// which is the thing reproducible builds exist to prevent.
 const deployWorkflow = `# Builds the site and publishes it to GitHub Pages.
 #
 # Turn Pages on first: Settings -> Pages -> Source -> GitHub Actions.
@@ -49,29 +49,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v7
-        with:
-          go-version: "@@GO@@"
-
-      # Pinned to the version that wrote this file, so this commit builds the
-      # same way in a year as it does today. Raise it deliberately.
-      - name: Install Kite
-        run: go install github.com/kite-plus/kite/cmd/kite@@@VERSION@@
-
       # Where Pages publishes the site: under the repository's name for a
       # project site, or at its own domain.
       - id: pages
         uses: actions/configure-pages@v6
 
       # Built for that address rather than the one kite.yaml names, which
-      # may still be the one the site was previewed at. --verify builds twice
-      # and compares every byte, so a site that would deploy differently on
-      # a second run fails here instead.
+      # may still be the one the site was previewed at, and with the Kite
+      # release kite.lock pins, which kitew downloads and checks first, so
+      # this commit builds the same way in a year as it does today. --verify
+      # builds twice and compares every byte, so a site that would deploy
+      # differently on a second run fails here instead.
       - name: Build
         shell: bash # with pipefail, so a failed build is not hidden by tee
         env:
           KITE_SITE_BASEURL: ${{ steps.pages.outputs.base_url }}
-        run: kite build --verify --json | tee build.json
+        run: sh ./kitew build --verify --json | tee build.json
 
       # Tells scheduled.yml when there is next something to publish.
       - name: Record the next scheduled post
@@ -161,7 +154,7 @@ jobs:
 // WorkflowPath is where the deploy workflow lives, and SchedulePath the one
 // that publishes scheduled posts.
 var (
-	WorkflowPath = filepath.Join(".github", "workflows", "deploy.yml")
+	WorkflowPath = kitew.Workflow
 	SchedulePath = filepath.Join(".github", "workflows", "scheduled.yml")
 )
 
@@ -177,11 +170,7 @@ func writeWorkflow(root, branch string) ([]string, error) {
 	if branch == "" {
 		branch = "main"
 	}
-	fill := strings.NewReplacer(
-		"@@BRANCH@@", branch,
-		"@@GO@@", buildinfo.GoVersion(),
-		"@@VERSION@@", installVersion(),
-	)
+	fill := strings.NewReplacer("@@BRANCH@@", branch)
 
 	var written []string
 	for _, w := range []struct{ path, body string }{
@@ -201,26 +190,4 @@ func writeWorkflow(root, branch string) ([]string, error) {
 		written = append(written, w.path)
 	}
 	return written, nil
-}
-
-// installVersion is what `go install` should be pinned to.
-//
-// A released build names its own tag. A build from source has no tag anyone
-// else can fetch, so it names the latest release rather than a version that
-// does not exist.
-func installVersion() string { return pinnedVersion(buildinfo.Version) }
-
-// release matches a version a tag names: the version a release stamps, as
-// 0.1.0, or what git describe says at a tag, as v0.1.0 or v0.2.0-rc.1.
-// Commits past a tag, as v0.1.0-3-gabc1234, and a dirty tree name no tag.
-var release = regexp.MustCompile(`^v?\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$`)
-
-// pinnedVersion is what the deploy workflow installs for a build of Kite
-// stamped v: the tag it was released as, or the latest release for a build
-// that is no release.
-func pinnedVersion(v string) string {
-	if !release.MatchString(v) || strings.HasSuffix(v, "-dirty") {
-		return "latest"
-	}
-	return "v" + strings.TrimPrefix(v, "v")
 }

@@ -121,6 +121,7 @@ func serveCommand(shape commandShape) *cobra.Command {
 				return err
 			}
 			defer func() { _ = s.Close() }()
+			pinNotice(cmd, s.Project.Root)
 
 			// The account is read once, here, so that the server is handed a
 			// decision rather than a file to consult. A change made in the

@@ -50,6 +50,7 @@ func newBuildCmd() *cobra.Command {
 				return err
 			}
 			defer func() { _ = s.Close() }()
+			pinNotice(cmd, s.Project.Root)
 
 			outDir := out
 			if outDir == "" {

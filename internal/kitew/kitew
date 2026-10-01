@@ -1,0 +1,98 @@
+#!/bin/sh
+# kitew runs the Kite release this site pins in kite.lock, so that every
+# machine and every deploy builds it with the same Kite. The first time, it
+# downloads the release for this machine and checks it against the release's
+# checksums, which kite.lock pins in turn; after that it runs the copy kept in
+# the user's cache. `kite wrapper` writes this file and moves the pin.
+#
+# On Windows, run kitew.ps1 instead.
+#
+#   KITE_DOWNLOAD_URL  where releases are downloaded from, in place of
+#                      https://github.com/kite-plus/kite/releases/download
+set -eu
+
+die() {
+	echo "kitew: $*" >&2
+	exit 1
+}
+
+lock="$(cd "$(dirname "$0")" && pwd)/kite.lock"
+[ -f "$lock" ] || die "there is no kite.lock beside kitew; run 'kite wrapper' to pin a Kite release"
+
+# pinned prints a key of the kite section of kite.lock.
+pinned() {
+	awk -v key="$1:" '
+		/^kite:/ { inside = 1; next }
+		/^[^ #]/ { inside = 0 }
+		inside && $1 == key { gsub(/["\047]/, "", $2); print $2; exit }
+	' "$lock"
+}
+version=$(pinned version)
+checksums=$(pinned checksums)
+[ -n "$version" ] || die "kite.lock pins no Kite release; run 'kite wrapper' to pin one"
+
+case $(uname -s) in
+Linux) os=linux ;;
+Darwin) os=darwin ;;
+*) die "there is no Kite release for $(uname -s); on Windows, run kitew.ps1" ;;
+esac
+case $(uname -m) in
+x86_64 | amd64) arch=amd64 ;;
+aarch64 | arm64) arch=arm64 ;;
+armv7* | armv8l) arch=armv7 ;;
+*) die "there is no Kite release for $(uname -m)" ;;
+esac
+
+if [ "$os" = darwin ]; then
+	cache="$HOME/Library/Caches/kite/releases/$version"
+else
+	cache="${XDG_CACHE_HOME:-$HOME/.cache}/kite/releases/$version"
+fi
+kite="$cache/kite"
+
+if [ ! -x "$kite" ]; then
+	fetch() {
+		if command -v curl >/dev/null 2>&1; then
+			curl -fsSL --retry 3 -o "$2" "$1"
+		elif command -v wget >/dev/null 2>&1; then
+			wget -q -O "$2" "$1"
+		else
+			die "curl or wget is needed to download Kite"
+		fi || die "could not download $1"
+	}
+	sha256() {
+		if command -v sha256sum >/dev/null 2>&1; then
+			sha256sum "$1"
+		elif command -v shasum >/dev/null 2>&1; then
+			shasum -a 256 "$1"
+		else
+			openssl dgst -sha256 -r "$1"
+		fi | cut -d ' ' -f 1
+	}
+
+	base=${KITE_DOWNLOAD_URL:-https://github.com/kite-plus/kite/releases/download}
+	base=${base%/}
+	archive="kite_${version}_${os}_$arch.tar.gz"
+	mkdir -p "$cache"
+	# Inside the cache, so that the finished binary is renamed into place
+	# whole, however many builds start at once.
+	tmp=$(mktemp -d "$cache/download.XXXXXX")
+	trap 'rm -rf "$tmp"' EXIT
+	trap 'exit 1' HUP INT TERM
+
+	echo "kitew: downloading Kite $version for $os/$arch" >&2
+	fetch "$base/v$version/checksums.txt" "$tmp/checksums.txt"
+	if [ -n "$checksums" ] && [ "sha256:$(sha256 "$tmp/checksums.txt")" != "$checksums" ]; then
+		die "the checksums Kite $version is downloaded with are not the ones kite.lock pins"
+	fi
+	want=$(awk -v f="$archive" '$2 == f || $2 == "*" f { print $1 }' "$tmp/checksums.txt")
+	[ -n "$want" ] || die "the checksums of Kite $version list no $archive"
+	fetch "$base/v$version/$archive" "$tmp/$archive"
+	[ "$(sha256 "$tmp/$archive")" = "$want" ] || die "$archive does not match its checksum"
+	tar -xzf "$tmp/$archive" -C "$tmp" kite || die "could not unpack $archive"
+	chmod +x "$tmp/kite"
+	mv -f "$tmp/kite" "$kite"
+	rm -rf "$tmp"
+	trap - EXIT
+fi
+exec "$kite" "$@"

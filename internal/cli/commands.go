@@ -107,7 +107,10 @@ type doctorReport struct {
 	// Packages are what kite.lock says that the installed themes and
 	// plugins do not bear out.
 	Packages []string `json:"packages,omitempty"`
-	Fixed    []string `json:"fixed,omitempty"`
+	// Kite is what keeps the release kite.lock pins from being the one
+	// every build runs.
+	Kite  []string `json:"kite,omitempty"`
+	Fixed []string `json:"fixed,omitempty"`
 }
 
 func newDoctorCmd() *cobra.Command {
@@ -128,7 +131,7 @@ func newDoctorCmd() *cobra.Command {
 				return err
 			}
 
-			report := doctorReport{Root: p.Root, Items: len(scan.Entries), Packages: lockProblems(p.Root)}
+			report := doctorReport{Root: p.Root, Items: len(scan.Entries), Packages: lockProblems(p.Root), Kite: pinProblems(p.Root)}
 			for _, pr := range scan.Problems {
 				report.Problems = append(report.Problems, pr.Error())
 			}
@@ -179,6 +182,12 @@ func printDoctor(cmd *cobra.Command, r doctorReport, fixed bool) error {
 			printf(cmd, "  %s\n", p)
 		}
 	}
+	if len(r.Kite) > 0 {
+		printf(cmd, "\nKite release:\n")
+		for _, p := range r.Kite {
+			printf(cmd, "  %s\n", p)
+		}
+	}
 	if len(r.Fixed) > 0 {
 		printf(cmd, "\nassigned ids to %d file(s):\n", len(r.Fixed))
 		for _, f := range r.Fixed {
@@ -192,7 +201,7 @@ func printDoctor(cmd *cobra.Command, r doctorReport, fixed bool) error {
 		}
 		printf(cmd, "\nrun 'kite doctor --fix-ids' to assign them\n")
 	}
-	if len(r.Problems) == 0 && len(r.MissingIDs) == 0 && len(r.Packages) == 0 && !fixed {
+	if len(r.Problems) == 0 && len(r.MissingIDs) == 0 && len(r.Packages) == 0 && len(r.Kite) == 0 && !fixed {
 		printf(cmd, "\nno problems found\n")
 	}
 	return nil

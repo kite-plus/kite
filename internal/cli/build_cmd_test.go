@@ -293,7 +293,7 @@ func TestTheDeployWorkflowBuildsForWherePagesPublishes(t *testing.T) {
 		if strings.HasPrefix(s.Uses, "actions/configure-pages@") && s.ID == "pages" {
 			configured = i
 		}
-		if strings.Contains(s.Run, "kite build") {
+		if strings.Contains(s.Run, "kitew build") {
 			built = i
 			if got := s.Env["KITE_SITE_BASEURL"]; got != "${{ steps.pages.outputs.base_url }}" {
 				t.Errorf("the build runs with KITE_SITE_BASEURL = %q", got)
@@ -327,24 +327,22 @@ func TestTheDeployWorkflowUploadsWhereANewSiteBuilds(t *testing.T) {
 	}
 }
 
-// The workflow installs the release that wrote it, so the site builds the
-// same way in a year. A release stamps its version without the v its tag
-// has, and a build that is no release installs the latest one.
-func TestTheWorkflowInstallsTheReleaseThatWroteIt(t *testing.T) {
-	for v, want := range map[string]string{
-		"0.1.0":              "v0.1.0",
-		"v0.1.0":             "v0.1.0",
-		"v0.2.0-rc.1":        "v0.2.0-rc.1",
-		"v0.1.0-3-gabc1234":  "latest",
-		"v0.1.0-dirty":       "latest",
-		"26200b0":            "latest",
-		"577feeb-dirty":      "latest",
-		"0.1.1-snapshot-abc": "latest",
-		"dev":                "latest",
-	} {
-		if got := pinnedVersion(v); got != want {
-			t.Errorf("pinnedVersion(%q) = %q, want %q", v, got, want)
+// The workflow builds with the release kite.lock pins, through kitew, rather
+// than compiling Kite on every deploy: the bytes the author runs, and a
+// commit that builds the same way in a year.
+func TestTheDeployWorkflowBuildsWithThePinnedRelease(t *testing.T) {
+	deploy, _ := readWorkflows(t)
+	built := false
+	for _, s := range deploy.Jobs["build"].Steps {
+		if strings.HasPrefix(s.Uses, "actions/setup-go@") || strings.Contains(s.Run, "go install") {
+			t.Errorf("the workflow installs Kite itself: %+v", s)
 		}
+		// Through sh, because a commit made where git keeps no execute bit,
+		// as on Windows, has kitew without one.
+		built = built || strings.HasPrefix(s.Run, "sh ./kitew build ")
+	}
+	if !built {
+		t.Error("no step builds with kitew")
 	}
 }
 

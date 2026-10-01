@@ -1,0 +1,4 @@
+# The wrapper scripts are written into sites byte for byte, and a shell
+# script with CRLF line endings does not run.
+internal/kitew/kitew text eol=lf
+internal/kitew/kitew.ps1 text eol=lf

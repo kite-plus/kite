@@ -17,8 +17,11 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/kite-plus/kite/internal/auth"
+	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/kitew"
+	"github.com/kite-plus/kite/internal/lock"
 	"github.com/kite-plus/kite/internal/project"
 	"github.com/kite-plus/kite/internal/store/file"
 )
@@ -246,6 +249,21 @@ func create(ctx context.Context, p plan) ([]string, error) {
 		created = append(created, ".gitignore")
 	}
 
+	// kitew runs the release kite.lock pins, and the deploy workflow builds
+	// with it. A release pins itself; a build from source has no release to
+	// pin, and the report says so.
+	scripts, err := kitew.Write(p.Root)
+	if err != nil {
+		return nil, err
+	}
+	created = append(created, scripts...)
+	if v, ok := kitew.Release(buildinfo.Version); ok {
+		if err := pinNew(ctx, p.Root, v); err != nil {
+			return nil, err
+		}
+		created = append(created, lock.Name)
+	}
+
 	if p.Workflow {
 		// Written now rather than offered later, so that the first push
 		// already has somewhere to go.
@@ -327,6 +345,9 @@ func reportInit(cmd *cobra.Command, p plan, created []string) {
 	if p.Password != "" {
 		printf(cmd, "  account   admin (%s)\n", auth.File)
 	}
+	if f, err := lock.Read(p.Root); err == nil && f.Kite != nil {
+		printf(cmd, "  kite      %s, which ./kitew runs\n", f.Kite.Version)
+	}
 
 	printf(cmd, "\nNext:\n")
 	if rel := relativeTo(p.Root); rel != "" {
@@ -341,6 +362,10 @@ func reportInit(cmd *cobra.Command, p plan, created []string) {
 			printf(cmd, "%s publishes scheduled posts once their time has come.\n", SchedulePath)
 		}
 		printf(cmd, "Turn on Pages first: Settings -> Pages -> Source -> GitHub Actions.\n")
+	}
+	if slices.Contains(created, "kitew") && !slices.Contains(created, lock.Name) {
+		printf(cmd, "\nThis Kite is a build from source, so kite.lock pins no release yet:\n"+
+			"run 'kite wrapper --version <release>' before the first deploy.\n")
 	}
 }
 
