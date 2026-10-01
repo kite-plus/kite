@@ -109,8 +109,8 @@ docker cp kite:/data/public ./public
 
 ## Roadmap
 
-- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4), and the first version of WebAssembly plugins (M8), released as 0.1.
-- **Next:** a public theme contract, `kite.lock` with the `kitew` wrapper, and a dynamic mode backed by SQLite (M5–M7).
+- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4), and the first version of WebAssembly plugins (M8), released as 0.1; the theme contract `kite/v1`, frozen in 0.1.4 (M5).
+- **Next:** `kite.lock` with the `kitew` wrapper and a dynamic mode backed by SQLite (M6–M7), and an [app center](https://github.com/kite-plus/kite/issues/16) to install themes and plugins online.
 
 The [reference guide](docs/reference.md#roadmap) lists every milestone, and the [roadmap](docs/design/roadmap.md) tracks progress item by item.
 

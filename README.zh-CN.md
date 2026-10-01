@@ -109,8 +109,8 @@ docker cp kite:/data/public ./public
 
 ## 路线图
 
-- **已完成**：静态构建、实时预览服务、浏览器后台、Git 发布（M0–M4），以及 WebAssembly 插件的第一版（M8），作为 0.1 发布。
-- **接下来**：公开主题契约、`kite.lock` 与 `kitew` wrapper、基于 SQLite 的动态模式（M5–M7）。
+- **已完成**：静态构建、实时预览服务、浏览器后台、Git 发布（M0–M4），以及 WebAssembly 插件的第一版（M8），作为 0.1 发布；主题契约 `kite/v1`，在 0.1.4 冻结（M5）。
+- **接下来**：`kite.lock` 与 `kitew` wrapper、基于 SQLite 的动态模式（M6–M7），以及在线安装主题和插件的[应用中心](https://github.com/kite-plus/kite/issues/16)。
 
 完整的里程碑列表见[详细使用说明](docs/reference.zh-CN.md#路线图)，逐项进度见[路线图与实现现状](docs/design/roadmap.md)。
 

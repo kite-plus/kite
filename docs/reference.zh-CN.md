@@ -314,8 +314,6 @@ pagination:
 一种。`.Paginator` 描述的是页面最终的分页；全部显示在一页的列表是第 1 页、共 1 页，
 `PageSize` 是条目的数目。
 
-主题契约尚未冻结；它会在 M5、也就是有了第二套按它写出来的主题之后再冻结。
-
 ## 短代码
 
 短代码按名字调用一个模板，把 Markdown 没有写法的东西放进页面，比如视频、相册或提示框。
@@ -826,7 +824,7 @@ GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot 
 | M2 | 只读后台，能打开现有仓库 | 已完成 |
 | M3 | 可写后台：编辑器、媒体、冲突处理 | 已完成 |
 | M4 | Git 发布器 —— 第一个发布版本 **0.1** | 已完成 |
-| M5 | 公开主题契约 | |
+| M5 | 公开主题契约 | 已完成：`kite/v1` 在 0.1.4 冻结 |
 | M6 | `kite.lock` 与 `kitew` wrapper | |
 | M7 | 基于 SQLite 的动态模式 | |
 | M8 | WebAssembly 插件 | 第一版完成：注入代码和构建期钩子 |
