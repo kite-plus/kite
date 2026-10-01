@@ -530,8 +530,10 @@ kite apps update         # 全部更新，也可以指定一个：kite apps upda
 索引最多一小时取一次，加 `--refresh` 立即重取，和下载过的压缩包一起缓存在
 `.kite/cache/apps` 里。断网时用缓存的那份，并说明是多久以前的。`kite.yaml` 里的
 `apps.index`，或者 `KITE_APPS_URL`，可以换成另一份索引，比如不通外网的内网里的一份副本。
-Kite 自带索引的副本用 Kite 的钥匙核对；自己的索引用自己的钥匙签名，把公钥写在 `apps.key`
-或者 `KITE_APPS_KEY` 里。
+Kite 从索引的地址加上 `.minisig` 读取签名，所以 Kite 自带索引的副本要把 `index.json.minisig`
+和 `index.json` 放在一起，用 Kite 的钥匙核对。自己的索引用自己的钥匙签名（比如
+`minisign -Sm index.json`），把公钥，也就是 `.pub` 文件里以 `RW` 开头的那一行，写在
+`apps.key` 或者 `KITE_APPS_KEY` 里。
 
 ## 配置
 
@@ -876,7 +878,7 @@ GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot 
 | M6 | `kite.lock` 与 `kitew` wrapper | 部分完成：`kite.lock` 记下从索引安装的主题和插件（0.1.5） |
 | M7 | 基于 SQLite 的动态模式 | |
 | M8 | WebAssembly 插件 | 第一版完成：注入代码和构建期钩子 |
-| 应用中心 | 按名字安装和更新主题与插件 | 第一版在 0.1.5 完成：后台和命令行；下一步是包签名 |
+| 应用中心 | 按名字安装和更新主题与插件 | 第一版在 0.1.5 完成：后台和命令行；0.1.6 起索引带签名 |
 
 [路线图与实现现状](design/roadmap.md)记录了逐项核实过的完成情况，以及之后的计划。
 

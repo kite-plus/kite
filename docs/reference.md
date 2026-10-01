@@ -634,9 +634,12 @@ The index is fetched at most once an hour, with `--refresh` to fetch it at
 once, and kept in `.kite/cache/apps` with the archives fetched. Without a
 network the copy kept is used, and Kite says how old it is. `apps.index` in
 `kite.yaml`, or `KITE_APPS_URL`, names another index to install from, such as
-a copy on a network without the internet. A copy of Kite's own index is
-checked with Kite's key; an index of your own is signed with a key of your
-own, whose public half `apps.key`, or `KITE_APPS_KEY`, names.
+a copy on a network without the internet. Kite reads the signature from the
+index's address with `.minisig` added, so a copy of Kite's own index keeps
+`index.json.minisig` beside `index.json`, and is checked with Kite's key. An
+index of your own is signed with a key of your own, as
+`minisign -Sm index.json` does, and `apps.key`, or `KITE_APPS_KEY`, names its
+public key: the line of the `.pub` file that starts with `RW`.
 
 ## Configuration
 
@@ -1048,7 +1051,7 @@ Verify a download against the `checksums.txt` published with the release.
 | M6 | `kite.lock` and the `kitew` wrapper | in part: `kite.lock` records the themes and plugins installed from the index (0.1.5) |
 | M7 | Dynamic mode backed by SQLite | |
 | M8 | WebAssembly plugins | first version done: injected code and build hooks |
-| App center | Themes and plugins installed and updated by name | first version done in 0.1.5: the studio and the command line; signed packages next |
+| App center | Themes and plugins installed and updated by name | first version done in 0.1.5: the studio and the command line; the index signed since 0.1.6 |
 
 The [roadmap](design/roadmap.md) (in Chinese) records what has been verified as done and the plan after it.
 

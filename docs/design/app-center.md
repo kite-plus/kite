@@ -209,7 +209,7 @@ plugins:
 
 **安装前展示**：主题和插件都写出会从哪些网站加载东西；插件另外写出注入几段代码、导出哪些钩子。插件本来就跑在没有文件、网络和环境变量的沙箱里（[plugin-system.md §10.3](plugin-system.md#103-默认不开放完整-wasi-已冻结)），读者浏览器里会加载什么，才是要让站长看清楚的部分。
 
-**签名**（A5，2026-10-01 定用 minisign）：`kite-plus/apps` 的 Index 工作流用私钥（仓库 secret `MINISIGN_SECRET_KEY`）把 `index.json` 签成旁边的 `index.json.minisig`，公钥公布在 `minisign.pub`，也编进 Kite（`internal/apps/sign.go` 的 `Key`，KEYID `5E21CB2A5C5314BB`）。Kite 取索引时连签名一起取，签名取不到、对不上，或者索引的 `generated` 比已经用过的索引更早（有人重放旧副本，比如撤回某个版本之前的那份），都不用这份索引（地址答复了却拿不出签名，报的是签名问题；网络中断取不到，只报连不上）；缓存的副本每次用之前也重新核对签名，所以 0.1.5 留下的、没有签名的缓存会被重新获取。包不单独签名：每个压缩包在签过名的索引里都有 sha256，收录后所在的 tag 也不再变，签过名的索引已经足以证明每个包。自建索引用自己的钥匙签名，`apps.key` 或 `KITE_APPS_KEY` 写它的公钥；Kite 自带索引的镜像不用写，用内置的公钥核对。工作流运行时先核对 secret 是不是 `minisign.pub` 那把钥匙，不是就让这次运行失败，免得签出一份所有 Kite 都拒绝的索引。换钥匙要先发一个带新公钥的 Kite 版本，再用新钥匙签名。
+**签名**（A5，2026-10-01 定用 minisign）：`kite-plus/apps` 的 Index 工作流用私钥（仓库 secret `MINISIGN_SECRET_KEY`）把 `index.json` 签成旁边的 `index.json.minisig`，公钥公布在 `minisign.pub`，也编进 Kite（`internal/apps/sign.go` 的 `Key`，KEYID `5E21CB2A5C5314BB`）。Kite 取索引时连签名一起取，签名取不到、对不上，或者索引的 `generated` 比已经用过的索引更早（有人重放旧副本，比如撤回某个版本之前的那份），都不用这份索引（地址答复了却拿不出签名，报的是签名问题；网络中断取不到，只报连不上）；缓存的副本每次用之前也重新核对签名，所以 0.1.5 留下的、没有签名的缓存会被重新获取。包不单独签名：每个压缩包在签过名的索引里都有 sha256，收录后所在的 tag 也不再变，签过名的索引已经足以证明每个包。自建索引用自己的钥匙签名（比如 `minisign -Sm index.json`，命令行默认的预哈希签名也认），`apps.key` 或 `KITE_APPS_KEY` 写它的公钥；Kite 自带索引的镜像不用写，用内置的公钥核对。工作流运行时先核对 secret 是不是 `minisign.pub` 那把钥匙，不是就让这次运行失败，免得签出一份所有 Kite 都拒绝的索引。换钥匙要先发一个带新公钥的 Kite 版本，再用新钥匙签名。
 
 用 Kite Plus 账号（`id.kite.plus`）提交、不必会用 Git，等账号服务就绪后再做。
 
@@ -289,7 +289,7 @@ POST /api/v1/apps/{kind}/{id}/update                   {"version": "…", "confi
 ## 6. 和其他计划的关系
 
 - **M6 `kite.lock`**：先做 lock 的 `themes`、`plugins` 两节；`kite:` 版本锁、`kitew` 和 Cloudflare Pages 仍在 M6。
-- **Kite Plus 账号**：第一版用 PR 上架；A5 起作者也可以用 `id.kite.plus` 登录提交（[Explore 的 identity-and-comments.md](https://github.com/kite-plus/explore/blob/main/docs/design/identity-and-comments.md)）。
+- **Kite Plus 账号**：第一版用 PR 上架；等 `id.kite.plus` 就绪后，作者也可以登录提交（[Explore 的 identity-and-comments.md](https://github.com/kite-plus/explore/blob/main/docs/design/identity-and-comments.md)）。
 - **网页版目录**：索引是公开的，以后可以由它生成官网上的一组页面，或者放进 Explore；第一版不做。
 - **原定 V4 的市场**（[architecture.md §32](architecture.md#32-现在不要设计的东西)）：应用中心是它的第一步，付费和评分仍然不做。
 
@@ -301,7 +301,7 @@ POST /api/v1/apps/{kind}/{id}/update                   {"version": "…", "confi
 | **A2** 已完成（2026-10-01） | [`kite-plus/apps`](https://github.com/kite-plus/apps) 仓库：条目格式、生成并检查 `index.json` 的 CI、每个版本一个 tag 的 zip 副本和 jsDelivr 刷新、提交说明和 PR 模板、审核清单；`kite theme pack` / `kite plugin pack`；收录 6 个官方包 | 6 个官方包的 11 个版本都通过检查并收录，jsDelivr 和 GitHub 两个地址下载的 sha256 都对得上；再跑一次没有改动；同一版本换内容被拒绝、权限变多的版本生成待审 PR，由端到端测试覆盖；从零上架一个测试主题（`kite theme new` → 加许可证 → `kite theme pack` → 收录）由 CI 里用真实 Kite 跑的集成测试覆盖 |
 | **A3** 已完成（2026-10-01） | `internal/apps`（读索引、缓存、按 `requires` 过滤、下载、校验）、`internal/lock`、`kite.lock` 的 `themes` / `plugins`、按名字安装和更新、`kite apps search/outdated/update`、`kite doctor` 检查 lock、`apps.index` / `KITE_APPS_URL` | 对线上索引验证：新站点 `kite theme add vane`、`kite plugin add search` 装上、能构建、lock 有记录；手改过的主题 `kite apps update` 不动、`--force` 才更新，`kite doctor` 报告；断网时用缓存并说明多久以前。插件扩权要确认、从压缩包装的包按 homepage 认领并比对后更新，由端到端测试覆盖 |
 | **A4** 已完成（2026-10-01） | §4.5 的页面和 §4.7 的 API，「官方」「社区」标记，撤回和下架的提醒；「设置 → 主题」和「系统 → 插件」的卡片标出「可更新」并链到应用中心；主题装好后的提示可以直接进整站预览 | 对线上索引在真实页面验证了浏览、搜索、详情、安装（插件安装前列出加载的网站、注入和钩子）、更新（手改过的要先勾选同意覆盖）、主题装好后进预览、手机宽度和深色模式；移除沿用原有的删除，lock 由存储层一起去掉。浏览器回归测试用本地假索引覆盖主题的安装和更新、插件扩权要勾选；其他浏览器测试的站点指向一个不存在的索引，不连外网 |
-| **A5** 签名已完成（2026-10-01，在 main 上，未发布）；账号提交待定 | minisign 签名：apps 仓库签索引、公布公钥，Kite 内置公钥并拒绝没签名、签错和更旧的索引，`apps.key` / `KITE_APPS_KEY` 给自建索引；用 Kite Plus 账号提交等 `id.kite.plus` | 用真实密钥签的线上索引在本地通过验证；改过一个字段的副本、还没签名的线上索引都被拒绝；端到端测试用 Go 和 Node 两种实现签名，后者顺带核对了格式 |
+| **A5** 签名已发布（Kite v0.1.6，2026-10-01）；账号提交待定 | minisign 签名：apps 仓库签索引、公布公钥，Kite 内置公钥并拒绝没签名、签错和更旧的索引，`apps.key` / `KITE_APPS_KEY` 给自建索引；用 Kite Plus 账号提交等 `id.kite.plus` | 线上索引由 Index 工作流签名（`kite-plus/apps` 的 38505f6）：Kite 经 jsDelivr 和 raw.githubusercontent.com 两个地址都验过，0.1.5 照常可用，minisign 官方命令行也验过；改过一个字段的副本、没有签名的索引都被拒绝；minisign 命令行默认签出的预哈希签名可以用于自建索引；端到端测试用 Go 和 Node 两种实现签名，后者顺带核对了格式 |
 
 ## 8. 决定与待定事项
 
@@ -312,7 +312,7 @@ POST /api/v1/apps/{kind}/{id}/update                   {"version": "…", "confi
 3. **lock**：装进站点仓库，`kite.lock` 只记来源（§4.2）。
 4. **后台入口**：「系统 → 应用中心」一个入口（§4.5）。
 
-已经解决的：打包命令和 `verify` 报告的加载网站随 Kite v0.1.5 发布（2026-10-01），`kite-plus/apps` 改用 v0.1.5 检查每个版本，说明里不再让作者装 main 上的 Kite。签名方案定为 minisign（2026-10-01，用户定），不用 Sigstore：验证不用联网，内网和离线都能用。
+已经解决的：打包命令和 `verify` 报告的加载网站随 Kite v0.1.5 发布（2026-10-01），`kite-plus/apps` 改用 v0.1.5 检查每个版本，说明里不再让作者装 main 上的 Kite。签名方案定为 minisign（2026-10-01，用户定），不用 Sigstore：验证不用联网，内网和离线都能用。上线按先签索引、再发 Kite 的顺序：线上索引 2026-10-01 签好之后，验签的 Kite 才随 v0.1.6 发布。
 
 还开着的 `[待定]`：
 
@@ -320,7 +320,6 @@ POST /api/v1/apps/{kind}/{id}/update                   {"version": "…", "confi
 2. **审核的人和时限**：审核清单已写进 `kite-plus/apps` 的说明；谁审、多久内回复还没定。
 3. **索引的正式域名**：先用 jsDelivr 和 raw.githubusercontent.com 的地址；要不要、什么时候换成 `apps.kite.plus`。
 4. **待审版本用 PR 还是 issue**：`kite-plus` 组织不允许工作流提 PR，所以待审的版本现在会以 issue 出现（附改动链接，一键开 PR）。要改成直接提 PR，在组织设置的 Actions → General → Workflow permissions 里打开 “Allow GitHub Actions to create and approve pull requests”，再在 `kite-plus/apps` 里打开同一项。
-5. **上线顺序**：带验签的 Kite 只能在线上索引已经签名之后发布：先在 `kite-plus/apps` 设好 `MINISIGN_SECRET_KEY`、让 Index 工作流签出 `index.json.minisig`，再发 Kite。0.1.5 不验签，签不签名都能用。
 
 ## 证据来源
 
