@@ -268,6 +268,7 @@ like any other:
 
 ```bash
 kite theme list                  # what the site can use; * marks the one in use
+kite theme add vane              # by name, from the index; vane@1.0.0 for that version
 kite theme add vane-0.2.0.zip    # a release's archive, or a folder; --replace over one
 kite theme use vane              # sets theme.name
 kite theme remove paper          # not the one in use
@@ -458,7 +459,7 @@ pages and which other sites its code loads from. The command line does the
 same:
 
 ```bash
-kite plugin add search-0.1.0.zip   # or a folder
+kite plugin add search             # by name, from the index; or an archive or a folder
 kite plugin enable search
 kite plugin list
 kite plugin disable search
@@ -588,6 +589,43 @@ calls; `build_complete` runs in a fresh one each build. A module is compiled
 once, when its plugin is turned on or a site first loads it, and kept compiled
 under `.kite/cache/wasm`.
 
+## Installing by name
+
+The official themes and plugins, and those others publish, are listed in an
+index that Kite reads from [kite-plus/apps](https://github.com/kite-plus/apps).
+A name given to `kite theme add` or `kite plugin add` that is not a file or a
+folder is looked up there, and the newest version that works with the running
+Kite is installed, or the one asked for as `name@version`. The index names
+every archive by its sha256, so whichever address serves it, the bytes are
+checked before they are unpacked, and then checked as any other install.
+
+```bash
+kite apps search docs    # what the index lists; every word given has to match
+kite apps outdated       # what has a newer version, or was yanked or taken off
+kite apps update         # update all of that, or name one: kite apps update vane
+```
+
+The files stay in `themes/` and `plugins/` and are committed with the site,
+so a build never needs the network. Beside them, `kite.lock` records what came
+from the index: the version, the index and the archive it came from, and a
+digest of the files as they were installed, and for a plugin what it was
+installed to do, the code it injects, the other sites that code loads from and
+the hooks it runs. A package installed from an archive or a folder has no
+record, and is offered updates only when its homepage is the repository the
+index names.
+
+`kite apps update` leaves alone a package whose files changed since it was
+installed, since the update would replace the changes, unless `--force`;
+`kite doctor` lists such changes. A plugin's update that does more than its
+record says, loads from another site, runs another hook or injects more code,
+asks first, or takes `--yes`.
+
+The index is fetched at most once an hour, with `--refresh` to fetch it at
+once, and kept in `.kite/cache/apps` with the archives fetched. Without a
+network the copy kept is used, and Kite says how old it is. `apps.index` in
+`kite.yaml`, or `KITE_APPS_URL`, names another index to install from, such as
+a copy on a network without the internet.
+
 ## Configuration
 
 `kite.yaml` sits at the root of a project. Everything except `site` is
@@ -637,6 +675,9 @@ plugins:
   settings:            # whatever each plugin declares in plugin.yaml
     search: {full_text: true}
 
+apps:
+  index: ""            # an index to install from in place of Kite's own
+
 menus:                 # the links themes draw, by menu; see Themes
   main:
     - {name: About, url: /about/}
@@ -662,7 +703,7 @@ post without making every tag's page as long.
 A few keys can be overridden from the environment, for a build whose output
 depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,
 `KITE_SITE_LANGUAGE`, `KITE_THEME`, `KITE_BUILD_OUTPUT`,
-`KITE_BUILD_URLSTYLE` and `KITE_BUILD_PAGESIZE`.
+`KITE_BUILD_URLSTYLE`, `KITE_BUILD_PAGESIZE` and `KITE_APPS_URL`.
 
 `build.output`, or `KITE_BUILD_OUTPUT` in its place, is the directory
 `kite build` writes the site to. A relative path is taken from the project

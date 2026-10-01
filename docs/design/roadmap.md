@@ -95,7 +95,7 @@
 | **2. M5 主题契约** | 已完成（2026-10-01） | 见 §2。剩下的只有风标 1.0 的发布和 `starters` 仓库，都要用户确认 | — |
 | **3. M6 可重现构建** | v1.2 | `kite.lock`、`kitew`、Cloudflare Pages 部署模板；启用增量构建里的跳过判断 | 依赖记录和缓存键已经有了 |
 | **4. 媒体库**（新增） | v1.5 | 在现有索引上汇总所有 page bundle 里的文件：媒体列表、跨文章复用、找出没人引用的文件、上传入口 | 单篇的附件上传、替换、删除和引用检查已经有了（后台的「附件」，admin-backlog B01） |
-| **应用中心**（新增，实施中：A1、A2 已完成） | — | 后台在线浏览、安装、更新和移除主题与插件，命令行按名字安装；第一版就开放第三方上架。方案和分阶段见 [app-center.md](app-center.md)，跟踪在 [kite-plus/kite#16](https://github.com/kite-plus/kite/issues/16)。索引已经在 [kite-plus/apps](https://github.com/kite-plus/apps) 上线，收录了 6 个官方包。原计划的主题市场和插件注册表在 V4（[architecture.md §32](architecture.md#32-现在不要设计的东西)），用户要求提前规划 | `kite theme add` / `kite plugin add` 和后台的 zip 安装共用同一条安装路径（`PutTheme` / `PutPlugin`），检查和发布都已经有了 |
+| **应用中心**（新增，实施中：A1–A3 已完成） | — | 后台在线浏览、安装、更新和移除主题与插件，命令行按名字安装；第一版就开放第三方上架。方案和分阶段见 [app-center.md](app-center.md)，跟踪在 [kite-plus/kite#16](https://github.com/kite-plus/kite/issues/16)。索引已经在 [kite-plus/apps](https://github.com/kite-plus/apps) 上线，收录了 6 个官方包；命令行可以按名字安装和更新（`kite theme add vane`、`kite apps update`），`kite.lock` 记下来源。原计划的主题市场和插件注册表在 V4（[architecture.md §32](architecture.md#32-现在不要设计的东西)），用户要求提前规划 | `kite theme add` / `kite plugin add` 和后台的 zip 安装共用同一条安装路径（`PutTheme` / `PutPlugin`），检查和发布都已经有了 |
 | **5. M7 动态模式** | v2.0 | SQLite 作为真相源，写入同一套读模型；`kite migrate` 在文件和数据库之间互转；文章加密和私密文章（只在服务端部署提供）；数据库备份和 `kite export`；Kite 自己存储的评论 | 读模型、单账号认证、Docker 都已经有了 |
 | **6. M8 插件** | v3.0 | 基于 wazero 的 WebAssembly 插件、Host ABI、能力和权限声明、`kite plugin`、插件 SDK | HookBus 已经被内置功能使用 |
 

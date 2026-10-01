@@ -224,6 +224,7 @@ menus:
 
 ```bash
 kite theme list                  # 站点能用的主题，* 标出正在用的
+kite theme add vane              # 按名字从索引安装；vane@1.0.0 安装指定版本
 kite theme add vane-0.2.0.zip    # 发布附带的压缩包，或一个目录；--replace 替换同名的
 kite theme use vane              # 写 theme.name
 kite theme remove paper          # 正在用的不能删
@@ -376,7 +377,7 @@ Markdown 源码打开。
 加什么、它的代码会从哪些网站加载内容。命令行也能做同样的事：
 
 ```bash
-kite plugin add search-0.1.0.zip   # 也可以是一个目录
+kite plugin add search             # 按名字从索引安装；也可以是压缩包或目录
 kite plugin enable search
 kite plugin list
 kite plugin disable search
@@ -497,6 +498,33 @@ GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o plugin.wasm .
 构建都在全新的实例里运行。模块在插件开启或站点第一次加载它时编译一次，编译结果缓存在
 `.kite/cache/wasm` 下。
 
+## 按名字安装
+
+官方的主题和插件，以及其他人发布的，都列在一份索引里，Kite 从
+[kite-plus/apps](https://github.com/kite-plus/apps) 读取它。传给 `kite theme add` 或
+`kite plugin add` 的参数既不是文件也不是目录时，就到索引里按名字找，安装能在当前 Kite 上
+运行的最新版本，或者用 `名字@版本` 指定的那个。索引用 sha256 标明每个压缩包，所以不管从
+哪个地址下载，解开之前都会先核对，之后再和其他安装方式一样检查一遍。
+
+```bash
+kite apps search 文档    # 索引里有什么；给出的每个词都要对上
+kite apps outdated       # 哪些有新版本，或者被撤回、被下架了
+kite apps update         # 全部更新，也可以指定一个：kite apps update vane
+```
+
+文件仍然放在 `themes/` 和 `plugins/` 下，随站点一起提交，构建永远不需要联网。它们旁边的
+`kite.lock` 记下从索引装了什么：版本、来自哪份索引和哪个压缩包、装好时所有文件的摘要；
+插件还记下安装时确认过的事：注入几段代码、这些代码从哪些网站加载东西、运行哪些钩子。从
+压缩包或目录装的包没有记录，只有当它的 homepage 就是索引里登记的仓库时，才会提示更新。
+
+自安装以来文件被改过的包，`kite apps update` 不会动它，因为更新会覆盖这些修改，除非加
+`--force`；`kite doctor` 会列出这类改动。插件的新版本如果做的事比记录里多，比如从新的
+网站加载东西、运行新的钩子、注入更多代码，会先问一句，或者加 `--yes`。
+
+索引最多一小时取一次，加 `--refresh` 立即重取，和下载过的压缩包一起缓存在
+`.kite/cache/apps` 里。断网时用缓存的那份，并说明是多久以前的。`kite.yaml` 里的
+`apps.index`，或者 `KITE_APPS_URL`，可以换成另一份索引，比如不通外网的内网里的一份副本。
+
 ## 配置
 
 `kite.yaml` 放在项目根目录。除 `site` 外全部可选，下面写的就是默认值。
@@ -545,6 +573,9 @@ plugins:
   settings:            # 各插件在 plugin.yaml 里声明的设置
     search: {full_text: true}
 
+apps:
+  index: ""            # 代替 Kite 自带索引的另一份索引
+
 menus:                 # 主题画的链接，按菜单分；见“主题”一节
   main:
     - {name: 关于, url: /about/}
@@ -564,7 +595,7 @@ menus:                 # 主题画的链接，按菜单分；见“主题”一�
 
 少数几个键可以用环境变量覆盖，供产出依赖运行环境的构建使用：`KITE_SITE_TITLE`、
 `KITE_SITE_BASEURL`、`KITE_SITE_LANGUAGE`、`KITE_THEME`、`KITE_BUILD_OUTPUT`、
-`KITE_BUILD_URLSTYLE` 和 `KITE_BUILD_PAGESIZE`。
+`KITE_BUILD_URLSTYLE`、`KITE_BUILD_PAGESIZE` 和 `KITE_APPS_URL`。
 
 `build.output`（或者代替它的 `KITE_BUILD_OUTPUT`）是 `kite build` 写出站点的目录。
 相对路径从项目根目录算起，不能跑到项目外面；绝对路径按原样使用，和 `kite build --output`

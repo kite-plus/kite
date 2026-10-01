@@ -36,6 +36,6 @@ Kite 的产品与技术总体设计。这些文档是**开发期的约束来源*
 | plugin-system.md | 第一版已实现（随 0.1.0 发布），其余在 M8 | 2026-09-26 |
 | roadmap.md | 持续更新 | 2026-10-01 |
 | admin-backlog.md | 待办盘点，A01–A08、B01–B06 已完成 | 2026-10-01 |
-| app-center.md | 实施中，A1、A2 已完成 | 2026-10-01 |
+| app-center.md | 实施中，A1–A3 已完成 | 2026-10-01 |
 
 里程碑定义见 [architecture.md §28 Roadmap](architecture.md#28-roadmap)，实际进度见 [roadmap.md](roadmap.md)。

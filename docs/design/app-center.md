@@ -146,36 +146,41 @@ official: true
 - 站点仓库就是站点的全部，换一台机器 `git clone` 就能构建。
 - 和上传 zip、`kite theme add` 是同一条写入路径，三种装法结果一样。
 
-lock 只记来源，和主题、插件文件在同一个 ChangeSet 里写入、一起提交：
+lock 只记来源，和主题、插件文件在同一个 ChangeSet 里写入、一起提交。下面是一个新站点 `kite theme add vane`、`kite plugin add search` 之后的 lock（A3，2026-10-01）：
 
 ```yaml
-# kite.lock
+# Written by Kite: where each theme and plugin installed from an index
+# came from. Their files are in themes/ and plugins/.
 lockfileVersion: 1
 themes:
   vane:
     version: 1.0.1
     source: https://cdn.jsdelivr.net/gh/kite-plus/apps@main/index.json   # 从哪份索引装的
-    resolved: https://…/vane-1.0.1.zip
-    checksum: sha256-da82c093…                    # 下载的 zip
-    tree: sha256-…                                # 装好后目录里每个文件的摘要
+    resolved: https://cdn.jsdelivr.net/gh/kite-plus/apps@theme-vane-1.0.1/vane-1.0.1.zip
+    checksum: sha256:da82c093d5e466e0de1bbd8bd075f628aa71a50fa5084bc76437ac4b8cec2947   # 下载的 zip
+    tree: sha256:1b9db074f2b4f28a5a161ef7d8e3cfbb7426754529f7c0a3512c8284450efe04       # 装好后的文件
 plugins:
   search:
     version: 0.1.0
     source: https://cdn.jsdelivr.net/gh/kite-plus/apps@main/index.json
-    resolved: https://…/search-0.1.0.zip
-    checksum: sha256-…
-    tree: sha256-…
+    resolved: https://cdn.jsdelivr.net/gh/kite-plus/apps@plugin-search-0.1.0/search-0.1.0.zip
+    checksum: sha256:20dee262d440cc4ebe5053d27ab46a3c11f346ebc9c95771b54285ff5fdfc59a
+    tree: sha256:ddfe916a361c81860623fe4cad436ac931329c631623294d630da4724e6a61b2
     granted:                                      # 安装时确认过的
       inject: 2
       loads: []
-      hooks: [build_complete]
+      hooks:
+        - build_complete
 ```
+
+`source` 是索引的名字，也就是第一个地址（`apps.index` 或 `KITE_APPS_URL` 换了索引时就是那一个），不管这次实际是从哪个镜像取到的；`resolved` 同样记索引里给这个压缩包的第一个地址，内容由 `checksum` 保证。lock 由存储层写：`PutTheme` / `PutPlugin` 带着来源（`Origin`）时记下，`tree` 由存储层按实际写下的文件算，不信调用方；从压缩包或目录装、删除，都会去掉这一条；记录清空时删掉 kite.lock。所以后台上传 zip 也自动去掉旧记录，不会留下和文件对不上的来源。lock 读不出来时，任何装包、删包的 ChangeSet 在写任何文件之前就失败。
 
 用法：
 
 - **提示更新**：lock 里有记录的，按 `source` 那份索引找新版本；lock 里没有的（上传 zip 或手放的），只有当包自己的 `homepage` 和索引里的 `repo` 对得上时才提示，免得把同名的别人的主题当成官方的。
-- **发现手改**：`tree` 是目录里每个文件（路径加 sha256）排序后的摘要。对不上说明有人改过，更新前提醒“会覆盖你的修改”。`kite doctor` 也报告这一项。
-- **防扩权**：插件更新后的 `loads`、`hooks` 或 `inject` 比 `granted` 多时，要重新确认才装。
+- **发现手改**：`tree` 是目录里每个文件按 `sha256  路径`（和 sha256sum 的输出一样）一行、按路径排序后，再取一次 sha256。换行一律按 `\n` 计算，Windows 上 Git 把换行改成 `\r\n` 不算改动；`.DS_Store` 这类系统自己加的文件不算在内，和读压缩包时的规则一样。对不上说明有人改过，`kite apps update` 不更新它，除非加 `--force`；`kite doctor` 也报告这一项。
+- **没有记录的包**：从压缩包装的、homepage 对得上的包，更新前先下载索引里同一个版本的压缩包比对文件，一样才当作没改过；更新后补上记录。`kite apps update vane` 对同一个版本也会这样补记录。
+- **防扩权**：插件更新后的 `loads`、`hooks` 或 `inject` 比 `granted` 多时，要重新确认才装（终端里问一句，脚本里要加 `--yes`）。`granted` 取自包本身（`plugin.yaml` 和它注入的代码），不取索引里的数字。已开启的插件，更新前先像开启时那样检查一遍模块。
 - `kite:` 版本锁和 `kitew` 仍在 M6；这里只先做 lock 的 `themes`、`plugins` 两节，格式按 M6 的写法留好位置。
 
 ### 4.3 上架、审核与信任
@@ -242,8 +247,10 @@ kite theme add vane@1.0.1        # 指定版本
 kite plugin add search
 kite apps search 文档            # 主题和插件一起搜
 kite apps outdated               # 列出有新版本的
-kite apps update [名字]          # 更新；插件扩权时要交互确认，或加 --yes
+kite apps update [名字]          # 更新；插件扩权时要交互确认，或加 --yes；手改过的要 --force
 ```
+
+`theme/名字`、`plugin/名字` 用来区分同名的主题和插件；`--refresh` 不等一小时、立即重取索引。
 
 `kite theme add <zip|目录>` 和 `kite plugin add <zip|目录>` 照旧。一个参数既不是文件也不是目录时才按名字到索引里找。
 
@@ -285,7 +292,7 @@ POST /api/v1/apps/{kind}/{id}/update           {"version": "…", "confirm": {..
 |---|---|---|
 | **A1** 已完成 | `kite theme list/add/remove/use/new`（0.1.4），主题和插件共用一个读压缩包和目录的入口 | — |
 | **A2** 已完成（2026-10-01） | [`kite-plus/apps`](https://github.com/kite-plus/apps) 仓库：条目格式、生成并检查 `index.json` 的 CI、每个版本一个 tag 的 zip 副本和 jsDelivr 刷新、提交说明和 PR 模板、审核清单；`kite theme pack` / `kite plugin pack`；收录 6 个官方包 | 6 个官方包的 11 个版本都通过检查并收录，jsDelivr 和 GitHub 两个地址下载的 sha256 都对得上；再跑一次没有改动；同一版本换内容被拒绝、权限变多的版本生成待审 PR，由端到端测试覆盖；从零上架一个测试主题（`kite theme new` → 加许可证 → `kite theme pack` → 收录）由 CI 里用真实 Kite 跑的集成测试覆盖 |
-| **A3** Kite 客户端和命令行 | `internal/apps`（读索引、缓存、按 `requires` 过滤、下载、校验）、`kite.lock` 的 `themes` / `plugins`、按名字安装和更新、`kite apps`、`kite doctor` 检查 lock | 新站点 `kite theme add vane` 装上、能构建、lock 有记录；手改过的主题更新前提醒；断网时用缓存 |
+| **A3** 已完成（2026-10-01） | `internal/apps`（读索引、缓存、按 `requires` 过滤、下载、校验）、`internal/lock`、`kite.lock` 的 `themes` / `plugins`、按名字安装和更新、`kite apps search/outdated/update`、`kite doctor` 检查 lock、`apps.index` / `KITE_APPS_URL` | 对线上索引验证：新站点 `kite theme add vane`、`kite plugin add search` 装上、能构建、lock 有记录；手改过的主题 `kite apps update` 不动、`--force` 才更新，`kite doctor` 报告；断网时用缓存并说明多久以前。插件扩权要确认、从压缩包装的包按 homepage 认领并比对后更新，由端到端测试覆盖 |
 | **A4** 后台应用中心 | §4.5 的页面和 §4.7 的 API，「官方」「社区」标记，撤回和下架的提醒 | 浏览、详情、安装、更新、移除在真实页面可用；浏览器回归测试覆盖安装和更新 |
 | **A5** 签名和账号提交 | 索引和包的签名；用 Kite Plus 账号提交 | — |
 
