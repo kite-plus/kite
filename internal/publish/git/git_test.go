@@ -516,3 +516,32 @@ func TestAFileTooLargeToPushIsReportedBeforeCommitting(t *testing.T) {
 		t.Error("the problem says what is wrong but not what to do about it")
 	}
 }
+
+// kite.lock is written beside the themes and plugins it records, and a clone
+// without it could not tell where they came from, so it is published with
+// them; a file of the author's own is still none of a publish's business.
+func TestTheLockIsPublishedWithThePackagesItRecords(t *testing.T) {
+	root := newRepo(t)
+	write(t, root, "themes/paper/theme.yaml", "name: paper\n")
+	write(t, root, "kite.lock", "lockfileVersion: 1\nthemes:\n  paper:\n    version: 1.0.0\n")
+	write(t, root, "notes.txt", "mine\n")
+
+	pub := newPublisher(root)
+	state, err := pub.State(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(state.Dirty, "kite.lock") || slices.Contains(state.Dirty, "notes.txt") {
+		t.Fatalf("dirty = %v", state.Dirty)
+	}
+	p := plan(t, pub, publish.Request{Paths: state.Dirty, Message: "theme: install paper"})
+	if !p.OK() {
+		t.Fatalf("plan: %v", codes(p.Problems))
+	}
+	if _, err := pub.Apply(t.Context(), p); err != nil {
+		t.Fatal(err)
+	}
+	if out := run(t, root, "show", "--name-only", "--format=", "HEAD"); !strings.Contains(out, "kite.lock") {
+		t.Errorf("the commit carries %q", out)
+	}
+}

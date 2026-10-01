@@ -10,8 +10,8 @@ import { PublishDialog } from "@/components/publish/PublishDialog";
 
 /**
  * PublishBar offers what the settings screens change for publishing: kite.yaml,
- * the themes in themes/, the plugins in plugins/ and the pictures settings
- * name. They belong to no
+ * the themes in themes/, the plugins in plugins/, kite.lock saying where they
+ * came from and the pictures settings name. They belong to no
  * item, so the editor never publishes them, and a theme switched to here
  * would otherwise reach the site only when someone committed it by hand.
  */
@@ -62,7 +62,7 @@ export function PublishBar({ className }: { className?: string }) {
 function settingsPaths(dirty: string[]): string[] {
   const out = new Set<string>();
   for (const path of dirty) {
-    if (path === "kite.yaml") out.add(path);
+    if (path === "kite.yaml" || path === "kite.lock") out.add(path);
     else if (path.startsWith("themes/") || path.startsWith("plugins/")) out.add(path.split("/").slice(0, 2).join("/"));
     else if (path.startsWith("static/uploads/")) out.add(path);
   }

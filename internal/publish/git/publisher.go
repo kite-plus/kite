@@ -353,8 +353,9 @@ func (p *Publisher) dirtyContent(ctx context.Context) ([]string, error) {
 
 // watched is what a publish would ever carry. Themes and plugins are among
 // it because the admin installs them, and a site using one nobody committed
-// would build on no machine but this one.
-var watched = []string{"content", "static", "themes", "plugins", "kite.yaml"}
+// would build on no machine but this one; kite.lock says where they came
+// from, and a clone without it could not tell.
+var watched = []string{"content", "static", "themes", "plugins", "kite.yaml", "kite.lock"}
 
 func (p *Publisher) message(req publish.Request) string {
 	if req.Message != "" {
