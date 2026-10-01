@@ -309,13 +309,15 @@ POST /api/v1/apps/{kind}/{id}/update                   {"version": "…", "confi
 3. **lock**：装进站点仓库，`kite.lock` 只记来源（§4.2）。
 4. **后台入口**：「系统 → 应用中心」一个入口（§4.5）。
 
+已经解决的：打包命令和 `verify` 报告的加载网站随 Kite v0.1.5 发布（2026-10-01），`kite-plus/apps` 改用 v0.1.5 检查每个版本，说明里不再让作者装 main 上的 Kite。
+
 还开着的 `[待定]`：
 
 1. **境内访问**：A2 上线后实测 jsDelivr 在境内的成功率和速度，不够时加香港镜像，或另发 npm 包借 npmmirror 分发。
 2. **审核的人和时限**：审核清单已写进 `kite-plus/apps` 的说明；谁审、多久内回复还没定。
 3. **索引的正式域名**：先用 jsDelivr 和 raw.githubusercontent.com 的地址；要不要、什么时候换成 `apps.kite.plus`。
-4. **打包命令进正式版本**：`kite theme pack` / `kite plugin pack` 和 `verify --json` 的 `loads` 还只在 main 上，`kite-plus/apps` 用 `.github/kite-version` 钉住这个提交，说明里让作者先装 main 上的 Kite。下一个 Kite 版本发布后，两处都改成正式版本。
-5. **待审版本用 PR 还是 issue**：`kite-plus` 组织不允许工作流提 PR，所以待审的版本现在会以 issue 出现（附改动链接，一键开 PR）。要改成直接提 PR，在组织设置的 Actions → General → Workflow permissions 里打开 “Allow GitHub Actions to create and approve pull requests”，再在 `kite-plus/apps` 里打开同一项。
+4. **待审版本用 PR 还是 issue**：`kite-plus` 组织不允许工作流提 PR，所以待审的版本现在会以 issue 出现（附改动链接，一键开 PR）。要改成直接提 PR，在组织设置的 Actions → General → Workflow permissions 里打开 “Allow GitHub Actions to create and approve pull requests”，再在 `kite-plus/apps` 里打开同一项。
+5. **签名方案（A5）**：建议 minisign：一对密钥，私钥作为 `kite-plus/apps` 的 secret 由 Index 工作流签索引和每个包，公钥编进 Kite，验证不用联网，适合内网；Sigstore 无密钥签名要在验证时连透明日志，内网用不了。用 Kite Plus 账号提交等 `id.kite.plus` 就绪后再做。
 
 ## 证据来源
 
