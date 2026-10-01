@@ -23,7 +23,7 @@ Kite is an open-source publishing platform that gives you the writing experience
 - **Files that stay yours.** Content is plain Markdown on disk. Saving rewrites only what changed and keeps your key order and comments, so editing a title is a one-line `git diff`.
 - **Publish your way.** Export static pages for any host, run the site on your own server, or commit and push through Git.
 - **Nothing else to install.** The studio, a default theme with light and dark modes, and the SQLite driver are compiled into the binary.
-- **Plugins when you want them.** Comments, analytics, search, and math come as official plugins you install and switch on in the studio. A plugin adds code to pages, or runs WebAssembly in a sandbox while the site builds.
+- **Themes and plugins by name.** Comments, analytics, search, and math come as official plugins, beside documentation and personal themes. The studio's app center, or `kite theme add vane` in a terminal, installs them by name and keeps them up to date. A plugin adds code to pages, or runs WebAssembly in a sandbox while the site builds.
 
 > Kite is in early development: 0.1 is its first release, and things may still change from one version to the next.
 
@@ -109,8 +109,8 @@ docker cp kite:/data/public ./public
 
 ## Roadmap
 
-- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4), and the first version of WebAssembly plugins (M8), released as 0.1; the theme contract `kite/v1`, frozen in 0.1.4 (M5).
-- **Next:** `kite.lock` with the `kitew` wrapper and a dynamic mode backed by SQLite (M6–M7), and an [app center](https://github.com/kite-plus/kite/issues/16) to install themes and plugins online.
+- **Done:** static builds, live serving, the browser studio, and Git publishing (M0–M4), and the first version of WebAssembly plugins (M8), released as 0.1; the theme contract `kite/v1`, frozen in 0.1.4 (M5); the [app center](https://github.com/kite-plus/kite/issues/16), which installs and updates themes and plugins by name from the studio and the command line, in 0.1.5.
+- **Next:** the Kite version pinned in `kite.lock` with the `kitew` wrapper (M6), a dynamic mode backed by SQLite (M7), and signed packages for the app center.
 
 The [reference guide](docs/reference.md#roadmap) lists every milestone, and the [roadmap](docs/design/roadmap.md) tracks progress item by item.
 

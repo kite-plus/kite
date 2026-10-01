@@ -1037,9 +1037,10 @@ Verify a download against the `checksums.txt` published with the release.
 | M3 | Editing admin: editor, media, conflict handling | done |
 | M4 | Git publisher — the first release, **0.1** | done |
 | M5 | Public theme contract | done: `kite/v1` frozen in 0.1.4 |
-| M6 | `kite.lock` and the `kitew` wrapper | |
+| M6 | `kite.lock` and the `kitew` wrapper | in part: `kite.lock` records the themes and plugins installed from the index (0.1.5) |
 | M7 | Dynamic mode backed by SQLite | |
 | M8 | WebAssembly plugins | first version done: injected code and build hooks |
+| App center | Themes and plugins installed and updated by name | first version done in 0.1.5: the studio and the command line; signed packages next |
 
 The [roadmap](design/roadmap.md) (in Chinese) records what has been verified as done and the plan after it.
 
