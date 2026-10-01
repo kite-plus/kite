@@ -33,8 +33,18 @@ function Fetch([string]$Url, [string]$Out) {
     }
 }
 
+# Sha256 uses .NET rather than Get-FileHash: Windows PowerShell started from
+# PowerShell 7 inherits a module path that hides its script modules, which
+# Get-FileHash and Expand-Archive are part of.
 function Sha256([string]$Path) {
-    (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $hash = $sha.ComputeHash($stream) } finally { $sha.Dispose() }
+    } finally {
+        $stream.Dispose()
+    }
+    -join ($hash | ForEach-Object { $_.ToString('x2') })
 }
 
 try {
@@ -94,7 +104,8 @@ try {
             $out = Join-Path $tmp 'out'
             New-Item -ItemType Directory -Path $out | Out-Null
             if ($format -eq 'zip') {
-                Expand-Archive -LiteralPath $file -DestinationPath $out
+                Add-Type -AssemblyName System.IO.Compression.FileSystem
+                [IO.Compression.ZipFile]::ExtractToDirectory($file, $out)
             } else {
                 tar -xzf $file -C $out kite
                 if ($LASTEXITCODE -ne 0) { throw "could not unpack $archive" }
