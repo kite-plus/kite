@@ -131,6 +131,8 @@ official: true
 
 插件版本的 `api` 是 `kite/plugin/v1`（模块的 ABI 由 `kite plugin verify` 检查），另有 `inject`（往页面注入几段代码）、`hooks`（`plugin.yaml` 声明的构建期钩子）。`loads` 是包会让读者的浏览器去加载的外部网站，由 `kite theme verify --json` / `kite plugin verify --json` 报告：主题用夹具站点构建一次，扫出页面和样式表让浏览器加载的外部域名（脚本、样式表和图标、图片、音视频、iframe、样式表里引用的地址），读者自己点的链接不算；插件取它注入的代码里的地址。
 
+包的图标（2026-10-02，随 v0.1.8 发布）：条目可以多写一行 `icon: docs/icon.svg`，指向包的仓库里一个方形的 SVG、PNG、WebP 或 JPEG。生成器按最新收录版本的 tag 读取并核对它，索引的 `icon` 是 jsDelivr 上固定在那个 tag 的地址；图标最大 64 KB，SVG 里不能有脚本、事件、嵌入的内容或从别处加载的东西。Kite 的服务端像代取截图一样代取图标，并再核对一遍（仓库的 tag 在收录后还可能被移动），SVG 带沙箱的 CSP 返回，后台在插件卡片和详情里显示它。官方的四个插件用的是仓库里原有的 `docs/icon.svg`。
+
 规则：
 
 - `id` 就是装进站点后的目录名：主题的 `name`、插件的 `id`。主题和插件各是一个命名空间。
