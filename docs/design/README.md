@@ -11,6 +11,7 @@ Kite 的产品与技术总体设计。这些文档是**开发期的约束来源*
 | [plugin-system.md](plugin-system.md) | 插件系统：WASM 运行时、Host ABI、Hook 目录、Capability、Permission、`plugin.yaml`、SDK | 插件开发者、扩展层贡献者 |
 | [roadmap.md](roadmap.md) | 路线图与实现现状：逐项核实的完成情况、验收标准核对、v1.0 收尾清单、分阶段计划、后台占位功能的归属 | 所有贡献者，排期前读 |
 | [admin-backlog.md](admin-backlog.md) | 后台页面盘点、主流程风险、功能缺口、优先级与验收条件 | 后台开发与排期 |
+| [app-center.md](app-center.md) | 应用中心：在线安装和更新主题与插件的索引、上架与审核、分发、`kite.lock` 来源记录、后台与命令行 | 主题和插件作者、后台与命令行贡献者 |
 
 ## 阅读顺序
 
@@ -31,9 +32,10 @@ Kite 的产品与技术总体设计。这些文档是**开发期的约束来源*
 | 文档 | 状态 | 最近更新 |
 |---|---|---|
 | architecture.md | 设计中（M0 开工前的基线） | 2026-09-21 |
-| theme-system.md | 设计中，契约计划于 **M5** 冻结 | 2026-09-21 |
-| plugin-system.md | 设计中，实现计划于 **M8** | 2026-09-21 |
-| roadmap.md | 持续更新 | 2026-09-23 |
-| admin-backlog.md | 待办盘点 | 2026-09-24 |
+| theme-system.md | 契约 `kite/v1` 已冻结（M5） | 2026-10-01 |
+| plugin-system.md | 第一版已实现（随 0.1.0 发布），其余在 M8 | 2026-09-26 |
+| roadmap.md | 持续更新 | 2026-10-01 |
+| admin-backlog.md | 待办盘点，A01–A08、B01–B06 已完成 | 2026-10-01 |
+| app-center.md | 设计中，A1 已完成 | 2026-10-01 |
 
 里程碑定义见 [architecture.md §28 Roadmap](architecture.md#28-roadmap)，实际进度见 [roadmap.md](roadmap.md)。

@@ -16,7 +16,7 @@
 - **§4 的收尾项只剩第 11 项的一部分**：`website`、`lab`、两个主题仓库和四个官方插件仓库都已建好，`starters` 和 `setup-kite` 还没有。第 14 项（部署在带子路径的地址上时站内链接失效）已修复。M4 的端到端验收已在 `kite-plus/website` 上通过（§3）。
 - 首个版本按用户的决定发成 **v0.1.0**（2026-09-27），之后连续发到 v0.1.3（2026-10-01）。
 - **M5 主题契约已完成**：`kite/v1` 于 2026-10-01 冻结，只增不改；菜单写进了契约，主题有了完整的命令行。**M8 插件的第一版提前随 v0.1.0 发布**（页面注入和构建期 WASM 钩子）。M6、M7 还没开始。后台只显示已经实现的功能；原设计稿里画出的其余功能各自归到哪个阶段见 §6。
-- 下一步待规划的是**应用中心**：在后台在线浏览、安装和更新主题与插件，见 [kite-plus/kite#16](https://github.com/kite-plus/kite/issues/16) 和 §5。
+- 下一步是**应用中心**：在后台在线浏览、安装和更新主题与插件，方案见 [app-center.md](app-center.md)，跟踪在 [kite-plus/kite#16](https://github.com/kite-plus/kite/issues/16)。
 
 ## 2. 各里程碑完成情况
 
@@ -95,7 +95,7 @@
 | **2. M5 主题契约** | 已完成（2026-10-01） | 见 §2。剩下的只有风标 1.0 的发布和 `starters` 仓库，都要用户确认 | — |
 | **3. M6 可重现构建** | v1.2 | `kite.lock`、`kitew`、Cloudflare Pages 部署模板；启用增量构建里的跳过判断 | 依赖记录和缓存键已经有了 |
 | **4. 媒体库**（新增） | v1.5 | 在现有索引上汇总所有 page bundle 里的文件：媒体列表、跨文章复用、找出没人引用的文件、上传入口 | 单篇的附件上传、替换、删除和引用检查已经有了（后台的「附件」，admin-backlog B01） |
-| **应用中心**（新增，待规划） | — | 后台在线浏览、安装、更新和移除主题与插件，命令行按名字安装；索引、信任、来源记录、镜像等问题见 [kite-plus/kite#16](https://github.com/kite-plus/kite/issues/16)。原计划的主题市场和插件注册表在 V4（[architecture.md §32](architecture.md#32-现在不要设计的东西)），用户要求提前规划 | `kite theme add` / `kite plugin add` 和后台的 zip 安装共用同一条安装路径（`PutTheme` / `PutPlugin`），检查和发布都已经有了 |
+| **应用中心**（新增，规划中） | — | 后台在线浏览、安装、更新和移除主题与插件，命令行按名字安装；第一版就开放第三方上架。方案和分阶段见 [app-center.md](app-center.md)，跟踪在 [kite-plus/kite#16](https://github.com/kite-plus/kite/issues/16)。原计划的主题市场和插件注册表在 V4（[architecture.md §32](architecture.md#32-现在不要设计的东西)），用户要求提前规划 | `kite theme add` / `kite plugin add` 和后台的 zip 安装共用同一条安装路径（`PutTheme` / `PutPlugin`），检查和发布都已经有了 |
 | **5. M7 动态模式** | v2.0 | SQLite 作为真相源，写入同一套读模型；`kite migrate` 在文件和数据库之间互转；文章加密和私密文章（只在服务端部署提供）；数据库备份和 `kite export`；Kite 自己存储的评论 | 读模型、单账号认证、Docker 都已经有了 |
 | **6. M8 插件** | v3.0 | 基于 wazero 的 WebAssembly 插件、Host ABI、能力和权限声明、`kite plugin`、插件 SDK | HookBus 已经被内置功能使用 |
 
