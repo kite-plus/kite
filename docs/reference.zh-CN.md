@@ -917,7 +917,7 @@ GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot 
 | M3 | 可写后台：编辑器、媒体、冲突处理 | 已完成 |
 | M4 | Git 发布器 —— 第一个发布版本 **0.1** | 已完成 |
 | M5 | 公开主题契约 | 已完成：`kite/v1` 在 0.1.4 冻结 |
-| M6 | `kite.lock` 与 `kitew` wrapper | 部分完成：`kite.lock` 记下从索引安装的主题和插件（0.1.5），并固定 `kitew` 运行的 Kite 版本 |
+| M6 | `kite.lock` 与 `kitew` wrapper | 部分完成：`kite.lock` 记下从索引安装的主题和插件（0.1.5），并固定 `kitew` 运行的 Kite 版本（0.1.7） |
 | M7 | 基于 SQLite 的动态模式 | |
 | M8 | WebAssembly 插件 | 第一版完成：注入代码和构建期钩子 |
 | 应用中心 | 按名字安装和更新主题与插件 | 第一版在 0.1.5 完成：后台和命令行；0.1.6 起索引带签名 |
