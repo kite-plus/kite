@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { CircleAlert, CircleCheck, Download, Info, XCircle } from "lucide-react";
+import { CircleAlert, CircleCheck, Download, Info, Pin, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/api/client";
 import { useI18n, useProblem } from "@/i18n";
-import { useSite } from "@/hooks/useContents";
+import { useSite, useWritable } from "@/hooks/useContents";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { saveFile, useExportSite } from "@/hooks/useExport";
+import { usePinKite } from "@/hooks/useKite";
 import { canPublish, useDelivery, usePublish } from "@/hooks/usePublish";
 import { sizeOf } from "@/lib/bytes";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
 import { DeliveryStages } from "@/components/publish/Delivery";
+import { PublishBar } from "@/features/settings/components/publish-bar";
 
 /**
  * Deploying is how a site written here gets online. A static site has two
@@ -36,8 +38,10 @@ export function Deploy() {
       <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
         <PageTitle title={t("nav.deploy")} description={t("deploy.note")} />
         <div className="grid max-w-3xl gap-4 sm:gap-6">
+          <PublishBar className="mb-0 lg:mb-0" />
           <ExportCard />
           <GitHubCard />
+          <KiteCard />
         </div>
       </Main>
     </>
@@ -154,6 +158,81 @@ function GitHubCard() {
               <li>{t("deploy.step3")}</li>
               <li>{t("deploy.step4")}</li>
             </ol>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * KiteCard says which Kite release builds the site: the one kite.lock pins,
+ * which kitew runs on this computer and in the deploy, against the one
+ * serving the studio, and moves the pin when the two differ.
+ */
+function KiteCard() {
+  const { t } = useI18n();
+  const problem = useProblem();
+  const site = useSite();
+  const writable = useWritable();
+  const pin = usePinKite();
+  const kite = site.data?.kite;
+
+  const pinNow = () =>
+    pin.mutate(undefined, {
+      onSuccess: (now) => toast.success(t("deploy.kitePinned", { version: now.pinned ?? "" })),
+      onError: (err) => {
+        const said = err instanceof ApiError ? problem(err.code, err.message) : { title: String(err), detail: undefined };
+        toast.error(said.title, { description: said.detail });
+      },
+    });
+
+  // A pin to move, or one to complete with the checksums it lacks.
+  const action =
+    kite?.running && kite.wrapper && writable
+      ? !kite.pinned
+        ? "deploy.kitePin"
+        : kite.pinned !== kite.running
+          ? "deploy.kiteUse"
+          : !kite.checksums
+            ? "deploy.kiteChecksums"
+            : null
+      : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("deploy.kite")}</CardTitle>
+        <CardDescription>{t("deploy.kiteNote")}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4 text-sm">
+        {!kite ? (
+          <Skeleton className="h-12 w-full" />
+        ) : (
+          <>
+            <ul className="grid gap-2">
+              {!kite.pinned ? (
+                <Check tone="warn">{t(kite.wrapper ? "deploy.kiteNoPin" : "deploy.kiteNone")}</Check>
+              ) : kite.running && kite.running !== kite.pinned ? (
+                <Check tone="warn">{t("deploy.kiteOther", { pinned: kite.pinned, running: kite.running })}</Check>
+              ) : (
+                <Check tone="ok">{t(kite.running ? "deploy.kiteSame" : "deploy.kitePinnedOnly", { pinned: kite.pinned })}</Check>
+              )}
+              {kite.pinned && !kite.wrapper && <Check tone="warn">{t("deploy.kiteNoWrapper")}</Check>}
+              {kite.pinned && !kite.checksums && <Check tone="info">{t("deploy.kiteNoChecksums")}</Check>}
+              {kite.deploy === "self" && <Check tone="warn">{t("deploy.kiteSelf")}</Check>}
+            </ul>
+            {!kite.wrapper && (
+              <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs">kite wrapper</pre>
+            )}
+            {action && (
+              <div>
+                <Button variant="outline" onClick={pinNow} disabled={pin.isPending}>
+                  {pin.isPending ? <Spinner /> : <Pin />}
+                  {t(action, { running: kite.running ?? "" })}
+                </Button>
+              </div>
+            )}
           </>
         )}
       </CardContent>

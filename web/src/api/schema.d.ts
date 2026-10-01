@@ -597,6 +597,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/site/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pin this server's Kite release in kite.lock, with the sha256 of its checksums when they can be fetched, so that kitew and the deploy build the site with it. */
+        post: operations["pinKite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/taxonomies": {
         parameters: {
             query?: never;
@@ -956,6 +973,13 @@ export interface components {
             updated_at?: string;
             url: string;
         };
+        KiteRelease: {
+            checksums: boolean;
+            deploy?: string;
+            pinned?: string;
+            running?: string;
+            wrapper: boolean;
+        };
         LayoutOption: {
             description?: string;
             label: string;
@@ -1142,6 +1166,7 @@ export interface components {
                 [key: string]: number;
             };
             description?: string;
+            kite: components["schemas"]["KiteRelease"];
             language?: string;
             problems?: string[];
             runtime: string;
@@ -4417,6 +4442,62 @@ export interface operations {
             };
             /** @description Not signed in. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    pinKite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Which release builds the site now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KiteRelease"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
