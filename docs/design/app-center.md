@@ -257,11 +257,15 @@ kite apps update [名字]          # 更新；插件扩权时要交互确认，�
 ### 4.7 API
 
 ```
-GET  /api/v1/apps?kind=theme|plugin&q=…        列表，标出已装、可更新、合不来
-GET  /api/v1/apps/{kind}/{id}                  详情，含各版本
-POST /api/v1/apps/{kind}/{id}/install          {"version": "1.0.1"}；同名已装时要 replace=true
-POST /api/v1/apps/{kind}/{id}/update           {"version": "…", "confirm": {...}}
+GET  /api/v1/apps?kind=theme|plugin&q=…&refresh=true   列表，标出已装、可更新、撤回；附索引取到的时间和是否离线
+GET  /api/v1/apps/{kind}/{id}                          详情，含各版本和每个版本合不合得来
+GET  /api/v1/apps/{kind}/{id}/screenshot               主题截图，服务端去取并缓存，只回 PNG/JPEG/GIF/WebP/AVIF
+POST /api/v1/apps/{kind}/{id}/install                  {"version": "1.0.1"}；同名已装时要 replace=true
+GET  /api/v1/apps/{kind}/{id}/update?version=…         更新计划：从哪个版本到哪个、手改会不会被覆盖、插件多要了什么
+POST /api/v1/apps/{kind}/{id}/update                   {"version": "…", "confirm": {"overwrite": true, "grant": true}}
 ```
+
+（A4 实现，2026-10-01）截图和更新计划是实现时加的两个接口：截图由服务端代取，浏览器不碰索引里的地址；不是图片的内容（比如 HTML、SVG）一律拒绝，免得在后台的源下当成页面打开。更新计划用结构化的字段（`changed`、`more_loads`、`more_hooks`、`injected`、`grows`），后台按自己的语言说给人听；`POST …/update` 缺少需要的确认时回 409 `update_needs_confirmation`，并带上同一份计划。索引取不到时回 502 `index_unreachable`。
 
 安装和更新最后都是一个 ChangeSet：`PutTheme` 或 `PutPlugin`，加上写 `kite.lock` 的一步，任何一步失败都不写。下载的 zip 先存在 `.kite/cache/apps/archives/`，按 sha256 命名，同一个包不重复下载。
 
@@ -293,7 +297,7 @@ POST /api/v1/apps/{kind}/{id}/update           {"version": "…", "confirm": {..
 | **A1** 已完成 | `kite theme list/add/remove/use/new`（0.1.4），主题和插件共用一个读压缩包和目录的入口 | — |
 | **A2** 已完成（2026-10-01） | [`kite-plus/apps`](https://github.com/kite-plus/apps) 仓库：条目格式、生成并检查 `index.json` 的 CI、每个版本一个 tag 的 zip 副本和 jsDelivr 刷新、提交说明和 PR 模板、审核清单；`kite theme pack` / `kite plugin pack`；收录 6 个官方包 | 6 个官方包的 11 个版本都通过检查并收录，jsDelivr 和 GitHub 两个地址下载的 sha256 都对得上；再跑一次没有改动；同一版本换内容被拒绝、权限变多的版本生成待审 PR，由端到端测试覆盖；从零上架一个测试主题（`kite theme new` → 加许可证 → `kite theme pack` → 收录）由 CI 里用真实 Kite 跑的集成测试覆盖 |
 | **A3** 已完成（2026-10-01） | `internal/apps`（读索引、缓存、按 `requires` 过滤、下载、校验）、`internal/lock`、`kite.lock` 的 `themes` / `plugins`、按名字安装和更新、`kite apps search/outdated/update`、`kite doctor` 检查 lock、`apps.index` / `KITE_APPS_URL` | 对线上索引验证：新站点 `kite theme add vane`、`kite plugin add search` 装上、能构建、lock 有记录；手改过的主题 `kite apps update` 不动、`--force` 才更新，`kite doctor` 报告；断网时用缓存并说明多久以前。插件扩权要确认、从压缩包装的包按 homepage 认领并比对后更新，由端到端测试覆盖 |
-| **A4** 后台应用中心 | §4.5 的页面和 §4.7 的 API，「官方」「社区」标记，撤回和下架的提醒 | 浏览、详情、安装、更新、移除在真实页面可用；浏览器回归测试覆盖安装和更新 |
+| **A4** 已完成（2026-10-01） | §4.5 的页面和 §4.7 的 API，「官方」「社区」标记，撤回和下架的提醒；「设置 → 主题」和「系统 → 插件」的卡片标出「可更新」并链到应用中心；主题装好后的提示可以直接进整站预览 | 对线上索引在真实页面验证了浏览、搜索、详情、安装（插件安装前列出加载的网站、注入和钩子）、更新（手改过的要先勾选同意覆盖）、主题装好后进预览、手机宽度和深色模式；移除沿用原有的删除，lock 由存储层一起去掉。浏览器回归测试用本地假索引覆盖主题的安装和更新、插件扩权要勾选；其他浏览器测试的站点指向一个不存在的索引，不连外网 |
 | **A5** 签名和账号提交 | 索引和包的签名；用 Kite Plus 账号提交 | — |
 
 ## 8. 决定与待定事项

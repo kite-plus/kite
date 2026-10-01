@@ -17,6 +17,7 @@ is what `kite init` asks in a terminal. Your name is the site's author.
 | **Editor** | A visual editor that reads and writes Markdown, with the source one click away, a live preview, front matter as a form, terms, slug, word count, and files dropped straight into the bundle, where a Files chip lists them with what the text uses, to copy the link to, replace in place or delete; a draft saves itself as you write, and what is not saved yet stays in the browser until it is |
 | **Taxonomies** | tags and categories as they actually exist across the content |
 | **Theme** | every theme the project has, each previewed on the whole site before it is used; a theme installed from its zip archive; the active theme's settings edited beside a live preview |
+| **App center** | the themes and plugins the index lists, searched, installed and updated; what each loads, injects and runs is shown before it is installed, and an update that would replace hand edits, or let a plugin do more, waits until that is ticked |
 | **Deploy** | the site exported as a zip to upload anywhere, or how far a push to GitHub Pages has got |
 | **Settings** | the site's title, description, address, language, keywords, time zone, search engine visibility and code added to every page; the studio's own language and colors; your account: name, picture, password and sessions |
 
@@ -598,6 +599,11 @@ folder is looked up there, and the newest version that works with the running
 Kite is installed, or the one asked for as `name@version`. The index names
 every archive by its sha256, so whichever address serves it, the bytes are
 checked before they are unpacked, and then checked as any other install.
+
+The studio's System → App center does the same, and marks a theme or a
+plugin with a newer version on its own page too. The server fetches the index
+and every archive and picture, so the browser never has to reach their
+addresses.
 
 ```bash
 kite apps search docs    # what the index lists; every word given has to match
