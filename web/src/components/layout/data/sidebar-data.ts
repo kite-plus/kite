@@ -9,6 +9,7 @@ import {
   Puzzle,
   Rocket,
   SlidersHorizontal,
+  Store,
   Tag,
   Tags,
 } from 'lucide-react'
@@ -69,6 +70,7 @@ export function useSidebarData(): SidebarData {
         items: [
           { title: t('nav.deploy'), url: '/deploy', icon: Rocket },
           { title: t('nav.plugins'), url: '/plugins', icon: Puzzle },
+          { title: t('nav.apps'), url: '/apps', icon: Store },
         ],
       },
       // Every setting is one click away rather than behind a fold. The

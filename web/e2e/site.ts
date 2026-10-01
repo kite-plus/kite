@@ -106,6 +106,9 @@ function environment(base: string): NodeJS.ProcessEnv {
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** deadIndex is where no index answers, as the site's own until a test serves one. */
+export const deadIndex = "http://127.0.0.1:9/index.json";
+
 /**
  * Site is one throwaway project served by a real kite binary: a git
  * repository with a bare repository beside it as its remote, in a temporary
@@ -156,6 +159,10 @@ export class Site {
       cwd: this.root,
       env: this.env,
     });
+    // No test reaches the real index of themes and plugins: one that wants
+    // an index serves its own here.
+    const config = path.join(this.root, "kite.yaml");
+    await writeFile(config, `${(await readFile(config, "utf8")).trimEnd()}\napps:\n  index: ${deadIndex}\n`);
 
     for (const spec of posts) {
       const id = newId();

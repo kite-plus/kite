@@ -44,6 +44,7 @@ import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
 import { QueryError } from "@/components/query-error";
 import { ReadOnlyNote } from "@/components/read-only-note";
+import { UpdateBadge } from "@/features/apps/parts";
 import { PublishBar } from "@/features/settings/components/publish-bar";
 
 /**
@@ -159,6 +160,7 @@ function PluginCard({ plugin, onRemove }: { plugin: PluginInfo; onRemove: () => 
             plugin.description && <p className="line-clamp-2 text-sm text-muted-foreground">{plugin.description}</p>
           )}
           <div className="flex flex-wrap gap-1.5 pt-1">
+            <UpdateBadge kind="plugin" name={plugin.id} />
             {plugin.injects && (
               <Badge variant="secondary" className="font-normal">
                 <Code />

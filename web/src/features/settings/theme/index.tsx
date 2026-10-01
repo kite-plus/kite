@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { QueryError } from "@/components/query-error";
+import { UpdateBadge } from "@/features/apps/parts";
 import { ContentSection } from "../components/content-section";
 
 /**
@@ -168,6 +169,7 @@ function ActiveTheme({ theme }: { theme: ThemeInfo }) {
               <CheckCircle2 />
               {t("themes.inUse")}
             </Badge>
+            {!theme.builtin && <UpdateBadge kind="theme" name={theme.name} />}
           </div>
           {theme.description && <p className="text-sm text-muted-foreground">{theme.description}</p>}
         </div>
@@ -276,6 +278,11 @@ function ThemeCard({
           <ProblemNote problem={theme.problem} />
         ) : (
           theme.description && <p className="line-clamp-2 text-sm text-muted-foreground">{theme.description}</p>
+        )}
+        {!theme.builtin && (
+          <div className="flex">
+            <UpdateBadge kind="theme" name={theme.name} />
+          </div>
         )}
       </div>
       <div className="flex items-center gap-2 border-t px-4 py-3">
