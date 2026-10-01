@@ -105,7 +105,7 @@ docker cp kite:/data/public ./public
 
 **Run on a server:** Follow the [deployment guide](docs/reference.md#deploying) to configure your site domain and serve it over HTTPS.
 
-**Publish through Git:** With a Git remote configured for your local site, run `kite publish --all --push` to commit and push content. Automatic deployment also needs a hosting workflow.
+**Publish through Git:** With a Git remote configured for your local site, run `kite publish --all --push` to commit and push content. Automatic deployment also needs a hosting workflow. The GitHub Pages workflow `kite init` writes builds with `kitew`, which runs the Kite release `kite.lock` pins, so the deploy uses the Kite you previewed with.
 
 ## Roadmap
 

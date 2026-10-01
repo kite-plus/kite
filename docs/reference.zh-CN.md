@@ -738,7 +738,7 @@ Hexo 站点只读不改。目标文件夹为空或不存在时，会按 Hexo 的
 ### 静态，发到 GitHub Pages
 
 `kite init` 会写好一个 GitHub Pages 工作流，构建时带 `--verify` —— 跑第二次会得到
-不同产物的站点，会在这里失败，而不是被发布出去。在 **Settings → Pages → Source →
+不同产物的站点，会在这里失败，而不是被发布出去；构建用的是站点固定的 Kite 版本（见下文）。在 **Settings → Pages → Source →
 GitHub Actions** 打开 Pages，之后推送到 `main` 即部署。
 
 在有自己的域名之前，仓库的站点位于 `https://<owner>.github.io/<仓库名>/`。把这个地址
@@ -779,6 +779,48 @@ kite publish content/posts/hello --push
 
 仓库里的提交 hook 会像任何一次提交那样运行。hook 拒绝时，后台会显示它给出的理由，
 并提供「跳过 hooks 发布」；在终端里用 `kite publish --no-verify` 效果相同。
+
+### 站点用哪个版本的 Kite 构建
+
+`kite.lock` 固定站点构建用的 Kite 版本，旁边的 `kitew` 负责运行这个版本：
+
+```bash
+./kitew build
+```
+
+在一台机器上第一次运行时，`kitew` 从 GitHub 下载这个版本对应本机的发布包，先用
+`kite.lock` 记下的 sha256 核对发布的 `checksums.txt`，再用 `checksums.txt` 核对发布包，
+然后把程序放进用户的缓存目录并运行；之后直接运行缓存里的那份。发布的文件和固定时
+记下的不一致，就拒绝运行。在 Windows 上，用 PowerShell 运行 `kitew.ps1`；不允许运行脚本
+的环境里用 `powershell -ExecutionPolicy Bypass -File kitew.ps1 build`。`KITE_DOWNLOAD_URL`
+可以换成发布的镜像地址，代替 GitHub。
+
+`kite init` 会写好这两个脚本，并固定运行它的那个 Kite 版本；它写的部署工作流用
+`sh ./kitew build` 构建：每次提交都用作者预览时的那个版本部署，而不是部署那天最新的版本。
+把 `kitew`、`kitew.ps1` 和 `kite.lock` 和站点一起提交。
+
+`kite wrapper` 把固定的版本改成正在运行的 Kite，或者 `--version` 指定的版本，并重新写
+一遍脚本。你运行的 Kite 和固定的版本不一样时，`kite build`、`kite serve` 和 `kite doctor`
+都会提示；后台的「系统 → 部署」会提供「改用当前版本构建」。固定的版本只在你确认后才会
+变，`kite.lock` 发布之后部署才用新版本构建。
+
+`kitew` 出现之前建的站点没有固定版本，部署工作流自己安装 Kite。在站点里运行
+`kite wrapper`，再把工作流的构建步骤从 `kite build` 改成 `sh ./kitew build`，并删掉安装
+Go 和 Kite 的步骤。
+
+### 静态，发到 Cloudflare Pages
+
+Cloudflare Pages 在一个没有 Kite 的容器里构建站点，`kitew` 正是为此准备的。连接仓库后
+这样设置：
+
+| 设置 | 值 |
+|---|---|
+| 构建命令 | `sh kitew build` |
+| 构建输出目录 | `public` |
+| `KITE_SITE_BASEURL` | 站点的地址，`kite.yaml` 里写的是别的地址时才需要 |
+
+定时文章要等发布时间之后再构建一次才会出现；按时调用项目的部署钩子（deploy hook）
+就能触发构建。
 
 ### 用 Docker
 
@@ -863,7 +905,7 @@ Release 的二进制是可重现的：同一个 commit，用 `go.mod` 里钉死�
 GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot --clean
 ```
 
-下载后请对照 release 附带的 `checksums.txt` 校验。
+下载后请对照 release 附带的 `checksums.txt` 校验；`kitew` 在运行之前会自动校验。
 
 ## 路线图
 
@@ -875,7 +917,7 @@ GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot 
 | M3 | 可写后台：编辑器、媒体、冲突处理 | 已完成 |
 | M4 | Git 发布器 —— 第一个发布版本 **0.1** | 已完成 |
 | M5 | 公开主题契约 | 已完成：`kite/v1` 在 0.1.4 冻结 |
-| M6 | `kite.lock` 与 `kitew` wrapper | 部分完成：`kite.lock` 记下从索引安装的主题和插件（0.1.5） |
+| M6 | `kite.lock` 与 `kitew` wrapper | 部分完成：`kite.lock` 记下从索引安装的主题和插件（0.1.5），并固定 `kitew` 运行的 Kite 版本 |
 | M7 | 基于 SQLite 的动态模式 | |
 | M8 | WebAssembly 插件 | 第一版完成：注入代码和构建期钩子 |
 | 应用中心 | 按名字安装和更新主题与插件 | 第一版在 0.1.5 完成：后台和命令行；0.1.6 起索引带签名 |

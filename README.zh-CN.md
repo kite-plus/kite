@@ -105,7 +105,7 @@ docker cp kite:/data/public ./public
 
 **部署到服务器：** 查看[部署说明](docs/reference.zh-CN.md#部署)，设置自己的站点域名并通过 HTTPS 对外提供访问。
 
-**通过 Git 发布：** 本机站点配置好 Git 远程仓库后，运行 `kite publish --all --push` 提交并推送内容；自动上线还需要托管平台的部署工作流。
+**通过 Git 发布：** 本机站点配置好 Git 远程仓库后，运行 `kite publish --all --push` 提交并推送内容；自动上线还需要托管平台的部署工作流。`kite init` 写的 GitHub Pages 工作流用 `kitew` 构建，它运行 `kite.lock` 固定的 Kite 版本，部署时用的和你预览时是同一个 Kite。
 
 ## 路线图
 

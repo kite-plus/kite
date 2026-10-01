@@ -883,7 +883,7 @@ can change your mind about.
 
 `kite init` writes a GitHub Pages workflow that builds with `--verify`, so a
 site that would deploy differently on a second run fails before it is
-published. Turn Pages on under **Settings → Pages → Source → GitHub Actions**
+published, and with the Kite release the site pins (see below). Turn Pages on under **Settings → Pages → Source → GitHub Actions**
 and a push to `main` deploys.
 
 Until it has a domain of its own, a repository's site lives at
@@ -936,6 +936,56 @@ whatever is already committed, for a push that failed the first time.
 The repository's commit hooks run as they would for any commit. When one
 refuses, the studio shows what it said and offers to publish without the
 hooks; `kite publish --no-verify` does the same from a terminal.
+
+### The Kite a site builds with
+
+`kite.lock` pins the Kite release a site builds with, and `kitew`, beside it,
+runs that release:
+
+```bash
+./kitew build
+```
+
+The first time on a machine, `kitew` downloads the release for it from
+GitHub, checks the archive against the release's `checksums.txt` and that list
+against the sha256 `kite.lock` records for it, keeps the binary in the user's
+cache and runs it; after that it runs the copy kept. A release whose files no
+longer match what was pinned is refused rather than run. On Windows, run
+`kitew.ps1` in PowerShell, or
+`powershell -ExecutionPolicy Bypass -File kitew.ps1 build` where scripts may
+not run. `KITE_DOWNLOAD_URL` names a mirror of the releases in place of
+GitHub.
+
+`kite init` writes both scripts and pins the Kite that ran it, and the deploy
+workflow it writes builds with `sh ./kitew build`: every commit is deployed
+with the release the author previewed it with, not whatever is newest by
+then. Commit `kitew`, `kitew.ps1` and `kite.lock` with the site.
+
+`kite wrapper` moves the pin to the Kite running it, or to the release
+`--version` names, and writes the scripts again. When the Kite you run is not
+the one pinned, `kite build`, `kite serve` and `kite doctor` say so, and
+**System → Deploy** in the studio offers to build with the one running. The
+pin changes only when you say so, and reaches the deploy once `kite.lock` is
+published.
+
+A site made before `kitew` pins nothing, and its deploy workflow installs Kite
+itself. Run `kite wrapper` in it, then change the workflow's build step from
+`kite build` to `sh ./kitew build` and remove the steps that install Go and
+Kite.
+
+### Static, on Cloudflare Pages
+
+Cloudflare Pages builds a site in a container with no Kite in it, which
+`kitew` is for. Connect the repository and set:
+
+| Setting | Value |
+|---|---|
+| Build command | `sh kitew build` |
+| Build output directory | `public` |
+| `KITE_SITE_BASEURL` | the site's address, if `kite.yaml` names another |
+
+A scheduled post appears once the site is built after its time; call the
+project's deploy hook on a schedule to build it then.
 
 ### With Docker
 
@@ -1036,7 +1086,8 @@ pinned in `go.mod`, compiles to the same bytes anywhere.
 GOTOOLCHAIN=$(awk '/^toolchain /{print $2}' go.mod) goreleaser build --snapshot --clean
 ```
 
-Verify a download against the `checksums.txt` published with the release.
+Verify a download against the `checksums.txt` published with the release;
+`kitew` does so before it runs one.
 
 ## Roadmap
 
@@ -1048,7 +1099,7 @@ Verify a download against the `checksums.txt` published with the release.
 | M3 | Editing admin: editor, media, conflict handling | done |
 | M4 | Git publisher — the first release, **0.1** | done |
 | M5 | Public theme contract | done: `kite/v1` frozen in 0.1.4 |
-| M6 | `kite.lock` and the `kitew` wrapper | in part: `kite.lock` records the themes and plugins installed from the index (0.1.5) |
+| M6 | `kite.lock` and the `kitew` wrapper | in part: `kite.lock` records the themes and plugins installed from the index (0.1.5) and pins the Kite release `kitew` runs |
 | M7 | Dynamic mode backed by SQLite | |
 | M8 | WebAssembly plugins | first version done: injected code and build hooks |
 | App center | Themes and plugins installed and updated by name | first version done in 0.1.5: the studio and the command line; the index signed since 0.1.6 |

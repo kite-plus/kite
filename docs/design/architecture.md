@@ -851,10 +851,12 @@ Cloudflare Pages 放到 M6 和 `kitew` 一起做——因为 CF Pages 的构建�
 ```
 kitew            # POSIX
 kitew.ps1        # Windows
-.kite/version    # 锁定的 Kite 版本
+kite.lock        # kite: 段锁定 Kite 版本，并记下那个版本 checksums.txt 的 sha256
 ```
 
 流程：读版本 → 下载对应平台二进制 → **强制校验 checksum（不可跳过）** → 缓存 → exec。
+
+实现（2026-10-01）：版本锁放在 `kite.lock` 的 `kite:` 段，不用原先设想的 `.kite/version`，因为 `.kite/` 是不入库的缓存。锁里还记下这个版本 `checksums.txt` 的 sha256：`kitew` 先用它核对下载的清单，再用清单核对发布包，所以发布被替换时拒绝运行，而不只是防下载损坏。`kite init` 写入两个脚本并锁定运行它的版本，生成的 `deploy.yml` 用 `sh ./kitew build`，不再在 CI 里装 Go 编译；`kite wrapper` 改锁定的版本，后台「系统 → 部署」在版本不一致时提供一键改用（用户 2026-10-01 定：提示并一键改用，不自动跟随，也不拒绝运行）。Cloudflare Pages 只写配置文档。
 
 价值：CI 与新机器零安装、版本随仓库走、`setup-kite` Action 不可用时（GitLab / 自建 CI / Cloudflare Pages 构建容器）仍然可用。
 
@@ -1035,7 +1037,9 @@ plugins:
 - `kite lock update` 显式更新
 - 保证 Local Build = CI Build = Production Build
 
-**注意分期**：V1 只需要一个 `.kite/version` 文件加 30 行 shell wrapper。完整的 lock 机制只有在存在多个版本、多个主题/插件时才有意义——提前做等于浪费。
+**注意分期**：V1 只需要一个版本锁加一个短小的 shell wrapper。完整的 lock 机制只有在存在多个版本、多个主题/插件时才有意义——提前做等于浪费。
+
+实际的做法（2026-10-01）：主题和插件装进站点仓库，构建不按 lock 下载（[app-center.md §4.2](app-center.md#42-装进仓库kitelock-只记来源)）；lock 记下它们的来源，`kite:` 段锁定 Kite 版本，由 `kitew` 运行（§17）。
 
 ---
 

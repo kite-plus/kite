@@ -181,7 +181,7 @@ plugins:
 - **发现手改**：`tree` 是目录里每个文件按 `sha256  路径`（和 sha256sum 的输出一样）一行、按路径排序后，再取一次 sha256。换行一律按 `\n` 计算，Windows 上 Git 把换行改成 `\r\n` 不算改动；`.DS_Store` 这类系统自己加的文件不算在内，和读压缩包时的规则一样。对不上说明有人改过，`kite apps update` 不更新它，除非加 `--force`；`kite doctor` 也报告这一项。
 - **没有记录的包**：从压缩包装的、homepage 对得上的包，更新前先下载索引里同一个版本的压缩包比对文件，一样才当作没改过；更新后补上记录。`kite apps update vane` 对同一个版本也会这样补记录。
 - **防扩权**：插件更新后的 `loads`、`hooks` 或 `inject` 比 `granted` 多时，要重新确认才装（终端里问一句，脚本里要加 `--yes`）。`granted` 取自包本身（`plugin.yaml` 和它注入的代码），不取索引里的数字。已开启的插件，更新前先像开启时那样检查一遍模块。
-- `kite:` 版本锁和 `kitew` 仍在 M6；这里只先做 lock 的 `themes`、`plugins` 两节，格式按 M6 的写法留好位置。
+- `kite:` 版本锁和 `kitew` 在 M6 里实现（2026-10-01，见 [architecture.md §17](architecture.md#17-cicd)）；这里先做的是 lock 的 `themes`、`plugins` 两节。
 
 ### 4.3 上架、审核与信任
 
@@ -288,7 +288,7 @@ POST /api/v1/apps/{kind}/{id}/update                   {"version": "…", "confi
 
 ## 6. 和其他计划的关系
 
-- **M6 `kite.lock`**：先做 lock 的 `themes`、`plugins` 两节；`kite:` 版本锁、`kitew` 和 Cloudflare Pages 仍在 M6。
+- **M6 `kite.lock`**：先做了 lock 的 `themes`、`plugins` 两节；`kite:` 版本锁、`kitew` 和 Cloudflare Pages 的文档随后在 M6 完成（2026-10-01）。
 - **Kite Plus 账号**：第一版用 PR 上架；等 `id.kite.plus` 就绪后，作者也可以登录提交（[Explore 的 identity-and-comments.md](https://github.com/kite-plus/explore/blob/main/docs/design/identity-and-comments.md)）。
 - **网页版目录**：索引是公开的，以后可以由它生成官网上的一组页面，或者放进 Explore；第一版不做。
 - **原定 V4 的市场**（[architecture.md §32](architecture.md#32-现在不要设计的东西)）：应用中心是它的第一步，付费和评分仍然不做。
