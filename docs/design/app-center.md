@@ -87,7 +87,7 @@ repo: kite-plus/theme-vane
 official: true
 ```
 
-第三方的条目同样只有这几行，`official` 写 `false`（只有维护者能写 `true`）。CI 每小时跑一次，官方仓库在发 release 时也会立即触发它，把条目展开成 `index.json`：
+第三方的条目同样只有这几行，`official` 写 `false`（只有 `kite-plus` 的包能写 `true`）。CI 每小时跑一次，条目有改动时立即跑，也可以在 Actions 里手动运行，把条目展开成 `index.json`。官方仓库发 release 时立即触发它要一个能跨仓库调用的令牌，第一版不做，新版本最多晚一小时收录。格式的正式说明在 [`kite-plus/apps` 的 docs/index-format.md](https://github.com/kite-plus/apps/blob/main/docs/index-format.md)：
 
 ```json
 {
@@ -102,19 +102,22 @@ official: true
       "title": {"en": "Vane", "zh-CN": "风标"},
       "description": {"en": "…", "zh-CN": "…"},
       "author": {"name": "Kite", "url": "https://github.com/kite-plus"},
-      "license": "MIT",
+      "license": "Apache-2.0",
       "homepage": "https://github.com/kite-plus/theme-vane",
       "tags": ["docs", "dark mode"],
-      "screenshot": "https://…/vane/1.0.1/screenshot.webp",
+      "screenshot": "https://cdn.jsdelivr.net/gh/kite-plus/apps@theme-vane-1.0.1/screenshot.webp",
       "versions": [
         {
           "version": "1.0.1",
-          "published": "2026-10-01T07:05:00Z",
+          "published": "2026-10-01T07:09:06Z",
           "notes": "https://github.com/kite-plus/theme-vane/releases/tag/v1.0.1",
           "api": "kite/v1",
           "requires": ">=0.1.4 <2.0.0",
           "archive": {
-            "urls": ["https://…/vane-1.0.1.zip", "https://github.com/kite-plus/theme-vane/releases/download/v1.0.1/vane-1.0.1.zip"],
+            "urls": [
+              "https://cdn.jsdelivr.net/gh/kite-plus/apps@theme-vane-1.0.1/vane-1.0.1.zip",
+              "https://github.com/kite-plus/theme-vane/releases/download/v1.0.1/vane-1.0.1.zip"
+            ],
             "sha256": "da82c093…",
             "size": 108040
           },
@@ -126,12 +129,12 @@ official: true
 }
 ```
 
-插件的版本另有 `abi`（插件契约）、`inject`（往页面注入几段代码）、`hooks`（导出的构建期钩子）；`loads` 是包会让读者的浏览器去访问的外部网站，插件取自 `plugin.yaml` 的声明，主题由 CI 用 `kite theme verify` 的夹具站点构建一次，扫出 `script`、`link`、`img`、`iframe` 指向的外部域名。
+插件版本的 `api` 是 `kite/plugin/v1`（模块的 ABI 由 `kite plugin verify` 检查），另有 `inject`（往页面注入几段代码）、`hooks`（`plugin.yaml` 声明的构建期钩子）。`loads` 是包会让读者的浏览器去加载的外部网站，由 `kite theme verify --json` / `kite plugin verify --json` 报告：主题用夹具站点构建一次，扫出页面和样式表让浏览器加载的外部域名（脚本、样式表和图标、图片、音视频、iframe、样式表里引用的地址），读者自己点的链接不算；插件取它注入的代码里的地址。
 
 规则：
 
 - `id` 就是装进站点后的目录名：主题的 `name`、插件的 `id`。主题和插件各是一个命名空间。
-- 一个版本一经收录就不再变：同一个版本号的 zip 换了内容，CI 拒绝，而不是悄悄更新 sha256。
+- 一个版本一经收录就不再变：同一个版本号的 zip 换了内容，CI 拒绝，而不是悄悄更新 sha256。CI 只看比最新已收录版本更新的 release，没过检查的旧版本不会每小时重试。
 - `title`、`description` 的中文取自包自己的语言包（`theme.title`、`theme.description`，插件同理），没有就只有英文。
 - `format` 是索引格式的大版本。Kite 遇到不认识的大版本时只浏览、不安装，并提示升级 Kite。
 
@@ -183,9 +186,9 @@ plugins:
 
 - 公开；发 release 时附上 `<id>-<版本>.zip`，tag 是 `v<版本>`。zip 里只有主题或插件本身，`kite theme pack` / `kite plugin pack` 打出来的就是这样（A2 加上这两个命令，打包规则和官方仓库的 `scripts/package.sh` 一致）。
 - `id` 等于包里 `theme.yaml` 的 `name` 或 `plugin.yaml` 的 `id`，在索引里还没人用；`default` 和官方包的名字是保留的。
-- 用允许再分发的开源许可（MIT、Apache-2.0、GPL 等），仓库里有 LICENSE，`theme.yaml` / `plugin.yaml` 写明 `license`。索引仓库要存一份 zip 副本经 jsDelivr 分发（§4.4），没有这个许可就不能这样做。
+- 用允许再分发的开源许可（MIT、Apache-2.0、GPL 等），`theme.yaml` / `plugin.yaml` 用 SPDX 标识写明 `license`，清单旁有许可证全文（`LICENSE` 等）并打进 zip。索引仓库要存一份 zip 副本经 jsDelivr 分发（§4.4），没有这个许可就不能这样做，许可证全文也要随副本一起。
 
-**CI 对每个版本都做的检查**：下载并核对大小和 sha256；`kite theme verify` 或 `kite plugin verify`；`requires` 至少能被一个已发布的 Kite 满足，`api`、`abi` 是已知的版本；zip 里只有该有的文件；扫出 `loads`（主题用 `kite theme verify` 的夹具站点构建一次，看 `script`、`link`、`img`、`iframe` 指向哪些外部域名；插件取 `plugin.yaml` 的声明）。同一个版本号的 zip 换了内容，直接拒绝。
+**CI 对每个版本都做的检查**：下载并核对 GitHub 记录的大小和 sha256；`kite theme verify` 或 `kite plugin verify`；`requires` 至少能被一个已发布的 Kite 满足，`api`、`abi` 是已知的版本；zip 里只有该有的文件；扫出 `loads`（主题用 `kite theme verify` 的夹具站点构建一次，看 `script`、`link`、`img`、`iframe` 指向哪些外部域名；插件取 `plugin.yaml` 的声明）。同一个版本号的 zip 换了内容，直接拒绝。
 
 **人工审核什么时候需要**：
 
@@ -193,7 +196,7 @@ plugins:
 |---|---|
 | 新条目 | CI 通过后，维护者审核：仓库和 PR 作者是同一个人或组织，名字不冒充别人，介绍和截图属实，`loads` 里的网站说得过去 |
 | 已收录的包发了新版本 | CI 通过、而且 `loads`、`hooks`、`inject` 没有变多，就自动收录 |
-| 新版本的权限变多了 | 生成一个待审 PR，维护者同意后才收录；同意前索引里的最新版本停在旧的 |
+| 新版本的权限变多了 | 生成一个待审 PR，把这个版本加进条目的 `approve`；维护者合并才收录，关闭则不再提起；同意前索引里的最新版本停在旧的。组织不允许工作流提 PR 时，改开一个 issue，附上同一处改动的链接 |
 | 发现问题的版本 | 在条目里标 `yanked: [版本]`；已经装了它的站点在后台和 `kite apps outdated` 里看到提醒，不能再新装它 |
 | 要下架的包 | 条目标 `delisted` 并写明原因；列表不再显示，已装的站点同样收到提醒 |
 
@@ -210,7 +213,7 @@ plugins:
 定下的做法（2026-10-01）：**索引仓库存一份 zip 副本，经 jsDelivr 分发，GitHub Release 作备用。**
 
 - jsDelivr 的 GitHub 通道有两个上限：一个仓库在某个版本下的整体快照不能超过 50 MB，单个文件不能超过 20 MB `[EV]`。所以 zip 不能都堆在 main 分支上：带 WASM 的插件一个版本就约 1 MB，几十个版本之后整个仓库就超限了。
-- 做法是**每个版本一个 tag**：CI 收录一个版本时，在 `kite-plus/apps` 里建一个只含这个 zip 的孤立提交，打上 tag `<kind>-<id>-<版本>`（如 `theme-vane-1.0.1`）。包的地址是 `https://cdn.jsdelivr.net/gh/kite-plus/apps@theme-vane-1.0.1/vane-1.0.1.zip`：每个快照只有一个文件，永远不会碰到上限；tag 不再移动，内容永远不变，可以长期缓存。main 分支只放条目的 YAML 和 `index.json`。
+- 做法是**每个版本一个 tag**：CI 收录一个版本时，在 `kite-plus/apps` 里建一个只含这个 zip 的孤立提交（主题另带截图 `screenshot.<扩展名>`，索引里的截图地址也指向这里），打上 tag `<kind>-<id>-<版本>`（如 `theme-vane-1.0.1`）。提交的作者和日期是固定的（github-actions[bot]、release 的发布时间），同一个版本在哪里生成都是同一个提交。包的地址是 `https://cdn.jsdelivr.net/gh/kite-plus/apps@theme-vane-1.0.1/vane-1.0.1.zip`：每个快照只有一个文件，永远不会碰到上限；tag 不再移动，内容永远不变，可以长期缓存。main 分支只放条目的 YAML 和 `index.json`。
 - 收录的 zip 不能超过 20 MB（jsDelivr 单个文件的上限）；现有的主题和插件都远在这之下。
 - 索引的地址是 `https://cdn.jsdelivr.net/gh/kite-plus/apps@main/index.json`，CI 更新后调 jsDelivr 的 purge 刷新这个分支地址的缓存；备用是 `https://raw.githubusercontent.com/kite-plus/apps/main/index.json`。以后要换成 `apps.kite.plus`，只需要在 Kite 内置的地址列表前面加一个。
 - 境内访问先实测。jsDelivr 不够稳时，两种补法（§8）：在香港加一个镜像，和 Kite Plus 的服务放在一起；或者把每个版本另发成一个 npm 包，借 npmmirror 在境内的 CDN 分发。
@@ -281,7 +284,7 @@ POST /api/v1/apps/{kind}/{id}/update           {"version": "…", "confirm": {..
 | 阶段 | 内容 | 验收 |
 |---|---|---|
 | **A1** 已完成 | `kite theme list/add/remove/use/new`（0.1.4），主题和插件共用一个读压缩包和目录的入口 | — |
-| **A2** 索引和上架 | `kite-plus/apps` 仓库：条目格式、生成并检查 `index.json` 的 CI、每个版本一个 tag 的 zip 副本和 jsDelivr 刷新、提交说明和 PR 模板、审核清单；`kite theme pack` / `kite plugin pack`；收录 6 个官方包 | 新 release 后 CI 自动更新索引；每个版本都通过 §4.3 的检查；同一版本换内容被拒绝；权限变多的版本生成待审 PR；按说明能从零上架一个测试主题 |
+| **A2** 已完成（2026-10-01） | [`kite-plus/apps`](https://github.com/kite-plus/apps) 仓库：条目格式、生成并检查 `index.json` 的 CI、每个版本一个 tag 的 zip 副本和 jsDelivr 刷新、提交说明和 PR 模板、审核清单；`kite theme pack` / `kite plugin pack`；收录 6 个官方包 | 6 个官方包的 11 个版本都通过检查并收录，jsDelivr 和 GitHub 两个地址下载的 sha256 都对得上；再跑一次没有改动；同一版本换内容被拒绝、权限变多的版本生成待审 PR，由端到端测试覆盖；从零上架一个测试主题（`kite theme new` → 加许可证 → `kite theme pack` → 收录）由 CI 里用真实 Kite 跑的集成测试覆盖 |
 | **A3** Kite 客户端和命令行 | `internal/apps`（读索引、缓存、按 `requires` 过滤、下载、校验）、`kite.lock` 的 `themes` / `plugins`、按名字安装和更新、`kite apps`、`kite doctor` 检查 lock | 新站点 `kite theme add vane` 装上、能构建、lock 有记录；手改过的主题更新前提醒；断网时用缓存 |
 | **A4** 后台应用中心 | §4.5 的页面和 §4.7 的 API，「官方」「社区」标记，撤回和下架的提醒 | 浏览、详情、安装、更新、移除在真实页面可用；浏览器回归测试覆盖安装和更新 |
 | **A5** 签名和账号提交 | 索引和包的签名；用 Kite Plus 账号提交 | — |
@@ -298,8 +301,10 @@ POST /api/v1/apps/{kind}/{id}/update           {"version": "…", "confirm": {..
 还开着的 `[待定]`：
 
 1. **境内访问**：A2 上线后实测 jsDelivr 在境内的成功率和速度，不够时加香港镜像，或另发 npm 包借 npmmirror 分发。
-2. **审核的人和时限**：谁审、多久内回复；审核清单随 A2 写进 `kite-plus/apps` 的说明。
+2. **审核的人和时限**：审核清单已写进 `kite-plus/apps` 的说明；谁审、多久内回复还没定。
 3. **索引的正式域名**：先用 jsDelivr 和 raw.githubusercontent.com 的地址；要不要、什么时候换成 `apps.kite.plus`。
+4. **打包命令进正式版本**：`kite theme pack` / `kite plugin pack` 和 `verify --json` 的 `loads` 还只在 main 上，`kite-plus/apps` 用 `.github/kite-version` 钉住这个提交，说明里让作者先装 main 上的 Kite。下一个 Kite 版本发布后，两处都改成正式版本。
+5. **待审版本用 PR 还是 issue**：`kite-plus` 组织不允许工作流提 PR，所以待审的版本现在会以 issue 出现（附改动链接，一键开 PR）。要改成直接提 PR，在组织设置的 Actions → General → Workflow permissions 里打开 “Allow GitHub Actions to create and approve pull requests”，再在 `kite-plus/apps` 里打开同一项。
 
 ## 证据来源
 
