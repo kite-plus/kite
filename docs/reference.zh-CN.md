@@ -505,7 +505,9 @@ GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o plugin.wasm .
 [kite-plus/apps](https://github.com/kite-plus/apps) 读取它。传给 `kite theme add` 或
 `kite plugin add` 的参数既不是文件也不是目录时，就到索引里按名字找，安装能在当前 Kite 上
 运行的最新版本，或者用 `名字@版本` 指定的那个。索引用 sha256 标明每个压缩包，所以不管从
-哪个地址下载，解开之前都会先核对，之后再和其他安装方式一样检查一遍。
+哪个地址下载，解开之前都会先核对，之后再和其他安装方式一样检查一遍。索引本身用
+[minisign](https://jedisct1.github.io/minisign/) 签名：Kite 内置公钥，没有这把钥匙签名的索引
+不用，比已经用过的索引更旧的也不用，免得有人拿旧的副本冒充最新的。
 
 后台的「系统 → 应用中心」做的是同样的事，主题页和插件页上也会标出有新版本的那些。
 索引、压缩包和截图都由服务端去取，浏览器不用访问它们的地址。
@@ -528,6 +530,8 @@ kite apps update         # 全部更新，也可以指定一个：kite apps upda
 索引最多一小时取一次，加 `--refresh` 立即重取，和下载过的压缩包一起缓存在
 `.kite/cache/apps` 里。断网时用缓存的那份，并说明是多久以前的。`kite.yaml` 里的
 `apps.index`，或者 `KITE_APPS_URL`，可以换成另一份索引，比如不通外网的内网里的一份副本。
+Kite 自带索引的副本用 Kite 的钥匙核对；自己的索引用自己的钥匙签名，把公钥写在 `apps.key`
+或者 `KITE_APPS_KEY` 里。
 
 ## 配置
 
@@ -579,6 +583,7 @@ plugins:
 
 apps:
   index: ""            # 代替 Kite 自带索引的另一份索引
+  key: ""              # 自己的索引的 minisign 公钥
 
 menus:                 # 主题画的链接，按菜单分；见“主题”一节
   main:
@@ -599,7 +604,7 @@ menus:                 # 主题画的链接，按菜单分；见“主题”一�
 
 少数几个键可以用环境变量覆盖，供产出依赖运行环境的构建使用：`KITE_SITE_TITLE`、
 `KITE_SITE_BASEURL`、`KITE_SITE_LANGUAGE`、`KITE_THEME`、`KITE_BUILD_OUTPUT`、
-`KITE_BUILD_URLSTYLE`、`KITE_BUILD_PAGESIZE` 和 `KITE_APPS_URL`。
+`KITE_BUILD_URLSTYLE`、`KITE_BUILD_PAGESIZE`、`KITE_APPS_URL` 和 `KITE_APPS_KEY`。
 
 `build.output`（或者代替它的 `KITE_BUILD_OUTPUT`）是 `kite build` 写出站点的目录。
 相对路径从项目根目录算起，不能跑到项目外面；绝对路径按原样使用，和 `kite build --output`

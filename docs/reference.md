@@ -598,7 +598,11 @@ A name given to `kite theme add` or `kite plugin add` that is not a file or a
 folder is looked up there, and the newest version that works with the running
 Kite is installed, or the one asked for as `name@version`. The index names
 every archive by its sha256, so whichever address serves it, the bytes are
-checked before they are unpacked, and then checked as any other install.
+checked before they are unpacked, and then checked as any other install. The
+index itself is signed with [minisign](https://jedisct1.github.io/minisign/):
+Kite carries the public key and uses no index that key did not sign, nor one
+older than an index it has already used, which is how a stale copy would be
+passed off as current.
 
 The studio's System → App center does the same, and marks a theme or a
 plugin with a newer version on its own page too. The server fetches the index
@@ -630,7 +634,9 @@ The index is fetched at most once an hour, with `--refresh` to fetch it at
 once, and kept in `.kite/cache/apps` with the archives fetched. Without a
 network the copy kept is used, and Kite says how old it is. `apps.index` in
 `kite.yaml`, or `KITE_APPS_URL`, names another index to install from, such as
-a copy on a network without the internet.
+a copy on a network without the internet. A copy of Kite's own index is
+checked with Kite's key; an index of your own is signed with a key of your
+own, whose public half `apps.key`, or `KITE_APPS_KEY`, names.
 
 ## Configuration
 
@@ -683,6 +689,7 @@ plugins:
 
 apps:
   index: ""            # an index to install from in place of Kite's own
+  key: ""              # the minisign public key of an index of your own
 
 menus:                 # the links themes draw, by menu; see Themes
   main:
@@ -709,7 +716,8 @@ post without making every tag's page as long.
 A few keys can be overridden from the environment, for a build whose output
 depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,
 `KITE_SITE_LANGUAGE`, `KITE_THEME`, `KITE_BUILD_OUTPUT`,
-`KITE_BUILD_URLSTYLE`, `KITE_BUILD_PAGESIZE` and `KITE_APPS_URL`.
+`KITE_BUILD_URLSTYLE`, `KITE_BUILD_PAGESIZE`, `KITE_APPS_URL` and
+`KITE_APPS_KEY`.
 
 `build.output`, or `KITE_BUILD_OUTPUT` in its place, is the directory
 `kite build` writes the site to. A relative path is taken from the project
