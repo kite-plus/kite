@@ -64,8 +64,23 @@ export function Apps() {
   const count = (k: AppKind) => items.filter((app) => app.kind === k).length;
   const open = search.id ? items.find((app) => app.kind === kind && app.id === search.id) : undefined;
 
+  // The list rarely changes, so the toast says what fetching it again found.
   const fetchAgain = () =>
     refresh.mutate(undefined, {
+      onSuccess: (list) => {
+        if (list.offline) {
+          toast.warning(t("apps.offline", { when: relative(list.fetched) }));
+          return;
+        }
+        const updates = list.items.filter((app) => app.update).length;
+        toast.success(t("apps.refreshed"), {
+          description: updates
+            ? t("apps.refreshedUpdates", { count: updates })
+            : list.items.some((app) => app.installed)
+              ? t("apps.refreshedCurrent")
+              : t("apps.refreshedListed", { count: list.items.length }),
+        });
+      },
       onError: (err) =>
         toast.error(err instanceof ApiError ? problem(err.code, err.message).title : String(err), {
           description: err instanceof ApiError ? err.message : undefined,
