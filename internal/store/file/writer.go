@@ -18,6 +18,7 @@ import (
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/frontmatter"
+	"github.com/kite-plus/kite/internal/lock"
 )
 
 // tmpDir holds partially written files. It sits inside the project so that the
@@ -137,6 +138,15 @@ func (w *Writer) precheck(cs content.ChangeSet, located map[content.ID]*Entry) e
 		var id content.ID
 		var want content.Revision
 		switch o := op.(type) {
+		case content.PutTheme, content.PutPlugin, content.DeleteTheme, content.DeletePlugin:
+			// Each of these writes kite.lock after its package: a lock that
+			// cannot be read would stop it halfway.
+			if !checked[lock.Name] {
+				checked[lock.Name] = true
+				if _, err := lock.Read(w.root); err != nil {
+					return lockError(err)
+				}
+			}
 		case content.PutContent:
 			if o.Content != nil {
 				id, want = o.Content.ID, o.IfRevision
@@ -525,7 +535,10 @@ func (w *Writer) putTheme(op content.PutTheme, res *content.Result) error {
 	if !content.ValidThemeName(op.Name) {
 		return fmt.Errorf("%w: theme name %q", content.ErrInvalid, op.Name)
 	}
-	return w.putPackage("theme", path.Join(ThemesDir, op.Name), op.Files, op.Replace, res)
+	if err := w.putPackage("theme", path.Join(ThemesDir, op.Name), op.Files, op.Replace, res); err != nil {
+		return err
+	}
+	return w.record("theme", op.Name, op.Files, op.Origin, res)
 }
 
 // putPlugin writes a plugin's files into its directory, as putTheme does.
@@ -533,7 +546,10 @@ func (w *Writer) putPlugin(op content.PutPlugin, res *content.Result) error {
 	if !config.ValidPluginID(op.ID) {
 		return fmt.Errorf("%w: plugin id %q", content.ErrInvalid, op.ID)
 	}
-	return w.putPackage("plugin", path.Join(PluginsDir, op.ID), op.Files, op.Replace, res)
+	if err := w.putPackage("plugin", path.Join(PluginsDir, op.ID), op.Files, op.Replace, res); err != nil {
+		return err
+	}
+	return w.record("plugin", op.ID, op.Files, op.Origin, res)
 }
 
 // putPackage writes the files of a theme or a plugin, kind, into dir.
@@ -627,7 +643,10 @@ func (w *Writer) deleteTheme(op content.DeleteTheme, res *content.Result) error 
 	if !content.ValidThemeName(op.Name) {
 		return fmt.Errorf("%w: theme name %q", content.ErrInvalid, op.Name)
 	}
-	return w.deletePackage("theme", path.Join(ThemesDir, op.Name), res)
+	if err := w.deletePackage("theme", path.Join(ThemesDir, op.Name), res); err != nil {
+		return err
+	}
+	return w.record("theme", op.Name, nil, nil, res)
 }
 
 // deletePlugin removes a plugin's directory, as deleteTheme does.
@@ -635,7 +654,58 @@ func (w *Writer) deletePlugin(op content.DeletePlugin, res *content.Result) erro
 	if !config.ValidPluginID(op.ID) {
 		return fmt.Errorf("%w: plugin id %q", content.ErrInvalid, op.ID)
 	}
-	return w.deletePackage("plugin", path.Join(PluginsDir, op.ID), res)
+	if err := w.deletePackage("plugin", path.Join(PluginsDir, op.ID), res); err != nil {
+		return err
+	}
+	return w.record("plugin", op.ID, nil, nil, res)
+}
+
+// record keeps kite.lock in step with an installed theme or plugin, kind: an
+// install from an index is recorded with the digest of the files it wrote,
+// and any other install, or a removal, drops the package's record. The file
+// goes when nothing is left in it.
+func (w *Writer) record(kind, name string, files map[string][]byte, origin *content.Origin, res *content.Result) error {
+	f, err := lock.Read(w.root)
+	if err != nil {
+		return lockError(err)
+	}
+	if origin == nil {
+		if !f.Delete(kind, name) {
+			return nil
+		}
+	} else {
+		e := lock.Entry{
+			Version:  origin.Version,
+			Source:   origin.Source,
+			Resolved: origin.Resolved,
+			Checksum: origin.Checksum,
+			Tree:     lock.Tree(files),
+		}
+		if g := origin.Granted; g != nil {
+			e.Granted = &lock.Grant{Inject: g.Inject, Loads: g.Loads, Hooks: g.Hooks}
+		}
+		f.Set(kind, name, e)
+	}
+	if f.Empty() {
+		if err := w.remove(lock.Name); err != nil {
+			return err
+		}
+		appendUnique(&res.Removed, lock.Name)
+		return nil
+	}
+	data, err := f.Bytes()
+	if err != nil {
+		return err
+	}
+	if err := w.write(lock.Name, data); err != nil {
+		return err
+	}
+	appendUnique(&res.Written, lock.Name)
+	return nil
+}
+
+func lockError(err error) error {
+	return fmt.Errorf("file store: %w; fix the file, or delete it to forget where packages came from", err)
 }
 
 // deletePackage removes the directory of a theme or plugin, kind.

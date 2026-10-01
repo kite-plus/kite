@@ -84,6 +84,10 @@ func Unpack(archive []byte, kind, manifest string, maxSize int64, maxFiles int) 
 	return files, ""
 }
 
+// Ignored reports whether a slash-separated path is something a computer adds
+// to a folder on its own, which an archive leaves out of a package.
+func Ignored(name string) bool { return archived(name) == "" }
+
 // archived is the name of a file in an archive with forward slashes, or ""
 // for what a computer adds to an archive on its own: a folder of macOS
 // metadata, a Finder or Explorer file, a repository's .git.

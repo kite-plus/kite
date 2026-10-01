@@ -198,10 +198,38 @@ type PutTheme struct {
 	// Replace lets the theme take the place of an installed one of the same
 	// name. A file the old one had and the new one lacks is removed.
 	Replace bool
+	// Origin is where the theme came from, when that was an index.
+	Origin *Origin
 }
 
 func (o PutTheme) Kind() OpKind     { return OpPutTheme }
 func (o PutTheme) Describe() string { return "themes/" + o.Name }
+
+// Origin says where an installed theme or plugin came from, which kite.lock
+// records beside it. A package installed without one, from an uploaded
+// archive or a folder, came from nowhere Kite can look for its updates, and
+// any record of an earlier origin is dropped; so is the record of a package
+// that is deleted.
+type Origin struct {
+	Version string
+	// Source is the index the package was found in.
+	Source string
+	// Resolved is the address of its archive, and Checksum the archive's
+	// sha256 as sha256:<hex>.
+	Resolved string
+	Checksum string
+	// Granted is, for a plugin, what its site's owner agreed it may do.
+	Granted *Grant
+}
+
+// Grant is what a plugin does to a site: the pieces of code it puts on
+// pages, the other sites those load from, and the hooks it runs while the
+// site is built.
+type Grant struct {
+	Inject int
+	Loads  []string
+	Hooks  []string
+}
 
 // DeleteTheme removes an installed theme and everything in its directory.
 type DeleteTheme struct {
@@ -221,6 +249,8 @@ type PutPlugin struct {
 	// Replace lets it take the place of an installed version. A file the old
 	// one had and the new one lacks is removed.
 	Replace bool
+	// Origin is where the plugin came from, when that was an index.
+	Origin *Origin
 }
 
 func (o PutPlugin) Kind() OpKind     { return OpPutPlugin }
