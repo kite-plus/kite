@@ -67,6 +67,7 @@ const (
 	OpDeleteTheme    OpKind = "delete_theme"
 	OpPutPlugin      OpKind = "put_plugin"
 	OpDeletePlugin   OpKind = "delete_plugin"
+	OpPinKite        OpKind = "pin_kite"
 )
 
 // Op is a single typed operation inside a [ChangeSet].
@@ -263,6 +264,18 @@ type DeletePlugin struct {
 
 func (o DeletePlugin) Kind() OpKind     { return OpDeletePlugin }
 func (o DeletePlugin) Describe() string { return "plugins/" + o.ID }
+
+// PinKite pins the Kite release the project builds with in kite.lock, which
+// kitew, and the deploy workflow through it, run.
+type PinKite struct {
+	Version string
+	// Checksums is the sha256 of the release's checksums.txt, as
+	// sha256:<hex>, or empty when it could not be fetched.
+	Checksums string
+}
+
+func (o PinKite) Kind() OpKind     { return OpPinKite }
+func (o PinKite) Describe() string { return "kite " + o.Version }
 
 // DeleteMedia removes a media file.
 type DeleteMedia struct {

@@ -1,5 +1,6 @@
-// Package lock reads and writes kite.lock, which records where each theme and
-// plugin installed from an index came from.
+// Package lock reads and writes kite.lock, which pins the Kite release a
+// project builds with and records where each theme and plugin installed
+// from an index came from.
 //
 // The files themselves stay in the site's repository, under themes/ and
 // plugins/, so that a build never needs the network. The lock only says what
@@ -33,13 +34,25 @@ const Version = 1
 
 // File is a project's lock file.
 type File struct {
-	LockfileVersion int              `yaml:"lockfileVersion"`
-	Themes          map[string]Entry `yaml:"themes,omitempty"`
-	Plugins         map[string]Entry `yaml:"plugins,omitempty"`
+	LockfileVersion int `yaml:"lockfileVersion"`
+	// Kite is the release the project builds with, which kitew runs.
+	Kite    *Pin             `yaml:"kite,omitempty"`
+	Themes  map[string]Entry `yaml:"themes,omitempty"`
+	Plugins map[string]Entry `yaml:"plugins,omitempty"`
 
-	// Other keeps the keys this Kite does not know, such as the Kite version
-	// a later one pins, so that writing the file never drops them.
+	// Other keeps the keys this Kite does not know, so that writing the file
+	// never drops what a later one records.
 	Other map[string]any `yaml:",inline"`
+}
+
+// Pin is the Kite release a project builds with.
+type Pin struct {
+	Version string `yaml:"version"`
+	// Checksums is the sha256 of the release's checksums.txt, as
+	// sha256:<hex>, which kitew checks the list against before it trusts
+	// it. It is empty when the list could not be fetched as the pin was
+	// made.
+	Checksums string `yaml:"checksums,omitempty"`
 }
 
 // Entry records one package installed from an index.
@@ -153,12 +166,13 @@ func (f *File) Delete(kind, name string) bool {
 // Empty reports whether the file records nothing, so that it need not be
 // kept.
 func (f *File) Empty() bool {
-	return len(f.Themes) == 0 && len(f.Plugins) == 0 && len(f.Other) == 0
+	return f.Kite == nil && len(f.Themes) == 0 && len(f.Plugins) == 0 && len(f.Other) == 0
 }
 
 // header says what the file is to whoever opens it.
-const header = "# Written by Kite: where each theme and plugin installed from an index\n" +
-	"# came from. Their files are in themes/ and plugins/.\n"
+const header = "# Written by Kite: the Kite release this site builds with, which kitew\n" +
+	"# runs, and where each theme and plugin installed from an index came from.\n" +
+	"# Their files are in themes/ and plugins/.\n"
 
 // Bytes is the file as it is written: the same records always make the same
 // bytes.

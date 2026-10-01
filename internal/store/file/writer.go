@@ -118,6 +118,8 @@ func (w *Writer) Apply(ctx context.Context, cs content.ChangeSet) (content.Resul
 			err = w.putPlugin(o, &res)
 		case content.DeletePlugin:
 			err = w.deletePlugin(o, &res)
+		case content.PinKite:
+			err = w.pinKite(o, &res)
 		default:
 			err = fmt.Errorf("file store: unsupported operation %q", op.Kind())
 		}
@@ -138,9 +140,9 @@ func (w *Writer) precheck(cs content.ChangeSet, located map[content.ID]*Entry) e
 		var id content.ID
 		var want content.Revision
 		switch o := op.(type) {
-		case content.PutTheme, content.PutPlugin, content.DeleteTheme, content.DeletePlugin:
-			// Each of these writes kite.lock after its package: a lock that
-			// cannot be read would stop it halfway.
+		case content.PutTheme, content.PutPlugin, content.DeleteTheme, content.DeletePlugin, content.PinKite:
+			// Each of these writes kite.lock, the first four after their
+			// package: a lock that cannot be read would stop them halfway.
 			if !checked[lock.Name] {
 				checked[lock.Name] = true
 				if _, err := lock.Read(w.root); err != nil {
@@ -686,6 +688,24 @@ func (w *Writer) record(kind, name string, files map[string][]byte, origin *cont
 		}
 		f.Set(kind, name, e)
 	}
+	return w.writeLock(f, res)
+}
+
+// pinKite records the Kite release the project builds with.
+func (w *Writer) pinKite(op content.PinKite, res *content.Result) error {
+	if op.Version == "" {
+		return fmt.Errorf("%w: no Kite version to pin", content.ErrInvalid)
+	}
+	f, err := lock.Read(w.root)
+	if err != nil {
+		return lockError(err)
+	}
+	f.Kite = &lock.Pin{Version: op.Version, Checksums: op.Checksums}
+	return w.writeLock(f, res)
+}
+
+// writeLock writes kite.lock, or removes it when nothing is left in it.
+func (w *Writer) writeLock(f *lock.File, res *content.Result) error {
 	if f.Empty() {
 		if err := w.remove(lock.Name); err != nil {
 			return err

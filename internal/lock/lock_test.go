@@ -9,7 +9,7 @@ import (
 )
 
 func TestALockKeepsWhatItDoesNotKnow(t *testing.T) {
-	f, err := Parse([]byte("lockfileVersion: 1\nkite:\n  version: 0.2.0\nthemes:\n  paper:\n    version: 1.0.0\n"))
+	f, err := Parse([]byte("lockfileVersion: 1\nlater:\n  version: 0.2.0\nthemes:\n  paper:\n    version: 1.0.0\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +22,7 @@ func TestALockKeepsWhatItDoesNotKnow(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.HasPrefix(text, "# Written by Kite") || !strings.Contains(text, "kite:\n  version: 0.2.0\n") ||
+	if !strings.HasPrefix(text, "# Written by Kite") || !strings.Contains(text, "later:\n  version: 0.2.0\n") ||
 		strings.Contains(text, "paper") || !strings.Contains(text, "loads: []") {
 		t.Errorf("written as\n%s", text)
 	}
@@ -36,6 +36,29 @@ func TestALockKeepsWhatItDoesNotKnow(t *testing.T) {
 	}
 	if b, _ := again.Bytes(); string(b) != text {
 		t.Errorf("the same records wrote other bytes:\n%s", b)
+	}
+}
+
+func TestTheKiteReleaseIsPinnedFirst(t *testing.T) {
+	f := &File{LockfileVersion: Version}
+	f.Set("theme", "paper", Entry{Version: "1.0.0"})
+	f.Kite = &Pin{Version: "0.1.7"}
+	data, err := f.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text := string(data); !strings.Contains(text, "lockfileVersion: 1\nkite:\n  version: 0.1.7\nthemes:\n") ||
+		strings.Contains(text, "checksums") {
+		t.Errorf("written as\n%s", text)
+	}
+
+	// Only a pin is still something to keep.
+	only, err := Parse([]byte("lockfileVersion: 1\nkite:\n  version: 0.1.7\n  checksums: sha256:ab\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if only.Empty() || only.Kite == nil || only.Kite.Version != "0.1.7" || only.Kite.Checksums != "sha256:ab" {
+		t.Errorf("read %+v", only)
 	}
 }
 

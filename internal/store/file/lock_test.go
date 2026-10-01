@@ -93,3 +93,30 @@ func TestABrokenLockStopsAnInstallRatherThanBeingOverwritten(t *testing.T) {
 		t.Errorf("the theme was written before the lock was found broken: %v", err)
 	}
 }
+
+func TestAPinnedReleaseKeepsTheLockWithoutPackages(t *testing.T) {
+	root, _, w := newTestProject(t)
+	apply := func(op content.Op) content.Result {
+		t.Helper()
+		res, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{op}})
+		if err != nil {
+			t.Fatalf("Apply %s: %v", op.Describe(), err)
+		}
+		return res
+	}
+	res := apply(content.PinKite{Version: "0.1.7", Checksums: "sha256:" + strings.Repeat("b", 64)})
+	f, err := lock.Read(root)
+	if err != nil || f.Kite == nil || f.Kite.Version != "0.1.7" || !slices.Contains(res.Written, lock.Name) {
+		t.Fatalf("pinned %+v, %v, written %v", f, err, res.Written)
+	}
+
+	apply(content.PutPlugin{ID: "hello", Files: map[string][]byte{"plugin.yaml": []byte("id: hello\n")},
+		Origin: &content.Origin{Version: "0.1.0", Source: "https://example.com/index.json"}})
+	apply(content.DeletePlugin{ID: "hello"})
+	if f, err := lock.Read(root); err != nil || f.Kite == nil || f.Kite.Version != "0.1.7" || len(f.Plugins) != 0 {
+		t.Errorf("after the last package went: %+v, %v", f, err)
+	}
+	if _, err := w.Apply(t.Context(), content.ChangeSet{Ops: []content.Op{content.PinKite{}}}); !errors.Is(err, content.ErrInvalid) {
+		t.Errorf("pinning no version: %v", err)
+	}
+}
