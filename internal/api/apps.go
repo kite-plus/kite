@@ -252,6 +252,10 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request, view View, refres
 
 // failApps answers a failure of the index or of a package from it.
 func (s *Server) failApps(w http.ResponseWriter, err error) {
+	if errors.Is(err, apps.ErrUntrusted) {
+		fail(w, http.StatusBadGateway, CodeIndexUntrusted, err.Error())
+		return
+	}
 	if errors.Is(err, apps.ErrUnreachable) {
 		fail(w, http.StatusBadGateway, CodeIndexUnreachable, err.Error())
 		return

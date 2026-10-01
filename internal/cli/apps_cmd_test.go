@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"aead.dev/minisign"
 
 	"github.com/kite-plus/kite/internal/apps"
 	"github.com/kite-plus/kite/internal/archive"
@@ -30,15 +33,29 @@ type fakeIndex struct {
 	mu    sync.Mutex
 	index apps.Index
 	files map[string][]byte
+	key   minisign.PrivateKey
 }
 
 func newFakeIndex(t *testing.T) *fakeIndex {
-	f := &fakeIndex{t: t, index: apps.Index{Format: apps.Format}, files: map[string][]byte{}}
+	pub, key, err := minisign.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &fakeIndex{t: t, index: apps.Index{Format: apps.Format}, files: map[string][]byte{}, key: key}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		if r.URL.Path == "/index.json" {
-			_ = json.NewEncoder(w).Encode(f.index)
+		switch r.URL.Path {
+		case "/index.json", "/index.json.minisig":
+			data, err := json.Marshal(f.index)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if r.URL.Path == "/index.json.minisig" {
+				data = minisign.Sign(f.key, data)
+			}
+			_, _ = w.Write(data)
 			return
 		}
 		data, ok := f.files[r.URL.Path]
@@ -50,6 +67,7 @@ func newFakeIndex(t *testing.T) *fakeIndex {
 	}))
 	t.Cleanup(f.srv.Close)
 	t.Setenv("KITE_APPS_URL", f.srv.URL+"/index.json")
+	t.Setenv("KITE_APPS_KEY", pub.String())
 	return f
 }
 
@@ -244,5 +262,25 @@ func TestAVersionNewerThanTheKeptIndexIsFound(t *testing.T) {
 	if _, err := tryKite(t, site, "theme", "add", "paper@9.0.0", "--replace"); err == nil ||
 		!strings.Contains(err.Error(), "theme paper has no version 9.0.0; the index lists 1.1.0, 1.0.0") {
 		t.Errorf("a version nobody released: %v", err)
+	}
+}
+
+// An index its key did not sign is not used, and the command says why.
+func TestAnIndexWithoutItsSignatureInstallsNothing(t *testing.T) {
+	ix := newFakeIndex(t)
+	ix.publish("theme", "paper", "1.0.0", paperTheme("1.0.0"))
+	_, stranger, err := minisign.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ix.mu.Lock()
+	ix.key = stranger
+	ix.mu.Unlock()
+	site := newSite(t)
+	if _, err := tryKite(t, site, "theme", "add", "paper"); err == nil || !strings.Contains(err.Error(), "not signed by the key Kite trusts") {
+		t.Errorf("theme add from a wrongly signed index: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(site, "themes", "paper")); !os.IsNotExist(err) {
+		t.Error("the theme was installed anyway")
 	}
 }

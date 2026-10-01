@@ -24,6 +24,7 @@ import (
 	// container included, rather than only where a zoneinfo database exists.
 	_ "time/tzdata"
 
+	"aead.dev/minisign"
 	"gopkg.in/yaml.v3"
 
 	"github.com/kite-plus/kite/internal/content"
@@ -271,6 +272,10 @@ type Apps struct {
 	// Index is the address of an index to install from in place of Kite's
 	// own, such as a copy on a network without the internet.
 	Index string `yaml:"index,omitempty"`
+	// Key is the minisign public key the index has to be signed with, for an
+	// index of one's own; a mirror of Kite's index is signed with Kite's
+	// key, which is used when this is empty.
+	Key string `yaml:"key,omitempty"`
 }
 
 // Plugins chooses the plugins a site runs and holds their settings.
@@ -472,6 +477,7 @@ func applyEnv(cfg *Config) {
 		}
 	})
 	set("KITE_APPS_URL", func(v string) { cfg.Apps.Index = v })
+	set("KITE_APPS_KEY", func(v string) { cfg.Apps.Key = v })
 }
 
 func (c *Config) normalize() {
@@ -527,6 +533,12 @@ func (c *Config) Validate() error {
 	}
 	if i := c.Apps.Index; i != "" && !strings.HasPrefix(i, "https://") && !strings.HasPrefix(i, "http://") {
 		return fmt.Errorf("config: apps.index %q is not an http or https address", i)
+	}
+	if k := c.Apps.Key; k != "" {
+		var key minisign.PublicKey
+		if key.UnmarshalText([]byte(strings.TrimSpace(k))) != nil {
+			return fmt.Errorf("config: apps.key %q is not a minisign public key (want the RW... line of a .pub file)", k)
+		}
 	}
 	if c.Content.Store != "" && c.Content.Store != "file" {
 		return fmt.Errorf("config: content.store %q is not implemented yet (only file)", c.Content.Store)

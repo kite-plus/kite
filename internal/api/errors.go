@@ -52,6 +52,9 @@ const (
 	// an archive it names, could not be fetched: the network's doing rather
 	// than the request's, so the same request may work later.
 	CodeIndexUnreachable = "index_unreachable"
+	// CodeIndexUntrusted reports an index that is not signed by the key Kite
+	// trusts for it, or is older than one already seen: it is not used.
+	CodeIndexUntrusted = "index_untrusted"
 	// CodeUpdateNeedsConfirmation answers an update that would replace files
 	// changed by hand, or let a plugin do more than it did, without being
 	// told it may.

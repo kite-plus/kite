@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"aead.dev/minisign"
+
 	"github.com/kite-plus/kite/internal/buildinfo"
 )
 
@@ -29,12 +31,18 @@ type unreachable struct{ error }
 func (unreachable) Is(target error) bool { return target == ErrUnreachable }
 func (u unreachable) Unwrap() error      { return u.error }
 
+// answered is a status other than the one a request was after.
+type answered string
+
+func (a answered) Error() string { return "answered " + string(a) }
+
 // Bounds on what is read from the network. An archive is held to the bound
 // Kite installs a package within.
 const (
-	maxIndex   = 16 << 20
-	maxArchive = 64 << 20
-	maxPicture = 8 << 20
+	maxIndex     = 16 << 20
+	maxSignature = 16 << 10
+	maxArchive   = 64 << 20
+	maxPicture   = 8 << 20
 )
 
 // Client reads the index and fetches archives.
@@ -42,6 +50,9 @@ type Client struct {
 	// URLs are where the index is read from, tried in order. The first names
 	// the index, as kite.lock records it.
 	URLs []string
+	// Key is the public key the index has to be signed with. An index it did
+	// not sign is refused, and so is an archive the index does not name.
+	Key minisign.PublicKey
 	// CacheDir keeps the index and the archives fetched; nothing is kept
 	// when it is empty.
 	CacheDir string
@@ -52,10 +63,10 @@ type Client struct {
 	Now    func() time.Time
 }
 
-// NewClient returns a client of the index at urls that keeps what it fetches
-// in cacheDir.
-func NewClient(urls []string, cacheDir string) *Client {
-	return &Client{URLs: urls, CacheDir: cacheDir, MaxAge: time.Hour, HTTP: &http.Client{}, Now: time.Now}
+// NewClient returns a client of the index at urls, signed with key, that
+// keeps what it fetches in cacheDir.
+func NewClient(urls []string, cacheDir string, key minisign.PublicKey) *Client {
+	return &Client{URLs: urls, Key: key, CacheDir: cacheDir, MaxAge: time.Hour, HTTP: &http.Client{}, Now: time.Now}
 }
 
 // Source names the index the client reads.
@@ -65,8 +76,8 @@ func (c *Client) Source() string { return c.URLs[0] }
 type Fetched struct {
 	URL string
 	At  time.Time
-	// Offline is set when no address answered, and the index is the copy
-	// fetched at At; Err says why.
+	// Offline is set when no address answered with an index that could be
+	// used, and the index is the copy fetched at At; Err says why.
 	Offline bool
 	Err     error
 }
@@ -77,39 +88,61 @@ type cacheMeta struct {
 	URL     string    `json:"url"`
 	ETag    string    `json:"etag,omitempty"`
 	Fetched time.Time `json:"fetched"`
+	// Newest is when the newest index the client accepted was generated.
+	Newest string `json:"newest,omitempty"`
 }
 
 // Index reads the index: the copy fetched within MaxAge unless refresh, or
-// else from the first address that answers, asked with the copy's ETag so
-// that an unchanged index is not sent again. When no address answers, the
-// copy is used however old it is, and Fetched says so.
+// else from the first address that answers with an index its key signed,
+// asked with the copy's ETag so that an unchanged index is not sent again.
+// An index generated before the newest one accepted is refused. When no
+// address answers with one, the copy is used however old it is, and Fetched
+// says so.
 func (c *Client) Index(ctx context.Context, refresh bool) (*Index, Fetched, error) {
-	meta, kept := c.cachedIndex()
+	meta, kept, keptSig := c.cachedIndex()
 	if kept != nil && !refresh && c.Now().Sub(meta.Fetched) < c.MaxAge {
 		if ix, err := parseIndex(kept); err == nil {
 			return ix, Fetched{URL: meta.URL, At: meta.Fetched}, nil
 		}
 	}
 	var errs []error
+	distrusted := false
 	for _, addr := range c.URLs {
 		etag := ""
 		if kept != nil && meta.URL == addr {
 			etag = meta.ETag
 		}
 		data, tag, err := c.fetchIndex(ctx, addr, etag)
-		if err == nil && data == nil {
-			data = kept
+		var sig []byte
+		switch {
+		case err != nil:
+		case data == nil:
+			data, sig = kept, keptSig
+		default:
+			if sig, err = c.fetch(ctx, addr+".minisig", maxSignature, 20*time.Second); err != nil {
+				err = unsigned(err)
+			} else {
+				err = c.verify(data, sig)
+			}
 		}
 		var ix *Index
 		if err == nil {
 			ix, err = parseIndex(data)
 		}
+		if err == nil && older(ix.Generated, meta.Newest) {
+			err = untrusted{fmt.Errorf("it was generated at %s, before the index already seen, of %s", ix.Generated, meta.Newest)}
+		}
 		if err != nil {
+			distrusted = distrusted || errors.Is(err, ErrUntrusted)
 			errs = append(errs, fmt.Errorf("%s: %w", addr, err))
 			continue
 		}
 		now := c.Now()
-		c.keepIndex(cacheMeta{Source: c.Source(), URL: addr, ETag: tag, Fetched: now}, data)
+		newest := meta.Newest
+		if newest == "" || older(newest, ix.Generated) {
+			newest = ix.Generated
+		}
+		c.keepIndex(cacheMeta{Source: c.Source(), URL: addr, ETag: tag, Fetched: now, Newest: newest}, data, sig)
 		return ix, Fetched{URL: addr, At: now}, nil
 	}
 	err := errors.Join(errs...)
@@ -118,7 +151,11 @@ func (c *Client) Index(ctx context.Context, refresh bool) (*Index, Fetched, erro
 			return ix, Fetched{URL: meta.URL, At: meta.Fetched, Offline: true, Err: err}, nil
 		}
 	}
-	return nil, Fetched{}, unreachable{fmt.Errorf("the index of themes and plugins could not be read: %w", err)}
+	err = fmt.Errorf("the index of themes and plugins could not be read: %w", err)
+	if distrusted {
+		return nil, Fetched{}, untrusted{err}
+	}
+	return nil, Fetched{}, unreachable{err}
 }
 
 // fetchIndex asks one address for the index. It returns no data and no
@@ -146,7 +183,7 @@ func (c *Client) fetchIndex(ctx context.Context, addr, etag string) ([]byte, str
 		}
 		return nil, tag, nil
 	case resp.StatusCode != http.StatusOK:
-		return nil, "", fmt.Errorf("answered %s", resp.Status)
+		return nil, "", answered(resp.Status)
 	}
 	data, err := readAtMost(resp.Body, maxIndex)
 	return data, tag, err
@@ -164,26 +201,32 @@ func parseIndex(data []byte) (*Index, error) {
 }
 
 // cachedIndex is the index kept from an earlier fetch of this client's
-// index, if there is one.
-func (c *Client) cachedIndex() (cacheMeta, []byte) {
+// index, with its signature, if there is one its key signed. A copy that is
+// not, as one kept by a Kite that did not check signatures, is fetched
+// again, though the meta it leaves still says how new an index has been.
+func (c *Client) cachedIndex() (cacheMeta, []byte, []byte) {
 	var meta cacheMeta
 	if c.CacheDir == "" {
-		return meta, nil
+		return meta, nil, nil
 	}
 	raw, err := os.ReadFile(filepath.Join(c.CacheDir, "index.meta.json"))
 	if err != nil || json.Unmarshal(raw, &meta) != nil || meta.Source != c.Source() {
-		return cacheMeta{}, nil
+		return cacheMeta{}, nil, nil
 	}
 	data, err := os.ReadFile(filepath.Join(c.CacheDir, "index.json"))
 	if err != nil {
-		return cacheMeta{}, nil
+		return meta, nil, nil
 	}
-	return meta, data
+	sig, err := os.ReadFile(filepath.Join(c.CacheDir, "index.json.minisig"))
+	if err != nil || c.verify(data, sig) != nil {
+		return meta, nil, nil
+	}
+	return meta, data, sig
 }
 
-// keepIndex keeps a fetched index. A cache that cannot be written only means
-// the next command asks again.
-func (c *Client) keepIndex(meta cacheMeta, data []byte) {
+// keepIndex keeps a fetched index with its signature. A cache that cannot be
+// written only means the next command asks again.
+func (c *Client) keepIndex(meta cacheMeta, data, sig []byte) {
 	if c.CacheDir == "" {
 		return
 	}
@@ -191,7 +234,8 @@ func (c *Client) keepIndex(meta cacheMeta, data []byte) {
 	if err != nil {
 		return
 	}
-	if writeFile(filepath.Join(c.CacheDir, "index.json"), data) == nil {
+	if writeFile(filepath.Join(c.CacheDir, "index.json"), data) == nil &&
+		writeFile(filepath.Join(c.CacheDir, "index.json.minisig"), sig) == nil {
 		_ = writeFile(filepath.Join(c.CacheDir, "index.meta.json"), raw)
 	}
 }
@@ -295,7 +339,7 @@ func (c *Client) fetch(ctx context.Context, addr string, limit int64, timeout ti
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("answered %s", resp.Status)
+		return nil, answered(resp.Status)
 	}
 	return readAtMost(resp.Body, limit)
 }
@@ -331,6 +375,9 @@ func readAtMost(r io.Reader, limit int64) ([]byte, error) {
 		return nil, err
 	}
 	if int64(len(data)) > limit {
+		if limit < 1<<20 {
+			return nil, fmt.Errorf("it is larger than %d KB", limit>>10)
+		}
 		return nil, fmt.Errorf("it is larger than %d MB", limit>>20)
 	}
 	return data, nil

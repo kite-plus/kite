@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes, sign, type KeyObject } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -21,19 +21,51 @@ interface Release {
 }
 
 /**
- * FakeIndex serves an index of themes and plugins and their archives, the
- * way kite-plus/apps and jsDelivr serve them. Each archive is packed by the
- * kite binary under test, from a package kite started.
+ * Signer makes minisign signatures, as kite-plus/apps signs its index:
+ * Ed25519 over the file, then over that signature and its trusted comment.
+ */
+class Signer {
+  private readonly id = randomBytes(8);
+  private readonly key: KeyObject;
+  /** publicKey is the RW... line of a .pub file, as apps.key takes it. */
+  readonly publicKey: string;
+
+  constructor() {
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    this.key = privateKey;
+    const raw = Buffer.from(publicKey.export({ format: "jwk" }).x!, "base64url");
+    this.publicKey = Buffer.concat([Buffer.from("Ed"), this.id, raw]).toString("base64");
+  }
+
+  sign(data: Buffer): Buffer {
+    const signature = sign(null, data, this.key);
+    const trusted = `timestamp:${Math.floor(Date.now() / 1000)}\tfile:index.json`;
+    const global = sign(null, Buffer.concat([signature, Buffer.from(trusted)]), this.key);
+    return Buffer.from(
+      `untrusted comment: e2e index key\n${Buffer.concat([Buffer.from("Ed"), this.id, signature]).toString("base64")}\n` +
+        `trusted comment: ${trusted}\n${global.toString("base64")}\n`,
+    );
+  }
+}
+
+/**
+ * FakeIndex serves an index of themes and plugins, signed, and their
+ * archives, the way kite-plus/apps and jsDelivr serve them. Each archive is
+ * packed by the kite binary under test, from a package kite started.
  */
 class FakeIndex {
   private readonly archives = new Map<string, Buffer>();
   private readonly apps: { kind: string; id: string; versions: Release[] }[] = [];
+  readonly signer = new Signer();
+  private served: { index: Buffer; signature: Buffer } = { index: Buffer.alloc(0), signature: Buffer.alloc(0) };
   url = "";
 
   private constructor(
     private readonly server: Server,
     readonly dir: string,
-  ) {}
+  ) {
+    this.refresh();
+  }
 
   static async start(): Promise<FakeIndex> {
     const dir = await realpath(await mkdtemp(path.join(tmpdir(), "kite-e2e-index-")));
@@ -42,7 +74,11 @@ class FakeIndex {
     server.on("request", (request, response) => {
       if (request.url === "/index.json") {
         response.setHeader("Content-Type", "application/json");
-        response.end(JSON.stringify(index.document()));
+        response.end(index.served.index);
+        return;
+      }
+      if (request.url === "/index.json.minisig") {
+        response.end(index.served.signature);
         return;
       }
       const archive = index.archives.get(request.url ?? "");
@@ -59,6 +95,12 @@ class FakeIndex {
   async stop() {
     await new Promise((resolve) => this.server.close(resolve));
     await rm(this.dir, { recursive: true, force: true });
+  }
+
+  /** refresh writes the index as it now stands, and signs it. */
+  private refresh() {
+    const index = Buffer.from(JSON.stringify(this.document()));
+    this.served = { index, signature: this.signer.sign(index) };
   }
 
   private document() {
@@ -109,6 +151,7 @@ class FakeIndex {
       archive: { urls: [this.url + route], sha256: createHash("sha256").update(data).digest("hex"), size: data.length },
       loads: [],
     });
+    this.refresh();
   }
 }
 
@@ -116,7 +159,9 @@ test.describe("the app center", () => {
   let index: FakeIndex;
   test.beforeEach(async ({ site }) => {
     index = await FakeIndex.start();
-    await site.editConfig((text) => text.replace(deadIndex, `${index.url}/index.json`));
+    await site.editConfig((text) =>
+      text.replace(deadIndex, `${index.url}/index.json\n  key: ${index.signer.publicKey}`),
+    );
   });
   test.afterEach(async () => {
     await index.stop();

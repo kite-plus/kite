@@ -323,11 +323,17 @@ func (s *Server) view() api.View {
 		Plugins:          current.Config.Plugins,
 		InstalledPlugins: s.installedPlugins,
 
-		Apps: apps.ClientFor(s.root, current.Config.Apps.Index),
 		Lock: func() (*lock.File, error) { return lock.Read(s.root) },
 		PackageTree: func(kind, name string) (string, error) {
 			return lock.TreeOf(filepath.Join(s.root, apps.Dir(kind, name)))
 		},
+	}
+	// The configuration was checked when it was read, key included, so a
+	// client that cannot be made only leaves the app center out.
+	if client, err := apps.ClientFor(s.root, current.Config.Apps.Index, current.Config.Apps.Key); err == nil {
+		v.Apps = client
+	} else {
+		s.log.Error("index of themes and plugins", "err", err)
 	}
 	if s.opts.Write {
 		v.Writer = current.Project.Writer()

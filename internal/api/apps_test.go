@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"aead.dev/minisign"
 
 	"github.com/kite-plus/kite/internal/api"
 	"github.com/kite-plus/kite/internal/apps"
@@ -32,18 +35,32 @@ type indexServer struct {
 	mu    sync.Mutex
 	index apps.Index
 	files map[string][]byte
+	key   minisign.PrivateKey
+	pub   minisign.PublicKey
 }
 
 func newIndexServer(t *testing.T) *indexServer {
-	ix := &indexServer{t: t, index: apps.Index{Format: apps.Format}, files: map[string][]byte{
+	pub, key, err := minisign.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ix := &indexServer{t: t, index: apps.Index{Format: apps.Format}, key: key, pub: pub, files: map[string][]byte{
 		"/paper.png":  pngBytes,
 		"/paper.html": []byte("<!doctype html><script>alert(1)</script>"),
 	}}
 	ix.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ix.mu.Lock()
 		defer ix.mu.Unlock()
-		if r.URL.Path == "/index.json" {
-			_ = json.NewEncoder(w).Encode(ix.index)
+		if r.URL.Path == "/index.json" || r.URL.Path == "/index.json.minisig" {
+			data, err := json.Marshal(ix.index)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if r.URL.Path == "/index.json.minisig" {
+				data = minisign.Sign(ix.key, data)
+			}
+			_, _ = w.Write(data)
 			return
 		}
 		data, ok := ix.files[r.URL.Path]
@@ -101,7 +118,11 @@ func withIndex(root string, ix *indexServer) func(*api.Options) {
 		inner := o.Site
 		o.Site = func() api.View {
 			v := inner()
-			v.Apps = apps.ClientFor(root, ix.srv.URL+"/index.json")
+			client, err := apps.ClientFor(root, ix.srv.URL+"/index.json", ix.pub.String())
+			if err != nil {
+				panic(err)
+			}
+			v.Apps = client
 			v.Lock = func() (*lock.File, error) { return lock.Read(root) }
 			v.PackageTree = func(kind, name string) (string, error) {
 				return lock.TreeOf(filepath.Join(root, apps.Dir(kind, name)))
@@ -259,4 +280,22 @@ func readLockFile(t *testing.T, root string) *lock.File {
 		t.Fatal(err)
 	}
 	return f
+}
+
+func TestAWronglySignedIndexIsTheIndexsFault(t *testing.T) {
+	ix := newIndexServer(t)
+	ix.publish("theme", "paper", "1.0.0", paperFiles("1.0.0"))
+	_, stranger, err := minisign.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ix.mu.Lock()
+	ix.key = stranger
+	ix.mu.Unlock()
+	root := newProject(t, 1)
+	h, _ := newWritableServer(t, root, withIndex(root, ix))
+	rec := send(t, h, http.MethodGet, api.Prefix+"/apps", nil, nil)
+	if rec.Code != http.StatusBadGateway || decode[api.ErrorBody](t, rec).Error.Code != api.CodeIndexUntrusted {
+		t.Errorf("a wrongly signed index: %d %s", rec.Code, rec.Body.String())
+	}
 }

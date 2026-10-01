@@ -1,7 +1,9 @@
 package apps
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,14 +12,28 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"aead.dev/minisign"
 )
 
-// indexServer serves an index with an ETag, counting what it is asked.
+// testKey signs every index the tests serve.
+var testKey, testSigner = func() (minisign.PublicKey, minisign.PrivateKey) {
+	pub, priv, err := minisign.GenerateKey(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	return pub, priv
+}()
+
+// indexServer serves an index, signed, with an ETag, counting what it is
+// asked.
 type indexServer struct {
 	srv           *httptest.Server
-	body          atomic.Value
+	body, sig     atomic.Value
 	full, revalid atomic.Int32
 	down          atomic.Bool
+	unsigned      atomic.Bool
+	hangup        atomic.Bool
 }
 
 func newIndexServer(t *testing.T, ix *Index) *indexServer {
@@ -26,6 +42,20 @@ func newIndexServer(t *testing.T, ix *Index) *indexServer {
 	s.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.down.Load() {
 			http.Error(w, "down", http.StatusServiceUnavailable)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, ".minisig") {
+			if s.unsigned.Load() {
+				http.NotFound(w, r)
+				return
+			}
+			if s.hangup.Load() {
+				if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
+					_ = conn.Close()
+				}
+				return
+			}
+			_, _ = w.Write(s.sig.Load().([]byte))
 			return
 		}
 		body := s.body.Load().([]byte)
@@ -44,11 +74,16 @@ func newIndexServer(t *testing.T, ix *Index) *indexServer {
 }
 
 func (s *indexServer) set(t *testing.T, ix *Index) {
+	s.setSigned(t, ix, testSigner)
+}
+
+func (s *indexServer) setSigned(t *testing.T, ix *Index, key minisign.PrivateKey) {
 	data, err := json.Marshal(ix)
 	if err != nil {
 		t.Fatal(err)
 	}
 	s.body.Store(data)
+	s.sig.Store(minisign.Sign(key, data))
 }
 
 func oneApp(versions ...string) *Index {
@@ -62,7 +97,7 @@ func oneApp(versions ...string) *Index {
 func TestTheIndexIsKeptForAnHourAndAskedForAgainByItsTag(t *testing.T) {
 	s := newIndexServer(t, oneApp("1.0.0"))
 	now := time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
-	c := NewClient([]string{s.srv.URL + "/index.json"}, t.TempDir())
+	c := NewClient([]string{s.srv.URL + "/index.json"}, t.TempDir(), testKey)
 	c.Now = func() time.Time { return now }
 
 	ix, got, err := c.Index(t.Context(), false)
@@ -88,7 +123,7 @@ func TestTheNextAddressAnswersWhenOneDoesNot(t *testing.T) {
 	down := newIndexServer(t, oneApp("1.0.0"))
 	down.down.Store(true)
 	up := newIndexServer(t, oneApp("1.0.0"))
-	c := NewClient([]string{down.srv.URL + "/index.json", up.srv.URL + "/index.json"}, "")
+	c := NewClient([]string{down.srv.URL + "/index.json", up.srv.URL + "/index.json"}, "", testKey)
 	if _, got, err := c.Index(t.Context(), false); err != nil || got.URL != up.srv.URL+"/index.json" {
 		t.Errorf("Index = %+v, %v", got, err)
 	}
@@ -97,7 +132,7 @@ func TestTheNextAddressAnswersWhenOneDoesNot(t *testing.T) {
 func TestOfflineTheKeptIndexIsUsedAndSaysHowOld(t *testing.T) {
 	s := newIndexServer(t, oneApp("1.0.0"))
 	cache := t.TempDir()
-	c := NewClient([]string{s.srv.URL + "/index.json"}, cache)
+	c := NewClient([]string{s.srv.URL + "/index.json"}, cache, testKey)
 	if _, _, err := c.Index(t.Context(), false); err != nil {
 		t.Fatal(err)
 	}
@@ -108,12 +143,12 @@ func TestOfflineTheKeptIndexIsUsedAndSaysHowOld(t *testing.T) {
 	}
 
 	// A kept copy of another index is not this one.
-	other := NewClient([]string{"https://example.invalid/index.json"}, cache)
+	other := NewClient([]string{"https://example.invalid/index.json"}, cache, testKey)
 	other.HTTP = s.srv.Client()
 	if _, _, err := other.Index(t.Context(), false); err == nil {
 		t.Error("another index was read from this one's copy")
 	}
-	if _, _, err := NewClient([]string{s.srv.URL}, t.TempDir()).Index(t.Context(), false); err == nil ||
+	if _, _, err := NewClient([]string{s.srv.URL}, t.TempDir(), testKey).Index(t.Context(), false); err == nil ||
 		!strings.Contains(err.Error(), "could not be read") {
 		t.Errorf("no answer and no copy: %v", err)
 	}
@@ -135,7 +170,7 @@ func TestAnArchiveIsTheBytesItsChecksumNames(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	cache := t.TempDir()
-	c := NewClient(nil, cache)
+	c := NewClient(nil, cache, testKey)
 	rel := &Release{Version: "1.0.0", Archive: Archive{
 		URLs:   []string{srv.URL + "/missing.zip", srv.URL + "/tampered.zip", srv.URL + "/good.zip"},
 		SHA256: sum(good),
@@ -230,5 +265,100 @@ func TestAPackageIsKnownByItsRepositoryAndItsWords(t *testing.T) {
 	}
 	if Text(a.Title, "zh-CN") != "风标" || Text(a.Description, "zh-CN") != "A documentation theme." {
 		t.Error("Text does not fall back to English")
+	}
+}
+
+func TestAnIndexItsKeyDidNotSignIsNotUsed(t *testing.T) {
+	s := newIndexServer(t, oneApp("1.0.0"))
+	s.unsigned.Store(true)
+	if _, _, err := NewClient([]string{s.srv.URL + "/index.json"}, t.TempDir(), testKey).Index(t.Context(), false); !errors.Is(err, ErrUntrusted) {
+		t.Errorf("an unsigned index: %v", err)
+	}
+	s.unsigned.Store(false)
+
+	// A signature lost on the way is no verdict on the index.
+	s.hangup.Store(true)
+	if _, _, err := NewClient([]string{s.srv.URL + "/index.json"}, t.TempDir(), testKey).Index(t.Context(), false); !errors.Is(err, ErrUnreachable) || errors.Is(err, ErrUntrusted) {
+		t.Errorf("a signature lost on the way: %v", err)
+	}
+	s.hangup.Store(false)
+	s.sig.Store(make([]byte, maxSignature+1))
+	if _, _, err := NewClient([]string{s.srv.URL + "/index.json"}, t.TempDir(), testKey).Index(t.Context(), false); err == nil ||
+		!strings.Contains(err.Error(), "larger than 16 KB") {
+		t.Errorf("an oversized signature: %v", err)
+	}
+
+	_, stranger, err := minisign.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.setSigned(t, oneApp("1.0.0"), stranger)
+	if _, _, err := NewClient([]string{s.srv.URL + "/index.json"}, t.TempDir(), testKey).Index(t.Context(), false); !errors.Is(err, ErrUntrusted) ||
+		!strings.Contains(err.Error(), "not signed by the key Kite trusts") {
+		t.Errorf("an index signed by another key: %v", err)
+	}
+
+	// The copy kept from a signed fetch stays in use, and says why.
+	cache := t.TempDir()
+	c := NewClient([]string{s.srv.URL + "/index.json"}, cache, testKey)
+	s.set(t, oneApp("1.0.0"))
+	if _, _, err := c.Index(t.Context(), false); err != nil {
+		t.Fatal(err)
+	}
+	s.setSigned(t, oneApp("1.0.0", "0.9.0"), stranger)
+	ix, got, err := c.Index(t.Context(), true)
+	if err != nil || !got.Offline || !errors.Is(got.Err, ErrUntrusted) || len(ix.Find("theme", "paper").Versions) != 1 {
+		t.Errorf("a refetch signed by another key: %+v, %v", got, err)
+	}
+}
+
+func TestAnIndexOlderThanOneSeenIsRefused(t *testing.T) {
+	newer := oneApp("1.1.0", "1.0.0")
+	newer.Generated = "2026-10-01T09:00:00Z"
+	s := newIndexServer(t, newer)
+	cache := t.TempDir()
+	c := NewClient([]string{s.srv.URL + "/index.json"}, cache, testKey)
+	if _, _, err := c.Index(t.Context(), false); err != nil {
+		t.Fatal(err)
+	}
+	// A signed copy from before 1.1.0 was listed, served again.
+	stale := oneApp("1.0.0")
+	stale.Generated = "2026-10-01T08:00:00Z"
+	s.set(t, stale)
+	ix, got, err := c.Index(t.Context(), true)
+	if err != nil || !got.Offline || !strings.Contains(got.Err.Error(), "before the index already seen") ||
+		ix.Find("theme", "paper").Versions[0].Version != "1.1.0" {
+		t.Errorf("a replayed older index: %+v, %v", got, err)
+	}
+	newest := oneApp("1.2.0", "1.1.0", "1.0.0")
+	newest.Generated = "2026-10-01T10:00:00Z"
+	s.set(t, newest)
+	if ix, got, err := c.Index(t.Context(), true); err != nil || got.Offline || ix.Find("theme", "paper").Versions[0].Version != "1.2.0" {
+		t.Errorf("a newer index: %+v, %v", got, err)
+	}
+}
+
+// A copy kept by a Kite that read the index without checking it, as 0.1.5
+// did, is not taken on trust.
+func TestACopyKeptWithoutItsSignatureIsFetchedAgain(t *testing.T) {
+	s := newIndexServer(t, oneApp("1.0.0"))
+	cache := t.TempDir()
+	c := NewClient([]string{s.srv.URL + "/index.json"}, cache, testKey)
+	old, err := json.Marshal(oneApp("0.9.0"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta, err := json.Marshal(cacheMeta{Source: c.Source(), URL: c.Source(), ETag: `"old"`, Fetched: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, data := range map[string][]byte{"index.json": old, "index.meta.json": meta} {
+		if err := os.WriteFile(filepath.Join(cache, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ix, _, err := c.Index(t.Context(), false)
+	if err != nil || ix.Find("theme", "paper").Versions[0].Version != "1.0.0" || s.full.Load() != 1 {
+		t.Errorf("an unsigned kept copy was used: %v, %d fetches", err, s.full.Load())
 	}
 }

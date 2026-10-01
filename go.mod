@@ -8,6 +8,7 @@ go 1.26.4
 toolchain go1.26.8
 
 require (
+	aead.dev/minisign v0.3.0
 	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/deepteams/webp v1.2.8
 	github.com/extism/go-pdk v1.1.3

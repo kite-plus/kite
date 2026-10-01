@@ -59,12 +59,12 @@ func byName(arg string) (id, version string, ok bool) {
 
 // appsClient is the client of the index a site, root, installs from, or for
 // no site, root "", the one KITE_APPS_URL names or Kite's own.
-func appsClient(root string, cfg *config.Config) *apps.Client {
-	index := ""
+func appsClient(root string, cfg *config.Config) (*apps.Client, error) {
+	index, key := "", ""
 	if cfg != nil {
-		index = cfg.Apps.Index
+		index, key = cfg.Apps.Index, cfg.Apps.Key
 	}
-	return apps.ClientFor(root, index)
+	return apps.ClientFor(root, index, key)
 }
 
 // readIndex reads the index, and says so when it is the copy kept from an
@@ -110,7 +110,10 @@ func plural(n int, unit string) string {
 // fetchByName finds a theme or a plugin, kind, in the index, and fetches the
 // version wanted, or else the newest that works with this Kite.
 func fetchByName(cmd *cobra.Command, root string, cfg *config.Config, kind, id, want string) (*apps.Package, error) {
-	client := appsClient(root, cfg)
+	client, err := appsClient(root, cfg)
+	if err != nil {
+		return nil, err
+	}
 	asked := client.Now()
 	ix, fetchedAt, err := readIndexAt(cmd, client, false)
 	if err != nil {
@@ -241,7 +244,10 @@ func newAppsSearchCmd() *cobra.Command {
 			if p != nil {
 				root, lang = p.Root, cfg.Site.Language
 			}
-			client := appsClient(root, cfg)
+			client, err := appsClient(root, cfg)
+			if err != nil {
+				return err
+			}
 			ix, err := readIndex(cmd, client, refresh)
 			if err != nil {
 				return err
@@ -367,7 +373,10 @@ func newAppsOutdatedCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			client := appsClient(p.Root, cfg)
+			client, err := appsClient(p.Root, cfg)
+			if err != nil {
+				return err
+			}
 			ix, err := readIndex(cmd, client, refresh)
 			if err != nil {
 				return err
@@ -437,7 +446,10 @@ func newAppsUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			client := appsClient(p.Root, cfg)
+			client, err := appsClient(p.Root, cfg)
+			if err != nil {
+				return err
+			}
 			ix, err := readIndex(cmd, client, refresh)
 			if err != nil {
 				return err

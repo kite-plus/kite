@@ -246,3 +246,13 @@ func TestMenusAreCheckedWhenTheyAreRead(t *testing.T) {
 		})
 	}
 }
+
+func TestTheIndexKeyIsAMinisignPublicKey(t *testing.T) {
+	cfg, err := load(t, "site: {title: T}\napps:\n  index: https://mirror.example.com/index.json\n  key: RWS7FFNcKsshXtrnjri11Qk9W6KWQxa1E+bPNr08Bm4vjNbjqyq+FEEt\n")
+	if err != nil || cfg.Apps.Key == "" {
+		t.Fatalf("a key: %+v, %v", cfg.Apps, err)
+	}
+	if _, err := load(t, "site: {title: T}\napps:\n  key: not-a-key\n"); err == nil || !strings.Contains(err.Error(), "apps.key") {
+		t.Errorf("a key that is not one: %v", err)
+	}
+}

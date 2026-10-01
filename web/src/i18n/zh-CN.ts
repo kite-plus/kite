@@ -893,6 +893,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "problem.publish_needs_confirmation": "请先读一下警告，然后再发布一次。",
   "problem.publish_failed": "发布没有完成。",
   "problem.build_failed": "网站现在的状态没法生成。",
+  "problem.index_untrusted": "主题和插件的索引没有通过签名检查，Kite 没有使用它。",
   "problem.index_unreachable": "连不上主题和插件的索引。请检查网络，稍后再试。",
   "problem.update_needs_confirmation": "这次更新需要先确认。",
   "problem.not_a_repository": "这个项目不是 git 仓库。",

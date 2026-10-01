@@ -17,10 +17,11 @@ import (
 )
 
 // ClientFor is the client of the index a site installs from: index, as
-// apps.index or KITE_APPS_URL names it, or else Kite's own. What it fetches
-// is kept in the site's .kite/cache/apps, or for no site, root "", in the
-// user's cache.
-func ClientFor(root, index string) *Client {
+// apps.index or KITE_APPS_URL names it, or else Kite's own, signed with key,
+// as apps.key or KITE_APPS_KEY names it, or else Kite's own; a mirror of
+// Kite's index needs no key of its own. What it fetches is kept in the
+// site's .kite/cache/apps, or for no site, root "", in the user's cache.
+func ClientFor(root, index, key string) (*Client, error) {
 	urls := Indexes
 	switch {
 	case index != "":
@@ -28,13 +29,23 @@ func ClientFor(root, index string) *Client {
 	case os.Getenv("KITE_APPS_URL") != "":
 		urls = []string{os.Getenv("KITE_APPS_URL")}
 	}
+	if key == "" {
+		key = os.Getenv("KITE_APPS_KEY")
+	}
+	if key == "" {
+		key = Key
+	}
+	pub, err := ParseKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("the key of the index: %w", err)
+	}
 	cache := ""
 	if root != "" {
 		cache = filepath.Join(root, ".kite", "cache", "apps")
 	} else if dir, err := os.UserCacheDir(); err == nil {
 		cache = filepath.Join(dir, "kite", "apps")
 	}
-	return NewClient(urls, cache)
+	return NewClient(urls, cache, pub), nil
 }
 
 // Dir is where a theme or a plugin, kind, is installed, relative to the

@@ -917,6 +917,7 @@ export const en = {
   "problem.publish_needs_confirmation": "Read the warnings, then publish again.",
   "problem.publish_failed": "The publish did not finish.",
   "problem.build_failed": "The site could not be built as it stands.",
+  "problem.index_untrusted": "The index of themes and plugins failed its signature check, so it was not used.",
   "problem.index_unreachable": "The index of themes and plugins could not be reached. Check the network, then try again.",
   "problem.update_needs_confirmation": "The update needs your agreement first.",
   "problem.not_a_repository": "This project is not a git repository.",
