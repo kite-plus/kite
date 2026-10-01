@@ -28,11 +28,13 @@ import (
 	"time"
 
 	"github.com/kite-plus/kite/internal/api"
+	"github.com/kite-plus/kite/internal/apps"
 	"github.com/kite-plus/kite/internal/auth"
 	"github.com/kite-plus/kite/internal/build"
 	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/lock"
 	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/render"
 	"github.com/kite-plus/kite/internal/render/img"
@@ -320,6 +322,12 @@ func (s *Server) view() api.View {
 
 		Plugins:          current.Config.Plugins,
 		InstalledPlugins: s.installedPlugins,
+
+		Apps: apps.ClientFor(s.root, current.Config.Apps.Index),
+		Lock: func() (*lock.File, error) { return lock.Read(s.root) },
+		PackageTree: func(kind, name string) (string, error) {
+			return lock.TreeOf(filepath.Join(s.root, apps.Dir(kind, name)))
+		},
 	}
 	if s.opts.Write {
 		v.Writer = current.Project.Writer()

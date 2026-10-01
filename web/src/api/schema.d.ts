@@ -92,6 +92,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/apps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the themes and plugins in the index the site installs from, with how the site stands with each: installed, a newer version that works with this Kite, a yanked version. A package no longer listed is left out unless the site has it. The index is fetched by this server, at most once an hour, and the copy kept is used, and said to be, when it cannot be fetched. */
+        get: operations["listApps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/apps/{kind}/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Describe a theme or a plugin in the index with every version it lists, newest first. */
+        get: operations["getApp"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/apps/{kind}/{id}/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install a theme or a plugin from the index: the version asked for, or the newest that works with this Kite. This server fetches the archive, checks it against the sha256 the index gives and then as an uploaded one is checked, and kite.lock records where it came from. A plugin is installed turned off. */
+        post: operations["installApp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/apps/{kind}/{id}/screenshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a theme's picture of itself, which this server fetches, so that a browser never has to reach the index's addresses. */
+        get: operations["getAppScreenshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/apps/{kind}/{id}/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Say what updating a package the site has from the index would do: the version it goes to, files changed by hand that it would replace, and what a plugin's new version does beyond what it did. */
+        get: operations["planAppUpdate"];
+        put?: never;
+        /** Update a package the site has from the index. One whose files changed since it was installed, or a plugin whose new version does more, is updated only when the request says that was agreed to; settings stay as they are. */
+        post: operations["updateApp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -655,6 +741,80 @@ export interface components {
             expires_at: string;
             remembered: boolean;
         };
+        AppConfirm: {
+            grant?: boolean;
+            overwrite?: boolean;
+        };
+        AppDetail: {
+            author?: components["schemas"]["PluginAuthor"];
+            delisted?: string;
+            description?: string;
+            homepage?: string;
+            hooks: string[];
+            id: string;
+            inject: number;
+            installed?: string;
+            kind: string;
+            license?: string;
+            loads: string[];
+            official: boolean;
+            other?: boolean;
+            problem?: string;
+            repo: string;
+            screenshot?: string;
+            tags?: string[];
+            title: string;
+            update?: string;
+            version?: string;
+            versions: components["schemas"]["AppVersion"][];
+            yanked?: boolean;
+        };
+        AppInfo: {
+            author?: components["schemas"]["PluginAuthor"];
+            delisted?: string;
+            description?: string;
+            homepage?: string;
+            hooks: string[];
+            id: string;
+            inject: number;
+            installed?: string;
+            kind: string;
+            license?: string;
+            loads: string[];
+            official: boolean;
+            other?: boolean;
+            problem?: string;
+            repo: string;
+            screenshot?: string;
+            tags?: string[];
+            title: string;
+            update?: string;
+            version?: string;
+            yanked?: boolean;
+        };
+        AppInstall: {
+            version?: string;
+        };
+        AppList: {
+            fetched: string;
+            items: components["schemas"]["AppInfo"][];
+            offline?: boolean;
+        };
+        AppUpdate: {
+            confirm: components["schemas"]["AppConfirm"];
+            version?: string;
+        };
+        AppVersion: {
+            hooks: string[];
+            inject: number;
+            loads: string[];
+            notes?: string;
+            problem?: string;
+            published?: string;
+            requires?: string;
+            version: string;
+            yanked?: boolean;
+        };
         BuildSettings: {
             feed_limit: number;
             page_size: number;
@@ -1155,6 +1315,26 @@ export interface components {
             values?: {
                 [key: string]: unknown;
             };
+        };
+        UpdateNeeds: {
+            error: components["schemas"]["ErrorDetail"];
+            plan: components["schemas"]["UpdatePlan"];
+        };
+        UpdatePlan: {
+            changed: boolean;
+            from: string;
+            grows: boolean;
+            hooks: string[];
+            id: string;
+            inject: number;
+            injected: number;
+            kind: string;
+            loads: string[];
+            more_hooks: string[];
+            more_loads: string[];
+            notes?: string;
+            to: string;
+            why?: string;
         };
         WordCount: {
             words: number;
@@ -1689,6 +1869,459 @@ export interface operations {
             };
             /** @description Failed. */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    listApps: {
+        parameters: {
+            query?: {
+                /** @description theme or plugin; both when absent. */
+                kind?: string;
+                /** @description Words every package listed has to match, in its id, title, description or tags. */
+                q?: string;
+                /** @description Fetch the index even if the copy kept is less than an hour old. */
+                refresh?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the index lists. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppList"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    getApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The package. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppDetail"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    installApp: {
+        parameters: {
+            query?: {
+                /** @description Replace a theme or a plugin of the same name the site has. Without it, one the site has is answered with 409. */
+                replace?: boolean;
+            };
+            header?: never;
+            path: {
+                kind: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AppInstall"];
+            };
+        };
+        responses: {
+            /** @description The package, as the site now has it. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppInfo"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    getAppScreenshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The picture. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planAppUpdate: {
+        parameters: {
+            query?: {
+                /** @description The version to go to; the newest that works with this Kite when absent. */
+                version?: string;
+            };
+            header?: never;
+            path: {
+                kind: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the update would do. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatePlan"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    updateApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppUpdate"];
+            };
+        };
+        responses: {
+            /** @description The package, as the site now has it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppInfo"];
+                };
+            };
+            /** @description Failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The request came from another site. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The update needs an agreement it was not given. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateNeeds"];
+                };
+            };
+            /** @description Failed. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Failed. */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -47,6 +47,15 @@ const (
 	// CodeBuildFailed reports a site that could not be built as it stands,
 	// such as one with content the index refused.
 	CodeBuildFailed = "build_failed"
+
+	// CodeIndexUnreachable reports that the index of themes and plugins, or
+	// an archive it names, could not be fetched: the network's doing rather
+	// than the request's, so the same request may work later.
+	CodeIndexUnreachable = "index_unreachable"
+	// CodeUpdateNeedsConfirmation answers an update that would replace files
+	// changed by hand, or let a plugin do more than it did, without being
+	// told it may.
+	CodeUpdateNeedsConfirmation = "update_needs_confirmation"
 )
 
 // errNothingWritten reports a store that accepted a write and reported no

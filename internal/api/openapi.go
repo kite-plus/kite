@@ -708,6 +708,92 @@ func openAPI() *document {
 				RequestBody: body(ref(PluginSwitch{})),
 				Responses:   ok(ref(PluginInfo{}), "The plugin as it now is.", "400", "404", "405", "409"),
 			}},
+			"/apps": {Get: &operation{
+				OperationID: "listApps",
+				Summary: "List the themes and plugins in the index the site installs from, with how the " +
+					"site stands with each: installed, a newer version that works with this Kite, a " +
+					"yanked version. A package no longer listed is left out unless the site has it. " +
+					"The index is fetched by this server, at most once an hour, and the copy kept is " +
+					"used, and said to be, when it cannot be fetched.",
+				Parameters: []parameter{
+					{Name: "kind", In: "query", Description: "theme or plugin; both when absent.",
+						Schema: &jsonSchema{Type: "string"}},
+					{Name: "q", In: "query", Description: "Words every package listed has to match, " +
+						"in its id, title, description or tags.", Schema: &jsonSchema{Type: "string"}},
+					{Name: "refresh", In: "query", Description: "Fetch the index even if the copy " +
+						"kept is less than an hour old.", Schema: &jsonSchema{Type: "boolean"}},
+				},
+				Responses: ok(ref(AppList{}), "What the index lists.", "400", "501", "502"),
+			}},
+			"/apps/{kind}/{id}": {Get: &operation{
+				OperationID: "getApp",
+				Summary:     "Describe a theme or a plugin in the index with every version it lists, newest first.",
+				Parameters:  []parameter{pathParam("kind"), pathParam("id")},
+				Responses:   ok(ref(AppDetail{}), "The package.", "404", "501", "502"),
+			}},
+			"/apps/{kind}/{id}/screenshot": {Get: &operation{
+				OperationID: "getAppScreenshot",
+				Summary: "Read a theme's picture of itself, which this server fetches, so that a " +
+					"browser never has to reach the index's addresses.",
+				Parameters: []parameter{pathParam("kind"), pathParam("id")},
+				Responses: map[string]response{
+					"200": {
+						Description: "The picture.",
+						Content:     map[string]mediaType{"image/*": {Schema: &jsonSchema{Type: "string", Format: "binary"}}},
+					},
+					"400": {Description: "Failed.", Content: jsonOf(errorRef)},
+					"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+					"502": {Description: "Failed.", Content: jsonOf(errorRef)},
+				},
+			}},
+			"/apps/{kind}/{id}/install": {Post: &operation{
+				OperationID: "installApp",
+				Summary: "Install a theme or a plugin from the index: the version asked for, or the " +
+					"newest that works with this Kite. This server fetches the archive, checks it " +
+					"against the sha256 the index gives and then as an uploaded one is checked, and " +
+					"kite.lock records where it came from. A plugin is installed turned off.",
+				Parameters: []parameter{pathParam("kind"), pathParam("id"), {
+					Name: "replace", In: "query",
+					Description: "Replace a theme or a plugin of the same name the site has. Without " +
+						"it, one the site has is answered with 409.",
+					Schema: &jsonSchema{Type: "boolean"},
+				}},
+				RequestBody: &requestBody{Content: jsonOf(ref(AppInstall{}))},
+				Responses: created(ref(AppInfo{}), "The package, as the site now has it.",
+					"400", "404", "405", "409", "501", "502"),
+			}},
+			"/apps/{kind}/{id}/update": {
+				Get: &operation{
+					OperationID: "planAppUpdate",
+					Summary: "Say what updating a package the site has from the index would do: the " +
+						"version it goes to, files changed by hand that it would replace, and what a " +
+						"plugin's new version does beyond what it did.",
+					Parameters: []parameter{pathParam("kind"), pathParam("id"), {
+						Name: "version", In: "query",
+						Description: "The version to go to; the newest that works with this Kite " +
+							"when absent.",
+						Schema: &jsonSchema{Type: "string"},
+					}},
+					Responses: ok(ref(UpdatePlan{}), "What the update would do.", "400", "404", "501", "502"),
+				},
+				Post: &operation{
+					OperationID: "updateApp",
+					Summary: "Update a package the site has from the index. One whose files changed " +
+						"since it was installed, or a plugin whose new version does more, is updated " +
+						"only when the request says that was agreed to; settings stay as they are.",
+					Parameters:  []parameter{pathParam("kind"), pathParam("id")},
+					RequestBody: body(ref(AppUpdate{})),
+					Responses: func() map[string]response {
+						out := ok(ref(AppInfo{}), "The package, as the site now has it.",
+							"400", "404", "405", "501", "502")
+						out["409"] = response{
+							Description: "The update needs an agreement it was not given.",
+							Content:     jsonOf(ref(UpdateNeeds{})),
+						}
+						return out
+					}(),
+				},
+			},
 			"/previews": {Post: &operation{
 				OperationID: "openPreview",
 				Summary: "Draw the site with a theme or settings being tried, without writing " +

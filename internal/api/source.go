@@ -4,8 +4,10 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/kite-plus/kite/internal/apps"
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/lock"
 	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/publish"
 	"github.com/kite-plus/kite/internal/render/theme"
@@ -54,6 +56,16 @@ type View struct {
 	// keeps any at all: one kept as a single file has no folder of its own.
 	// It is nil where files cannot be listed.
 	Bundle func(owner *content.Content) ([]BundleFile, bool, error)
+
+	// Apps reads the index of themes and plugins the site installs from. It
+	// is nil where nothing can be installed from one.
+	Apps *apps.Client
+	// Lock reads kite.lock, which records what the site installed from the
+	// index.
+	Lock func() (*lock.File, error)
+	// PackageTree is the digest of the files of an installed theme or
+	// plugin, kind, as kite.lock records one.
+	PackageTree func(kind, name string) (string, error)
 
 	// Writer is nil when this deployment may not be written to, which is the
 	// difference between a preview an author is typing into and a read-only

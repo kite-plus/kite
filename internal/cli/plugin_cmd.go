@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/kite-plus/kite/internal/apps"
 	"github.com/kite-plus/kite/internal/archive"
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
@@ -126,12 +127,12 @@ func newPluginAddCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				added, files, origin = got.plugin, got.files, got.origin
+				added, files, origin = got.Plugin, got.Files, got.Origin
 			} else {
 				if files, err = readPackage(args[0], pluginPackage); err != nil {
 					return err
 				}
-				if added, err = checkPlugin(files); err != nil {
+				if added, err = apps.CheckPlugin(files); err != nil {
 					return err
 				}
 			}
@@ -153,23 +154,13 @@ func newPluginAddCmd() *cobra.Command {
 			}
 			printf(cmd, "installed %s %s%s in %s\n", id, added.Manifest.Version, fromIndex(origin),
 				filepath.Join(plugin.Dir, id))
-			printf(cmd, "  %s\n", describeGrant(grantOf(added)))
+			printf(cmd, "  %s\n", describeGrant(apps.GrantOf(added)))
 			printf(cmd, "it is off: run 'kite plugin enable %s' to turn it on\n", id)
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&replace, "replace", false, "replace an installed plugin of the same id")
 	return cmd
-}
-
-// checkPlugin checks a plugin's files the way a site checks a plugin it
-// loads.
-func checkPlugin(files map[string][]byte) (*plugin.Plugin, error) {
-	manifest, err := plugin.ReadManifest(archive.FS(files))
-	if err != nil {
-		return nil, err
-	}
-	return plugin.Load(archive.FS(files), manifest.ID)
 }
 
 // packageKind is what a package of one kind may hold when it is installed

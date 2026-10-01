@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kite-plus/kite/internal/archive"
+	"github.com/kite-plus/kite/internal/apps"
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/project"
@@ -129,12 +129,12 @@ func newThemeAddCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				added, files, origin = got.theme, got.files, got.origin
+				added, files, origin = got.Theme, got.Files, got.Origin
 			} else {
 				if files, err = readPackage(args[0], themePackage); err != nil {
 					return err
 				}
-				if added, err = checkTheme(files); err != nil {
+				if added, err = apps.CheckTheme(files); err != nil {
 					return err
 				}
 			}
@@ -164,26 +164,6 @@ func newThemeAddCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&replace, "replace", false, "replace an installed theme of the same name")
 	return cmd
-}
-
-// checkTheme checks a theme's files the way a site checks a theme it loads,
-// and that it can be installed under the name it gives itself.
-func checkTheme(files map[string][]byte) (*theme.Theme, error) {
-	added, err := theme.Load(archive.FS(files))
-	if err != nil {
-		return nil, err
-	}
-	if !added.Manifest.SupportsStatic() {
-		return nil, errors.New("the theme says it cannot be built into a static site")
-	}
-	name := added.Manifest.Name
-	switch {
-	case name == site.BuiltinTheme:
-		return nil, fmt.Errorf("the name %s belongs to the theme built into Kite; the theme needs a name of its own", name)
-	case !content.ValidThemeName(name):
-		return nil, fmt.Errorf("the theme is named %q, and a name has to be usable as a directory: letters, digits, dots, - and _", name)
-	}
-	return added, nil
 }
 
 func fromIndex(origin *content.Origin) string {

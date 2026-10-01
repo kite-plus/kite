@@ -17,14 +17,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kite-plus/kite/internal/apps"
-	"github.com/kite-plus/kite/internal/archive"
 	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/lock"
 	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/project"
-	"github.com/kite-plus/kite/internal/render/theme"
 	"github.com/kite-plus/kite/internal/site"
 )
 
@@ -59,24 +57,14 @@ func byName(arg string) (id, version string, ok bool) {
 	return m[1], m[2], true
 }
 
-// appsClient reads the index a site installs from: the one apps.index or
-// KITE_APPS_URL names, or Kite's own. What it fetches is kept in the site's
-// .kite/cache/apps, or outside a site in the user's cache.
+// appsClient is the client of the index a site, root, installs from, or for
+// no site, root "", the one KITE_APPS_URL names or Kite's own.
 func appsClient(root string, cfg *config.Config) *apps.Client {
-	urls := apps.Indexes
-	switch {
-	case cfg != nil && cfg.Apps.Index != "":
-		urls = []string{cfg.Apps.Index}
-	case os.Getenv("KITE_APPS_URL") != "":
-		urls = []string{os.Getenv("KITE_APPS_URL")}
+	index := ""
+	if cfg != nil {
+		index = cfg.Apps.Index
 	}
-	cache := ""
-	if root != "" {
-		cache = filepath.Join(root, ".kite", "cache", "apps")
-	} else if dir, err := os.UserCacheDir(); err == nil {
-		cache = filepath.Join(dir, "kite", "apps")
-	}
-	return apps.NewClient(urls, cache)
+	return apps.ClientFor(root, index)
 }
 
 // readIndex reads the index, and says so when it is the copy kept from an
@@ -119,20 +107,9 @@ func plural(n int, unit string) string {
 	return fmt.Sprintf("%d %ss", n, unit)
 }
 
-// fetched is a release from the index, downloaded and checked the way an
-// install checks what it installs.
-type fetched struct {
-	app    *apps.App
-	rel    *apps.Release
-	files  map[string][]byte
-	theme  *theme.Theme
-	plugin *plugin.Plugin
-	origin *content.Origin
-}
-
 // fetchByName finds a theme or a plugin, kind, in the index, and fetches the
 // version wanted, or else the newest that works with this Kite.
-func fetchByName(cmd *cobra.Command, root string, cfg *config.Config, kind, id, want string) (*fetched, error) {
+func fetchByName(cmd *cobra.Command, root string, cfg *config.Config, kind, id, want string) (*apps.Package, error) {
 	client := appsClient(root, cfg)
 	asked := client.Now()
 	ix, fetchedAt, err := readIndexAt(cmd, client, false)
@@ -158,58 +135,7 @@ func fetchByName(cmd *cobra.Command, root string, cfg *config.Config, kind, id, 
 	if err != nil {
 		return nil, err
 	}
-	return fetchRelease(cmd, client, app, rel)
-}
-
-// fetchRelease downloads a release and checks that it is the package the
-// index says it is.
-func fetchRelease(cmd *cobra.Command, client *apps.Client, app *apps.App, rel *apps.Release) (*fetched, error) {
-	data, err := client.Archive(cmd.Context(), rel)
-	if err != nil {
-		return nil, err
-	}
-	kind := themePackage
-	if app.Kind == "plugin" {
-		kind = pluginPackage
-	}
-	files, problem := archive.Unpack(data, kind.name, kind.manifest, kind.maxSize, kind.maxFiles)
-	if problem != "" {
-		return nil, fmt.Errorf("%s %s %s: %s", app.Kind, app.ID, rel.Version, problem)
-	}
-	got := &fetched{app: app, rel: rel, files: files, origin: &content.Origin{
-		Version:  rel.Version,
-		Source:   client.Source(),
-		Resolved: rel.Archive.URLs[0],
-		Checksum: lock.Checksum(rel.Archive.SHA256),
-	}}
-	var name, version string
-	if app.Kind == "plugin" {
-		if got.plugin, err = checkPlugin(files); err != nil {
-			return nil, err
-		}
-		name, version = got.plugin.Manifest.ID, got.plugin.Manifest.Version
-		g := grantOf(got.plugin)
-		got.origin.Granted = &g
-	} else {
-		if got.theme, err = checkTheme(files); err != nil {
-			return nil, err
-		}
-		name, version = got.theme.Manifest.Name, got.theme.Manifest.Version
-	}
-	if name != app.ID || version != rel.Version {
-		return nil, fmt.Errorf("the archive of %s %s %s holds %s %s instead", app.Kind, app.ID, rel.Version, name, version)
-	}
-	return got, nil
-}
-
-// grantOf is what a plugin does to a site, which its owner is told before
-// it runs.
-func grantOf(pl *plugin.Plugin) content.Grant {
-	return content.Grant{
-		Inject: len(pl.Manifest.Inject),
-		Loads:  nonNil(pl.Hosts()),
-		Hooks:  nonNil(slices.Clone(pl.Manifest.Hooks)),
-	}
+	return client.Fetch(cmd.Context(), app, rel)
 }
 
 func describeGrant(g content.Grant) string {
@@ -224,22 +150,15 @@ func describeGrant(g content.Grant) string {
 	return fmt.Sprintf("it injects %d piece(s) of code; %s; %s", g.Inject, loads, hooks)
 }
 
-// installed is a theme or a plugin a site has in themes/ or plugins/.
-type installed struct {
-	kind, name, version, homepage string
-	// dir is where it is, relative to the project root.
-	dir string
-}
-
-func installedPackages(root string) ([]installed, error) {
-	var out []installed
+func installedPackages(root string) ([]apps.Installed, error) {
+	var out []apps.Installed
 	for _, one := range site.Themes(root) {
 		if one.Builtin {
 			continue
 		}
-		pkg := installed{kind: "theme", name: one.Name, dir: filepath.Join(site.ThemesDir, one.Name)}
+		pkg := apps.Installed{Kind: "theme", Name: one.Name}
 		if m := one.Manifest; m != nil {
-			pkg.version, pkg.homepage = m.Version, m.Homepage
+			pkg.Version, pkg.Homepage = m.Version, m.Homepage
 		}
 		out = append(out, pkg)
 	}
@@ -248,47 +167,30 @@ func installedPackages(root string) ([]installed, error) {
 		return nil, err
 	}
 	for _, id := range ids {
-		pkg := installed{kind: "plugin", name: id, dir: filepath.Join(plugin.Dir, id)}
-		if m, err := plugin.ReadManifest(os.DirFS(filepath.Join(root, pkg.dir))); err == nil {
-			pkg.version, pkg.homepage = m.Version, m.Homepage
+		pkg := apps.Installed{Kind: "plugin", Name: id}
+		if pl, err := plugin.Open(root, id); err == nil {
+			g := apps.GrantOf(pl)
+			pkg.Version, pkg.Homepage, pkg.Grant = pl.Manifest.Version, pl.Manifest.Homepage, &g
+		} else if m, err := plugin.ReadManifest(os.DirFS(filepath.Join(root, apps.Dir("plugin", id)))); err == nil {
+			pkg.Version, pkg.Homepage = m.Version, m.Homepage
 		}
 		out = append(out, pkg)
 	}
 	return out, nil
 }
 
-// tracked is an installed package the index is where updates come from:
-// kite.lock records it as installed from the index, or it was installed
-// some other way and is the project the index lists under its name.
-type tracked struct {
-	installed
-	app   *apps.App
-	entry *lock.Entry
-}
-
-func trackedPackages(root string, ix *apps.Index, lf *lock.File, source string) ([]tracked, error) {
+// trackedPackages are the packages a site, root, has whose updates come from
+// the index the client reads.
+func trackedPackages(root string, ix *apps.Index, client *apps.Client) ([]apps.Tracked, error) {
+	lf, err := lock.Read(root)
+	if err != nil {
+		return nil, err
+	}
 	pkgs, err := installedPackages(root)
 	if err != nil {
 		return nil, err
 	}
-	var out []tracked
-	for _, pkg := range pkgs {
-		app := ix.Find(pkg.kind, pkg.name)
-		if app == nil {
-			continue
-		}
-		t := tracked{installed: pkg, app: app}
-		if e, ok := lf.Get(pkg.kind, pkg.name); ok {
-			if e.Source != source {
-				continue
-			}
-			t.entry = &e
-		} else if !app.ProjectOf(pkg.homepage) {
-			continue
-		}
-		out = append(out, t)
-	}
-	return out, nil
+	return apps.Track(pkgs, ix, lf, client.Source()), nil
 }
 
 // optionalProject is the project a command runs in, or none outside of one.
@@ -348,16 +250,12 @@ func newAppsSearchCmd() *cobra.Command {
 			// installed, not another of the same name.
 			have := map[string]string{}
 			if root != "" {
-				lf, err := lock.Read(root)
-				if err != nil {
-					return err
-				}
-				pkgs, err := trackedPackages(root, ix, lf, client.Source())
+				pkgs, err := trackedPackages(root, ix, client)
 				if err != nil {
 					return err
 				}
 				for _, t := range pkgs {
-					have[t.kind+"/"+t.name] = t.version
+					have[t.Kind+"/"+t.Name] = t.Version
 				}
 			}
 			rows := []appRow{}
@@ -439,25 +337,17 @@ type outdatedRow struct {
 
 // outdated compares what a site has with the index: the rows of the
 // packages with a newer version, a yanked one or none listed any more.
-func outdated(pkgs []tracked) []outdatedRow {
+func outdated(pkgs []apps.Tracked) []outdatedRow {
 	rows := []outdatedRow{}
 	for _, t := range pkgs {
-		row := outdatedRow{Kind: t.kind, Name: t.name, Installed: t.version, Locked: t.entry != nil, Delisted: t.app.Delisted}
-		if rel := t.app.Release(t.version); rel != nil {
-			row.Yanked = rel.Yanked
+		st := t.Status(buildinfo.Version)
+		if st.Latest == "" && !st.Yanked && st.Delisted == "" {
+			continue
 		}
-		if t.app.Delisted == "" {
-			rel, err := t.app.Pick("", buildinfo.Version)
-			switch {
-			case err != nil:
-				row.Problem = err.Error()
-			case theme.CompareVersions(rel.Version, t.version) > 0:
-				row.Latest = rel.Version
-			}
-		}
-		if row.Latest != "" || row.Yanked || row.Delisted != "" {
-			rows = append(rows, row)
-		}
+		rows = append(rows, outdatedRow{
+			Kind: t.Kind, Name: t.Name, Installed: t.Version, Locked: t.Entry != nil,
+			Latest: st.Latest, Yanked: st.Yanked, Delisted: st.Delisted, Problem: st.Problem,
+		})
 	}
 	return rows
 }
@@ -485,11 +375,7 @@ func newAppsOutdatedCmd() *cobra.Command {
 			if err := ix.Usable(); err != nil {
 				return err
 			}
-			lf, err := lock.Read(p.Root)
-			if err != nil {
-				return err
-			}
-			pkgs, err := trackedPackages(p.Root, ix, lf, client.Source())
+			pkgs, err := trackedPackages(p.Root, ix, client)
 			if err != nil {
 				return err
 			}
@@ -559,11 +445,7 @@ func newAppsUpdateCmd() *cobra.Command {
 			if err := ix.Usable(); err != nil {
 				return err
 			}
-			lf, err := lock.Read(p.Root)
-			if err != nil {
-				return err
-			}
-			pkgs, err := trackedPackages(p.Root, ix, lf, client.Source())
+			pkgs, err := trackedPackages(p.Root, ix, client)
 			if err != nil {
 				return err
 			}
@@ -580,7 +462,7 @@ func newAppsUpdateCmd() *cobra.Command {
 			for _, t := range targets {
 				if err := u.update(t); err != nil {
 					failed++
-					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s %s: %v\n", t.kind, t.name, err)
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s %s: %v\n", t.Kind, t.Name, err)
 				}
 			}
 			if failed > 0 {
@@ -598,19 +480,17 @@ func newAppsUpdateCmd() *cobra.Command {
 // target is a package to update, and the version wanted, or "" for the
 // newest that works with this Kite.
 type target struct {
-	tracked
+	apps.Tracked
 	want string
 }
 
-func updateTargets(pkgs []tracked, args []string, root, source string) ([]target, error) {
+func updateTargets(pkgs []apps.Tracked, args []string, root, source string) ([]target, error) {
 	var out []target
 	if len(args) == 0 {
-		for _, row := range outdated(pkgs) {
-			if row.Latest == "" {
-				continue
+		for _, t := range pkgs {
+			if t.Status(buildinfo.Version).Latest != "" {
+				out = append(out, target{Tracked: t})
 			}
-			i := slices.IndexFunc(pkgs, func(t tracked) bool { return t.kind == row.Kind && t.name == row.Name })
-			out = append(out, target{tracked: pkgs[i]})
 		}
 		return out, nil
 	}
@@ -620,15 +500,15 @@ func updateTargets(pkgs []tracked, args []string, root, source string) ([]target
 			kind, spec = "", arg
 		}
 		name, want, _ := strings.Cut(spec, "@")
-		var found []tracked
+		var found []apps.Tracked
 		for _, t := range pkgs {
-			if t.name == name && (kind == "" || t.kind == kind) {
+			if t.Name == name && (kind == "" || t.Kind == kind) {
 				found = append(found, t)
 			}
 		}
 		switch {
 		case len(found) == 1:
-			out = append(out, target{tracked: found[0], want: want})
+			out = append(out, target{Tracked: found[0], want: want})
 		case len(found) > 1:
 			return nil, fmt.Errorf("a theme and a plugin are both named %s; say theme/%s or plugin/%s", name, name, name)
 		default:
@@ -645,17 +525,17 @@ func notTracked(root, source, kind, name string) error {
 	if err != nil {
 		return err
 	}
-	i := slices.IndexFunc(pkgs, func(pkg installed) bool { return pkg.name == name && (kind == "" || pkg.kind == kind) })
+	i := slices.IndexFunc(pkgs, func(pkg apps.Installed) bool { return pkg.Name == name && (kind == "" || pkg.Kind == kind) })
 	if i < 0 {
 		return fmt.Errorf("%s is not installed", name)
 	}
 	if lf, err := lock.Read(root); err == nil {
-		if e, ok := lf.Get(pkgs[i].kind, name); ok && e.Source != source {
+		if e, ok := lf.Get(pkgs[i].Kind, name); ok && e.Source != source {
 			return fmt.Errorf("%s was installed from %s, and the index in use is %s", name, e.Source, source)
 		}
 	}
 	return fmt.Errorf("%s was not installed from the index, and the index lists no package of its homepage under that name; "+
-		"'kite %s add %s --replace' installs it from the index", name, pkgs[i].kind, name)
+		"'kite %s add %s --replace' installs it from the index", name, pkgs[i].Kind, name)
 }
 
 type updater struct {
@@ -668,125 +548,85 @@ type updater struct {
 }
 
 func (u *updater) update(t target) error {
-	rel, err := t.app.Pick(t.want, buildinfo.Version)
+	rel, err := t.App.Pick(t.want, buildinfo.Version)
 	if err != nil {
 		return err
 	}
-	if rel.Version == t.version && t.entry != nil {
-		printf(u.cmd, "%s %s is at %s already\n", t.kind, t.name, t.version)
+	if rel.Version == t.Version && t.Entry != nil {
+		printf(u.cmd, "%s %s is at %s already\n", t.Kind, t.Name, t.Version)
 		return nil
 	}
-	got, err := fetchRelease(u.cmd, u.client, t.app, rel)
+	next, err := u.client.Fetch(u.cmd.Context(), t.App, rel)
 	if err != nil {
 		return err
 	}
 	if !u.force {
-		why, err := u.changed(t)
+		tree, err := lock.TreeOf(filepath.Join(u.p.Root, apps.Dir(t.Kind, t.Name)))
+		if err != nil {
+			return err
+		}
+		why, err := u.client.Changed(u.cmd.Context(), t.Tracked, tree)
 		if err != nil {
 			return err
 		}
 		if why != "" {
 			return fmt.Errorf("%s; updating would replace that, so it is left at %s. Run with --force to update it anyway",
-				why, t.version)
+				why, t.Version)
 		}
 	}
-	if got.plugin != nil {
-		ok, err := u.agree(t, got)
+	if next.Plugin != nil {
+		ok, err := u.agree(t, next)
 		if err != nil || !ok {
 			return err
 		}
-	}
-	var op content.Op = content.PutTheme{Name: t.name, Files: got.files, Replace: true, Origin: got.origin}
-	if t.kind == "plugin" {
-		if err := u.checkEnabled(t, got); err != nil {
+		if err := u.checkEnabled(t, next); err != nil {
 			return err
 		}
-		op = content.PutPlugin{ID: t.name, Files: got.files, Replace: true, Origin: got.origin}
 	}
 	if _, err := u.p.Writer().Apply(u.cmd.Context(), content.ChangeSet{
-		Ops:     []content.Op{op},
-		Message: fmt.Sprintf("%s: update %s %s to %s", t.kind, t.name, t.version, rel.Version),
+		Ops:     []content.Op{next.Op(true)},
+		Message: fmt.Sprintf("%s: update %s %s to %s", t.Kind, t.Name, t.Version, rel.Version),
 	}); err != nil {
 		return err
 	}
-	if rel.Version == t.version {
-		printf(u.cmd, "%s %s %s is recorded as installed from the index now\n", t.kind, t.name, t.version)
+	if rel.Version == t.Version {
+		printf(u.cmd, "%s %s %s is recorded as installed from the index now\n", t.Kind, t.Name, t.Version)
 	} else {
-		printf(u.cmd, "updated %s %s from %s to %s\n", t.kind, t.name, t.version, rel.Version)
+		printf(u.cmd, "updated %s %s from %s to %s\n", t.Kind, t.Name, t.Version, rel.Version)
 	}
 	return nil
 }
 
-// changed says how an installed package's files are not what was installed,
-// or "" when they are: for one installed from the index, the files kite.lock
-// recorded; for one installed from an archive, the same version's archive in
-// the index. A package Kite has nothing to compare with counts as changed,
-// since nothing says it is not.
-func (u *updater) changed(t target) (string, error) {
-	dir := filepath.Join(u.p.Root, t.dir)
-	tree, err := lock.TreeOf(dir)
-	if err != nil {
-		return "", err
-	}
-	if t.entry != nil {
-		if tree == t.entry.Tree {
-			return "", nil
-		}
-		return t.dir + " has changed since " + t.version + " was installed", nil
-	}
-	rel := t.app.Release(t.version)
-	if rel == nil {
-		return t.dir + " was installed from an archive of a version the index does not list, " + t.version, nil
-	}
-	same, err := fetchRelease(u.cmd, u.client, t.app, rel)
-	if err != nil {
-		return "", err
-	}
-	if lock.Tree(same.files) == tree {
-		return "", nil
-	}
-	return t.dir + " differs from " + t.version + " in the index", nil
-}
-
 // agree asks for what a plugin's new version does beyond what its owner
 // agreed to, and reports whether it was agreed to.
-func (u *updater) agree(t target, got *fetched) (bool, error) {
-	var granted content.Grant
-	if t.entry != nil && t.entry.Granted != nil {
-		g := t.entry.Granted
-		granted = content.Grant{Inject: g.Inject, Loads: g.Loads, Hooks: g.Hooks}
-	} else if pl, err := plugin.Open(u.p.Root, t.name); err == nil {
-		granted = grantOf(pl)
-	}
-	g := *got.origin.Granted
-	more := lock.Grant{Inject: g.Inject, Loads: g.Loads, Hooks: g.Hooks}.Exceeds(
-		lock.Grant{Inject: granted.Inject, Loads: granted.Loads, Hooks: granted.Hooks})
+func (u *updater) agree(t target, next *apps.Package) (bool, error) {
+	more := apps.Exceeds(*next.Origin.Granted, t.Granted())
 	if len(more) == 0 || u.yes {
 		return true, nil
 	}
-	ask := fmt.Sprintf("plugin %s %s %s", t.name, got.rel.Version, strings.Join(more, ", "))
+	ask := fmt.Sprintf("plugin %s %s %s", t.Name, next.Release.Version, strings.Join(more, ", "))
 	if !interactive(u.cmd, false) {
 		return false, fmt.Errorf("%s; run with --yes to agree to that", ask)
 	}
 	printf(u.cmd, "%s.\n", ask)
 	ok, err := askYesNo(u.cmd, u.answers, "Update it?", false)
 	if err == nil && !ok {
-		printf(u.cmd, "left %s at %s\n", t.name, t.version)
+		printf(u.cmd, "left %s at %s\n", t.Name, t.Version)
 	}
 	return ok, err
 }
 
 // checkEnabled checks a new version of an enabled plugin the way enabling
 // it does, so that an update never leaves the next build to fail on it.
-func (u *updater) checkEnabled(t target, got *fetched) error {
+func (u *updater) checkEnabled(t target, next *apps.Package) error {
 	cfg, err := config.Load(u.p.Root)
 	if err != nil {
 		return err
 	}
-	if !slices.Contains(cfg.Plugins.Enabled, t.name) {
+	if !slices.Contains(cfg.Plugins.Enabled, t.Name) {
 		return nil
 	}
-	return got.plugin.Check(u.cmd.Context(), filepath.Join(u.p.Root, filepath.FromSlash(plugin.CacheDir)))
+	return next.Plugin.Check(u.cmd.Context(), filepath.Join(u.p.Root, filepath.FromSlash(plugin.CacheDir)))
 }
 
 // lockProblems compares kite.lock with what is installed, for kite doctor.
@@ -797,13 +637,13 @@ func lockProblems(root string) []string {
 	}
 	var out []string
 	for _, kind := range []string{"theme", "plugin"} {
-		section, dir := lf.Themes, site.ThemesDir
+		section := lf.Themes
 		if kind == "plugin" {
-			section, dir = lf.Plugins, plugin.Dir
+			section = lf.Plugins
 		}
 		for _, name := range slices.Sorted(maps.Keys(section)) {
 			e := section[name]
-			at := filepath.Join(dir, name)
+			at := apps.Dir(kind, name)
 			if _, err := os.Stat(filepath.Join(root, at)); errors.Is(err, fs.ErrNotExist) {
 				out = append(out, fmt.Sprintf("%s records %s %s, which is not installed", lock.Name, kind, name))
 				continue

@@ -19,11 +19,22 @@ import (
 	"github.com/kite-plus/kite/internal/buildinfo"
 )
 
+// ErrUnreachable is reported, wrapped, when none of the addresses of the
+// index or of an archive served it.
+var ErrUnreachable = errors.New("unreachable")
+
+// unreachable is an error ErrUnreachable stands for, worded on its own.
+type unreachable struct{ error }
+
+func (unreachable) Is(target error) bool { return target == ErrUnreachable }
+func (u unreachable) Unwrap() error      { return u.error }
+
 // Bounds on what is read from the network. An archive is held to the bound
 // Kite installs a package within.
 const (
 	maxIndex   = 16 << 20
 	maxArchive = 64 << 20
+	maxPicture = 8 << 20
 )
 
 // Client reads the index and fetches archives.
@@ -107,7 +118,7 @@ func (c *Client) Index(ctx context.Context, refresh bool) (*Index, Fetched, erro
 			return ix, Fetched{URL: meta.URL, At: meta.Fetched, Offline: true, Err: err}, nil
 		}
 	}
-	return nil, Fetched{}, fmt.Errorf("the index of themes and plugins could not be read: %w", err)
+	return nil, Fetched{}, unreachable{fmt.Errorf("the index of themes and plugins could not be read: %w", err)}
 }
 
 // fetchIndex asks one address for the index. It returns no data and no
@@ -224,11 +235,55 @@ func (c *Client) Archive(ctx context.Context, r *Release) ([]byte, error) {
 	if len(errs) == 0 {
 		return nil, fmt.Errorf("the index gives version %s no address to fetch it from", r.Version)
 	}
-	return nil, fmt.Errorf("the archive of version %s could not be fetched: %w", r.Version, errors.Join(errs...))
+	return nil, unreachable{fmt.Errorf("the archive of version %s could not be fetched: %w", r.Version, errors.Join(errs...))}
+}
+
+// Picture fetches a picture the index points to, such as a theme's
+// screenshot, and keeps it named by its address, which for a listed version
+// never serves anything else. Only a picture is returned: bytes that are not
+// one, such as a page, are refused, since they are served on to a browser.
+func (c *Client) Picture(ctx context.Context, addr string) ([]byte, string, error) {
+	kept := ""
+	if c.CacheDir != "" {
+		h := sha256.Sum256([]byte(addr))
+		kept = filepath.Join(c.CacheDir, "pictures", hex.EncodeToString(h[:16]))
+		if data, err := os.ReadFile(kept); err == nil {
+			if ctype, ok := picture(data); ok {
+				return data, ctype, nil
+			}
+		}
+	}
+	data, err := c.fetch(ctx, addr, maxPicture, 30*time.Second)
+	if err != nil {
+		return nil, "", unreachable{fmt.Errorf("%s: %w", addr, err)}
+	}
+	ctype, ok := picture(data)
+	if !ok {
+		return nil, "", fmt.Errorf("%s is not a picture", addr)
+	}
+	if kept != "" {
+		_ = writeFile(kept, data)
+	}
+	return data, ctype, nil
+}
+
+// picture is the type of an image, read from its bytes. SVG is not one: it
+// can carry scripts.
+func picture(data []byte) (string, bool) {
+	ctype := http.DetectContentType(data)
+	switch ctype {
+	case "image/png", "image/jpeg", "image/gif", "image/webp", "image/avif":
+		return ctype, true
+	}
+	return "", false
 }
 
 func (c *Client) fetchArchive(ctx context.Context, addr string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	return c.fetch(ctx, addr, maxArchive, 2*time.Minute)
+}
+
+func (c *Client) fetch(ctx context.Context, addr string, limit int64, timeout time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	req, err := c.request(ctx, addr)
 	if err != nil {
@@ -242,7 +297,7 @@ func (c *Client) fetchArchive(ctx context.Context, addr string) ([]byte, error) 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("answered %s", resp.Status)
 	}
-	return readAtMost(resp.Body, maxArchive)
+	return readAtMost(resp.Body, limit)
 }
 
 // do sends a request. Its address is left out of an error, since the
