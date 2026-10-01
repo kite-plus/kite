@@ -285,7 +285,18 @@ server for every file the build wrote, the feed and the sitemap included, and
 compares every byte. A theme that passes publishes exactly what `kite run`
 previewed; one that fails is shown the first line that differs in each file.
 With no directory it checks the project's own theme, or the built-in one
-outside a project.
+outside a project. It also names the other sites the pages have a reader's
+browser load from, scripts, stylesheets, fonts, pictures and frames, which a
+site owner is shown before installing the theme; `--json` reports all of it
+for a script.
+
+A theme is released as the zip archive the studio and `kite theme add`
+install. `kite theme pack` makes it from the theme's folder: `theme.yaml`,
+`layouts`, `static`, `assets`, `i18n`, the screenshot, and the license and
+readme, under one folder named after the theme, written to
+`dist/<name>-<version>.zip`. Anything else in the repository, an example site
+or build tools, stays out, the same files always pack to the same bytes, and
+the archive is checked the way an install checks it before it is written.
 
 The contract a theme is written to, `apiVersion: kite/v1`, is frozen: what a
 template can call, every method and function with its signature, is listed in
@@ -468,7 +479,8 @@ the default one:
 
 ```bash
 kite plugin new greet     # a folder to start from
-kite plugin verify greet  # checked the way a site checks it
+kite plugin verify greet  # checked the way a site checks it; --json for a script
+kite plugin pack greet    # the zip a release carries, in greet/dist/
 ```
 
 A plugin is a folder with a `plugin.yaml`. Files under its `assets/` are

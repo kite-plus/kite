@@ -239,6 +239,13 @@ kite theme verify ./themes/paper
 它用这套主题构建一个用到每种页面的小站点，再向服务器请求构建写出的每个文件，包括
 RSS 和 sitemap，逐字节比较。通过检查的主题，发布出去的就是 `kite run` 预览时看到的；
 没通过的，会指出每个文件第一处不同的行。不给目录时，检查当前项目在用的主题，在项目之外则检查内置主题。
+它还会列出页面会让读者的浏览器从哪些其他网站加载东西：脚本、样式表、字体、图片和框架，站长安装主题前会看到这些；
+`--json` 把结果全部交给脚本。
+
+主题发布成一个 zip 压缩包，后台和 `kite theme add` 都装这种包。`kite theme pack` 从主题目录打出它：`theme.yaml`、
+`layouts`、`static`、`assets`、`i18n`、截图，以及许可和说明文件，放在一个以主题命名的文件夹里，写到
+`dist/<名字>-<版本>.zip`。仓库里的其他东西，比如示例站点或构建工具，都不会进去；同样的文件总是打出同样的字节，
+写出之前还会按安装时的标准检查一遍。
 
 主题所依据的契约 `apiVersion: kite/v1` 已经冻结：模板能调用的东西，每个方法和函数
 连同签名，列在 [theme-system.md](design/theme-system.md) 第 6、7 节，以后只增，不改名、
@@ -389,7 +396,8 @@ kite plugin remove search
 
 ```bash
 kite plugin new greet     # 生成一个起步目录
-kite plugin verify greet  # 按站点加载插件的标准检查
+kite plugin verify greet  # 按站点加载插件的标准检查；--json 交给脚本
+kite plugin pack greet    # 打出发布用的 zip，在 greet/dist/ 下
 ```
 
 插件是一个带 `plugin.yaml` 的目录。`assets/` 里的文件随网站发布到 `plugins/<id>/`

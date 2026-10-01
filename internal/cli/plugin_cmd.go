@@ -35,6 +35,7 @@ func newPluginCmd() *cobra.Command {
 		newPluginSwitchCmd(true),
 		newPluginSwitchCmd(false),
 		newPluginVerifyCmd(),
+		newPluginPackCmd(),
 		newPluginNewCmd(),
 	)
 	return cmd
@@ -322,6 +323,19 @@ func newPluginVerifyCmd() *cobra.Command {
 				return err
 			}
 			m := loaded.Manifest
+			if jsonOut(cmd) {
+				return writeJSON(cmd.OutOrStdout(), pluginCheck{
+					ID:         m.ID,
+					Version:    m.Version,
+					APIVersion: m.APIVersion,
+					Requires:   m.Requires,
+					License:    m.License,
+					Inject:     len(m.Inject),
+					Loads:      nonNil(loaded.Hosts()),
+					Hooks:      nonNil(m.Hooks),
+					Settings:   len(m.Settings),
+				})
+			}
 			printf(cmd, "%s %s loads\n", m.ID, m.Version)
 			if len(m.Inject) > 0 {
 				printf(cmd, "  injects %d piece(s) of code\n", len(m.Inject))
@@ -338,6 +352,27 @@ func newPluginVerifyCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// pluginCheck is what kite plugin verify reports with --json: what an index
+// of plugins shows a site owner before one is installed.
+type pluginCheck struct {
+	ID         string   `json:"id"`
+	Version    string   `json:"version"`
+	APIVersion string   `json:"api_version"`
+	Requires   string   `json:"requires,omitempty"`
+	License    string   `json:"license,omitempty"`
+	Inject     int      `json:"inject"`
+	Loads      []string `json:"loads"`
+	Hooks      []string `json:"hooks"`
+	Settings   int      `json:"settings"`
+}
+
+func nonNil(list []string) []string {
+	if list == nil {
+		return []string{}
+	}
+	return list
 }
 
 func newPluginNewCmd() *cobra.Command {

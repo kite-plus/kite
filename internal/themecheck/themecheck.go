@@ -18,11 +18,14 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -51,6 +54,12 @@ type Report struct {
 	// Outside holds each link that leaves the site for the root of its host,
 	// with the first page that makes it.
 	Outside []Difference `json:"outside,omitempty"`
+
+	// Loads are the other hosts the built pages have a reader's browser
+	// fetch from as they load, in name order: scripts, stylesheets, icons,
+	// pictures, media and frames, and what stylesheets import. They are not
+	// a failure; a site owner is told of them before installing the theme.
+	Loads []string `json:"loads"`
 }
 
 // Difference is a file the two runtimes did not produce alike, or a page
@@ -68,6 +77,69 @@ func (r *Report) OK() bool {
 // rootLink matches a link that starts at the root of its host, in the
 // attributes that hold one.
 var rootLink = regexp.MustCompile(`\b(?:href|src|action|poster)\s*=\s*["'](/[^"'\s]*)`)
+
+// loading matches the tags a browser fetches from as a page loads, and
+// fetched the attributes in them that hold an address. A link tag fetches
+// only for some of its rel values; an anchor or a form fetches nothing until
+// the reader acts.
+var (
+	loading = regexp.MustCompile(`(?is)<(script|img|source|video|audio|track|iframe|embed|object|input|link)\b[^>]*>`)
+	fetched = regexp.MustCompile(`(?is)\b(src|srcset|href|poster|data)\s*=\s*(?:"([^"]*)"|'([^']*)')`)
+	rel     = regexp.MustCompile(`(?is)\brel\s*=\s*(?:"([^"]*)"|'([^']*)')`)
+	// cssLoad matches what a stylesheet fetches, in a style tag or attribute
+	// or in a stylesheet of the theme's own.
+	cssLoad = regexp.MustCompile(`(?i)(?:url\(\s*["']?|@import\s+["'])((?:https?:)?//[^"')\s]+)`)
+)
+
+// fetchingRels are the rel values of a link tag that make a browser fetch or
+// connect while the page loads.
+var fetchingRels = []string{
+	"stylesheet", "icon", "apple-touch-icon", "mask-icon", "manifest",
+	"preload", "modulepreload", "prefetch", "preconnect", "dns-prefetch",
+}
+
+// loadedHosts adds to hosts the other hosts a page or a stylesheet has a
+// browser fetch from, leaving out the site's own.
+func loadedHosts(hosts map[string]bool, own, text string, page bool) {
+	add := func(addr string) {
+		addr = strings.TrimSpace(addr)
+		if !strings.HasPrefix(addr, "//") && !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
+			return
+		}
+		if u, err := neturl.Parse(addr); err == nil && u.Host != "" && !strings.EqualFold(u.Host, own) {
+			hosts[strings.ToLower(u.Host)] = true
+		}
+	}
+	for _, m := range cssLoad.FindAllStringSubmatch(text, -1) {
+		add(m[1])
+	}
+	if !page {
+		return
+	}
+	for _, m := range loading.FindAllStringSubmatch(text, -1) {
+		tag := m[0]
+		if strings.EqualFold(m[1], "link") {
+			r := rel.FindStringSubmatch(tag)
+			if r == nil || !slices.ContainsFunc(strings.Fields(strings.ToLower(r[1]+r[2])), func(v string) bool {
+				return slices.Contains(fetchingRels, v)
+			}) {
+				continue
+			}
+		}
+		for _, a := range fetched.FindAllStringSubmatch(tag, -1) {
+			value := a[2] + a[3]
+			if strings.EqualFold(a[1], "srcset") {
+				for candidate := range strings.SplitSeq(value, ",") {
+					if f := strings.Fields(candidate); len(f) > 0 {
+						add(f[0])
+					}
+				}
+				continue
+			}
+			add(value)
+		}
+	}
+}
 
 // Check renders the fixture site with a theme, built and served, and
 // compares every file.
@@ -121,6 +193,11 @@ func Check(ctx context.Context, fsys fs.FS) (*Report, error) {
 
 	report := &Report{Theme: s.Theme.Manifest.Name}
 	seen := make(map[string]bool)
+	hosts := make(map[string]bool)
+	own := ""
+	if u, err := neturl.Parse(s.Config.Site.BaseURL); err == nil {
+		own = u.Host
+	}
 	err = filepath.WalkDir(out, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
@@ -134,6 +211,9 @@ func Check(ctx context.Context, fsys fs.FS) (*Report, error) {
 			return err
 		}
 		url := s.Resolver.Rel(filepath.ToSlash(rel))
+		if strings.HasSuffix(rel, ".html") || strings.HasSuffix(rel, ".css") {
+			loadedHosts(hosts, own, string(built), strings.HasSuffix(rel, ".html"))
+		}
 		if strings.HasSuffix(rel, ".html") {
 			for _, m := range rootLink.FindAllStringSubmatch(string(built), -1) {
 				link := m[1]
@@ -171,6 +251,10 @@ func Check(ctx context.Context, fsys fs.FS) (*Report, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	report.Loads = slices.Sorted(maps.Keys(hosts))
+	if report.Loads == nil {
+		report.Loads = []string{}
 	}
 	return report, nil
 }

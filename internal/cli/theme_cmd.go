@@ -37,6 +37,7 @@ func newThemeCmd() *cobra.Command {
 		newThemeRemoveCmd(),
 		newThemeUseCmd(),
 		newThemeVerifyCmd(),
+		newThemePackCmd(),
 		newThemeNewCmd(),
 	)
 	return cmd
@@ -264,6 +265,9 @@ func newThemeVerifyCmd() *cobra.Command {
 				}
 			} else if report.OK() {
 				printf(cmd, "%s (%s): %d files identical built and served\n", report.Theme, where, report.Compared)
+				if len(report.Loads) > 0 {
+					printf(cmd, "  pages load from %s\n", strings.Join(report.Loads, ", "))
+				}
 			} else {
 				if len(report.Differ) > 0 {
 					printf(cmd, "%s (%s): %d of %d files differ between build and serve\n",

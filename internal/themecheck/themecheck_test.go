@@ -2,6 +2,7 @@ package themecheck_test
 
 import (
 	"io/fs"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -128,4 +129,29 @@ func defaultThemeWith(t *testing.T, file, old, replacement string) fstest.MapFS 
 		t.Fatal(err)
 	}
 	return theme
+}
+
+// A site owner is told which other hosts a theme has a reader's browser
+// fetch from. What fetches as the page loads counts; a link a reader may
+// follow, or a feed the page names, does not.
+func TestTheHostsAThemeLoadsFromAreReported(t *testing.T) {
+	theme := defaultThemeWith(t, "layouts/baseof.html", "  {{ .Site.HeadHTML }}", `  <script src="https://cdn.example.net/app.js"></script>
+  <link rel="stylesheet" href="//fonts.example.org/css?family=Serif">
+  <link rel="alternate" type="application/rss+xml" href="https://feeds.example.info/rss.xml">
+  <style>@import "https://styles.example.dev/base.css";</style>
+  <img srcset="https://pictures.example.net/a.webp 1x, https://pictures.example.com/b.webp 2x" alt="">
+  <a href="https://elsewhere.example.org/">a link a reader may follow</a>
+  {{ .Site.HeadHTML }}`)
+
+	report, err := themecheck.Check(t.Context(), theme)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	want := []string{
+		"cdn.example.net", "fonts.example.org", "pictures.example.com",
+		"pictures.example.net", "styles.example.dev",
+	}
+	if !slices.Equal(report.Loads, want) {
+		t.Errorf("loads = %q, want %q", report.Loads, want)
+	}
 }
