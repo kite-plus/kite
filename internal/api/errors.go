@@ -55,6 +55,9 @@ const (
 	// CodeIndexUntrusted reports an index that is not signed by the key Kite
 	// trusts for it, or is older than one already seen: it is not used.
 	CodeIndexUntrusted = "index_untrusted"
+	// CodeNoRelease refuses to pin a release that cannot be downloaded,
+	// which every build through kitew would then fail on.
+	CodeNoRelease = "no_release"
 	// CodeUpdateNeedsConfirmation answers an update that would replace files
 	// changed by hand, or let a plugin do more than it did, without being
 	// told it may.

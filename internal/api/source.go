@@ -66,6 +66,9 @@ type View struct {
 	// PackageTree is the digest of the files of an installed theme or
 	// plugin, kind, as kite.lock records one.
 	PackageTree func(kind, name string) (string, error)
+	// Kitew reports whether kitew is in the project, and how its deploy
+	// workflow gets Kite, as kitew.Deploy says.
+	Kitew func() (installed bool, deploy string)
 
 	// Writer is nil when this deployment may not be written to, which is the
 	// difference between a preview an author is typing into and a read-only

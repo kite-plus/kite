@@ -21,6 +21,7 @@ func (s *Server) handleSite(w http.ResponseWriter, r *http.Request) {
 		Runtime:     view.Runtime,
 		Theme:       view.Theme,
 		Version:     view.Version,
+		Kite:        kiteRelease(view),
 		Writable:    view.Writer != nil,
 		Problems:    view.Problems,
 		Counts:      make(map[string]int),

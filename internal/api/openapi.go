@@ -315,6 +315,12 @@ func openAPI() *document {
 				Summary:     "Describe the open project.",
 				Responses:   ok(ref(SiteInfo{}), "The project."),
 			}},
+			"/site/pin": {Post: &operation{
+				OperationID: "pinKite",
+				Summary: "Pin this server's Kite release in kite.lock, with the sha256 of its checksums " +
+					"when they can be fetched, so that kitew and the deploy build the site with it.",
+				Responses: ok(ref(KiteRelease{}), "Which release builds the site now.", "405", "409"),
+			}},
 			"/content-types": {Get: &operation{
 				OperationID: "listContentTypes",
 				Summary:     "List content types and the field schema forms are generated from.",

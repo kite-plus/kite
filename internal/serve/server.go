@@ -34,6 +34,7 @@ import (
 	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/config"
 	"github.com/kite-plus/kite/internal/content"
+	"github.com/kite-plus/kite/internal/kitew"
 	"github.com/kite-plus/kite/internal/lock"
 	"github.com/kite-plus/kite/internal/plugin"
 	"github.com/kite-plus/kite/internal/render"
@@ -327,6 +328,7 @@ func (s *Server) view() api.View {
 		PackageTree: func(kind, name string) (string, error) {
 			return lock.TreeOf(filepath.Join(s.root, apps.Dir(kind, name)))
 		},
+		Kitew: func() (bool, string) { return kitew.Installed(s.root), kitew.Deploy(s.root) },
 	}
 	// The configuration was checked when it was read, key included, so a
 	// client that cannot be made only leaves the app center out.

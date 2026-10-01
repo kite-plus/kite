@@ -147,6 +147,8 @@ type SiteInfo struct {
 
 	Theme   string `json:"theme,omitempty"`
 	Version string `json:"version,omitempty"`
+	// Kite says which Kite release builds the site.
+	Kite KiteRelease `json:"kite"`
 
 	// Writable says the server stores what the studio sends. One started
 	// without --write shows the site and refuses every change.
@@ -534,4 +536,21 @@ type PublishRefused struct {
 	// Problem is the publisher's own account of what stopped it, with a
 	// code a client can explain and what to do about it.
 	Problem *publish.Problem `json:"problem,omitempty"`
+}
+
+// KiteRelease says which Kite release builds the site: the one kite.lock
+// pins, which kitew runs, against the one this server is.
+type KiteRelease struct {
+	// Pinned is the release kite.lock pins, empty when it pins none.
+	Pinned string `json:"pinned,omitempty"`
+	// Checksums says the pin records the sha256 of the release's checksums,
+	// which kitew checks its download against first.
+	Checksums bool `json:"checksums"`
+	// Running is this server's release, empty for a build from source.
+	Running string `json:"running,omitempty"`
+	// Wrapper says kitew and kitew.ps1 are in the project.
+	Wrapper bool `json:"wrapper"`
+	// Deploy says how the deploy workflow gets Kite: "kitew", "self" when it
+	// installs a Kite of its own, or "" when there is no deploy workflow.
+	Deploy string `json:"deploy,omitempty"`
 }
