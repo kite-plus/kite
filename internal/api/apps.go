@@ -34,6 +34,9 @@ type AppInfo struct {
 	// Screenshot is where this server serves a theme's picture of itself,
 	// fetched from the index, when it has one.
 	Screenshot string `json:"screenshot,omitempty"`
+	// Icon is where this server serves the package's icon, when the index
+	// names one.
+	Icon string `json:"icon,omitempty"`
 
 	// Version is the newest version that works with this Kite, and Problem
 	// says why there is none.
@@ -214,6 +217,9 @@ func appInfo(a *apps.App, st standing, lang string) AppInfo {
 	if a.Screenshot != "" {
 		info.Screenshot = Prefix + "/apps/" + url.PathEscape(a.Kind) + "/" + url.PathEscape(a.ID) + "/screenshot"
 	}
+	if a.Icon != "" {
+		info.Icon = Prefix + "/apps/" + url.PathEscape(a.Kind) + "/" + url.PathEscape(a.ID) + "/icon"
+	}
 	if rel, err := a.Pick("", buildinfo.Version); err == nil {
 		info.Version = rel.Version
 		info.Loads, info.Inject, info.Hooks = nonNilList(rel.Loads), rel.Inject, nonNilList(rel.Hooks)
@@ -368,6 +374,35 @@ func (s *Server) handleAppScreenshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, max-age=86400")
+	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
+}
+
+// handleAppIcon serves a package's icon, which this server fetches as it
+// fetches a screenshot. An SVG icon is served sandboxed, so that even opened
+// on its own it runs nothing as the studio.
+func (s *Server) handleAppIcon(w http.ResponseWriter, r *http.Request) {
+	view := s.src()
+	ix, _, ok := s.index(w, r, view, false)
+	if !ok {
+		return
+	}
+	a, ok := s.findApp(w, r, ix)
+	if !ok {
+		return
+	}
+	if a.Icon == "" {
+		fail(w, http.StatusNotFound, CodeNotFound, "this package has no icon")
+		return
+	}
+	data, ctype, err := view.Apps.Icon(r.Context(), a.Icon)
+	if err != nil {
+		s.failApps(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, max-age=86400")
 	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))

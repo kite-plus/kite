@@ -218,6 +218,7 @@ func (s *Server) routes() []route {
 		{http.MethodGet, "/apps", s.handleApps},
 		{http.MethodGet, "/apps/{kind}/{id}", s.handleApp},
 		{http.MethodGet, "/apps/{kind}/{id}/screenshot", s.handleAppScreenshot},
+		{http.MethodGet, "/apps/{kind}/{id}/icon", s.handleAppIcon},
 		{http.MethodPost, "/apps/{kind}/{id}/install", s.handleInstallApp},
 		{http.MethodGet, "/apps/{kind}/{id}/update", s.handleUpdatePlan},
 		{http.MethodPost, "/apps/{kind}/{id}/update", s.handleUpdateApp},

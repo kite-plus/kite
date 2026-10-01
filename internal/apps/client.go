@@ -43,6 +43,7 @@ const (
 	maxSignature = 16 << 10
 	maxArchive   = 64 << 20
 	maxPicture   = 8 << 20
+	maxIcon      = 64 << 10
 )
 
 // Client reads the index and fetches archives.
@@ -287,21 +288,38 @@ func (c *Client) Archive(ctx context.Context, r *Release) ([]byte, error) {
 // never serves anything else. Only a picture is returned: bytes that are not
 // one, such as a page, are refused, since they are served on to a browser.
 func (c *Client) Picture(ctx context.Context, addr string) ([]byte, string, error) {
+	return c.image(ctx, addr, maxPicture, picture)
+}
+
+// Icon fetches a package's icon as Picture fetches a picture, and takes an
+// SVG too when there is nothing in it to run or to fetch; whoever serves it
+// still keeps a browser from running it.
+func (c *Client) Icon(ctx context.Context, addr string) ([]byte, string, error) {
+	return c.image(ctx, addr, maxIcon, func(data []byte) (string, bool) {
+		if ctype, ok := picture(data); ok {
+			return ctype, true
+		}
+		return "image/svg+xml", harmlessSVG(data)
+	})
+}
+
+// image fetches what kind says is an image, keeping a copy by its address.
+func (c *Client) image(ctx context.Context, addr string, limit int64, kind func([]byte) (string, bool)) ([]byte, string, error) {
 	kept := ""
 	if c.CacheDir != "" {
 		h := sha256.Sum256([]byte(addr))
 		kept = filepath.Join(c.CacheDir, "pictures", hex.EncodeToString(h[:16]))
 		if data, err := os.ReadFile(kept); err == nil {
-			if ctype, ok := picture(data); ok {
+			if ctype, ok := kind(data); ok {
 				return data, ctype, nil
 			}
 		}
 	}
-	data, err := c.fetch(ctx, addr, maxPicture, 30*time.Second)
+	data, err := c.fetch(ctx, addr, limit, 30*time.Second)
 	if err != nil {
 		return nil, "", unreachable{fmt.Errorf("%s: %w", addr, err)}
 	}
-	ctype, ok := picture(data)
+	ctype, ok := kind(data)
 	if !ok {
 		return nil, "", fmt.Errorf("%s is not a picture", addr)
 	}

@@ -752,6 +752,21 @@ func openAPI() *document {
 					"502": {Description: "Failed.", Content: jsonOf(errorRef)},
 				},
 			}},
+			"/apps/{kind}/{id}/icon": {Get: &operation{
+				OperationID: "getAppIcon",
+				Summary: "Read a package's icon, which this server fetches as it fetches a screenshot; " +
+					"an SVG is served sandboxed.",
+				Parameters: []parameter{pathParam("kind"), pathParam("id")},
+				Responses: map[string]response{
+					"200": {
+						Description: "The icon.",
+						Content:     map[string]mediaType{"image/*": {Schema: &jsonSchema{Type: "string", Format: "binary"}}},
+					},
+					"400": {Description: "Failed.", Content: jsonOf(errorRef)},
+					"404": {Description: "Failed.", Content: jsonOf(errorRef)},
+					"502": {Description: "Failed.", Content: jsonOf(errorRef)},
+				},
+			}},
 			"/apps/{kind}/{id}/install": {Post: &operation{
 				OperationID: "installApp",
 				Summary: "Install a theme or a plugin from the index: the version asked for, or the " +

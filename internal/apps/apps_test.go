@@ -362,3 +362,37 @@ func TestACopyKeptWithoutItsSignatureIsFetchedAgain(t *testing.T) {
 		t.Errorf("an unsigned kept copy was used: %v, %d fetches", err, s.full.Load())
 	}
 }
+
+func TestAnIconMayBeAnSVGThatRunsNothing(t *testing.T) {
+	files := map[string]string{
+		"/icon.svg":    `<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g"/></defs><rect fill="url(#g)"/><use href="#g"/></svg>`,
+		"/script.svg":  `<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`,
+		"/onload.svg":  `<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>`,
+		"/fetch.svg":   `<svg xmlns="http://www.w3.org/2000/svg"><style>@import url(https://example.com/x.css);</style></svg>`,
+		"/link.svg":    `<svg xmlns="http://www.w3.org/2000/svg"><image href="https://example.com/x.png"/></svg>`,
+		"/object.svg":  `<svg xmlns="http://www.w3.org/2000/svg"><foreignObject><div/></foreignObject></svg>`,
+		"/page.html":   `<html><body>hi</body></html>`,
+		"/picture.png": "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR",
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(files[r.URL.Path]))
+	}))
+	t.Cleanup(srv.Close)
+	c := NewClient(nil, t.TempDir(), testKey)
+
+	if _, ctype, err := c.Icon(t.Context(), srv.URL+"/icon.svg"); err != nil || ctype != "image/svg+xml" {
+		t.Errorf("a plain SVG: %q, %v", ctype, err)
+	}
+	if _, ctype, err := c.Icon(t.Context(), srv.URL+"/picture.png"); err != nil || ctype != "image/png" {
+		t.Errorf("a PNG: %q, %v", ctype, err)
+	}
+	for _, bad := range []string{"/script.svg", "/onload.svg", "/fetch.svg", "/link.svg", "/object.svg", "/page.html"} {
+		if _, _, err := c.Icon(t.Context(), srv.URL+bad); err == nil {
+			t.Errorf("%s was taken for an icon", bad)
+		}
+	}
+	// A screenshot is still a picture only.
+	if _, _, err := c.Picture(t.Context(), srv.URL+"/icon.svg"); err == nil {
+		t.Error("an SVG was taken for a picture")
+	}
+}

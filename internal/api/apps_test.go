@@ -47,6 +47,8 @@ func newIndexServer(t *testing.T) *indexServer {
 	ix := &indexServer{t: t, index: apps.Index{Format: apps.Format}, key: key, pub: pub, files: map[string][]byte{
 		"/paper.png":  pngBytes,
 		"/paper.html": []byte("<!doctype html><script>alert(1)</script>"),
+		"/greet.svg":  []byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="16" fill="#4A77D6"/></svg>`),
+		"/evil.svg":   []byte(`<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>`),
 	}}
 	ix.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ix.mu.Lock()
@@ -297,5 +299,34 @@ func TestAWronglySignedIndexIsTheIndexsFault(t *testing.T) {
 	rec := send(t, h, http.MethodGet, api.Prefix+"/apps", nil, nil)
 	if rec.Code != http.StatusBadGateway || decode[api.ErrorBody](t, rec).Error.Code != api.CodeIndexUntrusted {
 		t.Errorf("a wrongly signed index: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// An icon may be an SVG, which the studio would run as itself if it were
+// served plainly: it is served sandboxed, and one that would run something
+// is not served at all.
+func TestAnIconIsServedSoThatNothingInItRuns(t *testing.T) {
+	ix := newIndexServer(t)
+	ix.publish("plugin", "greet", "1.0.0", greetFiles("1.0.0", ""))
+	ix.set(func(i *apps.Index) { i.Find("plugin", "greet").Icon = ix.srv.URL + "/greet.svg" })
+	root := newProject(t, 1)
+	h, _ := newWritableServer(t, root, withIndex(root, ix))
+
+	greet := appsOf(t, h, "?kind=plugin")["plugin/greet"]
+	if greet.Icon != api.Prefix+"/apps/plugin/greet/icon" {
+		t.Fatalf("icon %q", greet.Icon)
+	}
+	rec := send(t, h, http.MethodGet, greet.Icon, nil, nil)
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/svg+xml" ||
+		!strings.Contains(rec.Header().Get("Content-Security-Policy"), "sandbox") {
+		t.Errorf("icon: %d %q %q", rec.Code, rec.Header().Get("Content-Type"), rec.Header().Get("Content-Security-Policy"))
+	}
+
+	ix.set(func(i *apps.Index) { i.Find("plugin", "greet").Icon = ix.srv.URL + "/evil.svg" })
+	other := newProject(t, 1)
+	evil, _ := newWritableServer(t, other, withIndex(other, ix))
+	if rec := send(t, evil, http.MethodGet, greet.Icon, nil, nil); rec.Code == http.StatusOK ||
+		strings.Contains(rec.Body.String(), "onload") {
+		t.Errorf("an SVG with a script was served: %d %s", rec.Code, rec.Body.String())
 	}
 }
