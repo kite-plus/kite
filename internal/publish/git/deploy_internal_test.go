@@ -38,13 +38,10 @@ func (f *fakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	switch {
 	case len(parts) == 4 && parts[3] == "deployments":
-		if r.URL.Query().Get("environment") != pagesEnvironment {
-			http.Error(w, "unexpected environment", http.StatusBadRequest)
-			return
-		}
 		var out []ghDeployment
 		for _, d := range f.deployments[parts[1]+"/"+parts[2]] {
-			if sha := r.URL.Query().Get("sha"); sha == "" || sha == d.SHA {
+			sha, env := r.URL.Query().Get("sha"), r.URL.Query().Get("environment")
+			if (sha == "" || sha == d.SHA) && (env == "" || env == d.Environment) {
 				out = append(out, d)
 			}
 		}
@@ -129,8 +126,51 @@ func TestANewerDeploymentThatContainsTheCommitCounts(t *testing.T) {
 	}
 }
 
+// Hosts other than Pages, such as Vercel, record their deployments on GitHub
+// too, in environments of their own naming.
+func TestADeploymentToAnotherHostIsReported(t *testing.T) {
+	fake, d := newFake(t)
+	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc", Environment: "Production"}}
+	fake.statuses[7] = []ghStatus{{ID: 1, State: "success", EnvironmentURL: "https://site-abc.vercel.app"}}
+
+	step, link, err := d.ask(t.Context(), "acme/site", "abc", never)
+	if err != nil || step != publish.StepDone || link != "https://site-abc.vercel.app" {
+		t.Errorf("step = %q, url = %q, %v", step, link, err)
+	}
+}
+
+// A repository that once deployed to Pages and then moved to another host
+// keeps its old Pages deployments; a commit is reported from where it went.
+func TestARepositoryThatMovedOffPagesIsReportedFromItsNewHost(t *testing.T) {
+	fake, d := newFake(t)
+	fake.deployments["acme/site"] = []ghDeployment{
+		{ID: 9, SHA: "abc", Environment: "Production"},
+		{ID: 3, SHA: "old", Environment: pagesEnvironment},
+	}
+	fake.statuses[9] = []ghStatus{{ID: 1, State: "success"}}
+
+	if step, _, err := d.ask(t.Context(), "acme/site", "abc", never); err != nil || step != publish.StepDone {
+		t.Errorf("step = %q, %v; want done", step, err)
+	}
+}
+
+// A commit deployed to Pages and previewed elsewhere is reported from Pages.
+func TestPagesIsPreferredOverAnotherEnvironment(t *testing.T) {
+	fake, d := newFake(t)
+	fake.deployments["acme/site"] = []ghDeployment{
+		{ID: 9, SHA: "abc", Environment: "Preview"},
+		{ID: 8, SHA: "abc", Environment: pagesEnvironment},
+	}
+	fake.statuses[9] = []ghStatus{{ID: 1, State: "success"}}
+	fake.statuses[8] = []ghStatus{{ID: 1, State: "in_progress"}}
+
+	if step, _, _ := d.ask(t.Context(), "acme/site", "abc", never); step != publish.StepPending {
+		t.Errorf("step = %q, want the Pages deployment's, still under way", step)
+	}
+}
+
 func TestARepositoryThatDoesNotReportDeploymentsIsNotApplicable(t *testing.T) {
-	t.Run("never deployed to Pages", func(t *testing.T) {
+	t.Run("never deployed", func(t *testing.T) {
 		_, d := newFake(t)
 		if step, _, err := d.ask(t.Context(), "acme/site", "abc", never); err != nil || step != publish.StepNotApplicable {
 			t.Errorf("step = %q, %v", step, err)

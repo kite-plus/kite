@@ -22,7 +22,8 @@ import (
 const GitHubAPI = "https://api.github.com"
 
 // pagesEnvironment is the environment actions/deploy-pages deploys to, and so
-// the one the workflow kite init writes deploys to.
+// the one the workflow kite init writes deploys to. A commit deployed there
+// and somewhere else as well is reported from here.
 const pagesEnvironment = "github-pages"
 
 const (
@@ -32,7 +33,7 @@ const (
 	longestWait = 10 * time.Minute
 
 	// probeAgain is how long an answer that could still change -- a failed
-	// deployment can be run again, and Pages can be turned on -- is taken at
+	// deployment can be run again, and a host can be connected -- is taken at
 	// its word before it is asked for again.
 	probeAgain = 10 * time.Minute
 
@@ -44,13 +45,14 @@ const (
 // errQuiet is returned while the checker is holding back from GitHub.
 var errQuiet = errors.New("git: not asking GitHub for now")
 
-// deployChecker asks GitHub whether a commit has been deployed to Pages.
+// deployChecker asks GitHub whether a commit has been deployed.
 //
 // Whether a site is live is something only its host knows. GitHub records
-// every Pages deployment against the commit it deployed, so for a repository
-// there the question has an answer. For any other host, or a repository that
-// does not deploy to Pages, the answer is that nobody reports it, which is
-// better than a step that stays pending forever.
+// every Pages deployment against the commit it deployed, and other hosts,
+// such as Vercel, record theirs in the same place, so for a repository
+// there the question has an answer. For a host that records nothing, the
+// answer is that nobody reports it, which is better than a step that stays
+// pending forever.
 //
 // Nothing here waits on the network while it is asked. The studio asks every
 // few seconds, and an anonymous caller gets sixty requests an hour, with or
@@ -63,13 +65,13 @@ type deployChecker struct {
 	now    func() time.Time
 
 	mu      sync.Mutex
-	pages   map[string]pagesProbe
+	reports map[string]reportProbe
 	answers map[string]*deployAnswer
 	quiet   time.Time
 }
 
-// pagesProbe is whether a repository deploys to Pages at all.
-type pagesProbe struct {
+// reportProbe is whether a repository records deployments at all.
+type reportProbe struct {
 	uses    bool
 	checked time.Time
 	asking  bool
@@ -93,7 +95,7 @@ func newDeployChecker(api string, now func() time.Time) *deployChecker {
 		api:     strings.TrimSuffix(api, "/"),
 		client:  &http.Client{Timeout: 10 * time.Second},
 		now:     now,
-		pages:   make(map[string]pagesProbe),
+		reports: make(map[string]reportProbe),
 		answers: make(map[string]*deployAnswer),
 	}
 }
@@ -109,10 +111,10 @@ func (d *deployChecker) look(repo, head string, pushed bool, includes func(sha s
 	if !pushed {
 		// Nothing of head is deployed until it is pushed; all there is to
 		// know is whether this repository would report it when it is.
-		probe, known := d.pages[repo]
+		probe, known := d.reports[repo]
 		if !probe.asking && (!known || d.now().Sub(probe.checked) > probeAgain) {
 			probe.asking = true
-			d.pages[repo] = probe
+			d.reports[repo] = probe
 			go d.probe(repo)
 		}
 		if known && !probe.uses && !probe.checked.IsZero() {
@@ -138,16 +140,16 @@ func (d *deployChecker) look(repo, head string, pushed bool, includes func(sha s
 func (d *deployChecker) probe(repo string) {
 	ctx, cancel := context.WithTimeout(context.Background(), d.client.Timeout)
 	defer cancel()
-	uses, err := d.usesPages(ctx, repo)
+	uses, err := d.recordsDeployments(ctx, repo)
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	probe := d.pages[repo]
+	probe := d.reports[repo]
 	probe.asking = false
 	if err == nil {
 		probe.uses, probe.checked = uses, d.now()
 	}
-	d.pages[repo] = probe
+	d.reports[repo] = probe
 }
 
 func (d *deployChecker) refresh(key, repo, head string, includes func(string) bool) {
@@ -176,36 +178,36 @@ func (d *deployChecker) refresh(key, repo, head string, includes func(string) bo
 // ask finds head's deployment and how it went.
 func (d *deployChecker) ask(ctx context.Context, repo, head string, includes func(string) bool) (publish.Step, string, error) {
 	var own []ghDeployment
-	found, err := d.get(ctx, "/repos/"+repo+"/deployments?environment="+pagesEnvironment+
-		"&sha="+url.QueryEscape(head)+"&per_page=5", &own)
+	found, err := d.get(ctx, "/repos/"+repo+"/deployments?sha="+url.QueryEscape(head)+"&per_page=10", &own)
 	if err != nil {
 		return "", "", err
 	}
 	if found && len(own) > 0 {
-		return d.status(ctx, repo, newest(own).ID)
+		return d.status(ctx, repo, preferred(own).ID)
 	}
 
-	// No deployment of head itself. The repository may not deploy to Pages
-	// at all, head's may not have started yet, or a later commit's may have
-	// replaced it, which deploys head's content all the same.
+	// No deployment of head itself. The repository may not record
+	// deployments at all, head's may not have started yet, or a later
+	// commit's may have replaced it, which deploys head's content all the same.
 	var latest []ghDeployment
-	found, err = d.get(ctx, "/repos/"+repo+"/deployments?environment="+pagesEnvironment+"&per_page=5", &latest)
+	found, err = d.get(ctx, "/repos/"+repo+"/deployments?per_page=10", &latest)
 	if err != nil {
 		return "", "", err
 	}
 	if !found || len(latest) == 0 {
 		return publish.StepNotApplicable, "", nil
 	}
-	if last := newest(latest); last.SHA != head && includes(last.SHA) {
+	if last := preferred(latest); last.SHA != head && includes(last.SHA) {
 		return d.status(ctx, repo, last.ID)
 	}
 	return publish.StepPending, "", nil
 }
 
-// usesPages reports whether a repository has ever deployed to Pages.
-func (d *deployChecker) usesPages(ctx context.Context, repo string) (bool, error) {
+// recordsDeployments reports whether a repository has ever recorded a
+// deployment, to any environment.
+func (d *deployChecker) recordsDeployments(ctx context.Context, repo string) (bool, error) {
 	var latest []ghDeployment
-	found, err := d.get(ctx, "/repos/"+repo+"/deployments?environment="+pagesEnvironment+"&per_page=1", &latest)
+	found, err := d.get(ctx, "/repos/"+repo+"/deployments?per_page=1", &latest)
 	return found && len(latest) > 0, err
 }
 
@@ -235,8 +237,9 @@ func (d *deployChecker) status(ctx context.Context, repo string, id int64) (publ
 }
 
 type ghDeployment struct {
-	ID  int64  `json:"id"`
-	SHA string `json:"sha"`
+	ID          int64  `json:"id"`
+	SHA         string `json:"sha"`
+	Environment string `json:"environment"`
 }
 
 type ghStatus struct {
@@ -249,6 +252,23 @@ type ghStatus struct {
 // but does not promise to, and ids only ever grow.
 func newest(ds []ghDeployment) ghDeployment {
 	return slices.MaxFunc(ds, func(a, b ghDeployment) int { return cmp.Compare(a.ID, b.ID) })
+}
+
+// preferred picks the deployment to report: the newest to Pages, since a
+// repository that deploys there may also send previews elsewhere, and
+// otherwise the newest to any environment. Hosts do not reliably mark which
+// of their environments is production, so nothing else tells them apart.
+func preferred(ds []ghDeployment) ghDeployment {
+	var pages []ghDeployment
+	for _, dep := range ds {
+		if dep.Environment == pagesEnvironment {
+			pages = append(pages, dep)
+		}
+	}
+	if len(pages) > 0 {
+		return newest(pages)
+	}
+	return newest(ds)
 }
 
 // get reads one GitHub API resource into v. It reports false when there is
