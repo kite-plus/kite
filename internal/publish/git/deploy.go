@@ -27,15 +27,34 @@ const GitHubAPI = "https://api.github.com"
 const pagesEnvironment = "github-pages"
 
 const (
-	// firstWait and longestWait bound how often a deployment still under way
-	// is asked about again: soon at first, then less and less often.
-	firstWait   = 15 * time.Second
-	longestWait = 10 * time.Minute
+	// perRequest is how often the checker may ask GitHub, and burst how many
+	// requests it may save up, so that a check needing two is not held back
+	// a minute between them. An anonymous caller gets sixty an hour, shared
+	// with everything else on the network, and running out costs the rest of
+	// the hour; a minute's delay in saying a site is live costs nothing.
+	perRequest = time.Minute
+	burst      = 3
+
+	// checkCost is the most requests one check makes: the list of
+	// deployments, then the status of the one that matters.
+	checkCost = 2
+
+	// pendingEvery is how often a deployment still under way is asked about,
+	// until slowAfter has passed since the push was first seen; then it is
+	// slowEvery, so a deployment that never comes costs a dozen requests an
+	// hour.
+	pendingEvery = time.Minute
+	slowAfter    = 10 * time.Minute
+	slowEvery    = 5 * time.Minute
 
 	// probeAgain is how long an answer that could still change -- a failed
 	// deployment can be run again, and a host can be connected -- is taken at
 	// its word before it is asked for again.
 	probeAgain = 10 * time.Minute
+
+	// listed is how many of a repository's newest deployments are read to
+	// find a commit's.
+	listed = 30
 
 	// spare is how many of the hour's anonymous requests are left alone, for
 	// whatever else on this machine talks to GitHub.
@@ -57,8 +76,8 @@ var errQuiet = errors.New("git: not asking GitHub for now")
 // Nothing here waits on the network while it is asked. The studio asks every
 // few seconds, and an anonymous caller gets sixty requests an hour, with or
 // without an ETag; so an answer is returned from what is known, and a stale
-// one is refreshed in the background, less often the longer a deployment
-// takes, and never again once it has finished.
+// one is refreshed in the background, at most once a minute across every
+// commit and repository, and never again once it has finished.
 type deployChecker struct {
 	api    string
 	client *http.Client
@@ -67,7 +86,16 @@ type deployChecker struct {
 	mu      sync.Mutex
 	reports map[string]reportProbe
 	answers map[string]*deployAnswer
+
+	// tokens is how many requests may be made now, and filled when the last
+	// one was added. It goes below zero when two checks start together.
+	tokens int
+	filled time.Time
+
+	// quiet is when GitHub may be asked again after a failure or a spent
+	// allowance, and limited the same for a spent allowance alone.
 	quiet   time.Time
+	limited time.Time
 }
 
 // reportProbe is whether a repository records deployments at all.
@@ -82,9 +110,21 @@ type deployAnswer struct {
 	step publish.Step
 	url  string
 
+	// id is the deployment found for the commit while it is under way, so
+	// later checks ask for its status alone.
+	id int64
+
+	since  time.Time
 	next   time.Time
-	wait   time.Duration
 	asking bool
+}
+
+// deployLook is what look knows about a deployment. pausedUntil is set while
+// GitHub's allowance is spent and the step is still pending.
+type deployLook struct {
+	step        publish.Step
+	url         string
+	pausedUntil time.Time
 }
 
 func newDeployChecker(api string, now func() time.Time) *deployChecker {
@@ -97,6 +137,8 @@ func newDeployChecker(api string, now func() time.Time) *deployChecker {
 		now:     now,
 		reports: make(map[string]reportProbe),
 		answers: make(map[string]*deployAnswer),
+		tokens:  burst,
+		filled:  now(),
 	}
 }
 
@@ -104,7 +146,7 @@ func newDeployChecker(api string, now func() time.Time) *deployChecker {
 // that in the background when it is due. includes reports whether a deployed
 // commit contains head, which a newer deployment that superseded head's own
 // does.
-func (d *deployChecker) look(repo, head string, pushed bool, includes func(sha string) bool) (publish.Step, string) {
+func (d *deployChecker) look(repo, head string, pushed bool, includes func(sha string) bool) deployLook {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -112,29 +154,48 @@ func (d *deployChecker) look(repo, head string, pushed bool, includes func(sha s
 		// Nothing of head is deployed until it is pushed; all there is to
 		// know is whether this repository would report it when it is.
 		probe, known := d.reports[repo]
-		if !probe.asking && (!known || d.now().Sub(probe.checked) > probeAgain) {
+		if !probe.asking && (!known || d.now().Sub(probe.checked) > probeAgain) && d.afford(1) {
 			probe.asking = true
 			d.reports[repo] = probe
 			go d.probe(repo)
 		}
 		if known && !probe.uses && !probe.checked.IsZero() {
-			return publish.StepNotApplicable, ""
+			return deployLook{step: publish.StepNotApplicable}
 		}
-		return publish.StepPending, ""
+		return deployLook{step: publish.StepPending}
 	}
 
 	key := repo + "@" + head
 	answer := d.answers[key]
 	if answer == nil {
-		answer = &deployAnswer{step: publish.StepPending}
+		answer = &deployAnswer{step: publish.StepPending, since: d.now()}
 		d.answers[key] = answer
 	}
 	// Once live, a deployment stays that way; anything else may still move.
-	if !answer.asking && answer.step != publish.StepDone && !d.now().Before(answer.next) {
+	if !answer.asking && answer.step != publish.StepDone && !d.now().Before(answer.next) && d.afford(checkCost) {
 		answer.asking = true
-		go d.refresh(key, repo, head, includes)
+		go d.refresh(key, repo, head, answer.id, includes)
 	}
-	return answer.step, answer.url
+	out := deployLook{step: answer.step, url: answer.url}
+	if answer.step == publish.StepPending && d.now().Before(d.limited) {
+		out.pausedUntil = d.limited
+	}
+	return out
+}
+
+// afford reports whether n requests may be made now. It spends nothing; get
+// spends one for each request it makes. The caller holds d.mu.
+func (d *deployChecker) afford(n int) bool {
+	now := d.now()
+	if gained := int(now.Sub(d.filled) / perRequest); gained > 0 {
+		d.tokens += gained
+		d.filled = d.filled.Add(time.Duration(gained) * perRequest)
+	}
+	if d.tokens >= burst {
+		// A full allowance saves up no more.
+		d.tokens, d.filled = burst, now
+	}
+	return d.tokens >= n
 }
 
 func (d *deployChecker) probe(repo string) {
@@ -152,10 +213,10 @@ func (d *deployChecker) probe(repo string) {
 	d.reports[repo] = probe
 }
 
-func (d *deployChecker) refresh(key, repo, head string, includes func(string) bool) {
+func (d *deployChecker) refresh(key, repo, head string, known int64, includes func(string) bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*d.client.Timeout)
 	defer cancel()
-	step, link, err := d.ask(ctx, repo, head, includes)
+	step, link, id, err := d.ask(ctx, repo, head, known, includes)
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -163,44 +224,63 @@ func (d *deployChecker) refresh(key, repo, head string, includes func(string) bo
 	answer.asking = false
 	if err == nil {
 		answer.step, answer.url = step, link
+		// A failed deployment can be run again as a new one, so only one
+		// still under way is kept to be asked about by its status.
+		answer.id = 0
+		if step == publish.StepPending {
+			answer.id = id
+		}
 	}
 	if answer.step == publish.StepPending {
-		// Under way, or not known: ask again later, and later still the
-		// time after, so a deployment that never comes costs a handful of
-		// requests rather than all of them.
-		answer.wait = min(max(2*answer.wait, firstWait), longestWait)
-		answer.next = d.now().Add(answer.wait)
+		every := pendingEvery
+		if d.now().Sub(answer.since) >= slowAfter {
+			every = slowEvery
+		}
+		answer.next = d.now().Add(every)
 		return
 	}
 	answer.next = d.now().Add(probeAgain)
 }
 
-// ask finds head's deployment and how it went.
-func (d *deployChecker) ask(ctx context.Context, repo, head string, includes func(string) bool) (publish.Step, string, error) {
-	var own []ghDeployment
-	found, err := d.get(ctx, "/repos/"+repo+"/deployments?sha="+url.QueryEscape(head)+"&per_page=10", &own)
-	if err != nil {
-		return "", "", err
-	}
-	if found && len(own) > 0 {
-		return d.status(ctx, repo, preferred(own).ID)
+// ask finds head's deployment and how it went, and the id of the deployment
+// it read, if any. known, when not zero, is a deployment of head found
+// before, and only its status is asked for.
+func (d *deployChecker) ask(ctx context.Context, repo, head string, known int64, includes func(string) bool) (publish.Step, string, int64, error) {
+	if known != 0 {
+		step, link, err := d.status(ctx, repo, known)
+		return step, link, known, err
 	}
 
-	// No deployment of head itself. The repository may not record
-	// deployments at all, head's may not have started yet, or a later
-	// commit's may have replaced it, which deploys head's content all the same.
+	// One list answers every question there is before a status: whether the
+	// repository records deployments at all, whether head has one of its
+	// own, and whether a later commit's replaced it, which deploys head's
+	// content all the same.
 	var latest []ghDeployment
-	found, err = d.get(ctx, "/repos/"+repo+"/deployments?per_page=10", &latest)
+	found, err := d.get(ctx, "/repos/"+repo+"/deployments?per_page="+strconv.Itoa(listed), &latest)
 	if err != nil {
-		return "", "", err
+		return "", "", 0, err
 	}
 	if !found || len(latest) == 0 {
-		return publish.StepNotApplicable, "", nil
+		return publish.StepNotApplicable, "", 0, nil
 	}
-	if last := preferred(latest); last.SHA != head && includes(last.SHA) {
-		return d.status(ctx, repo, last.ID)
+
+	var own []ghDeployment
+	for _, dep := range latest {
+		if dep.SHA == head {
+			own = append(own, dep)
+		}
 	}
-	return publish.StepPending, "", nil
+	var dep ghDeployment
+	switch {
+	case len(own) > 0:
+		dep = preferred(own)
+	case includes(preferred(latest).SHA):
+		dep = preferred(latest)
+	default:
+		return publish.StepPending, "", 0, nil
+	}
+	step, link, err := d.status(ctx, repo, dep.ID)
+	return step, link, dep.ID, err
 }
 
 // recordsDeployments reports whether a repository has ever recorded a
@@ -277,6 +357,9 @@ func preferred(ds []ghDeployment) ghDeployment {
 func (d *deployChecker) get(ctx context.Context, path string, v any) (bool, error) {
 	d.mu.Lock()
 	quiet := d.now().Before(d.quiet)
+	if !quiet {
+		d.tokens--
+	}
 	d.mu.Unlock()
 	if quiet {
 		return false, errQuiet
@@ -317,13 +400,12 @@ func (d *deployChecker) budget(h http.Header) {
 	if err != nil || remaining > spare {
 		return
 	}
-	reset, err := strconv.ParseInt(h.Get("X-RateLimit-Reset"), 10, 64)
-	if err != nil {
-		d.holdBack(longestWait)
-		return
+	until := d.now().Add(probeAgain)
+	if reset, err := strconv.ParseInt(h.Get("X-RateLimit-Reset"), 10, 64); err == nil {
+		until = time.Unix(reset, 0)
 	}
 	d.mu.Lock()
-	d.quiet = time.Unix(reset, 0)
+	d.quiet, d.limited = until, until
 	d.mu.Unlock()
 }
 

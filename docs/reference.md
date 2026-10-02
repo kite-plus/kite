@@ -910,7 +910,11 @@ anonymously and read-only, whether the pushed commit is live, and links to
 the site once it is. Pages records its deployments there, and so do some
 other hosts, such as Vercel; a commit deployed to Pages and somewhere else
 too is reported from Pages. A host that records nothing does not report
-deployments, and the studio says so instead of waiting.
+deployments, and the studio says so instead of waiting. GitHub gives an
+anonymous caller sixty requests an hour, shared with everything else on the
+same network, so the studio asks at most once a minute, every minute while
+a deployment is under way and every five once it has taken ten; when the
+hour's allowance is nearly spent, it says when it will ask again.
 
 `kite build` prints when the next scheduled post falls due. On any other host
 that is when the site has to be built again, because a static site only shows

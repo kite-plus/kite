@@ -57,6 +57,11 @@ type DeliveryState struct {
 	// has said so.
 	DeployedURL string `json:"deployed_url,omitempty"`
 
+	// DeployPausedUntil is when the host is next asked about a deployment
+	// still pending, while GitHub's allowance for anonymous requests is
+	// spent; it is zero otherwise.
+	DeployPausedUntil time.Time `json:"deploy_paused_until,omitzero"`
+
 	LastError *Problem  `json:"last_error,omitempty"`
 	CheckedAt time.Time `json:"checked_at,omitzero"`
 }

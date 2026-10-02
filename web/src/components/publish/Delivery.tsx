@@ -35,8 +35,9 @@ export interface Step {
  * pushed, pushed but not yet deployed, and "published" alone cannot say
  * which.
  */
-export function steps(delivery: DeliveryState | undefined, t: Translate): Step[] {
+export function steps(delivery: DeliveryState | undefined, t: Translate, locale: string): Step[] {
   const d = delivery;
+  const paused = pausedAt(d, locale);
   const dirty = d?.dirty?.length ?? 0;
   const pushed = d?.pushed ?? "pending";
   const deployed = d?.deployed ?? "pending";
@@ -69,13 +70,25 @@ export function steps(delivery: DeliveryState | undefined, t: Translate): Step[]
       label: t(stepLabel("deployed", deployStanding)),
       note: {
         done: t("publish.live"),
-        working: t("publish.deployedNote"),
+        working: paused ? t("publish.deployPaused", { time: paused }) : t("publish.deployedNote"),
         waiting: undefined,
         failed: t("publish.deployFailed"),
         unknown: t("publish.deployedUnknown"),
       }[deployStanding],
     },
   ];
+}
+
+/**
+ * pausedAt is when a deployment still pending is next asked about, as a time
+ * of day, while GitHub's allowance for anonymous requests is spent.
+ */
+export function pausedAt(delivery: DeliveryState | undefined, locale: string): string | undefined {
+  const iso = delivery?.deploy_paused_until;
+  if (!iso || delivery?.deployed !== "pending") return undefined;
+  const when = Date.parse(iso);
+  if (!Number.isFinite(when) || when <= Date.now()) return undefined;
+  return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(when);
 }
 
 function stepLabel(step: Step["key"], standing: Standing): Key {
@@ -138,9 +151,9 @@ export function DeliveryStages({
   /** publish, when given, lets commits that are waiting be pushed from here. */
   publish?: Publish;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const writable = useWritable();
-  const list = steps(delivery, t);
+  const list = steps(delivery, t, locale);
   const current = currentStep(list);
 
   return (
@@ -182,8 +195,8 @@ export function DeliveryStages({
  * the later is done, and under each what holds it up.
  */
 export function DeliveryProgress({ delivery }: { delivery?: DeliveryState }) {
-  const { t } = useI18n();
-  const list = steps(delivery, t);
+  const { t, locale } = useI18n();
+  const list = steps(delivery, t, locale);
   const current = currentStep(list);
 
   return (

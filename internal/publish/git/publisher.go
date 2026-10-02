@@ -303,7 +303,8 @@ func (p *Publisher) State(ctx context.Context) (*publish.DeliveryState, error) {
 	if ahead == 0 && len(dirty) == 0 {
 		state.Pushed = publish.StepDone
 	}
-	state.Deployed, state.DeployedURL = p.deployed(ctx, state)
+	seen := p.deployed(ctx, state)
+	state.Deployed, state.DeployedURL, state.DeployPausedUntil = seen.step, seen.url, seen.pausedUntil
 	return state, nil
 }
 
@@ -313,14 +314,14 @@ func (p *Publisher) State(ctx context.Context) (*publish.DeliveryState, error) {
 // publisher does not, so only a host that reports it is asked: GitHub, for a
 // repository that deploys to Pages. Anywhere else the step does not apply,
 // which is the truth, where a guess would be worse than nothing.
-func (p *Publisher) deployed(ctx context.Context, state *publish.DeliveryState) (publish.Step, string) {
+func (p *Publisher) deployed(ctx context.Context, state *publish.DeliveryState) deployLook {
 	remote, err := p.git.read(ctx, "remote", "get-url", state.Remote)
 	if err != nil {
-		return publish.StepNotApplicable, ""
+		return deployLook{step: publish.StepNotApplicable}
 	}
 	repo, ok := githubRepo(remote)
 	if !ok {
-		return publish.StepNotApplicable, ""
+		return deployLook{step: publish.StepNotApplicable}
 	}
 	head := p.head(ctx)
 	return p.deploys.look(repo, head, state.Pushed == publish.StepDone, func(sha string) bool {

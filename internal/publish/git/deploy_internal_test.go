@@ -56,6 +56,11 @@ func (f *fakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func newFake(t *testing.T) (*fakeGitHub, *deployChecker) {
 	t.Helper()
+	return newFakeAt(t, time.Now)
+}
+
+func newFakeAt(t *testing.T, now func() time.Time) (*fakeGitHub, *deployChecker) {
+	t.Helper()
 	fake := &fakeGitHub{
 		deployments: map[string][]ghDeployment{},
 		statuses:    map[int64][]ghStatus{},
@@ -63,7 +68,55 @@ func newFake(t *testing.T) (*fakeGitHub, *deployChecker) {
 	}
 	srv := httptest.NewServer(fake)
 	t.Cleanup(srv.Close)
-	return fake, newDeployChecker(srv.URL, time.Now)
+	return fake, newDeployChecker(srv.URL, now)
+}
+
+func (f *fakeGitHub) count() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.requests
+}
+
+// clock is a time a test moves by hand.
+type clock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func (c *clock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *clock) add(dt time.Duration) {
+	c.mu.Lock()
+	c.t = c.t.Add(dt)
+	c.mu.Unlock()
+}
+
+// settle waits for every check that look started to finish.
+func settle(t *testing.T, d *deployChecker) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		d.mu.Lock()
+		busy := false
+		for _, a := range d.answers {
+			busy = busy || a.asking
+		}
+		for _, p := range d.reports {
+			busy = busy || p.asking
+		}
+		d.mu.Unlock()
+		if !busy {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("a check did not finish in five seconds")
+		}
+		time.Sleep(time.Millisecond)
+	}
 }
 
 func never(string) bool { return false }
@@ -88,7 +141,7 @@ func TestADeploymentIsReadFromItsNewestStatus(t *testing.T) {
 				{ID: 2, State: tc.state, EnvironmentURL: "https://acme.github.io/site/"},
 				{ID: 1, State: "queued"},
 			}
-			step, _, err := d.ask(t.Context(), "acme/site", "abc", never)
+			step, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -104,7 +157,7 @@ func TestTheLiveAddressComesFromTheDeployment(t *testing.T) {
 	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc"}}
 	fake.statuses[7] = []ghStatus{{ID: 1, State: "success", EnvironmentURL: "https://acme.github.io/site/"}}
 
-	_, link, err := d.ask(t.Context(), "acme/site", "abc", never)
+	_, link, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never)
 	if err != nil || link != "https://acme.github.io/site/" {
 		t.Errorf("url = %q, %v", link, err)
 	}
@@ -118,10 +171,10 @@ func TestANewerDeploymentThatContainsTheCommitCounts(t *testing.T) {
 	fake.statuses[9] = []ghStatus{{ID: 1, State: "success"}}
 
 	contains := func(sha string) bool { return sha == "later" }
-	if step, _, _ := d.ask(t.Context(), "acme/site", "mine", contains); step != publish.StepDone {
+	if step, _, _, _ := d.ask(t.Context(), "acme/site", "mine", 0, contains); step != publish.StepDone {
 		t.Errorf("step = %q, want done", step)
 	}
-	if step, _, _ := d.ask(t.Context(), "acme/site", "mine", never); step != publish.StepPending {
+	if step, _, _, _ := d.ask(t.Context(), "acme/site", "mine", 0, never); step != publish.StepPending {
 		t.Errorf("a deployment that does not contain the commit counted: %q", step)
 	}
 }
@@ -133,7 +186,7 @@ func TestADeploymentToAnotherHostIsReported(t *testing.T) {
 	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc", Environment: "Production"}}
 	fake.statuses[7] = []ghStatus{{ID: 1, State: "success", EnvironmentURL: "https://site-abc.vercel.app"}}
 
-	step, link, err := d.ask(t.Context(), "acme/site", "abc", never)
+	step, link, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never)
 	if err != nil || step != publish.StepDone || link != "https://site-abc.vercel.app" {
 		t.Errorf("step = %q, url = %q, %v", step, link, err)
 	}
@@ -149,7 +202,7 @@ func TestARepositoryThatMovedOffPagesIsReportedFromItsNewHost(t *testing.T) {
 	}
 	fake.statuses[9] = []ghStatus{{ID: 1, State: "success"}}
 
-	if step, _, err := d.ask(t.Context(), "acme/site", "abc", never); err != nil || step != publish.StepDone {
+	if step, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); err != nil || step != publish.StepDone {
 		t.Errorf("step = %q, %v; want done", step, err)
 	}
 }
@@ -164,7 +217,7 @@ func TestPagesIsPreferredOverAnotherEnvironment(t *testing.T) {
 	fake.statuses[9] = []ghStatus{{ID: 1, State: "success"}}
 	fake.statuses[8] = []ghStatus{{ID: 1, State: "in_progress"}}
 
-	if step, _, _ := d.ask(t.Context(), "acme/site", "abc", never); step != publish.StepPending {
+	if step, _, _, _ := d.ask(t.Context(), "acme/site", "abc", 0, never); step != publish.StepPending {
 		t.Errorf("step = %q, want the Pages deployment's, still under way", step)
 	}
 }
@@ -172,14 +225,14 @@ func TestPagesIsPreferredOverAnotherEnvironment(t *testing.T) {
 func TestARepositoryThatDoesNotReportDeploymentsIsNotApplicable(t *testing.T) {
 	t.Run("never deployed", func(t *testing.T) {
 		_, d := newFake(t)
-		if step, _, err := d.ask(t.Context(), "acme/site", "abc", never); err != nil || step != publish.StepNotApplicable {
+		if step, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); err != nil || step != publish.StepNotApplicable {
 			t.Errorf("step = %q, %v", step, err)
 		}
 	})
 	t.Run("private", func(t *testing.T) {
 		fake, d := newFake(t)
 		fake.private = true
-		if step, _, err := d.ask(t.Context(), "acme/site", "abc", never); err != nil || step != publish.StepNotApplicable {
+		if step, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); err != nil || step != publish.StepNotApplicable {
 			t.Errorf("step = %q, %v", step, err)
 		}
 	})
@@ -194,10 +247,10 @@ func TestTheCheckerStopsAskingWhenTheAllowanceRunsLow(t *testing.T) {
 
 	// The first answer says the allowance is nearly spent, so the status it
 	// would have gone on to ask for is not asked for.
-	if _, _, err := d.ask(t.Context(), "acme/site", "abc", never); !errors.Is(err, errQuiet) {
+	if _, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); !errors.Is(err, errQuiet) {
 		t.Errorf("err = %v, want errQuiet", err)
 	}
-	if _, _, err := d.ask(t.Context(), "acme/site", "abc", never); !errors.Is(err, errQuiet) {
+	if _, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); !errors.Is(err, errQuiet) {
 		t.Errorf("err = %v, want errQuiet", err)
 	}
 	if fake.requests != 1 {
@@ -212,12 +265,12 @@ func TestLookNeverWaitsAndStopsAskingOnceLive(t *testing.T) {
 	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc"}}
 	fake.statuses[7] = []ghStatus{{ID: 1, State: "success"}}
 
-	if step, _ := d.look("acme/site", "abc", true, never); step != publish.StepPending {
+	if step := d.look("acme/site", "abc", true, never).step; step != publish.StepPending {
 		t.Errorf("first look = %q, want pending until GitHub has answered", step)
 	}
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		step, _ := d.look("acme/site", "abc", true, never)
+		step := d.look("acme/site", "abc", true, never).step
 		if step == publish.StepDone {
 			break
 		}
@@ -238,6 +291,95 @@ func TestLookNeverWaitsAndStopsAskingOnceLive(t *testing.T) {
 	defer fake.mu.Unlock()
 	if fake.requests != settled {
 		t.Errorf("a finished deployment was asked about %d more times", fake.requests-settled)
+	}
+}
+
+// Once a commit's deployment is found, a check asks for its status alone.
+func TestAFoundDeploymentIsThenAskedAboutByItsStatusAlone(t *testing.T) {
+	fake, d := newFake(t)
+	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc", Environment: "Production"}}
+	fake.statuses[7] = []ghStatus{{ID: 1, State: "in_progress"}}
+
+	step, _, id, err := d.ask(t.Context(), "acme/site", "abc", 0, never)
+	if err != nil || step != publish.StepPending || id != 7 {
+		t.Fatalf("step = %q, id = %d, %v", step, id, err)
+	}
+	if n := fake.count(); n != 2 {
+		t.Errorf("the first check made %d requests, want the list and the status", n)
+	}
+	if _, _, _, err := d.ask(t.Context(), "acme/site", "abc", id, never); err != nil {
+		t.Fatal(err)
+	}
+	if n := fake.count(); n != 3 {
+		t.Errorf("the second check made %d requests, want only the status", n-2)
+	}
+}
+
+// However many commits are pushed, the checker asks GitHub at most once a
+// minute, after the few requests it may save up.
+func TestTheCheckerAsksAtMostOnceAMinute(t *testing.T) {
+	c := &clock{t: time.Now()}
+	fake, d := newFakeAt(t, c.now)
+	var heads []string
+	for i := range 10 {
+		head := "commit" + strconv.Itoa(i)
+		heads = append(heads, head)
+		fake.deployments["acme/site"] = append(fake.deployments["acme/site"], ghDeployment{ID: int64(i + 1), SHA: head})
+		fake.statuses[int64(i+1)] = []ghStatus{{ID: 1, State: "in_progress"}}
+	}
+
+	const minutes = 10
+	for elapsed := time.Duration(0); elapsed < minutes*time.Minute; elapsed += 5 * time.Second {
+		for _, head := range heads {
+			d.look("acme/site", head, true, never)
+			settle(t, d)
+		}
+		c.add(5 * time.Second)
+	}
+	if n := fake.count(); n > burst+minutes || n < minutes {
+		t.Errorf("%d requests in %d minutes, want about one a minute and at most %d", n, minutes, burst+minutes)
+	}
+}
+
+// A deployment still under way is asked about every minute for ten minutes,
+// then every five, so one that never finishes costs a few requests an hour.
+func TestAPendingDeploymentIsAskedLessOftenAfterTenMinutes(t *testing.T) {
+	c := &clock{t: time.Now()}
+	fake, d := newFakeAt(t, c.now)
+	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc", Environment: "Production"}}
+	fake.statuses[7] = []ghStatus{{ID: 1, State: "in_progress"}}
+
+	var firstTen int
+	for elapsed := time.Duration(0); elapsed < time.Hour; elapsed += 5 * time.Second {
+		if elapsed == slowAfter {
+			firstTen = fake.count()
+		}
+		d.look("acme/site", "abc", true, never)
+		settle(t, d)
+		c.add(5 * time.Second)
+	}
+	// The list and the status at once, then the status at each minute to
+	// the tenth; then at the tenth and every five minutes after it.
+	if firstTen != 2+9 {
+		t.Errorf("%d requests in the first ten minutes, want 11", firstTen)
+	}
+	if n := fake.count(); n != 2+10+9 {
+		t.Errorf("%d requests in the hour, want 21", n)
+	}
+}
+
+// While GitHub's allowance is spent, a pending deployment says when it will
+// be asked about again rather than seeming to deploy forever.
+func TestASpentAllowanceSaysWhenTheCheckerAsksAgain(t *testing.T) {
+	fake, d := newFake(t)
+	fake.remaining = spare
+	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc"}}
+
+	d.look("acme/site", "abc", true, never)
+	settle(t, d)
+	seen := d.look("acme/site", "abc", true, never)
+	if seen.step != publish.StepPending || seen.pausedUntil.Before(time.Now().Add(50*time.Minute)) {
+		t.Errorf("step %q, paused until %v; want pending until GitHub's reset an hour away", seen.step, seen.pausedUntil)
 	}
 }
 

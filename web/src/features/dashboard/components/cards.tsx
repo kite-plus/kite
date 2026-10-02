@@ -30,7 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { DeliveryProgress, PublishProblems } from "@/components/publish/Delivery";
+import { DeliveryProgress, PublishProblems, pausedAt } from "@/components/publish/Delivery";
 import { PublishDialog } from "@/components/publish/PublishDialog";
 import { QueryError } from "@/components/query-error";
 import { TermBadge } from "@/components/TermBadge";
@@ -225,7 +225,7 @@ const tones = {
  * waiting, and what is waiting outranks what is under way.
  */
 function Headline({ delivery: d }: { delivery: DeliveryState }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const problem = useProblem();
   const dirty = d.dirty?.length ?? 0;
 
@@ -257,7 +257,8 @@ function Headline({ delivery: d }: { delivery: DeliveryState }) {
   } else if (d.deployed === "pending") {
     tone = "info";
     title = t("publish.headline.deploying");
-    note = t("publish.headline.deployingNote");
+    const paused = pausedAt(d, locale);
+    note = paused ? t("publish.headline.pausedNote", { time: paused }) : t("publish.headline.deployingNote");
   } else if (d.deployed === "not_applicable") {
     tone = "quiet";
     title = t("publish.headline.pushed");

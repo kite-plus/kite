@@ -908,6 +908,8 @@ export interface components {
             /** Format: date-time */
             checked_at?: string;
             committed: string;
+            /** Format: date-time */
+            deploy_paused_until?: string;
             deployed: string;
             deployed_url?: string;
             dirty?: string[];
