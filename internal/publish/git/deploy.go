@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -20,6 +21,14 @@ import (
 
 // GitHubAPI is where deployments are asked about.
 const GitHubAPI = "https://api.github.com"
+
+// cloudflareApp is the id of Cloudflare's GitHub app, which reports a
+// Cloudflare Pages build as a check run on the commit it built.
+const cloudflareApp = 85455
+
+// pagesDevURL finds the address of a Cloudflare Pages deployment in the
+// summary of its check run.
+var pagesDevURL = regexp.MustCompile(`https://[a-z0-9-]+\.[a-z0-9-]+\.pages\.dev`)
 
 // pagesEnvironment is the environment actions/deploy-pages deploys to, and so
 // the one the workflow kite init writes deploys to. A commit deployed there
@@ -87,6 +96,10 @@ type deployChecker struct {
 	reports map[string]reportProbe
 	answers map[string]*deployAnswer
 
+	// hosts is the host last seen deploying each repository, said again
+	// while a commit waits to be pushed.
+	hosts map[string]string
+
 	// tokens is how many requests may be made now, and filled when the last
 	// one was added. It goes below zero when two checks start together.
 	tokens int
@@ -107,23 +120,32 @@ type reportProbe struct {
 
 // deployAnswer is what is known about one commit's deployment.
 type deployAnswer struct {
-	step publish.Step
-	url  string
-
-	// id is the deployment found for the commit while it is under way, so
-	// later checks ask for its status alone.
-	id int64
-
+	found  record
 	since  time.Time
 	next   time.Time
 	asking bool
 }
 
-// deployLook is what look knows about a deployment. pausedUntil is set while
-// GitHub's allowance is spent and the step is still pending.
+// record is what GitHub says about one commit's deployment, and where it was
+// read, so that a later check of a deployment under way asks that alone.
+type record struct {
+	step publish.Step
+	url  string
+	host string
+
+	// id is the deployment found for the commit; checks says the commit's
+	// Cloudflare Pages check runs answered instead.
+	id     int64
+	checks bool
+}
+
+// deployLook is what look knows about a deployment. host names it as
+// DeliveryState.DeployHost does, and pausedUntil is set while GitHub's
+// allowance is spent and the step is still pending.
 type deployLook struct {
 	step        publish.Step
 	url         string
+	host        string
 	pausedUntil time.Time
 }
 
@@ -137,6 +159,7 @@ func newDeployChecker(api string, now func() time.Time) *deployChecker {
 		now:     now,
 		reports: make(map[string]reportProbe),
 		answers: make(map[string]*deployAnswer),
+		hosts:   make(map[string]string),
 		tokens:  burst,
 		filled:  now(),
 	}
@@ -162,22 +185,22 @@ func (d *deployChecker) look(repo, head string, pushed bool, includes func(sha s
 		if known && !probe.uses && !probe.checked.IsZero() {
 			return deployLook{step: publish.StepNotApplicable}
 		}
-		return deployLook{step: publish.StepPending}
+		return deployLook{step: publish.StepPending, host: d.hosts[repo]}
 	}
 
 	key := repo + "@" + head
 	answer := d.answers[key]
 	if answer == nil {
-		answer = &deployAnswer{step: publish.StepPending, since: d.now()}
+		answer = &deployAnswer{found: record{step: publish.StepPending}, since: d.now()}
 		d.answers[key] = answer
 	}
 	// Once live, a deployment stays that way; anything else may still move.
-	if !answer.asking && answer.step != publish.StepDone && !d.now().Before(answer.next) && d.afford(checkCost) {
+	if !answer.asking && answer.found.step != publish.StepDone && !d.now().Before(answer.next) && d.afford(checkCost) {
 		answer.asking = true
-		go d.refresh(key, repo, head, answer.id, includes)
+		go d.refresh(key, repo, head, answer.found, includes)
 	}
-	out := deployLook{step: answer.step, url: answer.url}
-	if answer.step == publish.StepPending && d.now().Before(d.limited) {
+	out := deployLook{step: answer.found.step, url: answer.found.url, host: cmp.Or(answer.found.host, d.hosts[repo])}
+	if answer.found.step == publish.StepPending && d.now().Before(d.limited) {
 		out.pausedUntil = d.limited
 	}
 	return out
@@ -213,25 +236,27 @@ func (d *deployChecker) probe(repo string) {
 	d.reports[repo] = probe
 }
 
-func (d *deployChecker) refresh(key, repo, head string, known int64, includes func(string) bool) {
+func (d *deployChecker) refresh(key, repo, head string, known record, includes func(string) bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*d.client.Timeout)
 	defer cancel()
-	step, link, id, err := d.ask(ctx, repo, head, known, includes)
+	found, err := d.ask(ctx, repo, head, known, includes)
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	answer := d.answers[key]
 	answer.asking = false
 	if err == nil {
-		answer.step, answer.url = step, link
 		// A failed deployment can be run again as a new one, so only one
-		// still under way is kept to be asked about by its status.
-		answer.id = 0
-		if step == publish.StepPending {
-			answer.id = id
+		// still under way is kept to be asked about where it was found.
+		if found.step != publish.StepPending {
+			found.id, found.checks = 0, false
+		}
+		answer.found = found
+		if found.host != "" {
+			d.hosts[repo] = found.host
 		}
 	}
-	if answer.step == publish.StepPending {
+	if answer.found.step == publish.StepPending {
 		every := pendingEvery
 		if d.now().Sub(answer.since) >= slowAfter {
 			every = slowEvery
@@ -242,27 +267,30 @@ func (d *deployChecker) refresh(key, repo, head string, known int64, includes fu
 	answer.next = d.now().Add(probeAgain)
 }
 
-// ask finds head's deployment and how it went, and the id of the deployment
-// it read, if any. known, when not zero, is a deployment of head found
-// before, and only its status is asked for.
-func (d *deployChecker) ask(ctx context.Context, repo, head string, known int64, includes func(string) bool) (publish.Step, string, int64, error) {
-	if known != 0 {
-		step, link, err := d.status(ctx, repo, known)
-		return step, link, known, err
+// ask finds head's deployment and how it went. known, when it names where a
+// deployment of head was found before, is asked about alone.
+//
+// It makes at most two requests: the list of deployments and then a status,
+// or the list and then head's check runs.
+func (d *deployChecker) ask(ctx context.Context, repo, head string, known record, includes func(string) bool) (record, error) {
+	switch {
+	case known.id != 0:
+		return d.deployment(ctx, repo, ghDeployment{ID: known.id}, known.host)
+	case known.checks:
+		found, _, err := d.checkRuns(ctx, repo, head)
+		return found, err
 	}
 
-	// One list answers every question there is before a status: whether the
-	// repository records deployments at all, whether head has one of its
-	// own, and whether a later commit's replaced it, which deploys head's
-	// content all the same.
+	// One list answers most of what there is to know before a status:
+	// whether the repository records deployments at all, whether head has
+	// one of its own, and whether a later commit's replaced it, which
+	// deploys head's content all the same.
 	var latest []ghDeployment
 	found, err := d.get(ctx, "/repos/"+repo+"/deployments?per_page="+strconv.Itoa(listed), &latest)
 	if err != nil {
-		return "", "", 0, err
+		return record{}, err
 	}
-	if !found || len(latest) == 0 {
-		return publish.StepNotApplicable, "", 0, nil
-	}
+	found = found && len(latest) > 0
 
 	var own []ghDeployment
 	for _, dep := range latest {
@@ -270,17 +298,80 @@ func (d *deployChecker) ask(ctx context.Context, repo, head string, known int64,
 			own = append(own, dep)
 		}
 	}
-	var dep ghDeployment
 	switch {
 	case len(own) > 0:
-		dep = preferred(own)
-	case includes(preferred(latest).SHA):
-		dep = preferred(latest)
-	default:
-		return publish.StepPending, "", 0, nil
+		return d.deployment(ctx, repo, preferred(own), "")
+	case found && includes(preferred(latest).SHA):
+		return d.deployment(ctx, repo, preferred(latest), "")
 	}
+
+	// Cloudflare Pages records no deployment, only a check run on the
+	// commit it built.
+	checked, ran, err := d.checkRuns(ctx, repo, head)
+	switch {
+	case err != nil:
+		return record{}, err
+	case ran:
+		return checked, nil
+	case !found:
+		return record{step: publish.StepNotApplicable}, nil
+	}
+	return record{step: publish.StepPending}, nil
+}
+
+// deployment reads how dep went. host, when known, names its host; otherwise
+// it is told from dep.
+func (d *deployChecker) deployment(ctx context.Context, repo string, dep ghDeployment, host string) (record, error) {
 	step, link, err := d.status(ctx, repo, dep.ID)
-	return step, link, dep.ID, err
+	if err != nil {
+		return record{}, err
+	}
+	return record{step: step, url: link, host: cmp.Or(host, hostOf(dep)), id: dep.ID}, nil
+}
+
+// hostOf names the host that recorded a deployment, when it is one the studio
+// knows by name.
+func hostOf(dep ghDeployment) string {
+	switch {
+	case dep.Environment == pagesEnvironment:
+		return publish.HostGitHubPages
+	case dep.Creator.Login == "vercel[bot]":
+		return publish.HostVercel
+	}
+	return ""
+}
+
+// checkRuns reads how Cloudflare Pages built head, and reports false when it
+// did not. A repository can build more than one Cloudflare project, each
+// with a check run of its own; head is live when every one of them is.
+func (d *deployChecker) checkRuns(ctx context.Context, repo, head string) (record, bool, error) {
+	var page struct {
+		CheckRuns []ghCheckRun `json:"check_runs"`
+	}
+	found, err := d.get(ctx, "/repos/"+repo+"/commits/"+url.PathEscape(head)+"/check-runs?app_id="+
+		strconv.Itoa(cloudflareApp)+"&per_page=10", &page)
+	if err != nil || !found || len(page.CheckRuns) == 0 {
+		return record{}, false, err
+	}
+
+	out := record{step: publish.StepDone, host: publish.HostCloudflarePages, checks: true}
+	for _, run := range page.CheckRuns {
+		switch {
+		case run.Status == "completed" && (run.Conclusion == "success" || run.Conclusion == "neutral"):
+		case run.Status == "completed" && (run.Conclusion == "failure" || run.Conclusion == "timed_out"):
+			out.step = publish.StepFailed
+		default:
+			// Queued or building; or stopped, skipped or gone stale, none of
+			// which put head's content live.
+			if out.step == publish.StepDone {
+				out.step = publish.StepPending
+			}
+		}
+		if out.url == "" {
+			out.url = pagesDevURL.FindString(run.Output.Summary)
+		}
+	}
+	return out, true, nil
 }
 
 // recordsDeployments reports whether a repository has ever recorded a
@@ -320,6 +411,17 @@ type ghDeployment struct {
 	ID          int64  `json:"id"`
 	SHA         string `json:"sha"`
 	Environment string `json:"environment"`
+	Creator     struct {
+		Login string `json:"login"`
+	} `json:"creator"`
+}
+
+type ghCheckRun struct {
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+	Output     struct {
+		Summary string `json:"summary"`
+	} `json:"output"`
 }
 
 type ghStatus struct {

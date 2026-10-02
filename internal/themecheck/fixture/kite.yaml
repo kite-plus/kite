@@ -6,6 +6,8 @@ site:
 build:
   pageSize: 3
   feedAliases: [index.xml]
+  # A theme draws no stamp, and CI names a commit where a laptop names none.
+  stamp: false
 menus:
   main:
     - name: Archive

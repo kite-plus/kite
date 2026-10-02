@@ -57,6 +57,11 @@ type DeliveryState struct {
 	// has said so.
 	DeployedURL string `json:"deployed_url,omitempty"`
 
+	// DeployHost names the host that deployed the content, when it is one
+	// the studio knows by name: HostGitHubPages, HostVercel or
+	// HostCloudflarePages.
+	DeployHost string `json:"deploy_host,omitempty"`
+
 	// DeployPausedUntil is when the host is next asked about a deployment
 	// still pending, while GitHub's allowance for anonymous requests is
 	// spent; it is zero otherwise.
@@ -65,6 +70,13 @@ type DeliveryState struct {
 	LastError *Problem  `json:"last_error,omitempty"`
 	CheckedAt time.Time `json:"checked_at,omitzero"`
 }
+
+// Hosts as DeliveryState.DeployHost names them.
+const (
+	HostGitHubPages     = "github-pages"
+	HostVercel          = "vercel"
+	HostCloudflarePages = "cloudflare-pages"
+)
 
 // Problem is something a publish found, whether or not it stops the publish.
 type Problem struct {

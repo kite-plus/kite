@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/kite-plus/kite/internal/hook"
+	"github.com/kite-plus/kite/internal/stamp"
 )
 
 // Register adds every built-in hook to a bus.
@@ -35,6 +36,12 @@ func Register(bus *hook.Bus, opts Options) {
 			Aliases: opts.FeedAliases,
 		}, hook.DefaultPriority)
 	}
+	if opts.Stamp != nil {
+		bus.Register(&BuildStamp{
+			Base:   hook.Base{HookName: "build-stamp", HookPhase: hook.PhaseBuild, HookVersion: "1"},
+			Commit: opts.Stamp,
+		}, hook.DefaultPriority)
+	}
 }
 
 // Options selects which built-in hooks to enable.
@@ -51,6 +58,11 @@ type Options struct {
 	// FeedAliases are more files the same feed is written to, for readers
 	// subscribed at an address the site used before.
 	FeedAliases []string
+
+	// Stamp, when set, returns the commit the site is built from, which is
+	// written to stamp.File. It is asked at each build, since a server
+	// that stays up sees new commits.
+	Stamp func() string
 }
 
 // DefaultOptions enables the hooks every site wants.
@@ -95,6 +107,23 @@ func (s *Sitemap) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 	}
 	buf.WriteByte('\n')
 	return b.Emit("sitemap.xml", buf.Bytes())
+}
+
+// BuildStamp writes the commit the site was built from, for the studio to
+// read back from the live site. A site built from no commit it can name gets
+// no stamp.
+type BuildStamp struct {
+	hook.Base
+	Commit func() string
+}
+
+// BuildComplete emits the stamp.
+func (s *BuildStamp) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
+	commit := s.Commit()
+	if commit == "" {
+		return nil
+	}
+	return b.Emit(stamp.File, stamp.Encode(commit))
 }
 
 // Feed writes an RSS 2.0 feed to rss.xml and to each of its aliases.

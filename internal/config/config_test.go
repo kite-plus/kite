@@ -168,6 +168,19 @@ func TestARelativeOutputStaysInsideTheProject(t *testing.T) {
 
 // A site moved from Hugo keeps its subscribers by writing the feed where they
 // subscribed too. Each such path is a feed's own file within the site.
+// A build stamps the site with its commit unless the site says not to.
+func TestTheBuildStampIsOnUnlessTurnedOff(t *testing.T) {
+	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
+	on, err := load(t, site)
+	if err != nil || !on.Build.Stamp {
+		t.Errorf("stamp = %v, %v; want on by default", on.Build.Stamp, err)
+	}
+	off, err := load(t, site+"build:\n  stamp: false\n")
+	if err != nil || off.Build.Stamp {
+		t.Errorf("stamp = %v, %v; want off", off.Build.Stamp, err)
+	}
+}
+
 func TestFeedAliasesAreFilesOfTheirOwn(t *testing.T) {
 	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
 	cfg, err := load(t, site+"build:\n  feedAliases: [/index.xml, posts/index.xml, ' atom.xml ']\n")
@@ -177,7 +190,7 @@ func TestFeedAliasesAreFilesOfTheirOwn(t *testing.T) {
 	if want := []string{"index.xml", "posts/index.xml", "atom.xml"}; !slices.Equal(cfg.Build.FeedAliases, want) {
 		t.Errorf("feedAliases = %q, want %q", cfg.Build.FeedAliases, want)
 	}
-	for _, list := range []string{"['']", "[feed/]", "[../out.xml]", "[index.html]", "[feed]", "[rss.xml]", "[sitemap.xml]", "[a.xml, /a.xml]"} {
+	for _, list := range []string{"['']", "[feed/]", "[../out.xml]", "[index.html]", "[feed]", "[rss.xml]", "[sitemap.xml]", "[kite-build.json]", "[a.xml, /a.xml]"} {
 		if _, err := load(t, site+"build:\n  feedAliases: "+list+"\n"); err == nil || !strings.Contains(err.Error(), "build.feedAliases") {
 			t.Errorf("feedAliases: %s = %v, want a refusal naming build.feedAliases", list, err)
 		}

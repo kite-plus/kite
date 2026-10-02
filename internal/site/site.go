@@ -31,6 +31,7 @@ import (
 	"github.com/kite-plus/kite/internal/render/markdown"
 	"github.com/kite-plus/kite/internal/render/theme"
 	kurl "github.com/kite-plus/kite/internal/render/url"
+	"github.com/kite-plus/kite/internal/stamp"
 	"github.com/kite-plus/kite/themes"
 )
 
@@ -163,6 +164,7 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index, images *i
 		FeedLimit:   cfg.Build.FeedLimit,
 		FeedKinds:   p.Types.FeedKinds(),
 		FeedAliases: cfg.Build.FeedAliases,
+		Stamp:       stampOf(cfg, p.Root),
 	})
 	plugins, pluginProblems := loadPlugins(p.Root, cfg, resolver, bus)
 
@@ -243,6 +245,15 @@ func loadPlugins(root string, cfg *config.Config, links *kurl.Resolver, bus *hoo
 	return loaded, problems
 }
 
+// stampOf returns what names the commit a build writes in its stamp, or nil
+// when the site writes none.
+func stampOf(cfg *config.Config, root string) func() string {
+	if !cfg.Build.Stamp {
+		return nil
+	}
+	return func() string { return stamp.Commit(root, os.Getenv) }
+}
+
 func newPublisher(p *project.Project, cfg *config.Config) publish.Publisher {
 	switch cfg.Publish.Publisher {
 	case "", "git":
@@ -250,6 +261,7 @@ func newPublisher(p *project.Project, cfg *config.Config) publish.Publisher {
 			Root:    p.Root,
 			Branch:  cfg.Publish.Branch,
 			Message: cfg.Publish.Message,
+			Site:    cfg.Site.BaseURL,
 		})
 	default:
 		return nil

@@ -29,6 +29,7 @@ import (
 
 	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/schema"
+	"github.com/kite-plus/kite/internal/stamp"
 )
 
 // languageTag is the shape of a BCP 47 tag: a language, then optional
@@ -246,6 +247,10 @@ type Build struct {
 	// the site's root, such as the index.xml a site moved from Hugo was
 	// subscribed at. Feed readers do not follow a page that redirects.
 	FeedAliases []string `yaml:"feedAliases,omitempty"`
+
+	// Stamp writes kite-build.json, the commit the site was built from, so
+	// the studio can tell from the live site whether a push has reached it.
+	Stamp bool `yaml:"stamp,omitempty"`
 }
 
 // PageSizes is how each kind of listing pages when not by PageSize: what a
@@ -404,7 +409,7 @@ func validFeedAliases(aliases []string) error {
 			return fmt.Errorf("config: build.feedAliases: %q is not a file within the site", p)
 		case ext == "" || ext == ".html" || ext == ".htm":
 			return fmt.Errorf("config: build.feedAliases: %q is not a feed's file name (want something like index.xml)", p)
-		case p == "rss.xml" || p == "sitemap.xml":
+		case p == "rss.xml" || p == "sitemap.xml" || p == stamp.File:
 			return fmt.Errorf("config: build.feedAliases: Kite writes %s itself", p)
 		case seen[p]:
 			return fmt.Errorf("config: build.feedAliases lists %q twice", p)
@@ -426,6 +431,7 @@ func Default() *Config {
 			URLStyle:  "directory",
 			PageSize:  10,
 			Sitemap:   true,
+			Stamp:     true,
 			Feed:      true,
 			FeedLimit: 20,
 		},

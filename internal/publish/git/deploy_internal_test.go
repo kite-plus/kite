@@ -14,11 +14,12 @@ import (
 	"github.com/kite-plus/kite/internal/publish"
 )
 
-// fakeGitHub answers the two deployment endpoints the checker uses.
+// fakeGitHub answers the endpoints the checker uses.
 type fakeGitHub struct {
 	mu          sync.Mutex
 	deployments map[string][]ghDeployment // by owner/name, newest first
 	statuses    map[int64][]ghStatus      // newest first
+	checkRuns   map[string][]ghCheckRun   // Cloudflare's, by commit
 	private     bool
 	remaining   int
 	requests    int
@@ -46,6 +47,12 @@ func (f *fakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		_ = json.NewEncoder(w).Encode(append([]ghDeployment{}, out...))
+	case len(parts) == 6 && parts[3] == "commits" && parts[5] == "check-runs":
+		if r.URL.Query().Get("app_id") != strconv.Itoa(cloudflareApp) {
+			http.Error(w, "unexpected app", http.StatusBadRequest)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"check_runs": append([]ghCheckRun{}, f.checkRuns[parts[4]]...)})
 	case len(parts) == 6 && parts[5] == "statuses":
 		id, _ := strconv.ParseInt(parts[4], 10, 64)
 		_ = json.NewEncoder(w).Encode(append([]ghStatus{}, f.statuses[id]...))
@@ -64,6 +71,7 @@ func newFakeAt(t *testing.T, now func() time.Time) (*fakeGitHub, *deployChecker)
 	fake := &fakeGitHub{
 		deployments: map[string][]ghDeployment{},
 		statuses:    map[int64][]ghStatus{},
+		checkRuns:   map[string][]ghCheckRun{},
 		remaining:   60,
 	}
 	srv := httptest.NewServer(fake)
@@ -121,6 +129,25 @@ func settle(t *testing.T, d *deployChecker) {
 
 func never(string) bool { return false }
 
+// check runs one check of head in acme/site with nothing known about it yet.
+func check(t *testing.T, d *deployChecker, head string, includes func(string) bool) (publish.Step, string, int64, error) {
+	t.Helper()
+	found, err := d.ask(t.Context(), "acme/site", head, record{}, includes)
+	return found.step, found.url, found.id, err
+}
+
+func checkRun(status, conclusion, summary string) ghCheckRun {
+	var run ghCheckRun
+	run.Status, run.Conclusion, run.Output.Summary = status, conclusion, summary
+	return run
+}
+
+// cloudflareSummary is the shape of the summary Cloudflare writes on a
+// finished build's check run.
+const cloudflareSummary = "<table><tr><td><strong>Latest commit:</strong> </td><td>\n<code>abc1234</code>\n</td></tr>\n" +
+	"<tr><td><strong>Status:</strong></td><td>&nbsp;✅&nbsp; Deploy successful!</td></tr>\n" +
+	"<tr><td><strong>Preview URL:</strong></td><td>\n<a href='https://d4f9f6fc.site.pages.dev'>https://d4f9f6fc.site.pages.dev</a>\n</td></tr>\n</table>"
+
 func TestADeploymentIsReadFromItsNewestStatus(t *testing.T) {
 	for _, tc := range []struct {
 		state string
@@ -141,7 +168,7 @@ func TestADeploymentIsReadFromItsNewestStatus(t *testing.T) {
 				{ID: 2, State: tc.state, EnvironmentURL: "https://acme.github.io/site/"},
 				{ID: 1, State: "queued"},
 			}
-			step, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never)
+			step, _, _, err := check(t, d, "abc", never)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -157,7 +184,7 @@ func TestTheLiveAddressComesFromTheDeployment(t *testing.T) {
 	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc"}}
 	fake.statuses[7] = []ghStatus{{ID: 1, State: "success", EnvironmentURL: "https://acme.github.io/site/"}}
 
-	_, link, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never)
+	_, link, _, err := check(t, d, "abc", never)
 	if err != nil || link != "https://acme.github.io/site/" {
 		t.Errorf("url = %q, %v", link, err)
 	}
@@ -171,10 +198,10 @@ func TestANewerDeploymentThatContainsTheCommitCounts(t *testing.T) {
 	fake.statuses[9] = []ghStatus{{ID: 1, State: "success"}}
 
 	contains := func(sha string) bool { return sha == "later" }
-	if step, _, _, _ := d.ask(t.Context(), "acme/site", "mine", 0, contains); step != publish.StepDone {
+	if step, _, _, _ := check(t, d, "mine", contains); step != publish.StepDone {
 		t.Errorf("step = %q, want done", step)
 	}
-	if step, _, _, _ := d.ask(t.Context(), "acme/site", "mine", 0, never); step != publish.StepPending {
+	if step, _, _, _ := check(t, d, "mine", never); step != publish.StepPending {
 		t.Errorf("a deployment that does not contain the commit counted: %q", step)
 	}
 }
@@ -186,7 +213,7 @@ func TestADeploymentToAnotherHostIsReported(t *testing.T) {
 	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc", Environment: "Production"}}
 	fake.statuses[7] = []ghStatus{{ID: 1, State: "success", EnvironmentURL: "https://site-abc.vercel.app"}}
 
-	step, link, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never)
+	step, link, _, err := check(t, d, "abc", never)
 	if err != nil || step != publish.StepDone || link != "https://site-abc.vercel.app" {
 		t.Errorf("step = %q, url = %q, %v", step, link, err)
 	}
@@ -202,7 +229,7 @@ func TestARepositoryThatMovedOffPagesIsReportedFromItsNewHost(t *testing.T) {
 	}
 	fake.statuses[9] = []ghStatus{{ID: 1, State: "success"}}
 
-	if step, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); err != nil || step != publish.StepDone {
+	if step, _, _, err := check(t, d, "abc", never); err != nil || step != publish.StepDone {
 		t.Errorf("step = %q, %v; want done", step, err)
 	}
 }
@@ -217,7 +244,7 @@ func TestPagesIsPreferredOverAnotherEnvironment(t *testing.T) {
 	fake.statuses[9] = []ghStatus{{ID: 1, State: "success"}}
 	fake.statuses[8] = []ghStatus{{ID: 1, State: "in_progress"}}
 
-	if step, _, _, _ := d.ask(t.Context(), "acme/site", "abc", 0, never); step != publish.StepPending {
+	if step, _, _, _ := check(t, d, "abc", never); step != publish.StepPending {
 		t.Errorf("step = %q, want the Pages deployment's, still under way", step)
 	}
 }
@@ -225,14 +252,14 @@ func TestPagesIsPreferredOverAnotherEnvironment(t *testing.T) {
 func TestARepositoryThatDoesNotReportDeploymentsIsNotApplicable(t *testing.T) {
 	t.Run("never deployed", func(t *testing.T) {
 		_, d := newFake(t)
-		if step, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); err != nil || step != publish.StepNotApplicable {
+		if step, _, _, err := check(t, d, "abc", never); err != nil || step != publish.StepNotApplicable {
 			t.Errorf("step = %q, %v", step, err)
 		}
 	})
 	t.Run("private", func(t *testing.T) {
 		fake, d := newFake(t)
 		fake.private = true
-		if step, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); err != nil || step != publish.StepNotApplicable {
+		if step, _, _, err := check(t, d, "abc", never); err != nil || step != publish.StepNotApplicable {
 			t.Errorf("step = %q, %v", step, err)
 		}
 	})
@@ -247,10 +274,10 @@ func TestTheCheckerStopsAskingWhenTheAllowanceRunsLow(t *testing.T) {
 
 	// The first answer says the allowance is nearly spent, so the status it
 	// would have gone on to ask for is not asked for.
-	if _, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); !errors.Is(err, errQuiet) {
+	if _, _, _, err := check(t, d, "abc", never); !errors.Is(err, errQuiet) {
 		t.Errorf("err = %v, want errQuiet", err)
 	}
-	if _, _, _, err := d.ask(t.Context(), "acme/site", "abc", 0, never); !errors.Is(err, errQuiet) {
+	if _, _, _, err := check(t, d, "abc", never); !errors.Is(err, errQuiet) {
 		t.Errorf("err = %v, want errQuiet", err)
 	}
 	if fake.requests != 1 {
@@ -300,14 +327,14 @@ func TestAFoundDeploymentIsThenAskedAboutByItsStatusAlone(t *testing.T) {
 	fake.deployments["acme/site"] = []ghDeployment{{ID: 7, SHA: "abc", Environment: "Production"}}
 	fake.statuses[7] = []ghStatus{{ID: 1, State: "in_progress"}}
 
-	step, _, id, err := d.ask(t.Context(), "acme/site", "abc", 0, never)
+	step, _, id, err := check(t, d, "abc", never)
 	if err != nil || step != publish.StepPending || id != 7 {
 		t.Fatalf("step = %q, id = %d, %v", step, id, err)
 	}
 	if n := fake.count(); n != 2 {
 		t.Errorf("the first check made %d requests, want the list and the status", n)
 	}
-	if _, _, _, err := d.ask(t.Context(), "acme/site", "abc", id, never); err != nil {
+	if _, err := d.ask(t.Context(), "acme/site", "abc", record{id: id}, never); err != nil {
 		t.Fatal(err)
 	}
 	if n := fake.count(); n != 3 {
@@ -380,6 +407,77 @@ func TestASpentAllowanceSaysWhenTheCheckerAsksAgain(t *testing.T) {
 	seen := d.look("acme/site", "abc", true, never)
 	if seen.step != publish.StepPending || seen.pausedUntil.Before(time.Now().Add(50*time.Minute)) {
 		t.Errorf("step %q, paused until %v; want pending until GitHub's reset an hour away", seen.step, seen.pausedUntil)
+	}
+}
+
+// Cloudflare Pages records no deployment; its build is a check run on the
+// commit, and a repository may build several projects, each with its own.
+func TestACloudflarePagesBuildIsReadFromItsCheckRuns(t *testing.T) {
+	for name, tc := range map[string]struct {
+		runs []ghCheckRun
+		want publish.Step
+	}{
+		"built":                {[]ghCheckRun{checkRun("completed", "success", cloudflareSummary)}, publish.StepDone},
+		"building":             {[]ghCheckRun{checkRun("in_progress", "", "")}, publish.StepPending},
+		"failed":               {[]ghCheckRun{checkRun("completed", "failure", "")}, publish.StepFailed},
+		"cancelled":            {[]ghCheckRun{checkRun("completed", "cancelled", "")}, publish.StepPending}, //nolint:misspell // GitHub's spelling
+		"one of two building":  {[]ghCheckRun{checkRun("completed", "success", cloudflareSummary), checkRun("queued", "", "")}, publish.StepPending},
+		"one of two failed":    {[]ghCheckRun{checkRun("completed", "failure", ""), checkRun("in_progress", "", "")}, publish.StepFailed},
+		"both of two finished": {[]ghCheckRun{checkRun("completed", "success", ""), checkRun("completed", "success", cloudflareSummary)}, publish.StepDone},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fake, d := newFake(t)
+			fake.checkRuns["abc"] = tc.runs
+			found, err := d.ask(t.Context(), "acme/site", "abc", record{}, never)
+			if err != nil || found.step != tc.want || found.host != publish.HostCloudflarePages {
+				t.Errorf("step %q, host %q, %v; want %q from Cloudflare Pages", found.step, found.host, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestACloudflarePagesBuildLinksToItsDeployment(t *testing.T) {
+	fake, d := newFake(t)
+	fake.checkRuns["abc"] = []ghCheckRun{checkRun("completed", "success", cloudflareSummary)}
+	if _, link, _, err := check(t, d, "abc", never); err != nil || link != "https://d4f9f6fc.site.pages.dev" {
+		t.Errorf("url = %q, %v", link, err)
+	}
+}
+
+// Once a commit's check runs have answered, a later check asks them alone.
+func TestACloudflarePagesBuildIsThenAskedAboutByItsCheckRunsAlone(t *testing.T) {
+	fake, d := newFake(t)
+	fake.checkRuns["abc"] = []ghCheckRun{checkRun("in_progress", "", "")}
+	found, err := d.ask(t.Context(), "acme/site", "abc", record{}, never)
+	if err != nil || !found.checks {
+		t.Fatalf("found %+v, %v; want the check runs", found, err)
+	}
+	before := fake.count()
+	if _, err := d.ask(t.Context(), "acme/site", "abc", found, never); err != nil {
+		t.Fatal(err)
+	}
+	if n := fake.count() - before; n != 1 {
+		t.Errorf("the second check made %d requests, want only the check runs", n)
+	}
+}
+
+func TestTheHostIsToldFromTheDeployment(t *testing.T) {
+	vercel := ghDeployment{ID: 1, SHA: "abc", Environment: "Production"}
+	vercel.Creator.Login = "vercel[bot]"
+	someone := ghDeployment{ID: 1, SHA: "abc", Environment: "production"}
+	someone.Creator.Login = "a-maintainer"
+	for want, dep := range map[string]ghDeployment{
+		publish.HostGitHubPages: {ID: 1, SHA: "abc", Environment: pagesEnvironment},
+		publish.HostVercel:      vercel,
+		"":                      someone,
+	} {
+		fake, d := newFake(t)
+		fake.deployments["acme/site"] = []ghDeployment{dep}
+		fake.statuses[1] = []ghStatus{{ID: 1, State: "success"}}
+		found, err := d.ask(t.Context(), "acme/site", "abc", record{}, never)
+		if err != nil || found.host != want {
+			t.Errorf("%s: host %q, %v; want %q", dep.Environment, found.host, err, want)
+		}
 	}
 }
 

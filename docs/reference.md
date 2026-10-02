@@ -680,6 +680,7 @@ build:
   feed: true
   feedLimit: 20
   feedAliases: []      # more files the feed is written to, such as index.xml
+  stamp: true          # writes kite-build.json, the commit the site was built from
 
 publish:
   publisher: git
@@ -905,16 +906,33 @@ for 60 days. Turn it back on under the **Actions** tab. Deploying on push is
 a separate workflow for exactly this reason, and keeps working either way.
 
 The studio follows a publish from the commit through the push to the
-deployment. For a public repository on GitHub, it asks GitHub's API,
-anonymously and read-only, whether the pushed commit is live, and links to
-the site once it is. Pages records its deployments there, and so do some
-other hosts, such as Vercel; a commit deployed to Pages and somewhere else
-too is reported from Pages. A host that records nothing does not report
-deployments, and the studio says so instead of waiting. GitHub gives an
-anonymous caller sixty requests an hour, shared with everything else on the
-same network, so the studio asks at most once a minute, every minute while
-a deployment is under way and every five once it has taken ten; when the
-hour's allowance is nearly spent, it says when it will ask again.
+deployment, and asks two witnesses whether the pushed commit is live.
+
+The first is the site itself. A build writes `kite-build.json` at the root of
+the site, naming the commit it was built from: the one the host names, from
+`GITHUB_SHA`, `VERCEL_GIT_COMMIT_SHA`, `CF_PAGES_COMMIT_SHA`, `COMMIT_REF` or
+`CI_COMMIT_SHA`, or else the repository's `HEAD`. Once a push is made, the
+studio reads that file from `site.baseURL` each minute, and the commit is
+live when the site was built from it or from a later commit that contains
+it. That works whatever hosts the site, Netlify and a server of one's own
+included, and needs no account; it cannot tell a failed deployment from a
+slow one. An address readers cannot reach, such as localhost, is not asked.
+`build.stamp: false` leaves the file out, for a site that would rather not
+publish its commit.
+
+The second is the host, for a public repository on GitHub. The studio asks
+GitHub's API, anonymously and read-only, what the host recorded: Pages and
+Vercel record deployments, and Cloudflare Pages a check run on the commit it
+built. A commit deployed to Pages and somewhere else too is reported from
+Pages. Only the host can say a deployment failed. GitHub gives an anonymous
+caller sixty requests an hour, shared with everything else on the same
+network, so the studio asks at most once a minute, every minute while a
+deployment is under way and every five once it has taken ten; when the
+hour's allowance is nearly spent, it says when it will ask again, unless the
+site has answered meanwhile.
+
+When neither can tell, the studio says the host does not report deployments
+instead of waiting.
 
 `kite build` prints when the next scheduled post falls due. On any other host
 that is when the site has to be built again, because a static site only shows

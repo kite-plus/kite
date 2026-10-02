@@ -26,7 +26,7 @@ import { PublishBar } from "@/features/settings/components/publish-bar";
 /**
  * Deploying is how a site written here gets online. A static site has two
  * ways: an archive uploaded by hand, which needs nothing but a place to put
- * files, and a push to GitHub, whose Pages then builds and serves it.
+ * files, and a push to a git repository, whose host then builds and serves it.
  */
 export function Deploy() {
   const { t } = useI18n();
@@ -40,7 +40,7 @@ export function Deploy() {
         <div className="grid max-w-3xl gap-4 sm:gap-6">
           <PublishBar className="mb-0 lg:mb-0" />
           <ExportCard />
-          <GitHubCard />
+          <PushCard />
           <KiteCard />
         </div>
       </Main>
@@ -118,23 +118,40 @@ function ExportCard() {
   );
 }
 
-function GitHubCard() {
+/** hosts names the hosts the server can tell a deployment came from. */
+const hosts: Record<string, string> = {
+  "github-pages": "GitHub Pages",
+  vercel: "Vercel",
+  "cloudflare-pages": "Cloudflare Pages",
+};
+
+/**
+ * PushCard follows a push to the site, whatever hosts it. Where the server
+ * can tell which host that is, from what the host recorded on GitHub, it is
+ * named; the steps for a site not yet in git are GitHub Pages', the host
+ * that needs nothing but the repository.
+ */
+function PushCard() {
   const { t } = useI18n();
   const delivery = useDelivery();
   const publish = usePublish([]);
+  const host = hosts[delivery.data?.deploy_host ?? ""];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("deploy.github")}</CardTitle>
-        <CardDescription>{t("deploy.githubNote")}</CardDescription>
+        <CardTitle>{t("deploy.push")}</CardTitle>
+        <CardDescription>{t("deploy.pushNote")}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm">
         {delivery.isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : canPublish(delivery.data) ? (
           <>
-            <p className="text-muted-foreground">{t("deploy.githubReady")}</p>
+            <div className="grid gap-1 text-muted-foreground">
+              <p>{t("deploy.pushReady")}</p>
+              {host && <p>{t("deploy.host", { host })}</p>}
+            </div>
             <DeliveryStages delivery={delivery.data} publish={publish} />
           </>
         ) : (

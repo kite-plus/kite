@@ -28,6 +28,7 @@ import (
 	"github.com/kite-plus/kite/internal/render/markdown"
 	"github.com/kite-plus/kite/internal/render/theme"
 	kurl "github.com/kite-plus/kite/internal/render/url"
+	"github.com/kite-plus/kite/internal/stamp"
 	"github.com/kite-plus/kite/themes"
 )
 
@@ -828,6 +829,37 @@ var absoluteLink = regexp.MustCompile(`<(?:loc|link)>([^<]*)</(?:loc|link)>`)
 
 // A server asks for what the completion hooks write without drawing any page,
 // and has to be given the bytes a build writes, observers included.
+// The stamp names the commit a site was built from, so the studio can ask the
+// live site whether a push has reached it; a site built from no commit it can
+// name gets none.
+func TestTheBuildStampNamesTheCommit(t *testing.T) {
+	const commit = "0123456789abcdef0123456789abcdef01234567"
+	for name, tc := range map[string]struct {
+		commit string
+		want   bool
+	}{
+		"a commit": {commit, true},
+		"none":     {"", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t, 1)
+			bus := hook.NewBus()
+			builtin.Register(bus, builtin.Options{Stamp: func() string { return tc.commit }})
+			_, files := f.run(t, f.out, func(o *build.Options) { o.Hooks = bus })
+			if slices.Contains(files, stamp.File) != tc.want {
+				t.Fatalf("%s written: %v, want %v", stamp.File, !tc.want, tc.want)
+			}
+			if !tc.want {
+				return
+			}
+			got, err := stamp.Decode([]byte(readFile(t, f.out, stamp.File)))
+			if err != nil || got.Commit != commit {
+				t.Errorf("stamp = %+v, %v", got, err)
+			}
+		})
+	}
+}
+
 func TestExtrasAreWhatABuildWrites(t *testing.T) {
 	f := newFixture(t, 5)
 	bus := hook.NewBus()

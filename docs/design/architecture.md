@@ -676,7 +676,7 @@ type DeliveryState struct {
     Local     StepState  // 内容已写入文件/DB
     Committed StepState  // 已 commit（Git 模式）
     Pushed    StepState  // 已 push
-    Deployed  StepState  // CI/CD 完成（V1 匿名查询 GitHub Deployments API 回填；不回报的托管平台为 N/A）
+    Deployed  StepState  // CI/CD 完成（V1 读站点上的 kite-build.json，并匿名查询 GitHub 上托管平台的记录回填；两处都说不出来为 N/A）
     LastError *PublishError
 }
 ```

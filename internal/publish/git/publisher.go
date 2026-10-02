@@ -30,6 +30,11 @@ type Options struct {
 	// been deployed. Empty means GitHub's own API.
 	GitHubAPI string
 
+	// Site is the site's address, whose build stamp says whether a push has
+	// reached it. An address readers cannot reach, such as localhost, is not
+	// asked.
+	Site string
+
 	// Now is injected so a test can make a commit reproducible.
 	Now func() time.Time
 }
@@ -43,6 +48,7 @@ type Publisher struct {
 	git     runner
 	lock    *lockFile
 	deploys *deployChecker
+	sites   *siteChecker
 }
 
 // New returns a publisher over a project.
@@ -55,6 +61,7 @@ func New(opts Options) *Publisher {
 		git:     runner{root: opts.Root},
 		lock:    newLock(opts.Root),
 		deploys: newDeployChecker(opts.GitHubAPI, opts.Now),
+		sites:   newSiteChecker(opts.Now),
 	}
 }
 
@@ -304,29 +311,55 @@ func (p *Publisher) State(ctx context.Context) (*publish.DeliveryState, error) {
 		state.Pushed = publish.StepDone
 	}
 	seen := p.deployed(ctx, state)
-	state.Deployed, state.DeployedURL, state.DeployPausedUntil = seen.step, seen.url, seen.pausedUntil
+	state.Deployed, state.DeployedURL, state.DeployHost, state.DeployPausedUntil = seen.step, seen.url, seen.host, seen.pausedUntil
 	return state, nil
 }
 
-// deployed reports whether what was pushed is live, as far as the host says.
+// deployed reports whether what was pushed is live, as far as the host and
+// the site itself say.
 //
 // Whether a deployment finished is something the host knows and this
-// publisher does not, so only a host that reports it is asked: GitHub, for a
-// repository that deploys to Pages. Anywhere else the step does not apply,
-// which is the truth, where a guess would be worse than nothing.
+// repository does not, so GitHub is asked, for a repository there, what its
+// host recorded; and the site is asked which commit it was built from. The
+// site is the better witness that a commit is live, since it is what readers
+// are served; only the host can say a deployment failed.
 func (p *Publisher) deployed(ctx context.Context, state *publish.DeliveryState) deployLook {
-	remote, err := p.git.read(ctx, "remote", "get-url", state.Remote)
-	if err != nil {
-		return deployLook{step: publish.StepNotApplicable}
-	}
-	repo, ok := githubRepo(remote)
-	if !ok {
-		return deployLook{step: publish.StepNotApplicable}
-	}
 	head := p.head(ctx)
-	return p.deploys.look(repo, head, state.Pushed == publish.StepDone, func(sha string) bool {
+	pushed := state.Pushed == publish.StepDone
+	includes := func(sha string) bool {
 		return p.git.ok(context.Background(), "merge-base", "--is-ancestor", head, sha)
-	})
+	}
+
+	host := deployLook{step: publish.StepNotApplicable}
+	if remote, err := p.git.read(ctx, "remote", "get-url", state.Remote); err == nil {
+		if repo, ok := githubRepo(remote); ok {
+			host = p.deploys.look(repo, head, pushed, includes)
+		}
+	}
+	addr := publicAddress(p.opts.Site)
+	site := publish.StepNotApplicable
+	if addr != "" {
+		site = p.sites.look(addr, head, pushed, includes)
+	}
+	return combine(host, site, addr)
+}
+
+// combine puts what the host recorded beside what the site at addr says.
+func combine(host deployLook, site publish.Step, addr string) deployLook {
+	switch {
+	case site == publish.StepDone:
+		return deployLook{step: publish.StepDone, url: addr + "/", host: host.host}
+	case host.step == publish.StepDone || host.step == publish.StepFailed:
+		return host
+	case host.step == publish.StepPending || site == publish.StepPending:
+		out := deployLook{step: publish.StepPending, host: host.host}
+		// The site goes on answering while GitHub's allowance is spent.
+		if site == publish.StepNotApplicable {
+			out.pausedUntil = host.pausedUntil
+		}
+		return out
+	}
+	return host
 }
 
 // dirtyContent lists what is uncommitted under the paths Kite writes.
