@@ -2,6 +2,7 @@ package builtin_test
 
 import (
 	"encoding/xml"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -23,10 +24,11 @@ type rss struct {
 		Generator *string `xml:"generator"`
 		Updated   *string `xml:"lastBuildDate"`
 		Items     []struct {
-			Title      string   `xml:"title"`
-			PubDate    string   `xml:"pubDate"`
-			Categories []string `xml:"category"`
-			GUID       struct {
+			Title       string   `xml:"title"`
+			PubDate     string   `xml:"pubDate"`
+			Description string   `xml:"description"`
+			Categories  []string `xml:"category"`
+			GUID        struct {
 				IsPermaLink string `xml:"isPermaLink,attr"`
 				ID          string `xml:",chardata"`
 			} `xml:"guid"`
@@ -244,5 +246,29 @@ func TestAPostsTermsAreItsCategories(t *testing.T) {
 	}
 	if got := feed.Channel.Items[1].Categories; len(got) != 0 {
 		t.Errorf("a post with no terms has categories %q", got)
+	}
+}
+
+// A post is described by what its author wrote for it, when there is
+// something, and by the opening of its text otherwise.
+func TestAPostIsDescribedAsItsAuthorWrote(t *testing.T) {
+	var pages []hook.PageInfo
+	for i, description := range []any{"  Written for the feed.\n", nil, " ", false} {
+		p := post(fmt.Sprintf("01J8KQ2P3R4S5T6V7W8X9YZ00%d", i), fmt.Sprint("post-", i), fmt.Sprintf("2026-01-0%d", 9-i))
+		p.Excerpt = "The opening of the text."
+		if description != nil {
+			p.Item.Meta = map[string]any{"description": description}
+		}
+		pages = append(pages, p)
+	}
+
+	feed := feedOf(t, builtin.Options{FeedKinds: []string{"post"}}, hook.SiteInfo{Title: "Site"}, pages...)
+	var got []string
+	for _, item := range feed.Channel.Items {
+		got = append(got, item.Description)
+	}
+	want := []string{"Written for the feed.", "The opening of the text.", "The opening of the text.", "The opening of the text."}
+	if !slices.Equal(got, want) {
+		t.Errorf("descriptions = %q, want %q", got, want)
 	}
 }

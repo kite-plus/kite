@@ -264,7 +264,7 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 			Title:       p.Title,
 			Link:        absolute(b.Site.BaseURL, p.URL),
 			GUID:        rssGUID{ID: string(p.Item.ID)},
-			Description: p.Excerpt,
+			Description: description(p),
 			Categories:  categories(p.Item),
 		}
 		if p.Item.PublishedAt != nil {
@@ -294,6 +294,15 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		}
 	}
 	return nil
+}
+
+// description is what an item says of itself: the description its author
+// wrote, as its page's head gives it, or else the opening of its text.
+func description(p hook.PageInfo) string {
+	if written, ok := p.Item.Meta["description"].(string); ok && strings.TrimSpace(written) != "" {
+		return strings.TrimSpace(written)
+	}
+	return p.Excerpt
 }
 
 // categories are an item's terms, by taxonomy in name order and as the item
