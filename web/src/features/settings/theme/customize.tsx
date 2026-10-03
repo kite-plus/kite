@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, ExternalLink, House, MoreHorizontal, PanelRight, RotateCcw, XCircle } from "lucide-react";
+import { ChevronLeft, ExternalLink, House, PanelRight, RotateCcw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, type Field } from "@/api/client";
@@ -19,12 +19,6 @@ import { stored } from "@/lib/uploads";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -368,19 +362,10 @@ export function ThemeCustomizer({ name, section }: { name: string; section?: str
           </Tooltip>
         )}
         {writable && !detail.problem && values && fields.length > 0 && (
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={t("themes.more")}>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => setResetting(true)}>
-                <RotateCcw />
-                {t("customize.resetAll")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setResetting(true)}>
+            <RotateCcw />
+            {t("customize.reset")}
+          </Button>
         )}
         {writable && (
           <Button
