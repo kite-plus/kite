@@ -19,6 +19,10 @@ import (
 // wrote the project, until the author moves the pin. A workflow that floated
 // to the newest release would rebuild the same commit differently later,
 // which is the thing reproducible builds exist to prevent.
+//
+// Its last job pings the update services the site lists once the deploy is
+// live. It is its own job, allowed to fail, so a service that is down never
+// fails a deployment.
 const deployWorkflow = `# Builds the site and publishes it to GitHub Pages.
 #
 # Turn Pages on first: Settings -> Pages -> Source -> GitHub Actions.
@@ -46,6 +50,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      base_url: ${{ steps.pages.outputs.base_url }}
     steps:
       - uses: actions/checkout@v7
 
@@ -89,6 +95,23 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # Tells the update services publish.ping in kite.yaml lists, such as
+  # Explore, that the site has changed, for the address Pages published it
+  # at. A site that lists none pings nothing, and a ping that fails is
+  # reported here without failing the deployment.
+  ping:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Ping
+        env:
+          KITE_SITE_BASEURL: ${{ needs.build.outputs.base_url }}
+        run: sh ./kitew ping
 `
 
 // scheduledWorkflow publishes scheduled posts once their time has come.

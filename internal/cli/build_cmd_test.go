@@ -258,10 +258,13 @@ func TestABuildIntoTheProjectIsRefused(t *testing.T) {
 type workflow struct {
 	On   map[string]any `yaml:"on"`
 	Jobs map[string]struct {
-		Needs any    `yaml:"needs"`
-		If    string `yaml:"if"`
-		Uses  string `yaml:"uses"`
-		Steps []struct {
+		Needs           any               `yaml:"needs"`
+		If              string            `yaml:"if"`
+		Uses            string            `yaml:"uses"`
+		Outputs         map[string]string `yaml:"outputs"`
+		ContinueOnError bool              `yaml:"continue-on-error"`
+		Permissions     map[string]string `yaml:"permissions"`
+		Steps           []struct {
 			ID   string            `yaml:"id"`
 			Uses string            `yaml:"uses"`
 			Run  string            `yaml:"run"`
@@ -365,6 +368,45 @@ func TestTheDeployWorkflowBuildsForWherePagesPublishes(t *testing.T) {
 	}
 	if configured < 0 || built < 0 || configured > built {
 		t.Errorf("configure-pages is step %d and the build step %d; the address has to be known first", configured, built)
+	}
+}
+
+// Once a deploy is live, the workflow pings the update services the site
+// lists, for the address Pages published it at, which the build learned. A
+// ping that fails never fails the deployment, and the job may only read.
+func TestTheDeployWorkflowPingsOnceTheSiteIsLive(t *testing.T) {
+	deploy, _ := readWorkflows(t)
+	if got := deploy.Jobs["build"].Outputs["base_url"]; got != "${{ steps.pages.outputs.base_url }}" {
+		t.Errorf("the build job gives base_url = %q", got)
+	}
+
+	ping, ok := deploy.Jobs["ping"]
+	if !ok {
+		t.Fatal("the deploy workflow has no ping job")
+	}
+	needs, _ := ping.Needs.([]any)
+	if !slices.Contains(needs, any("build")) || !slices.Contains(needs, any("deploy")) {
+		t.Errorf("the ping job needs %v, want build and deploy", ping.Needs)
+	}
+	if !ping.ContinueOnError {
+		t.Error("a failed ping would fail the deployment")
+	}
+	if len(ping.Permissions) != 1 || ping.Permissions["contents"] != "read" {
+		t.Errorf("the ping job may %v", ping.Permissions)
+	}
+
+	checkedOut, pinged := false, false
+	for _, s := range ping.Steps {
+		checkedOut = checkedOut || strings.HasPrefix(s.Uses, "actions/checkout@")
+		if s.Run == "sh ./kitew ping" {
+			pinged = true
+			if got := s.Env["KITE_SITE_BASEURL"]; got != "${{ needs.build.outputs.base_url }}" {
+				t.Errorf("the ping runs with KITE_SITE_BASEURL = %q", got)
+			}
+		}
+	}
+	if !checkedOut || !pinged {
+		t.Errorf("the ping job checks out %v and runs sh ./kitew ping %v", checkedOut, pinged)
 	}
 }
 
