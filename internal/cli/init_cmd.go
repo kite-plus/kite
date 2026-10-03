@@ -50,6 +50,9 @@ type plan struct {
 
 	// Workflow writes the GitHub Pages deploy workflow.
 	Workflow bool
+	// Ping has the workflow tell Explore after each deploy. It is written
+	// only with the workflow, which is what sends it.
+	Ping bool
 	// Git runs git init, which the workflow is useless without.
 	Git bool
 	// Password is the studio account to create, or "" for a project that
@@ -68,6 +71,10 @@ const (
 	defaultBaseURL  = "http://localhost:1717"
 	defaultLanguage = config.DefaultLanguage
 )
+
+// explorePing is where Explore, which lists new posts from independent
+// blogs at explore.kite.plus, takes pings.
+const explorePing = "https://explore.kite.plus/api/v1/ping"
 
 func newInitCmd() *cobra.Command {
 	var (
@@ -124,6 +131,7 @@ func newInitCmd() *cobra.Command {
 	cmd.Flags().StringVar(&p.Language, "language", "", "the language it is written in (default "+defaultLanguage+")")
 	cmd.Flags().StringVar(&p.Author, "author", "", "your name, shown as the author of what you publish")
 	cmd.Flags().BoolVar(&p.Workflow, "workflow", true, "write a GitHub Pages deploy workflow")
+	cmd.Flags().BoolVar(&p.Ping, "ping", true, "have the workflow tell Explore after each deploy")
 	cmd.Flags().BoolVar(&p.Git, "git", false, "run git init in the new project")
 	cmd.Flags().BoolVarP(&assumeOK, "yes", "y", false, "take the defaults without asking")
 	return cmd
@@ -200,6 +208,14 @@ func interview(cmd *cobra.Command, p *plan) error {
 		printf(cmd, "\nKite can write a GitHub Actions workflow that builds this site and\n")
 		printf(cmd, "publishes it to GitHub Pages on every push.\n")
 		if p.Workflow, err = askYesNo(cmd, lines, "Write it?", true); err != nil {
+			return err
+		}
+	}
+	if p.Workflow && !cmd.Flags().Changed("ping") {
+		printf(cmd, "\nExplore (explore.kite.plus) lists new posts from independent blogs.\n")
+		printf(cmd, "Once this site is listed there, the workflow can tell Explore after\n")
+		printf(cmd, "each deploy, so new posts show up there sooner.\n")
+		if p.Ping, err = askYesNo(cmd, lines, "Tell Explore after each deploy?", true); err != nil {
 			return err
 		}
 	}
@@ -305,6 +321,10 @@ func starterConfig(p plan) string {
 	if tz := strings.TrimSpace(p.Timezone); tz != "" {
 		zone = "  timezone: " + yamlScalar(tz) + "\n"
 	}
+	publish := ""
+	if p.Workflow && p.Ping {
+		publish = "\npublish:\n  ping:\n    - " + explorePing + "\n"
+	}
 	return fmt.Sprintf(`site:
   title: %s
 %s  baseURL: %s
@@ -316,7 +336,7 @@ content:
 
 build:
   output: public
-`, yamlScalar(p.Title), about, yamlScalar(p.BaseURL), yamlScalar(p.Language), zone)
+%s`, yamlScalar(p.Title), about, yamlScalar(p.BaseURL), yamlScalar(p.Language), zone, publish)
 }
 
 // yamlScalar quotes a value the way YAML needs it quoted, if it does.
@@ -358,6 +378,9 @@ func reportInit(cmd *cobra.Command, p plan, created []string) {
 
 	if slices.Contains(created, WorkflowPath) {
 		printf(cmd, "\n%s will build and deploy this site on every push to main.\n", WorkflowPath)
+		if p.Ping {
+			printf(cmd, "After each deploy it tells Explore, which publish.ping in %s names.\n", project.ConfigName)
+		}
 		if slices.Contains(created, SchedulePath) {
 			printf(cmd, "%s publishes scheduled posts once their time has come.\n", SchedulePath)
 		}

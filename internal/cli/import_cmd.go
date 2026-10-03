@@ -26,7 +26,7 @@ func newImportCmd() *cobra.Command {
 }
 
 func newImportHexoCmd() *cobra.Command {
-	var workflow bool
+	var workflow, ping bool
 	cmd := &cobra.Command{
 		Use:   "hexo <hexo-site> [dir]",
 		Short: "Import the content of a Hexo site",
@@ -62,7 +62,7 @@ func newImportHexoCmd() *cobra.Command {
 				if !emptyDir(root) {
 					return fmt.Errorf("%s holds files and is not a Kite project; import into an empty folder", root)
 				}
-				if _, err := create(cmd.Context(), planFromHexo(root, cfg, workflow)); err != nil {
+				if _, err := create(cmd.Context(), planFromHexo(root, cfg, workflow, ping)); err != nil {
 					return err
 				}
 				created = true
@@ -84,12 +84,13 @@ func newImportHexoCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&workflow, "workflow", true, "write a GitHub Pages deploy workflow into a new project")
+	cmd.Flags().BoolVar(&ping, "ping", true, "have that workflow tell Explore after each deploy")
 	return cmd
 }
 
 // planFromHexo is the new project a Hexo site becomes, named, addressed and
 // dated as the Hexo site is where its settings make sense to Kite.
-func planFromHexo(root string, cfg hexo.Config, workflow bool) plan {
+func planFromHexo(root string, cfg hexo.Config, workflow, ping bool) plan {
 	p := plan{
 		Root:        root,
 		Title:       cfg.Title,
@@ -97,6 +98,7 @@ func planFromHexo(root string, cfg hexo.Config, workflow bool) plan {
 		Author:      cfg.Author,
 		Description: cfg.Description,
 		Workflow:    workflow,
+		Ping:        ping,
 	}
 	if config.WellFormedLanguage(cfg.Language) {
 		p.Language = cfg.Language

@@ -51,6 +51,7 @@ func firstRun(ctx context.Context, cmd *cobra.Command, root, addr string, open b
 			Language:    site.Language,
 			Author:      site.Author,
 			Workflow:    true,
+			Ping:        true,
 		}
 		p.fill()
 		_, err := create(ctx, p)

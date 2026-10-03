@@ -75,7 +75,7 @@ func TestTheWizardTakesTheAnswersItIsGiven(t *testing.T) {
 
 // An answer nobody gave is the default, not an empty project.
 func TestEmptyAnswersLeaveTheDefaults(t *testing.T) {
-	p, _ := scripted(t, "\n\n\n\n\n\n")
+	p, _ := scripted(t, "\n\n\n\n\n\n\n")
 
 	if p.Title != defaultTitle || p.BaseURL != defaultBaseURL || p.Language != defaultLanguage {
 		t.Errorf("defaults not taken: %+v", p)
@@ -84,12 +84,66 @@ func TestEmptyAnswersLeaveTheDefaults(t *testing.T) {
 	if p.Author != "" {
 		t.Errorf("author = %q, want none", p.Author)
 	}
-	// The workflow question defaults to yes, and the password question to no.
+	// The workflow and Explore questions default to yes, and the password
+	// question to no.
 	if !p.Workflow {
 		t.Error("the deploy workflow was not written by default")
 	}
+	if !p.Ping {
+		t.Error("the workflow does not tell Explore by default")
+	}
 	if p.Password != "" {
 		t.Error("a password was set without being asked for")
+	}
+}
+
+// Telling Explore is something the deploy workflow does, so it is asked
+// about only when there is to be one.
+func TestTheWizardAsksAboutExploreOnlyWithAWorkflow(t *testing.T) {
+	p, out := scripted(t, "Site\n\nhttps://example.com\nen\ny\nn\nn\n")
+	if !p.Workflow || p.Ping {
+		t.Errorf("workflow %v, ping %v; want a workflow that does not tell Explore", p.Workflow, p.Ping)
+	}
+	if !strings.Contains(out, "Tell Explore after each deploy?") {
+		t.Errorf("the wizard did not ask about Explore:\n%s", out)
+	}
+
+	p, out = scripted(t, "Site\n\nhttps://example.com\nen\nn\nn\n")
+	if p.Workflow || strings.Contains(out, "Tell Explore") {
+		t.Errorf("asked about Explore with no workflow to tell it:\n%s", out)
+	}
+}
+
+// What kite init --yes makes tells Explore after each deploy, and a flag says
+// otherwise, as it does for the workflow that does the telling. Only what
+// was asked for is written.
+func TestANewSiteTellsExploreUnlessToldNotTo(t *testing.T) {
+	for _, tc := range []struct {
+		flags []string
+		want  []string
+	}{
+		{nil, []string{explorePing}},
+		{[]string{"--ping=false"}, nil},
+		{[]string{"--workflow=false"}, nil},
+	} {
+		parent := t.TempDir()
+		runKite(t, parent, append([]string{"init", "site", "--yes"}, tc.flags...)...)
+		root := filepath.Join(parent, "site")
+		cfg, err := config.Load(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(cfg.Publish.Ping, tc.want) {
+			t.Errorf("init %v: publish.ping = %q, want %q", tc.flags, cfg.Publish.Ping, tc.want)
+		}
+		data, err := os.ReadFile(filepath.Join(root, project.ConfigName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		const listed = "\npublish:\n  ping:\n    - https://explore.kite.plus/api/v1/ping\n"
+		if written := strings.HasSuffix(string(data), listed); written != (tc.want != nil) {
+			t.Errorf("init %v wrote:\n%s", tc.flags, data)
+		}
 	}
 }
 
