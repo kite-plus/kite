@@ -3,6 +3,7 @@ package build_test
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"image"
@@ -775,6 +776,33 @@ func TestSitemapAndFeedComeFromHooks(t *testing.T) {
 	sitemap := readFile(t, f.out, "sitemap.xml")
 	if strings.Contains(sitemap, "/404") {
 		t.Error("the error page must not appear in the sitemap")
+	}
+}
+
+// The feed holds the newest posts. Pages reach the hooks in the order of
+// their files, where post-24, the newest, comes last, so a site with more
+// posts than the feed holds kept its newest out of it.
+func TestTheFeedHoldsTheNewestPosts(t *testing.T) {
+	f := newFixture(t, 25)
+	f.run(t, f.out, nil)
+
+	var feed struct {
+		Items []struct {
+			Title string `xml:"title"`
+		} `xml:"channel>item"`
+	}
+	if err := xml.Unmarshal([]byte(readFile(t, f.out, "rss.xml")), &feed); err != nil {
+		t.Fatal(err)
+	}
+	var got, want []string
+	for _, item := range feed.Items {
+		got = append(got, item.Title)
+	}
+	for i := 24; i > 4; i-- {
+		want = append(want, fmt.Sprintf("Post %02d", i))
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("the feed holds\n %v\nwant the newest 20, newest first:\n %v", got, want)
 	}
 }
 

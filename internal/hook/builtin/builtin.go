@@ -7,10 +7,12 @@ package builtin
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/xml"
 	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/kite-plus/kite/internal/hook"
@@ -163,22 +165,30 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		limit = 20
 	}
 
+	var entries []hook.PageInfo
+	for _, p := range b.Pages {
+		if p.Item == nil || !p.Indexable {
+			continue // listings and taxonomy pages are not feed entries
+		}
+		if slices.Contains(f.Kinds, string(p.Item.Kind)) {
+			entries = append(entries, p)
+		}
+	}
+	// Pages come in the order of their files, which says nothing of when
+	// they were published. The feed takes the site's listing order: newest
+	// first, undated last, and the newer id first between items of a date.
+	slices.SortFunc(entries, func(x, y hook.PageInfo) int {
+		return cmp.Or(published(y).Compare(published(x)), strings.Compare(string(y.Item.ID), string(x.Item.ID)))
+	})
+	entries = entries[:min(limit, len(entries))]
+
 	channel := rssChannel{
 		Title:       b.Site.Title,
 		Link:        b.Site.BaseURL,
 		Description: b.Site.Description,
 		Language:    b.Site.Language,
 	}
-	for _, p := range b.Pages {
-		if p.Item == nil || !p.Indexable {
-			continue // listings and taxonomy pages are not feed entries
-		}
-		if !slices.Contains(f.Kinds, string(p.Item.Kind)) {
-			continue
-		}
-		if len(channel.Items) == limit {
-			break
-		}
+	for _, p := range entries {
 		item := rssItem{
 			Title:       p.Title,
 			Link:        absolute(b.Site.BaseURL, p.URL),
@@ -205,6 +215,14 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		}
 	}
 	return nil
+}
+
+// published is when a page's item was published, the zero time if never.
+func published(p hook.PageInfo) time.Time {
+	if p.Item.PublishedAt == nil {
+		return time.Time{}
+	}
+	return *p.Item.PublishedAt
 }
 
 // absolute makes a page's link absolute with the base URL. The link already
