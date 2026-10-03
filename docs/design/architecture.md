@@ -955,6 +955,7 @@ kite build [--force] [--verify] [--drafts]
 kite preview                          # 预览 public/
 kite serve                            # 生产动态服务
 kite publish [--message]
+kite ping                             # 通知 publish.ping 列出的更新服务，部署工作流在部署后运行
 kite index [--rebuild]                # 重建派生索引
 kite theme <list|add|remove|new|verify>
 kite plugin <list|add|remove|new>     # M8
@@ -1000,6 +1001,8 @@ publish:
   git:
     branch: main
     commitMessage: "publish: {{.Title}}"
+  ping:                  # 部署后用 XML-RPC weblogUpdates 通知的更新服务
+    - https://explore.kite.plus/api/v1/ping
 
 build:
   output: public

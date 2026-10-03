@@ -584,6 +584,7 @@ build:
 publish:
   publisher: git
   branch: main
+  ping: []             # 每次部署后通知的更新服务，见“部署”一节
 
 plugins:
   enabled: []          # 启用的插件，按运行顺序排列
@@ -606,10 +607,23 @@ menus:                 # 主题画的链接，按菜单分；见“主题”一�
 用 `keywords` 写自己的关键词。这些设置，连同每页文章数和订阅文章数，都可以在后台的
 设置 → 站点里修改。
 
+Kite 自己会在它画出的每个页面的 head 里加一行，不论用的是哪个主题：
+`<meta name="generator" content="Kite 0.1.9">`，写明构建它的版本；从源码构建的没有
+版本号，只写 `Kite`。主题或站点自己写了 generator 的，保留它们自己的那一行。
+
 列表每页显示 `pageSize` 条，除非主题在 `theme.yaml` 里给这种列表另定了分页。
 `build.pagination` 替站点规定，盖过主题：`home` 是首页，`list` 是某一种内容的列表，
 如 `/posts/`，`term` 是某个标签或分类的页面。数目写 0 就是全部显示在一页，归档页可以这样
 列出所有文章，而不用把每个标签的页面也拉得一样长。
+
+`build.feed` 写出 `rss.xml`，一份 RSS 2.0 订阅，收最新的 `feedLimit` 篇文章，新的在前；
+声明了 `feed: true` 的内容类型，它的条目也算文章。每个条目给出标题、地址和日期；
+`description`，没有时用正文开头的摘要；分类和标签，每个只出现一次；还有 `cover`，作为
+Media RSS 图片，地址和文章页面显示它时一样。条目的 `guid` 是它的 ID，并标明不是地址，
+所以文章换了地址仍是同一个条目。频道用 `generator` 写明生成它的 Kite，`lastBuildDate`
+取最新一篇文章的日期，而不是构建的时间，并用 `atom:link` 给出订阅自己的地址；写到
+`feedAliases` 的每一份各自给出自己的地址。没有 `baseURL` 时，订阅和 sitemap 只能给出
+相对链接，`kite build` 会发出警告，`--json` 里写在 `warnings` 下。
 
 少数几个键可以用环境变量覆盖，供产出依赖运行环境的构建使用：`KITE_SITE_TITLE`、
 `KITE_SITE_BASEURL`、`KITE_SITE_LANGUAGE`、`KITE_THEME`、`KITE_BUILD_OUTPUT`、
@@ -746,7 +760,8 @@ Hexo 站点只读不改。目标文件夹为空或不存在时，会按 Hexo 的
 
 `kite init` 会写好一个 GitHub Pages 工作流，构建时带 `--verify` —— 跑第二次会得到
 不同产物的站点，会在这里失败，而不是被发布出去；构建用的是站点固定的 Kite 版本（见下文）。在 **Settings → Pages → Source →
-GitHub Actions** 打开 Pages，之后推送到 `main` 即部署。
+GitHub Actions** 打开 Pages，之后推送到 `main` 即部署。部署上线之后，工作流会通知站点
+列出的更新服务，见[部署之后通知更新服务](#部署之后通知更新服务)。
 
 在有自己的域名之前，仓库的站点位于 `https://<owner>.github.io/<仓库名>/`。把这个地址
 填为 `baseURL`：Kite 生成的每个链接都会带上这段路径，`kite serve` 也会在这个路径下预览。
@@ -830,6 +845,57 @@ kite publish content/posts/hello --push
 `kitew` 出现之前建的站点没有固定版本，部署工作流自己安装 Kite。在站点里运行
 `kite wrapper`，再把工作流的构建步骤从 `kite build` 改成 `sh ./kitew build`，并删掉安装
 Go 和 Kite 的步骤。
+
+### 部署之后通知更新服务
+
+更新服务靠 ping 得知一个博客有了变化，ping 是博客程序发布内容之后发出的 XML-RPC 调用。
+[Explore](https://explore.kite.plus) 汇集独立博客的新文章，在
+`https://explore.kite.plus/api/v1/ping` 接收 ping，收到之后很快就会抓取它已经收录的
+博客，而不是等到下一轮。ping 不能让博客被 Explore 收录，收录要到 Explore 自己的网站上
+申请。
+
+`kite init` 会问部署工作流要不要在每次部署之后通知 Explore。除非回答“否”或者用了
+`--ping=false`，`kite.yaml` 里会写上：
+
+```yaml
+publish:
+  ping:
+    - https://explore.kite.plus/api/v1/ping
+```
+
+在浏览器里新建的站点、`kite import hexo` 新建的站点也一样。工作流的最后一个任务在部署
+上线之后运行：
+
+```bash
+sh ./kitew ping
+```
+
+`kite ping` 向 `publish.ping` 列出的每个服务发送 `weblogUpdates.extendedPing`，带上
+站点标题、两遍站点地址和订阅的地址；`build.feed: false` 的站点没有订阅，发的是不带订阅
+的 `weblogUpdates.ping`。它和 `kite build` 一样读取 `kite.yaml`，所以 `KITE_SITE_BASEURL`
+可以代替 `site.baseURL`，工作流把它设成 Pages 发布站点的地址；没有地址的站点会被拒绝。
+每个服务有十秒钟回应，命令为每个服务输出一行，写明它的回应。所有服务都试过之后，只要
+有一个没通知到，命令就失败，`--json` 报告同样的内容。一个服务都没列时，它说明没有要
+通知的，并正常结束。这个任务允许失败，所以服务出了问题也不会让部署失败。
+
+从 `kite.yaml` 删掉 `ping` 就不再通知，加上别的地址就会通知别的服务。`kite ping` 出现
+之前写的工作流里没有这个任务，这样的站点固定的版本里也没有这个命令：用有这个命令的 Kite
+运行 `kite wrapper`，给工作流的构建任务加上输出
+`base_url: ${{ steps.pages.outputs.base_url }}`，再在 `deploy` 后面加上：
+
+```yaml
+  ping:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - env:
+          KITE_SITE_BASEURL: ${{ needs.build.outputs.base_url }}
+        run: sh ./kitew ping
+```
 
 ### 静态，发到 Cloudflare Pages
 

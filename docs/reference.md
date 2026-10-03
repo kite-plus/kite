@@ -693,6 +693,7 @@ build:
 publish:
   publisher: git
   branch: main
+  ping: []             # update services told after each deploy; see Deploying
 
 plugins:
   enabled: []          # the plugins that run, in the order they run in
@@ -718,12 +719,29 @@ default theme does. A page can give its own keywords with `keywords` in its
 front matter. The studio edits all of these, and the page size and feed limit,
 under Settings → Site.
 
+Kite itself adds one line to the head of every page it draws, whatever the
+theme: `<meta name="generator" content="Kite 0.1.9">`, naming the release
+that built it, or just `Kite` for a build from source. A theme or a site that
+names a generator of its own keeps it.
+
 A listing shows `pageSize` items a page unless its theme says otherwise for
 that kind of listing in `theme.yaml`. `build.pagination` says it for the site,
 over the theme: `home` for the home page, `list` for the list of a kind of
 item, such as `/posts/`, and `term` for the page of a tag or a category. A
 size of 0 puts every item on one page, which is how an archive lists every
 post without making every tag's page as long.
+
+`build.feed` writes `rss.xml`, an RSS 2.0 feed of the `feedLimit` newest
+posts, newest first; items of a kind declared with `feed: true` count as
+posts. An item gives its title, address and date; its `description`, or else
+the opening of its text; its categories and tags, each once; and its `cover`,
+as a Media RSS picture at the address its page shows it from. Its `guid` is
+its id, marked as no address, so a post that moves stays one item. The
+channel names the Kite that wrote it as its `generator`, is dated by its
+newest post in `lastBuildDate`, never by the time of the build, and gives its
+own address in an `atom:link`; each copy written to `feedAliases` gives its
+own. Without a `baseURL` the feed and the sitemap can only give relative
+links, and `kite build` warns, in `--json` under `warnings`.
 
 A few keys can be overridden from the environment, for a build whose output
 depends on where it runs: `KITE_SITE_TITLE`, `KITE_SITE_BASEURL`,
@@ -893,7 +911,8 @@ can change your mind about.
 `kite init` writes a GitHub Pages workflow that builds with `--verify`, so a
 site that would deploy differently on a second run fails before it is
 published, and with the Kite release the site pins (see below). Turn Pages on under **Settings → Pages → Source → GitHub Actions**
-and a push to `main` deploys.
+and a push to `main` deploys. Once a deploy is live, the workflow tells the
+update services the site lists; see [Pinging after a deploy](#pinging-after-a-deploy).
 
 Until it has a domain of its own, a repository's site lives at
 `https://<owner>.github.io/<repository>/`. Give that address as `baseURL`:
@@ -1004,6 +1023,64 @@ A site made before `kitew` pins nothing, and its deploy workflow installs Kite
 itself. Run `kite wrapper` in it, then change the workflow's build step from
 `kite build` to `sh ./kitew build` and remove the steps that install Go and
 Kite.
+
+### Pinging after a deploy
+
+An update service learns that a blog has changed from a ping, the XML-RPC
+call blog engines send once something is published. [Explore](https://explore.kite.plus),
+which lists new posts from independent blogs, takes pings at
+`https://explore.kite.plus/api/v1/ping` and fetches a blog it lists soon
+after one, rather than at its next round. A ping cannot put a blog on
+Explore; that is done on Explore's own site.
+
+`kite init` asks whether the deploy workflow should tell Explore after each
+deploy. Unless it is told no, by an answer or by `--ping=false`, `kite.yaml`
+gets:
+
+```yaml
+publish:
+  ping:
+    - https://explore.kite.plus/api/v1/ping
+```
+
+A site made in the browser, or a new one from `kite import hexo`, gets the
+same. The workflow's last job runs, once the deploy is live:
+
+```bash
+sh ./kitew ping
+```
+
+`kite ping` sends `weblogUpdates.extendedPing`, with the site's title, its
+address twice and the address of its feed, to every service `publish.ping`
+lists, or `weblogUpdates.ping`, without the feed, for a site with
+`build.feed: false`. It reads `kite.yaml` as `kite build` does, so
+`KITE_SITE_BASEURL` stands in for `site.baseURL`, and the workflow sets it to
+the address Pages published the site at; a site with no address is refused.
+Each service has ten seconds to answer, and a line says what it answered.
+Once every one has been tried, the command fails if any could not be told,
+and `--json` reports the same. With none listed, it says there is nothing to
+ping and succeeds. The job is allowed to fail, so a service that is down never
+fails a deployment.
+
+Deleting `ping` from `kite.yaml` stops it, and another service is told by
+adding its address. A workflow written before `kite ping` has no such job,
+and the release such a site pins has no such command: run `kite wrapper` with
+a Kite that has it, give the workflow's build job the output
+`base_url: ${{ steps.pages.outputs.base_url }}`, and add, after `deploy`:
+
+```yaml
+  ping:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - env:
+          KITE_SITE_BASEURL: ${{ needs.build.outputs.base_url }}
+        run: sh ./kitew ping
+```
 
 ### Static, on Cloudflare Pages
 
