@@ -100,6 +100,9 @@ type ContentType struct {
 	Taxonomies []string      `json:"taxonomies,omitempty"`
 	Sortable   []string      `json:"sortable,omitempty"`
 	Fields     schema.Schema `json:"fields,omitempty"`
+	// NewTerms are the terms a new item of this type starts with, by
+	// taxonomy, as the site's default category.
+	NewTerms map[string][]string `json:"new_terms,omitempty"`
 	// Layouts are the templates the active theme offers items of this type,
 	// chosen by name in an item's meta as layout. Layout above is unrelated:
 	// it says how the items are stored.
@@ -352,9 +355,10 @@ type MediaList struct {
 
 // Settings is what a project exposes to a configuration form.
 type Settings struct {
-	Site  SiteSettings  `json:"site"`
-	Build BuildSettings `json:"build"`
-	Theme ThemeSettings `json:"theme"`
+	Site    SiteSettings    `json:"site"`
+	Content ContentSettings `json:"content"`
+	Build   BuildSettings   `json:"build"`
+	Theme   ThemeSettings   `json:"theme"`
 
 	// Menus are the site's menus by name. Which of them the theme draws, and
 	// how deep, is in Theme.Menus.
@@ -390,6 +394,13 @@ type SiteSettings struct {
 	NoIndex    bool   `json:"noindex,omitempty"`
 	HeadHTML   string `json:"head_html,omitempty"`
 	FooterHTML string `json:"footer_html,omitempty"`
+}
+
+// ContentSettings is how new items start.
+type ContentSettings struct {
+	// DefaultCategory is the category a new item of a kind with categories
+	// starts in, "" for none.
+	DefaultCategory string `json:"default_category"`
 }
 
 // BuildSettings is how the site's listings and feed are cut.

@@ -56,13 +56,18 @@ function autosaves(draft: Draft | null, base: Item | null): boolean {
  * created once however many uploads start together.
  *
  * site names the site for the copy of an item never saved; until it is known,
- * such a copy is not looked for. onCreated hears a new item's id once, when
- * its first save returns, whichever save that was.
+ * such a copy is not looked for. terms are what a new item starts with, by
+ * taxonomy, as the site's default category. onCreated hears a new item's id
+ * once, when its first save returns, whichever save that was.
  */
 export function useItem(
   id: string | null,
   kind: string,
-  { site, onCreated }: { site?: string; onCreated?: (id: string) => void } = {},
+  {
+    site,
+    terms,
+    onCreated,
+  }: { site?: string; terms?: Record<string, string[]>; onCreated?: (id: string) => void } = {},
 ) {
   const queryClient = useQueryClient();
 
@@ -107,6 +112,9 @@ export function useItem(
   siteRef.current = site;
   const created = useRef(onCreated);
   created.current = onCreated;
+  // Read when a new item opens, so a refetch of the types does not reset it.
+  const startTerms = useRef(terms);
+  startTerms.current = terms;
   // A save can return after the page has gone; its id then moves nothing.
   const mounted = useRef(true);
 
@@ -171,7 +179,10 @@ export function useItem(
         pendingSince.current = Date.now();
         setRestored({ at: kept.at });
       } else {
-        show({ kind, title: "", status: "draft", body: "" });
+        // The default terms are a start, not an edit: an item left untouched
+        // is not saved for them.
+        const taxonomies = startTerms.current && structuredClone(startTerms.current);
+        show({ kind, title: "", status: "draft", body: "", ...(taxonomies && { taxonomies }) });
         mark(false);
         setRestored(null);
       }

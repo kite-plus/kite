@@ -516,6 +516,7 @@ func newWritableServer(t *testing.T, root string, with ...func(*api.Options)) (h
 			Types:         current.Project.Types,
 			Site:          current.Config.Site,
 			Build:         current.Config.Build,
+			NewCategory:   current.Config.Content.NewCategory(current.Config.Site.Language),
 			Store:         current.Config.Content.Store,
 			Runtime:       "test",
 			Theme:         current.Config.Theme.Name,
@@ -1098,6 +1099,10 @@ func TestTheSitesOwnSettingsAreCheckedBeforeTheyAreWritten(t *testing.T) {
 		{"no posts to a page", "build.pageSize", 0},
 		{"a feed of thousands", "build.feedLimit", 5000},
 		{"a feed limit as text", "build.feedLimit", "20"},
+		{"a category of slashes", "content.defaultCategory", " / "},
+		{"a category of spaces", "content.defaultCategory", "   "},
+		{"a category over two lines", "content.defaultCategory", "a\nb"},
+		{"a category as a number", "content.defaultCategory", 7},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
@@ -1178,6 +1183,57 @@ func TestTheSitesOwnSettingsAreWrittenAndReadBack(t *testing.T) {
 	if strings.Contains(string(data), "keywords") {
 		t.Errorf("kite.yaml still holds keywords:\n%s", data)
 	}
+}
+
+// The default category is written to kite.yaml and is what a new post then
+// starts in; empty, a new post starts in none, and taken out, it is
+// Uncategorized again.
+func TestTheDefaultCategoryIsSetTurnedOffAndTakenOut(t *testing.T) {
+	root := newProject(t, 1)
+	config := filepath.Join(root, "kite.yaml")
+	h, _ := newWritableServer(t, root)
+	tag := send(t, h, http.MethodGet, api.Prefix+"/settings", nil, nil).Header().Get("ETag")
+
+	newPost := func() []string {
+		t.Helper()
+		for _, ct := range get[api.List[api.ContentType]](t, h, api.Prefix+"/content-types", http.StatusOK).Items {
+			if ct.Kind == "post" {
+				return ct.NewTerms["categories"]
+			}
+		}
+		t.Fatal("no post type")
+		return nil
+	}
+	set := func(value any, want string, inFile string) {
+		t.Helper()
+		rec := send(t, h, http.MethodPut, api.Prefix+"/settings",
+			map[string]any{"content.defaultCategory": value}, map[string]string{"If-Match": tag})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%v: status = %d, want 200\n%s", value, rec.Code, rec.Body.String())
+		}
+		tag = rec.Header().Get("ETag")
+		if got := decode[api.Settings](t, rec).Content.DefaultCategory; got != want {
+			t.Errorf("%v: settings say %q, want %q", value, got, want)
+		}
+		wantNew := []string{want}
+		if want == "" {
+			wantNew = nil
+		}
+		if got := newPost(); !slices.Equal(got, wantNew) {
+			t.Errorf("%v: a new post starts in %q, want %q", value, got, wantNew)
+		}
+		data, err := os.ReadFile(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if has := strings.Contains(string(data), "defaultCategory"); (inFile != "") != has || !strings.Contains(string(data), inFile) {
+			t.Errorf("%v: kite.yaml, want %q in it:\n%s", value, inFile, data)
+		}
+	}
+
+	set("Essays", "Essays", "defaultCategory: Essays")
+	set("", "", `defaultCategory: ""`)
+	set(nil, "Uncategorized", "")
 }
 
 // Clearing the language is not the same as breaking it: a project that never

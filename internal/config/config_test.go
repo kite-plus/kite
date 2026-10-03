@@ -269,3 +269,40 @@ func TestTheIndexKeyIsAMinisignPublicKey(t *testing.T) {
 		t.Errorf("a key that is not one: %v", err)
 	}
 }
+
+// A new post starts in a category: Uncategorized in the site's language
+// unless kite.yaml names one, and none when it names the empty one.
+func TestANewPostStartsInTheDefaultCategory(t *testing.T) {
+	for _, tc := range []struct {
+		name, language, line, want string
+	}{
+		{"unset in English", "en", "", "Uncategorized"},
+		{"unset in Chinese", "zh-CN", "", "未分类"},
+		{"unset in traditional Chinese", "zh-TW", "", "未分類"},
+		{"unset in Japanese", "ja", "", "未分類"},
+		{"named", "zh-CN", "  defaultCategory: ' 随笔 '\n", "随笔"},
+		{"turned off", "zh-CN", "  defaultCategory: ''\n", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := load(t, "site:\n  title: T\n  baseURL: https://example.com\n  language: "+tc.language+
+				"\ncontent:\n  dir: content\n"+tc.line)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := cfg.Content.NewCategory(cfg.Site.Language); got != tc.want {
+				t.Errorf("new category = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// A default category nobody could file a post under is refused when the
+// configuration is read, not when the first post is saved.
+func TestTheDefaultCategoryMustBeACategory(t *testing.T) {
+	for _, name := range []string{"' / - '", `"a\nb"`} {
+		_, err := load(t, "site:\n  title: T\n  baseURL: https://example.com\ncontent:\n  defaultCategory: "+name+"\n")
+		if err == nil || !strings.Contains(err.Error(), "content.defaultCategory") {
+			t.Errorf("defaultCategory %s: err = %v, want it refused", name, err)
+		}
+	}
+}

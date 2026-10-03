@@ -15,6 +15,8 @@ async function openedId(page: Page): Promise<string> {
 
 test("a new post is saved to a file of its own", async ({ page, site }) => {
   await page.goto("/admin/content/post/new");
+  // It starts in the site's default category, which nothing in kite.yaml names.
+  await expect(page.getByRole("button", { name: "Uncategorized" })).toBeVisible();
   await page.getByRole("textbox", { name: "Title" }).fill("A walk in the hills");
   await bodyOf(page).click();
   await page.keyboard.type("The path climbed through the pines.");
@@ -24,6 +26,7 @@ test("a new post is saved to a file of its own", async ({ page, site }) => {
   await expect(page.getByText(savedAt)).toBeVisible();
   const text = await site.textOf(id);
   expect(text).toContain("title: A walk in the hills");
+  expect(text).toContain("categories:\n  - Uncategorized");
   expect(text).toContain("The path climbed through the pines.");
 });
 

@@ -810,6 +810,9 @@ export const zhCN: Record<keyof typeof en, string> = {
   "settings.pagedSep": "；",
   "settings.feedLimit": "订阅文章数",
   "settings.feedLimitHelp": "RSS 订阅里最多放多少篇最新文章。",
+  "settings.defaultCategory": "默认分类",
+  "settings.defaultCategoryHelp": "在后台新建的文章先放进这个分类，写的时候可以改。留空就不预填分类。",
+  "settings.defaultCategoryNone": "不预填",
   "settings.headHTML": "页面头部代码",
   "settings.headHTMLHelp": "原样插到每个页面的 </head> 之前，例如统计代码或站点验证代码。",
   "settings.footerHTML": "页面底部代码",
@@ -817,6 +820,7 @@ export const zhCN: Record<keyof typeof en, string> = {
   "settings.groupBasics": "基本信息",
   "settings.groupSearch": "搜索引擎",
   "settings.groupReading": "阅读",
+  "settings.groupWriting": "写作",
   "settings.groupCode": "自定义代码",
   "settings.groupCodeNote": "跟着站点保存，而不是跟着主题，换主题也不会丢。这里的代码不会被检查，请只粘贴你信任的代码。",
 

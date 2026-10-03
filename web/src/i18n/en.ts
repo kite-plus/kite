@@ -830,6 +830,9 @@ export const en = {
   "settings.pagedSep": "; ",
   "settings.feedLimit": "Posts in the feed",
   "settings.feedLimitHelp": "How many of the newest posts the RSS feed carries.",
+  "settings.defaultCategory": "Default category",
+  "settings.defaultCategoryHelp": "A post written here starts in this category, which its author can change. Left empty, it starts in none.",
+  "settings.defaultCategoryNone": "None",
   "settings.headHTML": "Code at the end of the head",
   "settings.headHTMLHelp": "Added as written before </head> on every page, for an analytics or verification snippet.",
   "settings.footerHTML": "Code at the end of the page",
@@ -837,6 +840,7 @@ export const en = {
   "settings.groupBasics": "Basics",
   "settings.groupSearch": "Search engines",
   "settings.groupReading": "Reading",
+  "settings.groupWriting": "Writing",
   "settings.groupCode": "Custom code",
   "settings.groupCodeNote": "Kept with the site rather than the theme, so it survives a change of theme. It is not checked, so paste only code you trust.",
 

@@ -16,11 +16,14 @@ import (
 
 // View is one consistent look at an open project.
 type View struct {
-	Reader         content.Reader
-	Resolver       *url.Resolver
-	Types          *content.Registry
-	Site           config.Site
-	Build          config.Build
+	Reader   content.Reader
+	Resolver *url.Resolver
+	Types    *content.Registry
+	Site     config.Site
+	Build    config.Build
+	// NewCategory is the category a new item of a kind with categories
+	// starts in, "" for none.
+	NewCategory    string
 	Store          string
 	Runtime        string
 	Theme          string

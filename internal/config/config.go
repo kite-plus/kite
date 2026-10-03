@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	// Time zones are looked up by name on every system, Windows and a scratch
 	// container included, rather than only where a zoneinfo database exists.
@@ -148,9 +149,48 @@ type Content struct {
 	Store string `yaml:"store,omitempty"`
 	Dir   string `yaml:"dir,omitempty"`
 
+	// DefaultCategory is the category the studio writes into a new item of
+	// a kind that has categories. Unset, it is Uncategorized in the site's
+	// language; empty, a new item starts with none.
+	DefaultCategory *string `yaml:"defaultCategory,omitempty"`
+
 	// Types are the kinds of content the site declares of its own, beside
 	// post and page.
 	Types []Type `yaml:"types,omitempty"`
+}
+
+// NewCategory is the category a new item starts in, or "" for none.
+func (c Content) NewCategory(language string) string {
+	if c.DefaultCategory != nil {
+		return *c.DefaultCategory
+	}
+	return Uncategorized(language)
+}
+
+// Uncategorized is what a site in a language calls the category of an item
+// nobody filed, in English where Kite does not know the word.
+func Uncategorized(language string) string {
+	tag := strings.ToLower(language)
+	switch {
+	case tag == "zh-tw" || tag == "zh-hk" || tag == "zh-mo" || strings.HasPrefix(tag, "zh-hant"):
+		return "未分類"
+	case tag == "zh" || strings.HasPrefix(tag, "zh-"):
+		return "未分类"
+	case tag == "ja" || strings.HasPrefix(tag, "ja-"):
+		return "未分類"
+	}
+	return "Uncategorized"
+}
+
+// CheckCategory says why a name cannot be a category, or "" when it can.
+func CheckCategory(name string) string {
+	switch {
+	case strings.ContainsFunc(name, unicode.IsControl):
+		return "a category cannot hold line breaks or other control characters"
+	case content.TermSlug(name) == "":
+		return "a category needs more than spaces, slashes and dashes"
+	}
+	return ""
 }
 
 // Type declares a kind of content of a site's own, as a portfolio's projects
@@ -512,6 +552,10 @@ func (c *Config) normalize() {
 	if c.Site.Language == "" {
 		c.Site.Language = DefaultLanguage
 	}
+	if c.Content.DefaultCategory != nil {
+		name := strings.TrimSpace(*c.Content.DefaultCategory)
+		c.Content.DefaultCategory = &name
+	}
 }
 
 // Listings are the kinds of listing whose pages a site or a theme can size.
@@ -548,6 +592,11 @@ func (c *Config) Validate() error {
 	}
 	if c.Content.Store != "" && c.Content.Store != "file" {
 		return fmt.Errorf("config: content.store %q is not implemented yet (only file)", c.Content.Store)
+	}
+	if name := c.Content.DefaultCategory; name != nil && *name != "" {
+		if problem := CheckCategory(*name); problem != "" {
+			return fmt.Errorf("config: content.defaultCategory %q: %s (or \"\" for none)", *name, problem)
+		}
 	}
 	if !WellFormedLanguage(c.Site.Language) {
 		return fmt.Errorf("config: site.language %q is not a language tag (want something like en or zh-CN)",

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -85,14 +86,15 @@ func newServer(t *testing.T, root string, with ...func(*api.Options)) (http.Hand
 
 	opts := api.Options{Site: func() api.View {
 		return api.View{
-			Reader:   s.Reader,
-			Resolver: s.Resolver,
-			Types:    s.Project.Types,
-			Site:     s.Config.Site,
-			Store:    s.Config.Content.Store,
-			Runtime:  "test",
-			Problems: s.Problems,
-			Bundle:   func(owner *content.Content) ([]api.BundleFile, bool, error) { return bundleOf(s, owner) },
+			Reader:      s.Reader,
+			Resolver:    s.Resolver,
+			Types:       s.Project.Types,
+			Site:        s.Config.Site,
+			Store:       s.Config.Content.Store,
+			Runtime:     "test",
+			NewCategory: s.Config.Content.NewCategory(s.Config.Site.Language),
+			Problems:    s.Problems,
+			Bundle:      func(owner *content.Content) ([]api.BundleFile, bool, error) { return bundleOf(s, owner) },
 		}
 	}}
 	for _, apply := range with {
@@ -391,6 +393,26 @@ func TestContentTypesCarryTheFieldSchemaFormsAreBuiltFrom(t *testing.T) {
 	}
 	if post.Route == "" || post.Layout == "" {
 		t.Errorf("route = %q, layout = %q, want both", post.Route, post.Layout)
+	}
+}
+
+// A new post starts in the site's default category, which the studio writes
+// into it; a page has no categories to start in.
+func TestANewPostStartsInTheDefaultCategory(t *testing.T) {
+	h, _ := newServer(t, newProject(t, 1))
+
+	for _, ct := range get[api.List[api.ContentType]](t, h, api.Prefix+"/content-types", http.StatusOK).Items {
+		got := ct.NewTerms["categories"]
+		switch ct.Kind {
+		case "post":
+			if !slices.Equal(got, []string{"Uncategorized"}) {
+				t.Errorf("a new post starts in %q, want Uncategorized", got)
+			}
+		case "page":
+			if ct.NewTerms != nil {
+				t.Errorf("a new page starts with %v, want nothing", ct.NewTerms)
+			}
+		}
 	}
 }
 

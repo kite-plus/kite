@@ -39,6 +39,13 @@ carries it, however each wrote it, so renaming Go to Go writes it one way;
 removing one takes off every way of writing it. The editor offers a tag in
 use when it is typed another way, rather than starting a new one.
 
+A post written in the studio starts in the default category, shown under its
+title, which its author can change or take off. It is `content.defaultCategory`
+in kite.yaml, also set under Settings → Site: left out, it is Uncategorized in
+the site's language (未分类 on a Chinese site), and `""` starts a post in none.
+It is an ordinary category written into the new post's front matter, so posts
+already written keep theirs, and a post without one is not counted in it.
+
 ### Signing in
 
 On localhost a project with no password is open, because there is nobody else
@@ -662,6 +669,7 @@ site:
 content:
   store: file          # where content lives
   dir: content
+  defaultCategory: Uncategorized # what a new post starts in; "" for none
 
 theme:
   name: default

@@ -874,6 +874,9 @@ export interface components {
             conflict: components["schemas"]["Conflict"];
             error: components["schemas"]["ErrorDetail"];
         };
+        ContentSettings: {
+            default_category: string;
+        };
         ContentType: {
             dir: string;
             fields?: components["schemas"]["Field"][];
@@ -881,6 +884,9 @@ export interface components {
             label: string;
             layout: string;
             layouts?: components["schemas"]["LayoutOption"][];
+            new_terms?: {
+                [key: string]: string[];
+            };
             route: string;
             sortable?: string[];
             taxonomies?: string[];
@@ -1163,6 +1169,7 @@ export interface components {
         };
         Settings: {
             build: components["schemas"]["BuildSettings"];
+            content: components["schemas"]["ContentSettings"];
             menus: {
                 [key: string]: components["schemas"]["MenuEntry"][];
             };

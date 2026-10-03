@@ -308,6 +308,7 @@ func (s *Server) view() api.View {
 		Types:          current.Project.Types,
 		Site:           current.Config.Site,
 		Build:          current.Config.Build,
+		NewCategory:    current.Config.Content.NewCategory(current.Config.Site.Language),
 		Store:          current.Config.Content.Store,
 		Runtime:        "serve",
 		Theme:          current.Config.Theme.Name,

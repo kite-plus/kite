@@ -54,6 +54,9 @@ func (s *Server) handleContentTypes(w http.ResponseWriter, r *http.Request) {
 	for _, t := range types {
 		ct := contentTypeOf(t)
 		ct.Layouts = layoutsFor(layouts, string(t.Kind))
+		if view.NewCategory != "" && slices.Contains(t.Taxonomies, "categories") {
+			ct.NewTerms = map[string][]string{"categories": {view.NewCategory}}
+		}
 		out = append(out, ct)
 	}
 	writeJSON(w, http.StatusOK, List[ContentType]{Items: out})

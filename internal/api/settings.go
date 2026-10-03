@@ -35,6 +35,7 @@ var settable = []string{
 	"site.noindex",
 	"site.headHTML",
 	"site.footerHTML",
+	"content.defaultCategory",
 	"theme.name",
 	"build.pageSize",
 	"build.feedLimit",
@@ -103,6 +104,15 @@ func checkSetting(path string, value any) string {
 		if len(text) > maxCodeBytes {
 			return fmt.Sprintf("longer than %d KiB", maxCodeBytes>>10)
 		}
+	case "content.defaultCategory":
+		// Empty is kept, and means a new item starts with no category; null
+		// takes the key out, back to Uncategorized in the site's language.
+		if text != "" {
+			if strings.TrimSpace(text) == "" {
+				return "a category needs a name; send an empty one for none"
+			}
+			return config.CheckCategory(text)
+		}
 	case "build.pageSize":
 		return checkCount(value, maxPageSize)
 	case "build.feedLimit":
@@ -111,7 +121,8 @@ func checkSetting(path string, value any) string {
 	// A value of the wrong kind would be written as it came and then fail to
 	// load, leaving the project unable to open.
 	switch path {
-	case "site.description", "site.author", "site.timezone", "site.headHTML", "site.footerHTML":
+	case "site.description", "site.author", "site.timezone", "site.headHTML", "site.footerHTML",
+		"content.defaultCategory":
 		if _, ok := value.(string); value != nil && !ok {
 			return "want text"
 		}
@@ -237,6 +248,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			HeadHTML:    view.Site.HeadHTML,
 			FooterHTML:  view.Site.FooterHTML,
 		},
+		Content: ContentSettings{DefaultCategory: view.NewCategory},
 		Build: BuildSettings{
 			PageSize:   view.Build.PageSize,
 			FeedLimit:  view.Build.FeedLimit,

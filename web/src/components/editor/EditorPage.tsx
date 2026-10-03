@@ -79,6 +79,7 @@ export function EditorPage({ id, kind }: { id: string | null; kind: string }) {
   const moved = useRef<(saved: string) => void>(() => {});
   const item = useItem(id, kind, {
     site: site.data?.base_url,
+    terms: types.data?.items.find((entry) => entry.kind === kind)?.new_terms,
     onCreated: (saved) => moved.current(saved),
   });
   const delivery = useDelivery();

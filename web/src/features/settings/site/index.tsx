@@ -25,13 +25,15 @@ const paths: Record<string, string> = {
   noindex: "site.noindex",
   page_size: "build.pageSize",
   feed_limit: "build.feedLimit",
+  default_category: "content.defaultCategory",
   head_html: "site.headHTML",
   footer_html: "site.footerHTML",
 };
 
 // A setting left empty is sent as null, which takes it out of kite.yaml
-// rather than leaving a key that says nothing.
-const read = ({ site, build }: Settings) => ({
+// rather than leaving a key that says nothing. The default category is the
+// exception: empty says a new post starts in none.
+const read = ({ site, build, content }: Settings) => ({
   title: site.title,
   description: site.description || null,
   base_url: site.base_url,
@@ -41,6 +43,7 @@ const read = ({ site, build }: Settings) => ({
   noindex: site.noindex ?? false,
   page_size: build.page_size || null,
   feed_limit: build.feed_limit || null,
+  default_category: content.default_category,
   head_html: site.head_html || null,
   footer_html: site.footer_html || null,
 });
@@ -145,6 +148,17 @@ export function SiteSettings() {
                   />
                 </Row>
               </div>
+            </Group>
+
+            <Group title={t("settings.groupWriting")}>
+              <Row id="default_category" label="settings.defaultCategory" help="settings.defaultCategoryHelp">
+                <Input
+                  id="default_category"
+                  placeholder={t("settings.defaultCategoryNone")}
+                  value={values.default_category ?? ""}
+                  onChange={(event) => set("default_category", event.target.value)}
+                />
+              </Row>
             </Group>
 
             <Group title={t("settings.groupCode")} note={t("settings.groupCodeNote")}>
