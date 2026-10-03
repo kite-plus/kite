@@ -21,9 +21,11 @@ type rss struct {
 			Type string `xml:"type,attr"`
 		} `xml:"http://www.w3.org/2005/Atom link"`
 		Generator *string `xml:"generator"`
+		Updated   *string `xml:"lastBuildDate"`
 		Items     []struct {
-			Title string `xml:"title"`
-			GUID  struct {
+			Title   string `xml:"title"`
+			PubDate string `xml:"pubDate"`
+			GUID    struct {
 				IsPermaLink string `xml:"isPermaLink,attr"`
 				ID          string `xml:",chardata"`
 			} `xml:"guid"`
@@ -197,5 +199,30 @@ func TestTheFeedGivesItsOwnAddress(t *testing.T) {
 	bare := emit(t, opts, hook.SiteInfo{Title: "Site"}, hello)["rss.xml"]
 	if strings.Contains(bare, "atom") {
 		t.Errorf("a feed with no address to give names one:\n%s", bare)
+	}
+}
+
+// The channel is dated by its newest post, which two builds of one site
+// agree on, and not by the clock, which they would not. A feed with no dated
+// post has no date to give.
+func TestTheFeedIsDatedByItsNewestPost(t *testing.T) {
+	site := hook.SiteInfo{Title: "Site", BaseURL: "https://example.com"}
+	opts := builtin.Options{FeedKinds: []string{"post"}}
+
+	feed := feedOf(t, opts, site,
+		post("01J8KQ2P3R4S5T6V7W8X9YZ001", "older", "2026-01-01"),
+		post("01J8KQ2P3R4S5T6V7W8X9YZ002", "newest", "2026-03-01"),
+		post("01J8KQ2P3R4S5T6V7W8X9YZ003", "undated", ""))
+	if u := feed.Channel.Updated; u == nil || *u != "Sun, 01 Mar 2026 00:00:00 +0000" || *u != feed.Channel.Items[0].PubDate {
+		t.Errorf("lastBuildDate = %v, want the newest post's date", u)
+	}
+
+	for name, pages := range map[string][]hook.PageInfo{
+		"no posts":      nil,
+		"undated posts": {post("01J8KQ2P3R4S5T6V7W8X9YZ001", "undated", "")},
+	} {
+		if u := feedOf(t, opts, site, pages...).Channel.Updated; u != nil {
+			t.Errorf("%s: lastBuildDate = %q, want none", name, *u)
+		}
 	}
 }

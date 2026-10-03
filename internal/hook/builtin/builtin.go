@@ -201,6 +201,7 @@ type rssChannel struct {
 	Description string    `xml:"description"`
 	Language    string    `xml:"language,omitempty"`
 	Generator   string    `xml:"generator,omitempty"`
+	Updated     string    `xml:"lastBuildDate,omitempty"`
 	Self        *atomLink `xml:"atom:link"`
 	Items       []rssItem `xml:"item"`
 }
@@ -249,6 +250,11 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		Description: b.Site.Description,
 		Language:    b.Site.Language,
 		Generator:   f.Generator,
+	}
+	// The feed changed when its newest item was published. The clock would
+	// make two builds of one site differ.
+	if len(entries) > 0 && entries[0].Item.PublishedAt != nil {
+		channel.Updated = entries[0].Item.PublishedAt.UTC().Format(time.RFC1123Z)
 	}
 	for _, p := range entries {
 		item := rssItem{
