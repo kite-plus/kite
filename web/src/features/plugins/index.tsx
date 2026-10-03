@@ -6,7 +6,6 @@ import {
   ExternalLink,
   Globe,
   MoreHorizontal,
-  Puzzle,
   Settings2,
   Trash2,
   TriangleAlert,
@@ -44,7 +43,7 @@ import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
 import { QueryError } from "@/components/query-error";
 import { ReadOnlyNote } from "@/components/read-only-note";
-import { UpdateBadge } from "@/features/apps/parts";
+import { InstalledIcon, UpdateBadge } from "@/features/apps/parts";
 import { PublishBar } from "@/features/settings/components/publish-bar";
 
 /**
@@ -140,9 +139,7 @@ function PluginCard({ plugin, onRemove }: { plugin: PluginInfo; onRemove: () => 
   return (
     <article className={cn("flex flex-col rounded-xl border bg-card", plugin.enabled && "border-primary/40")}>
       <div className="flex flex-1 items-start gap-3 p-4">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-          <Puzzle className="size-5" />
-        </div>
+        <InstalledIcon name={plugin.id} className="size-10" />
         <div className="grid min-w-0 flex-1 gap-1.5">
           <div className="flex items-baseline gap-2">
             <h3 className="truncate font-medium">{plugin.name}</h3>

@@ -33,11 +33,26 @@ export function AppScreenshot({ app, className }: { app: AppInfo; className?: st
 
 /** AppIcon is a plugin's own icon, or a puzzle piece for one without. */
 export function AppIcon({ app, className }: { app: AppInfo; className?: string }) {
+  return <PluginIcon key={app.icon} src={app.icon} className={className} />;
+}
+
+/**
+ * InstalledIcon is an installed plugin's icon as the index lists it, so the
+ * plugins page draws it as the app center does: a puzzle piece while the
+ * index cannot be read or does not list the plugin.
+ */
+export function InstalledIcon({ name, className }: { name: string; className?: string }) {
+  const apps = useApps();
+  const icon = apps.data?.items.find((one) => one.kind === "plugin" && one.id === name)?.icon;
+  return <PluginIcon key={icon} src={icon} className={className} />;
+}
+
+function PluginIcon({ src, className }: { src?: string; className?: string }) {
   const [failed, setFailed] = useState(false);
   return (
     <div className={cn("flex shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground", className)}>
-      {app.icon && !failed ? (
-        <img src={app.icon} alt="" className="size-3/4 object-contain" onError={() => setFailed(true)} />
+      {src && !failed ? (
+        <img src={src} alt="" className="size-3/4 object-contain" onError={() => setFailed(true)} />
       ) : (
         <Puzzle className="size-1/2" />
       )}
