@@ -23,9 +23,10 @@ type rss struct {
 		Generator *string `xml:"generator"`
 		Updated   *string `xml:"lastBuildDate"`
 		Items     []struct {
-			Title   string `xml:"title"`
-			PubDate string `xml:"pubDate"`
-			GUID    struct {
+			Title      string   `xml:"title"`
+			PubDate    string   `xml:"pubDate"`
+			Categories []string `xml:"category"`
+			GUID       struct {
 				IsPermaLink string `xml:"isPermaLink,attr"`
 				ID          string `xml:",chardata"`
 			} `xml:"guid"`
@@ -224,5 +225,24 @@ func TestTheFeedIsDatedByItsNewestPost(t *testing.T) {
 		if u := feedOf(t, opts, site, pages...).Channel.Updated; u != nil {
 			t.Errorf("%s: lastBuildDate = %q, want none", name, *u)
 		}
+	}
+}
+
+// A post's categories and tags are its categories in the feed, each once
+// however often or however it is written, categories first.
+func TestAPostsTermsAreItsCategories(t *testing.T) {
+	tagged := post("01J8KQ2P3R4S5T6V7W8X9YZ001", "tagged", "2026-01-01")
+	tagged.Item.Taxonomies = map[string][]string{
+		"tags":       {"Go", " web dev ", "go", "---", "Notes"},
+		"categories": {"Notes"},
+	}
+	plain := post("01J8KQ2P3R4S5T6V7W8X9YZ002", "plain", "2025-01-01")
+
+	feed := feedOf(t, builtin.Options{FeedKinds: []string{"post"}}, hook.SiteInfo{Title: "Site"}, tagged, plain)
+	if got, want := feed.Channel.Items[0].Categories, []string{"Notes", "Go", "web dev"}; !slices.Equal(got, want) {
+		t.Errorf("categories = %q, want %q", got, want)
+	}
+	if got := feed.Channel.Items[1].Categories; len(got) != 0 {
+		t.Errorf("a post with no terms has categories %q", got)
 	}
 }

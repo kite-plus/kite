@@ -11,12 +11,14 @@ import (
 	"context"
 	"encoding/xml"
 	"html"
+	"maps"
 	"net/url"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/kite-plus/kite/internal/content"
 	"github.com/kite-plus/kite/internal/hook"
 	"github.com/kite-plus/kite/internal/stamp"
 )
@@ -181,11 +183,12 @@ type Feed struct {
 func (f *Feed) CacheKey() []byte { return append(f.Base.CacheKey(), f.Generator...) }
 
 type rssItem struct {
-	Title       string  `xml:"title"`
-	Link        string  `xml:"link"`
-	GUID        rssGUID `xml:"guid"`
-	PubDate     string  `xml:"pubDate,omitempty"`
-	Description string  `xml:"description,omitempty"`
+	Title       string   `xml:"title"`
+	Link        string   `xml:"link"`
+	GUID        rssGUID  `xml:"guid"`
+	PubDate     string   `xml:"pubDate,omitempty"`
+	Description string   `xml:"description,omitempty"`
+	Categories  []string `xml:"category"`
 }
 
 // rssGUID is an item's id. RSS takes a guid for the item's address unless it
@@ -262,6 +265,7 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 			Link:        absolute(b.Site.BaseURL, p.URL),
 			GUID:        rssGUID{ID: string(p.Item.ID)},
 			Description: p.Excerpt,
+			Categories:  categories(p.Item),
 		}
 		if p.Item.PublishedAt != nil {
 			item.PubDate = p.Item.PublishedAt.UTC().Format(time.RFC1123Z)
@@ -290,6 +294,25 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		}
 	}
 	return nil
+}
+
+// categories are an item's terms, by taxonomy in name order and as the item
+// writes them. A term written twice, in one taxonomy or two, is given once,
+// and one with no address is not a term.
+func categories(item *content.Content) []string {
+	var out []string
+	seen := make(map[string]bool)
+	for _, taxonomy := range slices.Sorted(maps.Keys(item.Taxonomies)) {
+		for _, term := range item.Taxonomies[taxonomy] {
+			slug := content.TermSlug(term)
+			if slug == "" || seen[slug] {
+				continue
+			}
+			seen[slug] = true
+			out = append(out, strings.TrimSpace(term))
+		}
+	}
+	return out
 }
 
 // published is when a page's item was published, the zero time if never.
