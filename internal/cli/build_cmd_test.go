@@ -135,6 +135,39 @@ func TestABuildNamesTheKiteThatMadeIt(t *testing.T) {
 	}
 }
 
+// A site with no address still builds, but its feed and its sitemap then give
+// relative links, which their readers mostly cannot follow, so the build says
+// so: on stderr, and in the report, where it leaves the JSON whole.
+func TestABuildWithNoAddressWarnsThatItsLinksAreRelative(t *testing.T) {
+	t.Setenv("KITE_BUILD_OUTPUT", "")
+	t.Setenv("KITE_SITE_BASEURL", "")
+	root := t.TempDir()
+	if _, err := create(t.Context(), plan{Root: root, Title: "Nowhere", Language: "en"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	var report buildReport
+	if err := json.Unmarshal([]byte(runKite(t, root, "build", "--json")), &report); err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "site.baseURL is empty") ||
+		!strings.Contains(report.Warnings[0], "the feed and the sitemap") {
+		t.Errorf("warnings = %q, want one about site.baseURL", report.Warnings)
+	}
+	if out := runKite(t, root, "build"); !strings.Contains(out, "warning: site.baseURL is empty") {
+		t.Errorf("the build does not warn:\n%s", out)
+	}
+
+	t.Setenv("KITE_SITE_BASEURL", "https://example.com")
+	report = buildReport{}
+	if err := json.Unmarshal([]byte(runKite(t, root, "build", "--json")), &report); err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Warnings) != 0 {
+		t.Errorf("a site with an address is warned: %q", report.Warnings)
+	}
+}
+
 // entries lists what a directory holds, leaving out the .kite a build keeps
 // its records in.
 func entries(t *testing.T, dir string) []string {

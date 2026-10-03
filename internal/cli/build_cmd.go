@@ -7,10 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/kite-plus/kite/internal/config"
+	"github.com/kite-plus/kite/internal/project"
 	"github.com/kite-plus/kite/internal/site"
 )
 
@@ -28,6 +31,10 @@ type buildReport struct {
 	// NextDue is when a scheduled post falls due and the site has to be
 	// built again to publish it. The deploy workflow reads it.
 	NextDue string `json:"next_due,omitempty"`
+
+	// Warnings say what in a site that built would still trip up its
+	// readers.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 func newBuildCmd() *cobra.Command {
@@ -73,6 +80,7 @@ func newBuildCmd() *cobra.Command {
 				Files:    len(files),
 				Output:   outDir,
 				Took:     stats.Duration.Round(100000).String(),
+				Warnings: buildWarnings(s.Config),
 			}
 			if !stats.NextDue.IsZero() {
 				report.NextDue = stats.NextDue.UTC().Format(time.RFC3339)
@@ -93,6 +101,9 @@ func newBuildCmd() *cobra.Command {
 				}
 			} else {
 				printBuild(cmd, report)
+				for _, w := range report.Warnings {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", w)
+				}
 			}
 			if len(report.Diverged) > 0 {
 				return fmt.Errorf("build is not reproducible: %d file(s) differ between two runs", len(report.Diverged))
@@ -104,6 +115,23 @@ func newBuildCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&drafts, "drafts", false, "include unpublished content")
 	cmd.Flags().BoolVar(&verify, "verify", false, "build twice and compare, proving the output is reproducible")
 	return cmd
+}
+
+// buildWarnings says what about a site would trip up its readers.
+func buildWarnings(cfg *config.Config) []string {
+	var lists []string
+	if cfg.Build.Feed {
+		lists = append(lists, "the feed")
+	}
+	if cfg.Build.Sitemap {
+		lists = append(lists, "the sitemap")
+	}
+	if cfg.Site.BaseURL != "" || len(lists) == 0 {
+		return nil
+	}
+	return []string{fmt.Sprintf("site.baseURL is empty, so the links in %s are relative, "+
+		"which feed readers and search engines may not follow; set it in %s or with KITE_SITE_BASEURL",
+		strings.Join(lists, " and "), project.ConfigName)}
 }
 
 func printBuild(cmd *cobra.Command, r buildReport) {
