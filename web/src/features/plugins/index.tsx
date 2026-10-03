@@ -5,9 +5,7 @@ import {
   Cpu,
   ExternalLink,
   Globe,
-  MoreHorizontal,
   Settings2,
-  Trash2,
   TriangleAlert,
   Upload,
 } from "lucide-react";
@@ -28,16 +26,11 @@ import {
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { RemoveButton } from "@/components/remove-button";
 import { AppHeader } from "@/components/layout/app-header";
 import { Main } from "@/components/layout/main";
 import { PageTitle } from "@/components/layout/page-title";
@@ -201,19 +194,12 @@ function PluginCard({ plugin, onRemove }: { plugin: PluginInfo; onRemove: () => 
           </Button>
         )}
         {writable && (
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="ms-auto size-8" aria-label={t("themes.more")}>
-              <MoreHorizontal />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem variant="destructive" disabled={plugin.enabled} onSelect={onRemove}>
-              <Trash2 />
-              {t(plugin.enabled ? "plugins.removeOnFirst" : "plugins.remove")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <RemoveButton
+            className="ms-auto"
+            label={t("plugins.remove")}
+            blocked={plugin.enabled ? t("plugins.removeOnFirst") : undefined}
+            onClick={onRemove}
+          />
         )}
       </div>
     </article>

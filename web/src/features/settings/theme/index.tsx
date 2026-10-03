@@ -4,10 +4,8 @@ import {
   CheckCircle2,
   ExternalLink,
   Eye,
-  MoreHorizontal,
   Paintbrush,
   Palette,
-  Trash2,
   TriangleAlert,
   Upload,
 } from "lucide-react";
@@ -28,15 +26,10 @@ import { siteHome } from "@/lib/links";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { RemoveButton } from "@/components/remove-button";
 import { QueryError } from "@/components/query-error";
 import { UpdateBadge } from "@/features/apps/parts";
 import { ContentSection } from "../components/content-section";
@@ -304,19 +297,7 @@ function ThemeCard({
           </>
         )}
         {!theme.builtin && writable && (
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="ms-auto size-8" aria-label={t("themes.more")}>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem variant="destructive" onSelect={onRemove}>
-                <Trash2 />
-                {t("themes.remove")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RemoveButton className="ms-auto" label={t("themes.remove")} onClick={onRemove} />
         )}
       </div>
     </article>
