@@ -15,6 +15,11 @@ import (
 // rss is the part of a feed these tests read.
 type rss struct {
 	Channel struct {
+		Self []struct {
+			Href string `xml:"href,attr"`
+			Rel  string `xml:"rel,attr"`
+			Type string `xml:"type,attr"`
+		} `xml:"http://www.w3.org/2005/Atom link"`
 		Generator *string `xml:"generator"`
 		Items     []struct {
 			Title string `xml:"title"`
@@ -163,5 +168,34 @@ func TestEveryPageNamesItsGenerator(t *testing.T) {
 	}
 	if page := "<html><head></head></html>"; transform(builtin.Options{}, page) != page {
 		t.Error("a page names a generator with none given")
+	}
+}
+
+// A feed gives its own address, for a reader to know where it subscribed:
+// under the path of a site published beneath one, and in each copy of the
+// feed its own. A site with no address has none to give.
+func TestTheFeedGivesItsOwnAddress(t *testing.T) {
+	hello := post("01J8KQ2P3R4S5T6V7W8X9YZ001", "hello", "2026-01-01")
+	opts := builtin.Options{Feed: true, FeedAliases: []string{"index.xml", "posts/index.xml"}}
+	files := emit(t, opts, hook.SiteInfo{Title: "Site", BaseURL: "https://example.github.io/blog"}, hello)
+
+	for name, want := range map[string]string{
+		"rss.xml":         "https://example.github.io/blog/rss.xml",
+		"index.xml":       "https://example.github.io/blog/index.xml",
+		"posts/index.xml": "https://example.github.io/blog/posts/index.xml",
+	} {
+		var feed rss
+		if err := xml.Unmarshal([]byte(files[name]), &feed); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		self := feed.Channel.Self
+		if len(self) != 1 || self[0].Href != want || self[0].Rel != "self" || self[0].Type != "application/rss+xml" {
+			t.Errorf("%s gives itself as %+v, want %s", name, self, want)
+		}
+	}
+
+	bare := emit(t, opts, hook.SiteInfo{Title: "Site"}, hello)["rss.xml"]
+	if strings.Contains(bare, "atom") {
+		t.Errorf("a feed with no address to give names one:\n%s", bare)
 	}
 }

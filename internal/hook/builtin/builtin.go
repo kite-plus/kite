@@ -201,12 +201,21 @@ type rssChannel struct {
 	Description string    `xml:"description"`
 	Language    string    `xml:"language,omitempty"`
 	Generator   string    `xml:"generator,omitempty"`
+	Self        *atomLink `xml:"atom:link"`
 	Items       []rssItem `xml:"item"`
+}
+
+// atomLink gives the feed's own address, which RSS has no element for.
+type atomLink struct {
+	Href string `xml:"href,attr"`
+	Rel  string `xml:"rel,attr"`
+	Type string `xml:"type,attr"`
 }
 
 type rssFeed struct {
 	XMLName xml.Name   `xml:"rss"`
 	Version string     `xml:"version,attr"`
+	Atom    string     `xml:"xmlns:atom,attr,omitempty"`
 	Channel rssChannel `xml:"channel"`
 }
 
@@ -254,15 +263,22 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		channel.Items = append(channel.Items, item)
 	}
 
-	var buf bytes.Buffer
-	buf.WriteString(xml.Header)
-	enc := xml.NewEncoder(&buf)
-	enc.Indent("", "  ")
-	if err := enc.Encode(rssFeed{Version: "2.0", Channel: channel}); err != nil {
-		return err
-	}
-	buf.WriteByte('\n')
+	feed := rssFeed{Version: "2.0", Channel: channel}
 	for _, name := range append([]string{"rss.xml"}, f.Aliases...) {
+		// Each file gives its own address, which is where its readers
+		// subscribed; a site with no address has none to give.
+		if b.Site.BaseURL != "" {
+			feed.Atom = "http://www.w3.org/2005/Atom"
+			feed.Channel.Self = &atomLink{Href: under(b.Site.BaseURL, name), Rel: "self", Type: "application/rss+xml"}
+		}
+		var buf bytes.Buffer
+		buf.WriteString(xml.Header)
+		enc := xml.NewEncoder(&buf)
+		enc.Indent("", "  ")
+		if err := enc.Encode(feed); err != nil {
+			return err
+		}
+		buf.WriteByte('\n')
 		if err := b.Emit(name, buf.Bytes()); err != nil {
 			return err
 		}
@@ -276,6 +292,12 @@ func published(p hook.PageInfo) time.Time {
 		return time.Time{}
 	}
 	return *p.Item.PublishedAt
+}
+
+// under is the address of a file of the site, beneath the base URL's path;
+// resolving the file against the base would drop the path's last part.
+func under(base, file string) string {
+	return strings.TrimRight(base, "/") + "/" + strings.TrimLeft(file, "/")
 }
 
 // absolute makes a page's link absolute with the base URL. The link already

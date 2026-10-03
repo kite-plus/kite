@@ -1500,6 +1500,7 @@ Body.
 
 // Feed readers do not follow a page that redirects, so a site that moved from
 // Hugo keeps its subscribers by writing the same feed where they subscribed.
+// Each copy gives the address it is published at as the feed's own.
 func TestTheFeedIsAlsoWrittenToItsAliases(t *testing.T) {
 	f := newFixture(t, 2)
 	f.hooks = hook.NewBus()
@@ -1509,12 +1510,17 @@ func TestTheFeedIsAlsoWrittenToItsAliases(t *testing.T) {
 
 	_, files := f.run(t, f.out, nil)
 	feed := readFile(t, f.out, "rss.xml")
+	const self = `<atom:link href="https://example.com/rss.xml" rel="self"`
+	if !strings.Contains(feed, self) {
+		t.Fatalf("rss.xml does not give its own address:\n%s", feed)
+	}
 	for _, alias := range opts.FeedAliases {
 		if !slices.Contains(files, alias) {
 			t.Fatalf("no feed at %s\ngot: %v", alias, files)
 		}
-		if got := readFile(t, f.out, alias); got != feed {
-			t.Errorf("%s differs from rss.xml", alias)
+		want := strings.Replace(feed, self, `<atom:link href="https://example.com/`+alias+`" rel="self"`, 1)
+		if got := readFile(t, f.out, alias); got != want {
+			t.Errorf("%s is not rss.xml at its own address:\n%s", alias, got)
 		}
 	}
 	if strings.Contains(readFile(t, f.out, "sitemap.xml"), "index.xml") {
