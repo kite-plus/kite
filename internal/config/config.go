@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -420,6 +421,28 @@ type Publish struct {
 	Publisher string `yaml:"publisher,omitempty"`
 	Branch    string `yaml:"branch,omitempty"`
 	Message   string `yaml:"commitMessage,omitempty"`
+
+	// Ping lists the update services kite ping tells that the site has
+	// changed, which the deploy workflow does after each deploy. A site
+	// that lists none pings nothing.
+	Ping []string `yaml:"ping,omitempty"`
+}
+
+// validPings checks that each update service is named once, by an http or
+// https address.
+func validPings(endpoints []string) error {
+	seen := make(map[string]bool, len(endpoints))
+	for _, e := range endpoints {
+		u, err := url.Parse(e)
+		switch {
+		case err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "":
+			return fmt.Errorf("config: publish.ping: %q is not an http or https address", e)
+		case seen[e]:
+			return fmt.Errorf("config: publish.ping lists %q twice", e)
+		}
+		seen[e] = true
+	}
+	return nil
 }
 
 // Config is a parsed kite.yaml.
@@ -537,6 +560,9 @@ func (c *Config) normalize() {
 	for i, p := range c.Build.FeedAliases {
 		c.Build.FeedAliases[i] = strings.TrimLeft(strings.TrimSpace(p), "/")
 	}
+	for i, e := range c.Publish.Ping {
+		c.Publish.Ping[i] = strings.TrimSpace(e)
+	}
 	if c.Build.Output == "" {
 		c.Build.Output = "public"
 	}
@@ -611,6 +637,9 @@ func (c *Config) Validate() error {
 			c.Build.Output)
 	}
 	if err := validFeedAliases(c.Build.FeedAliases); err != nil {
+		return err
+	}
+	if err := validPings(c.Publish.Ping); err != nil {
 		return err
 	}
 	if err := ValidPagination(c.Build.Pagination); err != nil {

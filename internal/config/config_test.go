@@ -306,3 +306,33 @@ func TestTheDefaultCategoryMustBeACategory(t *testing.T) {
 		}
 	}
 }
+
+// An update service is named by an http or https address, once. A site that
+// names none pings nothing, as a site made before pings did.
+func TestPingsGoToHTTPAddressesOnce(t *testing.T) {
+	const site = "site:\n  title: T\n  baseURL: https://example.com\n"
+	cfg, err := load(t, site)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Publish.Ping) != 0 {
+		t.Errorf("ping = %q with none named", cfg.Publish.Ping)
+	}
+
+	cfg, err = load(t, site+"publish:\n  ping:\n    - https://explore.kite.plus/api/v1/ping\n    - ' http://ping.example.com/rpc '\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"https://explore.kite.plus/api/v1/ping", "http://ping.example.com/rpc"}; !slices.Equal(cfg.Publish.Ping, want) {
+		t.Errorf("ping = %q, want %q", cfg.Publish.Ping, want)
+	}
+
+	for _, list := range []string{
+		"['']", "[ftp://example.com/ping]", "[example.com/ping]", "[/api/v1/ping]", "['https://']",
+		"[https://example.com/ping, ' https://example.com/ping']",
+	} {
+		if _, err := load(t, site+"publish:\n  ping: "+list+"\n"); err == nil || !strings.Contains(err.Error(), "publish.ping") {
+			t.Errorf("ping: %s = %v, want a refusal naming publish.ping", list, err)
+		}
+	}
+}
