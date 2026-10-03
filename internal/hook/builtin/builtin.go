@@ -183,12 +183,19 @@ type Feed struct {
 func (f *Feed) CacheKey() []byte { return append(f.Base.CacheKey(), f.Generator...) }
 
 type rssItem struct {
-	Title       string   `xml:"title"`
-	Link        string   `xml:"link"`
-	GUID        rssGUID  `xml:"guid"`
-	PubDate     string   `xml:"pubDate,omitempty"`
-	Description string   `xml:"description,omitempty"`
-	Categories  []string `xml:"category"`
+	Title       string        `xml:"title"`
+	Link        string        `xml:"link"`
+	GUID        rssGUID       `xml:"guid"`
+	PubDate     string        `xml:"pubDate,omitempty"`
+	Description string        `xml:"description,omitempty"`
+	Categories  []string      `xml:"category"`
+	Cover       *mediaContent `xml:"media:content"`
+}
+
+// mediaContent is a picture of an item, as Media RSS gives one.
+type mediaContent struct {
+	URL    string `xml:"url,attr"`
+	Medium string `xml:"medium,attr"`
 }
 
 // rssGUID is an item's id. RSS takes a guid for the item's address unless it
@@ -220,6 +227,7 @@ type rssFeed struct {
 	XMLName xml.Name   `xml:"rss"`
 	Version string     `xml:"version,attr"`
 	Atom    string     `xml:"xmlns:atom,attr,omitempty"`
+	Media   string     `xml:"xmlns:media,attr,omitempty"`
 	Channel rssChannel `xml:"channel"`
 }
 
@@ -270,10 +278,16 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		if p.Item.PublishedAt != nil {
 			item.PubDate = p.Item.PublishedAt.UTC().Format(time.RFC1123Z)
 		}
+		if picture := cover(b.Site.BaseURL, p); picture != "" {
+			item.Cover = &mediaContent{URL: picture, Medium: "image"}
+		}
 		channel.Items = append(channel.Items, item)
 	}
 
 	feed := rssFeed{Version: "2.0", Channel: channel}
+	if slices.ContainsFunc(channel.Items, func(i rssItem) bool { return i.Cover != nil }) {
+		feed.Media = "http://search.yahoo.com/mrss/"
+	}
 	for _, name := range append([]string{"rss.xml"}, f.Aliases...) {
 		// Each file gives its own address, which is where its readers
 		// subscribed; a site with no address has none to give.
@@ -303,6 +317,34 @@ func description(p hook.PageInfo) string {
 		return strings.TrimSpace(written)
 	}
 	return p.Excerpt
+}
+
+// cover is the address of an item's cover, read as a theme reads it: a full
+// address as it is, one from the site's root under the base URL's path, and
+// any other from the page's own address. cover: false names none, and an
+// address a reader cannot fetch, such as a data: one, is left out.
+func cover(base string, p hook.PageInfo) string {
+	written, _ := p.Item.Meta["cover"].(string)
+	written = strings.TrimSpace(written)
+	if written == "" {
+		return ""
+	}
+	ref, err := url.Parse(written)
+	if err != nil || (ref.Scheme != "" && ref.Scheme != "http" && ref.Scheme != "https") {
+		return ""
+	}
+	page, err := url.Parse(absolute(base, p.URL))
+	if err != nil {
+		return ""
+	}
+	if ref.Scheme == "" && ref.Host == "" && strings.HasPrefix(ref.Path, "/") {
+		site, err := url.Parse(base)
+		if err != nil {
+			return ""
+		}
+		ref.Path = strings.TrimRight(site.Path, "/") + ref.Path
+	}
+	return page.ResolveReference(ref).String()
 }
 
 // categories are an item's terms, by taxonomy in name order and as the item

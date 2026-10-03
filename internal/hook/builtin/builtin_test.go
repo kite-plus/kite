@@ -28,7 +28,11 @@ type rss struct {
 			PubDate     string   `xml:"pubDate"`
 			Description string   `xml:"description"`
 			Categories  []string `xml:"category"`
-			GUID        struct {
+			Media       []struct {
+				URL    string `xml:"url,attr"`
+				Medium string `xml:"medium,attr"`
+			} `xml:"http://search.yahoo.com/mrss/ content"`
+			GUID struct {
 				IsPermaLink string `xml:"isPermaLink,attr"`
 				ID          string `xml:",chardata"`
 			} `xml:"guid"`
@@ -270,5 +274,43 @@ func TestAPostIsDescribedAsItsAuthorWrote(t *testing.T) {
 	want := []string{"Written for the feed.", "The opening of the text.", "The opening of the text.", "The opening of the text."}
 	if !slices.Equal(got, want) {
 		t.Errorf("descriptions = %q, want %q", got, want)
+	}
+}
+
+// A post's cover goes with it as Media RSS, at the address its page shows it
+// from: a full address as written, one from the site's root under the site's
+// path, and any other beside the page. A post with no cover, or with
+// cover: false, has none, and a feed with no cover declares no Media RSS.
+func TestAPostsCoverGoesWithIt(t *testing.T) {
+	site := hook.SiteInfo{Title: "Site", BaseURL: "https://example.github.io/blog"}
+	for _, tc := range []struct {
+		cover any
+		want  string
+	}{
+		{"cover.jpg", "https://example.github.io/blog/posts/hello/cover.jpg"},
+		{"./images/cover.jpg", "https://example.github.io/blog/posts/hello/images/cover.jpg"},
+		{"/uploads/cover.jpg", "https://example.github.io/blog/uploads/cover.jpg"},
+		{"https://cdn.example.com/c.jpg", "https://cdn.example.com/c.jpg"},
+		{"//cdn.example.com/c.jpg", "https://cdn.example.com/c.jpg"},
+		{"", ""},
+		{false, ""},
+		{"data:image/png;base64,iVBORw0KGgo=", ""},
+	} {
+		hello := post("01J8KQ2P3R4S5T6V7W8X9YZ001", "hello", "2026-01-01")
+		hello.URL = "/blog/posts/hello/"
+		hello.Item.Meta = map[string]any{"cover": tc.cover}
+
+		raw := emit(t, builtin.Options{Feed: true}, site, hello)["rss.xml"]
+		var feed rss
+		if err := xml.Unmarshal([]byte(raw), &feed); err != nil {
+			t.Fatal(err)
+		}
+		media := feed.Channel.Items[0].Media
+		switch {
+		case tc.want == "" && (len(media) != 0 || strings.Contains(raw, "mrss")):
+			t.Errorf("cover %#v: the feed gives a picture:\n%s", tc.cover, raw)
+		case tc.want != "" && (len(media) != 1 || media[0].URL != tc.want || media[0].Medium != "image"):
+			t.Errorf("cover %#v: media = %+v, want an image at %s", tc.cover, media, tc.want)
+		}
 	}
 }
