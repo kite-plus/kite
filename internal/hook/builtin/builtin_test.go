@@ -16,6 +16,10 @@ type rss struct {
 	Channel struct {
 		Items []struct {
 			Title string `xml:"title"`
+			GUID  struct {
+				IsPermaLink string `xml:"isPermaLink,attr"`
+				ID          string `xml:",chardata"`
+			} `xml:"guid"`
 		} `xml:"item"`
 	} `xml:"channel"`
 }
@@ -94,5 +98,19 @@ func TestTheFeedIsInTheOrderOfTheSitesListings(t *testing.T) {
 	)
 	if got := titles(limited); !slices.Equal(got, []string{"newest", "newer"}) {
 		t.Errorf("with a limit of 2, items = %v, want the two newest", got)
+	}
+}
+
+// A post's guid is its id, which outlives a change of address. RSS takes a
+// guid for the post's address unless it says otherwise, so it says so.
+func TestAGuidIsTheIdAndNoAddress(t *testing.T) {
+	feed := feedOf(t, builtin.Options{FeedKinds: []string{"post"}}, hook.SiteInfo{Title: "Site", BaseURL: "https://example.com"},
+		post("01J8KQ2P3R4S5T6V7W8X9YZ001", "hello", "2026-01-01"))
+	if len(feed.Channel.Items) != 1 {
+		t.Fatalf("items = %d, want 1", len(feed.Channel.Items))
+	}
+	guid := feed.Channel.Items[0].GUID
+	if guid.ID != "01J8KQ2P3R4S5T6V7W8X9YZ001" || guid.IsPermaLink != "false" {
+		t.Errorf("guid = %q, isPermaLink = %q; want the id, and false", guid.ID, guid.IsPermaLink)
 	}
 }

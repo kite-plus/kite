@@ -137,11 +137,18 @@ type Feed struct {
 }
 
 type rssItem struct {
-	Title       string `xml:"title"`
-	Link        string `xml:"link"`
-	GUID        string `xml:"guid"`
-	PubDate     string `xml:"pubDate,omitempty"`
-	Description string `xml:"description,omitempty"`
+	Title       string  `xml:"title"`
+	Link        string  `xml:"link"`
+	GUID        rssGUID `xml:"guid"`
+	PubDate     string  `xml:"pubDate,omitempty"`
+	Description string  `xml:"description,omitempty"`
+}
+
+// rssGUID is an item's id. RSS takes a guid for the item's address unless it
+// says otherwise, and an id is not one.
+type rssGUID struct {
+	IsPermaLink bool   `xml:"isPermaLink,attr"`
+	ID          string `xml:",chardata"`
 }
 
 type rssChannel struct {
@@ -192,7 +199,7 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		item := rssItem{
 			Title:       p.Title,
 			Link:        absolute(b.Site.BaseURL, p.URL),
-			GUID:        string(p.Item.ID),
+			GUID:        rssGUID{ID: string(p.Item.ID)},
 			Description: p.Excerpt,
 		}
 		if p.Item.PublishedAt != nil {
