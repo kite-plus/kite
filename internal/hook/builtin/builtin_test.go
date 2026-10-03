@@ -3,6 +3,7 @@ package builtin_test
 import (
 	"encoding/xml"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -128,5 +129,39 @@ func TestTheFeedNamesItsGenerator(t *testing.T) {
 	}
 	if g := feedOf(t, builtin.Options{}, site, hello).Channel.Generator; g != nil {
 		t.Errorf("generator = %q with none given", *g)
+	}
+}
+
+// Every page names the Kite that built it before </head>, whatever theme drew
+// it. A page that names a generator of its own keeps it, and one that does not
+// close its head is left as it is.
+func TestEveryPageNamesItsGenerator(t *testing.T) {
+	transform := func(opts builtin.Options, page string) string {
+		t.Helper()
+		bus := hook.NewBus()
+		builtin.Register(bus, opts)
+		doc := hook.HTMLDoc{URL: "/", Kind: "home", HTML: page}
+		if err := bus.TransformHTML(t.Context(), &doc); err != nil {
+			t.Fatal(err)
+		}
+		return doc.HTML
+	}
+	credited := builtin.Options{Generator: "Kite 0.1.9"}
+
+	got := transform(credited, "<html><head><title>x</title></head><body></body></html>")
+	if want := `<title>x</title><meta name="generator" content="Kite 0.1.9">` + "\n</head>"; !strings.Contains(got, want) {
+		t.Errorf("page = %s\nwant it to hold %s", got, want)
+	}
+	for _, page := range []string{
+		`<html><head><meta name="generator" content="Kite"></head><body></body></html>`,
+		`<html><head><META content="A theme" NAME=Generator></head><body></body></html>`,
+		`<p>a fragment</p>`,
+	} {
+		if got := transform(credited, page); got != page {
+			t.Errorf("%s became %s", page, got)
+		}
+	}
+	if page := "<html><head></head></html>"; transform(builtin.Options{}, page) != page {
+		t.Error("a page names a generator with none given")
 	}
 }

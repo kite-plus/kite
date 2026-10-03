@@ -115,6 +115,7 @@ func TestABuildNamesTheKiteThatMadeIt(t *testing.T) {
 	buildinfo.Version = "0.1.9"
 	t.Cleanup(func() { buildinfo.Version = was })
 
+	writePost(t, root, "01J8KQ2P3R4S5T6V7W8X9YZ001", "hello", "status: published\npublished_at: 2026-01-01T08:00:00Z\n")
 	runKite(t, root, "build")
 	feed, err := os.ReadFile(filepath.Join(root, "public", "rss.xml"))
 	if err != nil {
@@ -122,6 +123,15 @@ func TestABuildNamesTheKiteThatMadeIt(t *testing.T) {
 	}
 	if !strings.Contains(string(feed), "<generator>Kite 0.1.9</generator>") {
 		t.Errorf("the feed does not name Kite 0.1.9:\n%s", feed)
+	}
+	for _, page := range []string{"index.html", "posts/index.html", "posts/hello/index.html", "404.html"} {
+		html, err := os.ReadFile(filepath.Join(root, "public", filepath.FromSlash(page)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(html), `<meta name="generator" content="Kite 0.1.9">`) {
+			t.Errorf("%s does not name Kite 0.1.9", page)
+		}
 	}
 }
 

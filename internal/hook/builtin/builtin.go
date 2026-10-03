@@ -10,7 +10,9 @@ import (
 	"cmp"
 	"context"
 	"encoding/xml"
+	"html"
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -45,6 +47,12 @@ func Register(bus *hook.Bus, opts Options) {
 			Commit: opts.Stamp,
 		}, hook.DefaultPriority)
 	}
+	if opts.Generator != "" {
+		bus.Register(&Generator{
+			Base:   hook.Base{HookName: "generator", HookPhase: hook.PhaseBuild, HookVersion: "1"},
+			Credit: opts.Generator,
+		}, hook.DefaultPriority)
+	}
 }
 
 // Options selects which built-in hooks to enable.
@@ -67,8 +75,8 @@ type Options struct {
 	// that stays up sees new commits.
 	Stamp func() string
 
-	// Generator names the Kite building the site, which the feed credits;
-	// empty, it credits none.
+	// Generator names the Kite building the site, which every page and the
+	// feed credit; empty, nothing does.
 	Generator string
 }
 
@@ -114,6 +122,33 @@ func (s *Sitemap) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 	}
 	buf.WriteByte('\n')
 	return b.Emit("sitemap.xml", buf.Bytes())
+}
+
+// Generator names the Kite that built a page in the page's head, whatever
+// theme drew it. A page that names a generator already keeps its own.
+type Generator struct {
+	hook.Base
+	Credit string
+}
+
+// CacheKey changes with the Kite named, as every page does.
+func (g *Generator) CacheKey() []byte { return append(g.Base.CacheKey(), g.Credit...) }
+
+var (
+	headEnd   = regexp.MustCompile(`(?i)</head\s*>`)
+	generator = regexp.MustCompile(`(?i)<meta\s[^>]*\bname\s*=\s*["']?generator["'\s/>]`)
+)
+
+// TransformHTML adds the meta tag before the first </head>. A page that does
+// not close its head is left as it is.
+func (g *Generator) TransformHTML(_ context.Context, doc *hook.HTMLDoc) error {
+	at := headEnd.FindStringIndex(doc.HTML)
+	if at == nil || generator.MatchString(doc.HTML[:at[0]]) {
+		return nil
+	}
+	meta := `<meta name="generator" content="` + html.EscapeString(g.Credit) + `">` + "\n"
+	doc.HTML = doc.HTML[:at[0]] + meta + doc.HTML[at[0]:]
+	return nil
 }
 
 // BuildStamp writes the commit the site was built from, for the studio to
