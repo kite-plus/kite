@@ -32,10 +32,11 @@ func Register(bus *hook.Bus, opts Options) {
 			kinds = []string{"post"}
 		}
 		bus.Register(&Feed{
-			Base:    hook.Base{HookName: "feed", HookPhase: hook.PhaseBuild, HookVersion: "1"},
-			Limit:   opts.FeedLimit,
-			Kinds:   kinds,
-			Aliases: opts.FeedAliases,
+			Base:      hook.Base{HookName: "feed", HookPhase: hook.PhaseBuild, HookVersion: "1"},
+			Limit:     opts.FeedLimit,
+			Kinds:     kinds,
+			Aliases:   opts.FeedAliases,
+			Generator: opts.Generator,
 		}, hook.DefaultPriority)
 	}
 	if opts.Stamp != nil {
@@ -65,6 +66,10 @@ type Options struct {
 	// written to stamp.File. It is asked at each build, since a server
 	// that stays up sees new commits.
 	Stamp func() string
+
+	// Generator names the Kite building the site, which the feed credits;
+	// empty, it credits none.
+	Generator string
 }
 
 // DefaultOptions enables the hooks every site wants.
@@ -131,10 +136,14 @@ func (s *BuildStamp) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 // Feed writes an RSS 2.0 feed to rss.xml and to each of its aliases.
 type Feed struct {
 	hook.Base
-	Limit   int
-	Kinds   []string
-	Aliases []string
+	Limit     int
+	Kinds     []string
+	Aliases   []string
+	Generator string
 }
+
+// CacheKey changes with the Kite the feed credits, as the feed does.
+func (f *Feed) CacheKey() []byte { return append(f.Base.CacheKey(), f.Generator...) }
 
 type rssItem struct {
 	Title       string  `xml:"title"`
@@ -156,6 +165,7 @@ type rssChannel struct {
 	Link        string    `xml:"link"`
 	Description string    `xml:"description"`
 	Language    string    `xml:"language,omitempty"`
+	Generator   string    `xml:"generator,omitempty"`
 	Items       []rssItem `xml:"item"`
 }
 
@@ -194,6 +204,7 @@ func (f *Feed) BuildComplete(_ context.Context, b *hook.BuildInfo) error {
 		Link:        b.Site.BaseURL,
 		Description: b.Site.Description,
 		Language:    b.Site.Language,
+		Generator:   f.Generator,
 	}
 	for _, p := range entries {
 		item := rssItem{

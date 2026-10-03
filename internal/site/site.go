@@ -165,6 +165,7 @@ func assemble(p *project.Project, cfg *config.Config, ix *index.Index, images *i
 		FeedKinds:   p.Types.FeedKinds(),
 		FeedAliases: cfg.Build.FeedAliases,
 		Stamp:       stampOf(cfg, p.Root),
+		Generator:   buildinfo.Generator(),
 	})
 	plugins, pluginProblems := loadPlugins(p.Root, cfg, resolver, bus)
 

@@ -14,7 +14,8 @@ import (
 // rss is the part of a feed these tests read.
 type rss struct {
 	Channel struct {
-		Items []struct {
+		Generator *string `xml:"generator"`
+		Items     []struct {
 			Title string `xml:"title"`
 			GUID  struct {
 				IsPermaLink string `xml:"isPermaLink,attr"`
@@ -112,5 +113,20 @@ func TestAGuidIsTheIdAndNoAddress(t *testing.T) {
 	guid := feed.Channel.Items[0].GUID
 	if guid.ID != "01J8KQ2P3R4S5T6V7W8X9YZ001" || guid.IsPermaLink != "false" {
 		t.Errorf("guid = %q, isPermaLink = %q; want the id, and false", guid.ID, guid.IsPermaLink)
+	}
+}
+
+// The feed names the Kite that wrote it, as the site gives it, and nothing
+// when it is given none.
+func TestTheFeedNamesItsGenerator(t *testing.T) {
+	site := hook.SiteInfo{Title: "Site", BaseURL: "https://example.com"}
+	hello := post("01J8KQ2P3R4S5T6V7W8X9YZ001", "hello", "2026-01-01")
+
+	feed := feedOf(t, builtin.Options{Generator: "Kite 0.1.9"}, site, hello)
+	if g := feed.Channel.Generator; g == nil || *g != "Kite 0.1.9" {
+		t.Errorf("generator = %v, want Kite 0.1.9", g)
+	}
+	if g := feedOf(t, builtin.Options{}, site, hello).Channel.Generator; g != nil {
+		t.Errorf("generator = %q with none given", *g)
 	}
 }

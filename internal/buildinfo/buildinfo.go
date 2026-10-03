@@ -1,6 +1,8 @@
 // Package buildinfo carries values stamped into the binary at link time.
 package buildinfo
 
+import "strings"
+
 // Version is the release version, set via -ldflags at build time.
 var Version = "dev"
 
@@ -23,3 +25,12 @@ const PluginABIVersion = 1
 // BuildABIVersion changes whenever build cache keying changes, invalidating
 // every cached artifact.
 const BuildABIVersion = 1
+
+// Generator is how a site credits the Kite that built it, in its pages and
+// its feed: Kite and the version, or Kite alone for a build that has none.
+func Generator() string {
+	if Version == "" || Version == "dev" {
+		return "Kite"
+	}
+	return "Kite " + strings.TrimPrefix(Version, "v")
+}

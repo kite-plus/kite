@@ -12,6 +12,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/kite-plus/kite/internal/buildinfo"
 	"github.com/kite-plus/kite/internal/project"
 )
 
@@ -102,6 +103,25 @@ func TestBuildReportsWhenTheNextScheduledPostIsDue(t *testing.T) {
 
 	if out := runKite(t, root, "build"); !strings.Contains(out, "next scheduled post is due 2099-01-01T00:00:00Z") {
 		t.Errorf("the build does not say when to build again:\n%s", out)
+	}
+}
+
+// A site credits the Kite that built it, for the services that tell one
+// engine's sites from another's.
+func TestABuildNamesTheKiteThatMadeIt(t *testing.T) {
+	t.Setenv("KITE_BUILD_OUTPUT", "")
+	root := newSite(t)
+	was := buildinfo.Version
+	buildinfo.Version = "0.1.9"
+	t.Cleanup(func() { buildinfo.Version = was })
+
+	runKite(t, root, "build")
+	feed, err := os.ReadFile(filepath.Join(root, "public", "rss.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(feed), "<generator>Kite 0.1.9</generator>") {
+		t.Errorf("the feed does not name Kite 0.1.9:\n%s", feed)
 	}
 }
 
