@@ -2,3 +2,9 @@
 # script with CRLF line endings does not run.
 internal/kitew/kitew text eol=lf
 internal/kitew/kitew.ps1 text eol=lf
+
+# Go sources check out with LF on every platform. The gofmt gate in CI
+# rejects a file whose line endings differ from LF, so a Windows checkout
+# under core.autocrlf=true would otherwise fail that gate on every file
+# before a single line was edited.
+*.go text eol=lf
