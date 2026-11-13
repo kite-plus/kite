@@ -3,11 +3,6 @@
 Notes for agents (and people) working in this repository.
 
 - Build and verification commands live in `Makefile`; `make check` is the pre-PR gate.
-- On Windows the test step of `make check` can fail with `TempDir RemoveAll
-  cleanup: ...: The directory is not empty`. The system is refusing to remove a
-  directory while a handle on it is still open; the test itself has already
-  run. Re-run the package before believing it, and treat Linux and macOS as the
-  gate.
 - Commit messages follow Conventional Commits, lowercase, scoped, no trailing
   full stop — the rule is spelled out in `docs/reference.md`.
 - Domain documentation is multi-context; see `docs/agents/domain.md`.
