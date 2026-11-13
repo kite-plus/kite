@@ -104,7 +104,7 @@ docker run -d --name kite --restart unless-stopped \
 <details>
 <summary><b>从源码构建</b></summary>
 
-需要 Git、Make、Go 1.26.4+、Node.js 22.19.0 和 pnpm 10.11.1，构建会使用项目指定的 Go 工具链。
+需要 Git、Make、Go 1.27.0+、Node.js 22.19.0 和 pnpm 10.11.1，构建会使用项目指定的 Go 工具链。
 
 ```bash
 git clone https://github.com/kite-plus/kite.git

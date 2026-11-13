@@ -1339,7 +1339,7 @@ Hugo 在 v0.146 不得不重写整个模板系统并打断主题生态 `[EV]`。
 
 - **`Apply(ChangeSet)` 是唯一写入口**——任何一次"就加一个 setter 吧"的妥协都要在 review 里打回
 - **每个里程碑结束录一个 2 分钟 Demo**——检验"是否真的可用"最诚实的方式
-- 写 Go 代码时应用 Modern Go Guidelines（Go 1.26）
+- 写 Go 代码时应用 Modern Go Guidelines（Go 1.27）
 
 ---
 
