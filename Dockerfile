@@ -7,7 +7,7 @@
 # repository: the same commit should produce the same image next year.
 
 # Must match the toolchain directive in go.mod.
-ARG GO_VERSION=1.27.4
+ARG GO_VERSION=1.26.8
 # Must match web/.nvmrc.
 ARG NODE_VERSION=22.19.0
 ARG ALPINE_VERSION=3.22
@@ -51,9 +51,9 @@ ARG DATE=unknown
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
     go build -trimpath -buildvcs=false \
     -ldflags "-s -w \
-    -X github.com/kite-plus/kite/internal/buildinfo.Version=${VERSION} \
-    -X github.com/kite-plus/kite/internal/buildinfo.Commit=${COMMIT} \
-    -X github.com/kite-plus/kite/internal/buildinfo.Date=${DATE}" \
+      -X github.com/kite-plus/kite/internal/buildinfo.Version=${VERSION} \
+      -X github.com/kite-plus/kite/internal/buildinfo.Commit=${COMMIT} \
+      -X github.com/kite-plus/kite/internal/buildinfo.Date=${DATE}" \
     -o /out/kite ./cmd/kite
 
 FROM alpine:${ALPINE_VERSION}
