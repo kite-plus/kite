@@ -205,6 +205,10 @@ func TestAWebPKeepsItsBlackAndWhite(t *testing.T) {
 // multiplication and an addition; a change here means a machine now makes
 // other bytes, or the code that makes pictures changed and its version with
 // it.
+//
+// The hashes below are what the pinned toolchain makes. Go 1.27 rewrote
+// compress/flate, so the PNG case moved when the toolchain did; the formats
+// that do not go through flate did not.
 func TestAPictureIsTheSameOnEveryMachine(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 160, 120))
 	seed := uint32(7)
@@ -234,7 +238,7 @@ func TestAPictureIsTheSameOnEveryMachine(t *testing.T) {
 		want   string
 	}{
 		{"resize to jpeg", buf.Bytes(), Recipe{Steps: []Step{step(t, "resize", "80x")}, Format: "jpeg", Quality: 80}, "5e01c3417c1c018f"},
-		{"fill to png", buf.Bytes(), Recipe{Steps: []Step{step(t, "fill", "64x64 topright")}}, "2bb66b381f53bb40"},
+		{"fill to png", buf.Bytes(), Recipe{Steps: []Step{step(t, "fill", "64x64 topright")}}, "e9705459bfc78416"},
 		{"fit to webp", buf.Bytes(), Recipe{Steps: []Step{step(t, "fit", "100x100")}, Format: "webp"}, "c802f674051ab457"},
 		{"crop to gif", buf.Bytes(), Recipe{Steps: []Step{step(t, "crop", "50x40")}, Format: "gif"}, "cba15e309f6b1c3e"},
 		{"turned photo", photo, Recipe{Steps: []Step{step(t, "resize", "x60")}, Format: "webp", Quality: 60}, "20404a3c8835980d"},
