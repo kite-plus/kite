@@ -9,7 +9,6 @@ coverage.out
 # local tooling
 /node_modules/
 /.claude/
-/.vscode/
 .DS_Store
 
 # goreleaser output
