@@ -67,7 +67,7 @@ fmt:
 vet:
 	$(GO) vet ./...
 
-LINT_VERSION ?= v2.14.0
+LINT_VERSION ?= v2.13.2
 
 lint:
 	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(LINT_VERSION) run ./...
