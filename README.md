@@ -104,7 +104,7 @@ Open the [studio](http://localhost:1717/admin/) and follow the setup steps to na
 <details>
 <summary><b>From source</b></summary>
 
-Requires Git, Make, Go 1.27.0+, Node.js 22.19.0 and pnpm 10.11.1; the build uses the Go toolchain the project pins.
+Requires Git, Make, Go 1.26.4+, Node.js 22.19.0 and pnpm 10.11.1; the build uses the Go toolchain the project pins.
 
 ```bash
 git clone https://github.com/kite-plus/kite.git
