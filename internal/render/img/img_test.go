@@ -234,7 +234,7 @@ func TestAPictureIsTheSameOnEveryMachine(t *testing.T) {
 		want   string
 	}{
 		{"resize to jpeg", buf.Bytes(), Recipe{Steps: []Step{step(t, "resize", "80x")}, Format: "jpeg", Quality: 80}, "5e01c3417c1c018f"},
-		{"fill to png", buf.Bytes(), Recipe{Steps: []Step{step(t, "fill", "64x64 topright")}}, "2bb66b381f53bb40"},
+		{"fill to png", buf.Bytes(), Recipe{Steps: []Step{step(t, "fill", "64x64 topright")}}, "e9705459bfc78416"},
 		{"fit to webp", buf.Bytes(), Recipe{Steps: []Step{step(t, "fit", "100x100")}, Format: "webp"}, "c802f674051ab457"},
 		{"crop to gif", buf.Bytes(), Recipe{Steps: []Step{step(t, "crop", "50x40")}, Format: "gif"}, "cba15e309f6b1c3e"},
 		{"turned photo", photo, Recipe{Steps: []Step{step(t, "resize", "x60")}, Format: "webp", Quality: 60}, "20404a3c8835980d"},

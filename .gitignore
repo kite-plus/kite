@@ -10,6 +10,7 @@ coverage.out
 /node_modules/
 /.claude/
 .DS_Store
+/.vscode
 
 # goreleaser output
 /dist/

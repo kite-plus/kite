@@ -15,7 +15,10 @@ import (
 // version names the code that makes pictures. It is part of every key, so a
 // change to how a picture comes out makes it again instead of handing out
 // what an older build made.
-const version = "1"
+//
+// Bumped to 2 with Go 1.27, whose rewritten compress/flate makes different
+// PNG bytes for a picture that is otherwise unchanged.
+const version = "2"
 
 // Made is a picture a recipe made.
 type Made struct {
