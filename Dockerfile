@@ -7,7 +7,7 @@
 # repository: the same commit should produce the same image next year.
 
 # Must match the toolchain directive in go.mod.
-ARG GO_VERSION=1.26.8
+ARG GO_VERSION=1.27.4
 # Must match web/.nvmrc.
 ARG NODE_VERSION=22.19.0
 ARG ALPINE_VERSION=3.22
