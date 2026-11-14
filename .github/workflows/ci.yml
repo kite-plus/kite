@@ -73,9 +73,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      # The prebuilt binary is fine as long as it ships an importer that
+      # knows the export data format of the Go above: v2.14.0 moved to
+      # x/tools v0.50, which reads version 5.
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.13.2
+          version: v2.14.0
 
   tidy:
     name: Modules tidy
